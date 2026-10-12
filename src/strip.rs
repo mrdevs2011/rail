@@ -15,10 +15,20 @@ pub fn gap(zoom: f64) -> f64 {
     GAP + (1.0 - zoom) * 40.0
 }
 
-/// Half columns fill exactly two-per-screen; full columns fill the viewport.
+/// Minimum width for a column to be usable. If the strip viewport cannot comfortably
+/// fit two columns of at least MIN_COL_W, columns expand to fill the full viewport.
+pub const MIN_COL_W: f64 = 480.0;
+
+/// Half columns fill two-per-screen when wide; if the viewport is narrow (< MIN_COL_W*2 + GAP)
+/// or if `full` is true, the column fills the viewport (adaptive single-column mode).
 pub fn col_width(full: bool, viewport: f64) -> f64 {
-    if full { viewport } else { ((viewport - GAP) / 2.0).floor() }
+    if full || viewport < (MIN_COL_W * 2.0 + GAP) {
+        viewport.max(280.0)
+    } else {
+        ((viewport - GAP) / 2.0).floor()
+    }
 }
+
 
 mod imp {
     use super::*;

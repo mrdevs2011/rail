@@ -12,16 +12,22 @@ use webkit6::WebView;
 
 const START_PAGE: &str = r#"<!doctype html><meta charset=utf-8><meta name=color-scheme content=dark>
 <style>
-html,body{height:100%;margin:0}
-body{display:grid;place-items:center;background:#16161e;color:#6b7399;font:15px/1.5 system-ui,sans-serif}
-.w{text-align:center}
-h1{font-weight:600;font-size:60px;letter-spacing:-.03em;margin:0;color:#c0caf5}
+html,body{height:100%;margin:0;box-sizing:border-box}
+body{display:grid;place-items:center;background:#16161e;color:#6b7399;font:14px/1.5 system-ui,-apple-system,sans-serif;padding:16px;overflow-y:auto;overflow-x:hidden}
+.w{text-align:center;max-width:540px;width:100%;margin:auto;box-sizing:border-box}
+h1{font-weight:600;font-size:clamp(30px, 7vw, 56px);letter-spacing:-.03em;margin:0;color:#c0caf5}
 h1 b{color:#7aa2f7}
-p{margin:4px 0 40px}
-.k{display:grid;grid-template-columns:auto auto;gap:12px 32px;text-align:left;justify-content:center}
-.k span:nth-child(odd){text-align:right}
-kbd{font:12px ui-monospace,monospace;background:#1f2335;border:1px solid #2f334d;border-bottom-width:2px;
-    border-radius:6px;padding:2px 7px;color:#a9b1d6;margin-left:3px}
+p{margin:4px 0 24px;font-size:clamp(12px, 2.5vw, 14px);color:#7982a9}
+.k{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;text-align:left;justify-content:center;align-items:center;font-size:13px}
+.k span:nth-child(odd){text-align:right;white-space:nowrap}
+.k span:nth-child(even){text-align:left;color:#a9b1d6}
+kbd{font:11px ui-monospace,monospace;background:#1f2335;border:1px solid #2f334d;border-bottom-width:2px;
+    border-radius:6px;padding:2px 6px;color:#c0caf5;margin-left:3px;white-space:nowrap}
+@media (max-width: 440px) {
+  body{padding:8px}
+  .k{font-size:11px;gap:6px 10px}
+  kbd{padding:1px 4px;font-size:10px}
+}
 </style>
 <div class=w><h1>rail<b>.</b></h1><p>a niri-style tiled browser (horizontal strip & vertical stacks)</p><div class=k>
 <span><kbd>Ctrl</kbd><kbd>G</kbd></span><span>go to address</span>
@@ -82,12 +88,12 @@ progressbar.load-bar progress { min-height: 3px; background: #7aa2f7; border-rad
                                 box-shadow: 0 0 10px rgba(122,162,247,0.7); }
 
 /* ---- address palette ---- */
-.palette { background: #1a1b26; border-radius: 16px; border: 1px solid #2f334d; padding: 16px 20px 12px;
-           box-shadow: 0 24px 64px rgba(0,0,0,0.55); min-width: 620px; }
+.palette { background: #1a1b26; border-radius: 16px; border: 1px solid #2f334d; padding: 14px 18px 12px;
+           box-shadow: 0 24px 64px rgba(0,0,0,0.55); }
 .palette image { color: #7982a9; }
 entry.palette-entry, entry.palette-entry:focus-within { background: none; border: none; box-shadow: none; outline: none;
-    padding: 0; min-height: 0; font-size: 19px; color: #c0caf5; }
-.palette-hint { color: #565f89; font-size: 12px; margin-top: 8px; }
+    padding: 0; min-height: 0; font-size: 16px; color: #c0caf5; }
+.palette-hint { color: #565f89; font-size: 11px; margin-top: 6px; }
 
 /* ---- overview (the live strip, zoomed out) ---- */
 .zoomed .tab { opacity: 0.88; border-radius: 28px; }
@@ -683,9 +689,23 @@ impl App {
 
     // ---- address palette -------------------------------------------------
 
+    fn update_palette_size(&self) {
+        let win_w = self.win.width();
+        let target_w = if win_w < 900 {
+            (win_w - 48).clamp(280, 520)
+        } else {
+            580
+        };
+        self.palette.set_size_request(target_w, -1);
+        let win_h = self.win.height();
+        let target_top = if win_h < 600 { 50 } else { 90 };
+        self.palette.set_margin_top(target_top);
+    }
+
     fn show_palette(&self) {
         let uri = self.focused_view().and_then(|v| v.uri()).filter(|u| !u.starts_with("about:"));
         self.entry.set_text(uri.as_deref().unwrap_or(""));
+        self.update_palette_size();
         self.palette.set_visible(true);
         self.entry.grab_focus();
         self.entry.select_region(0, -1);
@@ -1035,7 +1055,9 @@ fn build(gapp: &gtk::Application) {
     palette.add_css_class("palette");
     palette.set_halign(gtk::Align::Center);
     palette.set_valign(gtk::Align::Start);
-    palette.set_margin_top(110);
+    palette.set_margin_top(90);
+    palette.set_margin_start(16);
+    palette.set_margin_end(16);
     palette.append(&prow);
     palette.append(&phint);
     palette.set_visible(false);
@@ -1097,7 +1119,12 @@ fn build(gapp: &gtk::Application) {
     });
 
     let a = app.clone();
-    layout.connect_resized(move || a.reveal_focus());
+    layout.connect_resized(move || {
+        a.reveal_focus();
+        if a.palette_open() {
+            a.update_palette_size();
+        }
+    });
 
     let a = app.clone();
     list.connect_row_activated(move |_, row| {
