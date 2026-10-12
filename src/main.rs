@@ -23,12 +23,16 @@ p{margin:4px 0 40px}
 kbd{font:12px ui-monospace,monospace;background:#1f2335;border:1px solid #2f334d;border-bottom-width:2px;
     border-radius:6px;padding:2px 7px;color:#a9b1d6;margin-left:3px}
 </style>
-<div class=w><h1>rail<b>.</b></h1><p>a browser that scrolls sideways</p><div class=k>
+<div class=w><h1>rail<b>.</b></h1><p>a niri-style tiled browser (horizontal strip & vertical stacks)</p><div class=k>
 <span><kbd>Ctrl</kbd><kbd>G</kbd></span><span>go to address</span>
 <span><kbd>Ctrl</kbd><kbd>Enter</kbd></span><span>edit current URL</span>
-<span><kbd>Ctrl</kbd><kbd>T</kbd></span><span>new tab</span>
+<span><kbd>Ctrl</kbd><kbd>T</kbd></span><span>new column tab</span>
+<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>T</kbd> / <kbd>Ctrl</kbd><kbd>V</kbd></span><span>split vertically (new window down)</span>
+<span><kbd>Ctrl</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>focus left / right column</span>
+<span><kbd>Ctrl</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>focus down / up window</span>
+<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>move column left / right</span>
+<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>move window down / up</span>
 <span><kbd>Ctrl</kbd><kbd>F</kbd></span><span>full / half width</span>
-<span><kbd>Ctrl</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>focus left / right</span>
 <span><kbd>Ctrl</kbd><kbd>O</kbd></span><span>overview</span>
 <span><kbd>Ctrl</kbd><kbd>B</kbd></span><span>sidebar</span>
 </div></div>"#;
@@ -37,7 +41,8 @@ const CSS: &str = "
 window { background: #0f1016; border-radius: 0; box-shadow: none; }
 label { color: #a9b1d6; }
 
-/* ---- tabs ---- */
+/* ---- columns & tabs ---- */
+.rail-col { background: transparent; }
 .tab { border-radius: 12px; border: 2px solid #1a1b26; }
 .tab.focused { border-color: #7aa2f7; }
 
@@ -98,6 +103,11 @@ struct Tab {
     view: WebView,
 }
 
+struct Column {
+    container: gtk::Box,
+    tabs: Vec<Tab>,
+}
+
 struct App {
     win: gtk::ApplicationWindow,
     shell: gtk::Box,
@@ -113,13 +123,14 @@ struct App {
     ov_hint: gtk::Label,
     /// Overview is active: the strip is zoomed out and tabs ignore the pointer.
     ov: Cell<bool>,
-    /// Tab that was focused when overview opened; Esc returns here.
-    ov_return: Cell<usize>,
+    /// Tab coordinates that were focused when overview opened; Esc returns here.
+    ov_return: Cell<(usize, usize)>,
     /// Scroll position before the overview, restored when zooming back in.
     ov_saved: Cell<f64>,
     target_zoom: Cell<f64>,
-    tabs: RefCell<Vec<Tab>>,
-    focus: Cell<usize>,
+    cols: RefCell<Vec<Column>>,
+    focus_col: Cell<usize>,
+    focus_row: Cell<usize>,
     target: Cell<f64>,
     animating: Cell<bool>,
     side_open: Cell<bool>,
@@ -150,7 +161,10 @@ fn host_of(uri: &str) -> Option<String> {
 
 impl App {
     fn focused_view(&self) -> Option<WebView> {
-        self.tabs.borrow().get(self.focus.get()).map(|t| t.view.clone())
+        let cols = self.cols.borrow();
+        cols.get(self.focus_col.get())
+            .and_then(|c| c.tabs.get(self.focus_row.get()))
+            .map(|t| t.view.clone())
     }
 
     fn palette_open(&self) -> bool {
@@ -172,12 +186,12 @@ impl App {
         }
         let visible = vw / self.target_zoom.get(); // strip width that fits on screen
         let g = gap(self.target_zoom.get());
-        let tabs = self.tabs.borrow();
+        let cols = self.cols.borrow();
         let mut x = 0.0;
         let mut span = None;
-        for (i, t) in tabs.iter().enumerate() {
-            let w = col_width(t.view.has_css_class("full"), vw);
-            if i == self.focus.get() {
+        for (i, col) in cols.iter().enumerate() {
+            let w = col_width(col.container.has_css_class("full"), vw);
+            if i == self.focus_col.get() {
                 span = Some((x, x + w));
             }
             x += w + g;
@@ -201,7 +215,7 @@ impl App {
             t.clamp(0.0, max)
         };
         self.target.set(t);
-        drop(tabs);
+        drop(cols);
         self.animate();
     }
 
@@ -227,9 +241,6 @@ impl App {
             let w = (strip.width() as f64).max(1.0);
             let (oc, ot) = (app.layout.offset(), app.target.get());
             let (zc, zt) = (app.layout.zoom(), app.target_zoom.get());
-            // Animate the camera *center* (the strip point at screen center), not the
-            // left edge: then zooming pivots on the middle of the screen instead of
-            // visibly shrinking toward the left and sliding into place.
             let (cc, ct) = (oc + w / (2.0 * zc), ot + w / (2.0 * zt));
             let mut cn = cc + (ct - cc) * k;
             let mut znext = zc + (zt - zc) * k;
@@ -253,30 +264,73 @@ impl App {
         });
     }
 
-    // ---- tabs ------------------------------------------------------------
+    // ---- tabs & columns --------------------------------------------------
 
     fn new_tab(self: &Rc<Self>) {
         self.exit_overview();
         let view = WebView::new();
         view.load_html(START_PAGE, None);
         *self.fresh.borrow_mut() = Some(view.clone());
-        self.add_view(view);
+        self.add_view(view, true); // new column
         self.show_palette();
     }
 
-    fn add_view(self: &Rc<Self>, view: WebView) {
+    fn split_vertical(self: &Rc<Self>) {
+        self.exit_overview();
+        let view = WebView::new();
+        view.load_html(START_PAGE, None);
+        *self.fresh.borrow_mut() = Some(view.clone());
+        self.add_view(view, false); // in current column below
+        self.show_palette();
+    }
+
+    fn add_view(self: &Rc<Self>, view: WebView, new_col: bool) {
         view.add_css_class("tab");
         view.set_overflow(gtk::Overflow::Hidden);
         view.set_can_target(!self.ov.get());
-        let idx = if self.tabs.borrow().is_empty() { 0 } else { self.focus.get() + 1 };
-        {
-            let tabs = self.tabs.borrow();
-            match idx {
-                0 => self.strip.prepend(&view),
-                _ => self.strip.insert_child_after(&view, Some(&tabs[idx - 1].view)),
+        view.set_vexpand(true);
+        view.set_hexpand(true);
+
+        let (target_c, target_r) = {
+            let mut cols = self.cols.borrow_mut();
+            if cols.is_empty() || new_col {
+                let box_widget = gtk::Box::new(gtk::Orientation::Vertical, 6);
+                box_widget.add_css_class("rail-col");
+                box_widget.set_vexpand(true);
+                box_widget.set_hexpand(true);
+                box_widget.set_homogeneous(true);
+                box_widget.append(&view);
+
+                let c_idx = if cols.is_empty() {
+                    self.strip.prepend(&box_widget);
+                    0
+                } else {
+                    let cur = self.focus_col.get();
+                    let prev = &cols[cur].container;
+                    self.strip.insert_child_after(&box_widget, Some(prev));
+                    cur + 1
+                };
+
+                cols.insert(c_idx, Column {
+                    container: box_widget,
+                    tabs: vec![Tab { view: view.clone() }],
+                });
+                (c_idx, 0)
+            } else {
+                let cur_c = self.focus_col.get();
+                let cur_r = self.focus_row.get();
+                let col = &mut cols[cur_c];
+                let next_r = (cur_r + 1).min(col.tabs.len());
+                if next_r == 0 {
+                    col.container.prepend(&view);
+                } else {
+                    let prev_tab = &col.tabs[next_r - 1].view;
+                    col.container.insert_child_after(&view, Some(prev_tab));
+                }
+                col.tabs.insert(next_r, Tab { view: view.clone() });
+                (cur_c, next_r)
             }
-        }
-        self.tabs.borrow_mut().insert(idx, Tab { view: view.clone() });
+        };
 
         let app = self.clone();
         view.connect_title_notify(move |_| app.refresh_sidebar());
@@ -294,78 +348,177 @@ impl App {
         let app = self.clone();
         view.connect_create(move |v, _| {
             let nv = WebView::builder().related_view(v).build();
-            app.add_view(nv.clone());
+            app.add_view(nv.clone(), true);
             Some(nv.upcast())
         });
         let app = self.clone();
         view.connect_close(move |v| app.close_view(v));
 
-        self.focus_tab(idx);
+        self.focus_coords(target_c, target_r);
+    }
+
+    fn find_view_coords(&self, view: &WebView) -> Option<(usize, usize)> {
+        let cols = self.cols.borrow();
+        for (c_idx, col) in cols.iter().enumerate() {
+            for (r_idx, tab) in col.tabs.iter().enumerate() {
+                if &tab.view == view {
+                    return Some((c_idx, r_idx));
+                }
+            }
+        }
+        None
     }
 
     fn close_view(self: &Rc<Self>, view: &WebView) {
-        let Some(idx) = self.tabs.borrow().iter().position(|t| &t.view == view) else { return };
-        self.strip.remove(view);
-        self.tabs.borrow_mut().remove(idx);
+        let Some((c_idx, r_idx)) = self.find_view_coords(view) else { return };
         if self.fresh.borrow().as_ref() == Some(view) {
             *self.fresh.borrow_mut() = None;
         }
-        self.focus.set(usize::MAX);
-        let len = self.tabs.borrow().len();
-        if len == 0 {
+
+        let mut cols = self.cols.borrow_mut();
+        cols[c_idx].container.remove(view);
+        cols[c_idx].tabs.remove(r_idx);
+
+        let col_empty = cols[c_idx].tabs.is_empty();
+        if col_empty {
+            self.strip.remove(&cols[c_idx].container);
+            cols.remove(c_idx);
+        }
+
+        let total_cols = cols.len();
+        drop(cols);
+
+        if total_cols == 0 {
             self.new_tab();
         } else {
-            self.focus_tab(idx.saturating_sub(1).min(len - 1));
+            let next_c = c_idx.min(total_cols - 1);
+            let cols = self.cols.borrow();
+            let next_r = if col_empty {
+                0
+            } else {
+                r_idx.saturating_sub(1).min(cols[next_c].tabs.len().saturating_sub(1))
+            };
+            drop(cols);
+            self.focus_coords(next_c, next_r);
         }
     }
 
-    fn focus_tab(self: &Rc<Self>, idx: usize) {
-        if idx >= self.tabs.borrow().len() {
+    fn focus_coords(self: &Rc<Self>, c_idx: usize, r_idx: usize) {
+        let cols = self.cols.borrow();
+        if c_idx >= cols.len() {
             return;
         }
-        self.focus.set(idx);
-        for (i, t) in self.tabs.borrow().iter().enumerate() {
-            if i == idx {
-                t.view.add_css_class("focused");
-            } else {
-                t.view.remove_css_class("focused");
+        let r_clamped = r_idx.min(cols[c_idx].tabs.len().saturating_sub(1));
+        self.focus_col.set(c_idx);
+        self.focus_row.set(r_clamped);
+
+        for (ci, col) in cols.iter().enumerate() {
+            for (ri, tab) in col.tabs.iter().enumerate() {
+                if ci == c_idx && ri == r_clamped {
+                    tab.view.add_css_class("focused");
+                } else {
+                    tab.view.remove_css_class("focused");
+                }
             }
         }
-        if !self.tabs.borrow()[idx].view.is_loading() {
-            self.load_bar.set_visible(false);
+
+        if let Some(tab) = cols[c_idx].tabs.get(r_clamped) {
+            if !tab.view.is_loading() {
+                self.load_bar.set_visible(false);
+            }
         }
+        drop(cols);
+
         self.update_load_bar();
         self.reveal_focus();
         self.refresh_sidebar();
+
         if !self.palette_open() && !self.ov.get() {
-            self.tabs.borrow()[idx].view.grab_focus();
+            if let Some(v) = self.focused_view() {
+                v.grab_focus();
+            }
         }
     }
 
-    fn move_tab(self: &Rc<Self>, dir: isize) {
-        let i = self.focus.get();
-        let Some(j) = i.checked_add_signed(dir).filter(|&j| j < self.tabs.borrow().len()) else { return };
-        self.tabs.borrow_mut().swap(i, j);
-        let tabs = self.tabs.borrow();
-        let mut prev: Option<&WebView> = None;
-        for t in tabs.iter() {
-            self.strip.reorder_child_after(&t.view, prev);
-            prev = Some(&t.view);
+    fn focus_column_left(self: &Rc<Self>) {
+        let cur_c = self.focus_col.get();
+        if cur_c > 0 {
+            self.focus_coords(cur_c - 1, self.focus_row.get());
         }
-        drop(tabs);
-        self.focus.set(j);
+    }
+
+    fn focus_column_right(self: &Rc<Self>) {
+        let cur_c = self.focus_col.get();
+        let cols = self.cols.borrow();
+        if cur_c + 1 < cols.len() {
+            drop(cols);
+            self.focus_coords(cur_c + 1, self.focus_row.get());
+        }
+    }
+
+    fn focus_window_up(self: &Rc<Self>) {
+        let cur_r = self.focus_row.get();
+        if cur_r > 0 {
+            self.focus_coords(self.focus_col.get(), cur_r - 1);
+        }
+    }
+
+    fn focus_window_down(self: &Rc<Self>) {
+        let cur_c = self.focus_col.get();
+        let cur_r = self.focus_row.get();
+        let cols = self.cols.borrow();
+        if let Some(col) = cols.get(cur_c) {
+            if cur_r + 1 < col.tabs.len() {
+                drop(cols);
+                self.focus_coords(cur_c, cur_r + 1);
+            }
+        }
+    }
+
+    fn move_column(self: &Rc<Self>, dir: isize) {
+        let cur = self.focus_col.get();
+        let mut cols = self.cols.borrow_mut();
+        let Some(target) = cur.checked_add_signed(dir).filter(|&t| t < cols.len()) else { return };
+        cols.swap(cur, target);
+        let mut prev: Option<&gtk::Widget> = None;
+        for c in cols.iter() {
+            self.strip.reorder_child_after(&c.container, prev);
+            prev = Some(c.container.as_ref());
+        }
+        drop(cols);
+        self.focus_col.set(target);
         self.strip.queue_allocate();
         self.reveal_focus();
         self.refresh_sidebar();
     }
 
-    fn toggle_full(self: &Rc<Self>) {
-        let Some(v) = self.focused_view() else { return };
-        if v.has_css_class("full") {
-            v.remove_css_class("full");
-        } else {
-            v.add_css_class("full");
+    fn move_window(self: &Rc<Self>, dir: isize) {
+        let cur_c = self.focus_col.get();
+        let cur_r = self.focus_row.get();
+        let mut cols = self.cols.borrow_mut();
+        let Some(col) = cols.get_mut(cur_c) else { return };
+        let Some(target_r) = cur_r.checked_add_signed(dir).filter(|&t| t < col.tabs.len()) else { return };
+        col.tabs.swap(cur_r, target_r);
+        let mut prev: Option<&gtk::Widget> = None;
+        for t in col.tabs.iter() {
+            col.container.reorder_child_after(&t.view, prev);
+            prev = Some(t.view.as_ref());
         }
+        drop(cols);
+        self.focus_row.set(target_r);
+        self.focus_coords(cur_c, target_r);
+    }
+
+    fn toggle_full(self: &Rc<Self>) {
+        let cur_c = self.focus_col.get();
+        let cols = self.cols.borrow();
+        let Some(col) = cols.get(cur_c) else { return };
+        if col.container.has_css_class("full") {
+            col.container.remove_css_class("full");
+        } else {
+            col.container.add_css_class("full");
+        }
+        drop(cols);
         self.strip.queue_allocate();
         self.reveal_focus();
     }
@@ -395,7 +548,6 @@ impl App {
             img.set_pixel_size(size);
             return img.upcast();
         }
-        // No favicon yet: a colored letter badge, stable per site.
         let label = Self::tab_label(t);
         let letter = label.chars().find(|c| c.is_alphanumeric()).unwrap_or('·');
         let seed = label.bytes().fold(0u32, |a, b| a.wrapping_mul(31).wrapping_add(b as u32));
@@ -411,27 +563,53 @@ impl App {
         while let Some(r) = self.list.row_at_index(0) {
             self.list.remove(&r);
         }
-        for t in self.tabs.borrow().iter() {
-            let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-            row.add_css_class("tabrow");
-            row.append(&Self::tab_icon(t, 16));
-            let label = gtk::Label::new(Some(&Self::tab_label(t)));
-            label.set_xalign(0.0);
-            label.set_hexpand(true);
-            label.set_width_chars(1);
-            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-            row.append(&label);
-            let close = gtk::Button::from_icon_name("window-close-symbolic");
-            close.add_css_class("tab-close");
-            close.set_valign(gtk::Align::Center);
-            let (app, v) = (self.clone(), t.view.clone());
-            close.connect_clicked(move |_| app.close_view(&v));
-            row.append(&close);
-            self.list.append(&row);
+        let cols = self.cols.borrow();
+        let cur_c = self.focus_col.get();
+        let cur_r = self.focus_row.get();
+        let mut row_idx = 0;
+        let mut selected_row_idx = None;
+
+        for (ci, col) in cols.iter().enumerate() {
+            for (ri, t) in col.tabs.iter().enumerate() {
+                let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+                row.add_css_class("tabrow");
+                row.append(&Self::tab_icon(t, 16));
+
+                let title_prefix = if col.tabs.len() > 1 {
+                    format!("[{}:{}] ", ci + 1, ri + 1)
+                } else {
+                    format!("[{}] ", ci + 1)
+                };
+                let full_title = format!("{}{}", title_prefix, Self::tab_label(t));
+                let label = gtk::Label::new(Some(&full_title));
+                label.set_xalign(0.0);
+                label.set_hexpand(true);
+                label.set_width_chars(1);
+                label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                row.append(&label);
+
+                let close = gtk::Button::from_icon_name("window-close-symbolic");
+                close.add_css_class("tab-close");
+                close.set_valign(gtk::Align::Center);
+                let (app, v) = (self.clone(), t.view.clone());
+                close.connect_clicked(move |_| app.close_view(&v));
+                row.append(&close);
+
+                self.list.append(&row);
+                if ci == cur_c && ri == cur_r {
+                    selected_row_idx = Some(row_idx);
+                }
+                row_idx += 1;
+            }
         }
-        if let Some(row) = self.list.row_at_index(self.focus.get() as i32) {
-            self.list.select_row(Some(&row));
+        drop(cols);
+
+        if let Some(s_idx) = selected_row_idx {
+            if let Some(row) = self.list.row_at_index(s_idx as i32) {
+                self.list.select_row(Some(&row));
+            }
         }
+
         let text = match self.focused_view().and_then(|v| v.uri()) {
             Some(u) if !u.starts_with("about:") => host_of(&u).unwrap_or(u.to_string()),
             _ => "Search or enter address".into(),
@@ -456,7 +634,7 @@ impl App {
         let t0 = Cell::new(None::<i64>);
         self.shell.add_tick_callback(move |shell, clock| {
             if app.side_gen.get() != epoch {
-                return glib::ControlFlow::Break; // superseded by a newer toggle
+                return glib::ControlFlow::Break;
             }
             let now = clock.frame_time();
             let begin = t0.get().unwrap_or_else(|| {
@@ -483,7 +661,6 @@ impl App {
 
     // ---- load feedback ---------------------------------------------------
 
-    /// Thin bar along the top of the window showing the focused tab's progress.
     fn update_load_bar(self: &Rc<Self>) {
         let bar = &self.load_bar;
         let Some(v) = self.focused_view() else {
@@ -492,7 +669,6 @@ impl App {
         };
         if v.is_loading() {
             bar.set_visible(true);
-            // Never show an empty bar: it should read as "started" right away.
             bar.set_fraction(v.estimated_load_progress().max(0.08));
         } else if gtk::prelude::WidgetExt::is_visible(bar) {
             bar.set_fraction(1.0);
@@ -522,13 +698,13 @@ impl App {
         }
     }
 
-    /// Esc on the palette: close it, and also drop a tab that was never used.
     fn cancel_palette(self: &Rc<Self>) {
         let view = self.focused_view();
         let fresh = self.fresh.borrow().clone();
         self.hide_palette();
         if let (Some(v), Some(f)) = (view, fresh) {
-            if v == f && self.tabs.borrow().len() > 1 {
+            let total_tabs: usize = self.cols.borrow().iter().map(|c| c.tabs.len()).sum();
+            if v == f && total_tabs > 1 {
                 self.close_view(&v);
             }
         }
@@ -546,34 +722,35 @@ impl App {
         self.hide_palette();
     }
 
-    // ---- overview (niri-style: the live strip, zoomed out) ----------------
+    // ---- overview (niri-style: zoomed out) --------------------------------
 
     fn toggle_overview(self: &Rc<Self>) {
         if self.ov.get() {
-            self.exit_overview(); // Ctrl+O again opens whatever is focused now
+            self.exit_overview();
         } else {
             self.enter_overview();
         }
     }
 
     fn enter_overview(self: &Rc<Self>) {
-        if self.ov.get() || self.tabs.borrow().is_empty() {
+        if self.ov.get() || self.cols.borrow().is_empty() {
             return;
         }
         self.palette.set_visible(false);
         self.ov.set(true);
-        self.ov_return.set(self.focus.get());
+        self.ov_return.set((self.focus_col.get(), self.focus_row.get()));
         self.ov_saved.set(self.target.get());
         self.strip.add_css_class("zoomed");
         self.ov_hint.set_visible(true);
-        for t in self.tabs.borrow().iter() {
-            t.view.set_can_target(false); // clicks pick a tab, they don't reach the page
+        for col in self.cols.borrow().iter() {
+            for t in col.tabs.iter() {
+                t.view.set_can_target(false);
+            }
         }
         self.target_zoom.set(OV_ZOOM);
         self.reveal_focus();
     }
 
-    /// Zoom back in on whichever tab is focused now.
     fn exit_overview(self: &Rc<Self>) {
         if !self.ov.get() {
             return;
@@ -581,12 +758,12 @@ impl App {
         self.ov.set(false);
         self.strip.remove_css_class("zoomed");
         self.ov_hint.set_visible(false);
-        for t in self.tabs.borrow().iter() {
-            t.view.set_can_target(true);
+        for col in self.cols.borrow().iter() {
+            for t in col.tabs.iter() {
+                t.view.set_can_target(true);
+            }
         }
         self.target_zoom.set(1.0);
-        // Start from the pre-overview scroll: if the focus didn't move we land exactly
-        // where we left, otherwise we scroll the minimum to reveal the new tab.
         self.target.set(self.ov_saved.get());
         self.reveal_focus();
         if let Some(v) = self.focused_view() {
@@ -594,22 +771,21 @@ impl App {
         }
     }
 
-    /// Esc: zoom back in on the tab you started from.
     fn cancel_overview(self: &Rc<Self>) {
-        let back = self.ov_return.get().min(self.tabs.borrow().len().saturating_sub(1));
-        self.focus_tab(back);
+        let (c, r) = self.ov_return.get();
+        self.focus_coords(c, r);
         self.exit_overview();
     }
 
-    /// Click in overview: the tab under the pointer wins; empty space just exits.
     fn ov_click(self: &Rc<Self>, x: f64) {
         let vw = self.strip.width() as f64;
         let (z, off) = (self.layout.zoom(), self.layout.offset());
         let g = gap(z);
         let mut hit = None;
         let mut cx = 0.0;
-        for (i, t) in self.tabs.borrow().iter().enumerate() {
-            let w = col_width(t.view.has_css_class("full"), vw);
+        let cols = self.cols.borrow();
+        for (i, col) in cols.iter().enumerate() {
+            let w = col_width(col.container.has_css_class("full"), vw);
             let left = (cx - off) * z;
             if x >= left && x <= left + w * z {
                 hit = Some(i);
@@ -617,25 +793,32 @@ impl App {
             }
             cx += w + g;
         }
+        drop(cols);
         if let Some(i) = hit {
-            self.focus_tab(i);
+            self.focus_coords(i, 0);
         }
         self.exit_overview();
     }
 
-    /// Keys while zoomed out. Returns true when consumed.
     fn ov_key(self: &Rc<Self>, k: gdk::Key, m: gdk::ModifierType) -> bool {
         use gdk::ModifierType as M;
         let plain = m.is_empty();
-        let f = self.focus.get();
         if plain || m == M::CONTROL_MASK {
             match k {
                 gdk::Key::h | gdk::Key::Left => {
-                    self.focus_tab(f.saturating_sub(1));
+                    self.focus_column_left();
                     return true;
                 }
                 gdk::Key::l | gdk::Key::Right => {
-                    self.focus_tab(f + 1);
+                    self.focus_column_right();
+                    return true;
+                }
+                gdk::Key::j | gdk::Key::Down => {
+                    self.focus_window_down();
+                    return true;
+                }
+                gdk::Key::k | gdk::Key::Up => {
+                    self.focus_window_up();
                     return true;
                 }
                 _ => {}
@@ -652,7 +835,6 @@ impl App {
                 _ => {}
             }
         }
-        // Swallow stray typing so it never reaches a page.
         plain
     }
 
@@ -691,13 +873,18 @@ impl App {
             };
             return true;
         }
-        let focus = self.focus.get();
+
         if m == M::CONTROL_MASK {
             match k {
                 gdk::Key::t => self.new_tab(),
+                gdk::Key::v => self.split_vertical(),
                 gdk::Key::f => self.toggle_full(),
-                gdk::Key::h => self.focus_tab(focus.saturating_sub(1)),
-                gdk::Key::l => self.focus_tab(focus + 1),
+                // Horizontal navigation (columns)
+                gdk::Key::h | gdk::Key::Left => self.focus_column_left(),
+                gdk::Key::l | gdk::Key::Right => self.focus_column_right(),
+                // Vertical navigation (windows in column)
+                gdk::Key::j | gdk::Key::Down => self.focus_window_down(),
+                gdk::Key::k | gdk::Key::Up => self.focus_window_up(),
                 gdk::Key::w => {
                     if let Some(v) = self.focused_view() {
                         self.close_view(&v);
@@ -706,7 +893,6 @@ impl App {
                 gdk::Key::b => self.toggle_sidebar(),
                 gdk::Key::o => self.toggle_overview(),
                 gdk::Key::g => self.show_palette(),
-                // Edit the focused tab's URL (already open? let the entry handle it).
                 gdk::Key::Return | gdk::Key::KP_Enter => {
                     if self.palette_open() {
                         return false;
@@ -725,8 +911,11 @@ impl App {
         }
         if m == M::CONTROL_MASK | M::SHIFT_MASK {
             match k {
-                gdk::Key::h => self.move_tab(-1),
-                gdk::Key::l => self.move_tab(1),
+                gdk::Key::t => self.split_vertical(),
+                gdk::Key::h | gdk::Key::Left => self.move_column(-1),
+                gdk::Key::l | gdk::Key::Right => self.move_column(1),
+                gdk::Key::j | gdk::Key::Down => self.move_window(1),
+                gdk::Key::k | gdk::Key::Up => self.move_window(-1),
                 _ => return false,
             }
             return true;
@@ -735,7 +924,6 @@ impl App {
     }
 }
 
-/// Keep logins across restarts: WebKit only writes cookies to disk if told to.
 fn setup_storage() {
     let dir = glib::user_data_dir().join("rail");
     let _ = std::fs::create_dir_all(&dir);
@@ -767,7 +955,7 @@ fn build(gapp: &gtk::Application) {
     brand.set_xalign(0.0);
     let add = gtk::Button::from_icon_name("list-add-symbolic");
     add.add_css_class("flat-icon");
-    add.set_tooltip_text(Some("New tab  (Ctrl+T)"));
+    add.set_tooltip_text(Some("New column tab  (Ctrl+T)"));
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     head.set_margin_start(8);
     head.append(&brand);
@@ -795,7 +983,7 @@ fn build(gapp: &gtk::Application) {
     list_scroll.set_vexpand(true);
     list_scroll.set_child(Some(&list));
 
-    let hint = gtk::Label::new(Some("ctrl+b hide  ·  ctrl+o overview"));
+    let hint = gtk::Label::new(Some("ctrl+h/l cols  ·  ctrl+j/k rows  ·  ctrl+v split"));
     hint.add_css_class("hint");
     hint.set_xalign(0.0);
     hint.set_margin_start(8);
@@ -852,8 +1040,8 @@ fn build(gapp: &gtk::Application) {
     palette.append(&phint);
     palette.set_visible(false);
 
-    // ---- overview hint (the overview itself is the strip, zoomed) ----
-    let ov_hint = gtk::Label::new(Some("h / l  move      Enter  open      x  close      Esc  cancel"));
+    // ---- overview hint ----
+    let ov_hint = gtk::Label::new(Some("h/l/j/k  move      Enter  open      x  close      Esc  cancel"));
     ov_hint.add_css_class("ov-hint");
     ov_hint.set_halign(gtk::Align::Center);
     ov_hint.set_valign(gtk::Align::End);
@@ -864,7 +1052,7 @@ fn build(gapp: &gtk::Application) {
     let load_bar = gtk::ProgressBar::new();
     load_bar.add_css_class("load-bar");
     load_bar.set_valign(gtk::Align::Start);
-    load_bar.set_can_target(false); // never steal clicks from the page
+    load_bar.set_can_target(false);
     load_bar.set_visible(false);
 
     let overlay = gtk::Overlay::new();
@@ -877,7 +1065,7 @@ fn build(gapp: &gtk::Application) {
         .application(gapp)
         .default_width(1400)
         .default_height(850)
-        .decorated(false) // no header, no footer: the page is the window
+        .decorated(false)
         .child(&overlay)
         .build();
 
@@ -895,11 +1083,12 @@ fn build(gapp: &gtk::Application) {
         entry: entry.clone(),
         ov_hint,
         ov: Cell::new(false),
-        ov_return: Cell::new(0),
+        ov_return: Cell::new((0, 0)),
         ov_saved: Cell::new(0.0),
         target_zoom: Cell::new(1.0),
-        tabs: RefCell::new(Vec::new()),
-        focus: Cell::new(usize::MAX),
+        cols: RefCell::new(Vec::new()),
+        focus_col: Cell::new(0),
+        focus_row: Cell::new(0),
         target: Cell::new(0.0),
         animating: Cell::new(false),
         side_open: Cell::new(true),
@@ -909,8 +1098,23 @@ fn build(gapp: &gtk::Application) {
 
     let a = app.clone();
     layout.connect_resized(move || a.reveal_focus());
+
     let a = app.clone();
-    list.connect_row_activated(move |_, row| a.focus_tab(row.index() as usize));
+    list.connect_row_activated(move |_, row| {
+        let idx = row.index() as usize;
+        let mut counted = 0;
+        let cols = a.cols.borrow();
+        for (ci, col) in cols.iter().enumerate() {
+            if idx < counted + col.tabs.len() {
+                let ri = idx - counted;
+                drop(cols);
+                a.focus_coords(ci, ri);
+                return;
+            }
+            counted += col.tabs.len();
+        }
+    });
+
     let a = app.clone();
     add.connect_clicked(move |_| a.new_tab());
     let a = app.clone();
@@ -918,7 +1122,6 @@ fn build(gapp: &gtk::Application) {
     let a = app.clone();
     entry.connect_activate(move |e| a.navigate(&e.text()));
 
-    // In overview, clicking a (non-interactive) zoomed tab selects it.
     let pick = gtk::GestureClick::new();
     let a = app.clone();
     pick.connect_released(move |_, _, x, _| {
@@ -928,7 +1131,6 @@ fn build(gapp: &gtk::Application) {
     });
     app.strip.add_controller(pick);
 
-    // Clicking anywhere in the page area dismisses the address palette.
     let click = gtk::GestureClick::new();
     click.set_propagation_phase(gtk::PropagationPhase::Capture);
     let a = app.clone();
@@ -939,7 +1141,6 @@ fn build(gapp: &gtk::Application) {
     });
     shell.add_controller(click);
 
-    // Capture phase so the web page never swallows our ctrl+hjkl & friends.
     let keys = gtk::EventControllerKey::new();
     keys.set_propagation_phase(gtk::PropagationPhase::Capture);
     let a = app.clone();
@@ -948,7 +1149,6 @@ fn build(gapp: &gtk::Application) {
     });
     win.add_controller(keys);
 
-    // Fresh every launch: one empty tab, no session restore.
     app.new_tab();
     if let Some(url) = std::env::args().nth(1) {
         app.navigate(&url);

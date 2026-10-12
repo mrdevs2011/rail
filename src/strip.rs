@@ -1,5 +1,5 @@
 //! The niri-style horizontal strip: a custom GTK layout manager that places
-//! tabs side by side in columns and slides the whole strip by `offset`.
+//! columns side by side in a strip and slides the whole strip by `offset`.
 
 use gtk::glib;
 use gtk::prelude::*;
@@ -29,7 +29,7 @@ mod imp {
     pub struct StripLayout {
         /// Left edge of the visible region, in unscaled strip coordinates.
         pub offset: Cell<f64>,
-        /// 1.0 normally; < 1.0 in overview, where the live tabs are scaled down.
+        /// 1.0 normally; < 1.0 in overview, where the live columns are scaled down.
         pub zoom: Cell<f64>,
         pub width: Cell<i32>,
         pub on_resize: RefCell<Option<Rc<dyn Fn()>>>,
