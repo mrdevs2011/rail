@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Rail browser installer (Standalone AppImage for Linux)
+# Rail browser installer
 set -euo pipefail
 
 APP_NAME="Rail"
 REPO="${RAIL_REPO:-mrdevs2011/rail}"
 INSTALL_DIR="${RAIL_DIR:-$HOME/MR/Applictions}"
-BIN_LINK="$HOME/.local/bin/rail"
+BIN_DIR="$HOME/.local/bin"
+BIN_LINK="$BIN_DIR/rail"
 DESKTOP_DIR="$HOME/.local/share/applications"
 ICON_CACHE="$HOME/.cache/rail-icons"
 
 echo "==> $APP_NAME o‘rnatilmoqda..."
-mkdir -p "$INSTALL_DIR" "$HOME/.local/bin" "$DESKTOP_DIR" "$ICON_CACHE"
+mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$DESKTOP_DIR" "$ICON_CACHE"
 
 download() {
   if command -v curl >/dev/null 2>&1; then
@@ -23,26 +24,57 @@ download() {
   fi
 }
 
-TARGET="$INSTALL_DIR/rail-x86_64.AppImage"
-API="https://api.github.com/repos/${REPO}/releases/latest"
-TMP="$(mktemp)"
+check_webkit() {
+  ldconfig -p 2>/dev/null | grep -q "libwebkitgtk-6.0.so" || \
+  [ -f /usr/lib/libwebkitgtk-6.0.so.4 ] || \
+  [ -f /usr/lib/x86_64-linux-gnu/libwebkitgtk-6.0.so.4 ] || \
+  [ -f /lib/libwebkitgtk-6.0.so.4 ]
+}
 
-echo "==> Eng so‘nggi $APP_NAME AppImage yuklab olinmoqda..."
-if curl -fsSL -o "$TMP" "$API" 2>/dev/null; then
-  ASSET_URL="$(python3 -c "import json,sys; j=json.load(open(sys.argv[1])); print(next((a['browser_download_url'] for a in j.get('assets',[]) if 'rail' in a.get('name','').lower() and a.get('name','').endswith('.AppImage')), ''))" "$TMP" 2>/dev/null || true)"
-  rm -f "$TMP"
-  if [ -n "${ASSET_URL:-}" ]; then
-    download "$ASSET_URL" "$TARGET"
-  else
-    download "https://github.com/${REPO}/releases/download/v0.1.0/rail-x86_64.AppImage" "$TARGET"
+ensure_dependencies() {
+  if check_webkit; then
+    echo "✓ Tizimda WebKit6 topildi! Ortiqcha paketlar yuklanmaydi."
+    return 0
   fi
-else
-  rm -f "$TMP" 2>/dev/null || true
-  download "https://github.com/${REPO}/releases/download/v0.1.0/rail-x86_64.AppImage" "$TARGET"
+
+  echo "==> WebKitGTK 6.0 tizimda topilmadi. O‘rnatishga harakat qilinmoqda..."
+  if command -v pacman >/dev/null 2>&1; then
+    sudo pacman -S --needed --noconfirm webkitgtk-6.0 gtk4 || true
+  elif command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update && sudo apt-get install -y libwebkitgtk-6.0-4 libgtk-4-1 || true
+  elif command -v dnf >/dev/null 2>&1; then
+    sudo dnf install -y webkitgtk6.0 gtk4 || true
+  fi
+
+  if check_webkit; then
+    echo "✓ WebKit6 o‘rnatildi!"
+    return 0
+  else
+    echo "Ogohlantirish: WebKit6 tizim paketlaridan o‘rnatilmadi. Standalone AppImage yuklab olinadi..."
+    return 1
+  fi
+}
+
+# 1. Tizimda WebKit6 borligini tekshiramiz
+USE_STANDALONE=0
+if ! ensure_dependencies; then
+  USE_STANDALONE=1
 fi
 
-chmod +x "$TARGET"
-ln -sfn "$TARGET" "$BIN_LINK"
+if [ "$USE_STANDALONE" -eq 0 ]; then
+  # Faqat ~400 KB binar fayl yuklanadi
+  TARGET="$BIN_LINK"
+  echo "==> Rail binar fayli yuklab olinmoqda (atigi ~400 KB)..."
+  download "https://github.com/${REPO}/releases/download/v0.1.0/rail-x86_64" "$TARGET"
+  chmod +x "$TARGET"
+else
+  # WebKit bo'lmasa, to'liq AppImage yuklanadi
+  TARGET="$INSTALL_DIR/rail-x86_64.AppImage"
+  echo "==> Rail Standalone AppImage yuklab olinmoqda..."
+  download "https://github.com/${REPO}/releases/download/v0.1.0/rail-x86_64.AppImage" "$TARGET"
+  chmod +x "$TARGET"
+  ln -sfn "$TARGET" "$BIN_LINK"
+fi
 
 # Icon
 ICON="$ICON_CACHE/rail.svg"
@@ -61,7 +93,7 @@ Type=Application
 Name=Rail
 GenericName=Web Browser
 Comment=A browser that scrolls sideways
-Exec="$TARGET" %u
+Exec="$BIN_LINK" %u
 Icon=$ICON
 Terminal=false
 Categories=Network;WebBrowser;
