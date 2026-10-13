@@ -165,12 +165,15 @@ button.profile-item-btn.selected {
     background: #1f2335;
 }
 .profile-item-dot {
-    min-width: 22px;
-    min-height: 22px;
+    min-width: 24px;
+    max-width: 24px;
+    min-height: 24px;
+    max-height: 24px;
     border-radius: 9999px;
     font-size: 11px;
     font-weight: 800;
-    color: #0f1016;
+    color: #16161e;
+    padding: 0;
 }
 .profile-item-name {
     font-size: 13px;
@@ -185,43 +188,143 @@ button.profile-item-btn.selected {
 
 /* ---- profiles manager modal (Ctrl+P / Ctrl+Shift+P) ---- */
 .profiles-modal {
-    background: #1a1b26;
+    background: #16161e;
     border: 1px solid #2f334d;
     border-radius: 20px;
-    padding: 22px 24px;
-    box-shadow: 0 32px 80px rgba(0,0,0,0.7);
-    min-width: 320px;
+    padding: 24px 28px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.85);
+    min-width: 440px;
     max-width: 480px;
     margin-left: 16px;
     margin-right: 16px;
 }
 .profiles-modal-title {
-    font-size: 18px;
+    font-size: 19px;
     font-weight: 700;
     color: #c0caf5;
+    letter-spacing: -0.02em;
 }
 .profiles-modal-subtitle {
     font-size: 12px;
-    color: #6b7399;
+    color: #565f89;
+    margin-top: 2px;
 }
 .profile-card {
-    background: #16161e;
+    background: #1a1b26;
     border: 1px solid #24283b;
     border-radius: 12px;
-    padding: 8px 12px;
-    margin-bottom: 6px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    transition: all 120ms ease;
+}
+.profile-card:hover {
+    border-color: #3b4261;
 }
 .profile-card.active-profile {
     border-color: #7aa2f7;
-    background: #1a1e2f;
+    background: #1d2033;
+    box-shadow: 0 0 16px rgba(122, 162, 247, 0.12);
+}
+.profile-avatar-circle {
+    min-width: 32px;
+    max-width: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #16161e;
+    margin: 0;
+    padding: 0;
+}
+.profile-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #c0caf5;
+}
+.profile-card-sub {
+    font-size: 11px;
+    color: #565f89;
+    font-family: ui-monospace, monospace;
 }
 .profile-badge-active {
-    font-size: 10px;
-    font-weight: 700;
-    border-radius: 6px;
-    padding: 2px 7px;
-    background: #24283b;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 9999px;
+    padding: 3px 10px;
+    background: rgba(122, 162, 247, 0.14);
     color: #7aa2f7;
+    border: 1px solid rgba(122, 162, 247, 0.35);
+}
+button.btn-make-active {
+    background: #24283b;
+    color: #a9b1d6;
+    border: 1px solid #3b4261;
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 120ms;
+}
+button.btn-make-active:hover {
+    background: #7aa2f7;
+    color: #16161e;
+    border-color: #7aa2f7;
+}
+button.btn-del-profile {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 4px 6px;
+    color: #565f89;
+    transition: all 120ms;
+}
+button.btn-del-profile:hover {
+    background: rgba(247, 118, 142, 0.15);
+    color: #f7768e;
+}
+.profile-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #565f89;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
+}
+.profile-entry-box {
+    background: #13141c;
+    border: 1px solid #2f334d;
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: #c0caf5;
+    font-size: 13px;
+    transition: all 120ms;
+}
+.profile-entry-box:focus {
+    border-color: #7aa2f7;
+    box-shadow: 0 0 0 1px #7aa2f7;
+}
+.profile-entry-box.error {
+    border-color: #f7768e;
+    box-shadow: 0 0 0 1px #f7768e;
+}
+.profile-error-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #f7768e;
+    margin-top: 2px;
+}
+button.btn-create-profile {
+    background: #7aa2f7;
+    color: #16161e;
+    font-weight: 700;
+    font-size: 12px;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 16px;
+    transition: all 120ms;
+}
+button.btn-create-profile:hover {
+    background: #89b4fa;
 }
 .profile-badge-mini {
     font-size: 9px;
@@ -233,8 +336,10 @@ button.profile-item-btn.selected {
     color: #0f1016;
 }
 button.color-choice {
-    min-width: 22px;
-    min-height: 22px;
+    min-width: 24px;
+    max-width: 24px;
+    min-height: 24px;
+    max-height: 24px;
     padding: 0;
     border-radius: 9999px;
     border: 2px solid transparent;
@@ -245,7 +350,8 @@ button.color-choice:hover {
 }
 button.color-choice.selected {
     border-color: #ffffff;
-    transform: scale(1.2);
+    box-shadow: 0 0 0 2px #16161e;
+    transform: scale(1.15);
 }
 ";
 
@@ -300,6 +406,7 @@ struct App {
     profiles_modal: gtk::Box,
     profiles_list_box: gtk::ListBox,
     new_profile_entry: gtk::Entry,
+    new_profile_error_lbl: gtk::Label,
     new_profile_color_idx: Cell<usize>,
     color_buttons: RefCell<Vec<gtk::Button>>,
 }
@@ -931,6 +1038,10 @@ impl App {
             let dot = gtk::Label::new(Some(&p.initial_letter()));
             dot.add_css_class("profile-item-dot");
             dot.add_css_class(&format!("prof-bg-{}", p.color_idx));
+            dot.set_valign(gtk::Align::Center);
+            dot.set_halign(gtk::Align::Center);
+            dot.set_width_request(24);
+            dot.set_height_request(24);
 
             let name_lbl = gtk::Label::new(Some(&p.name));
             name_lbl.add_css_class("profile-item-name");
@@ -1079,6 +1190,8 @@ impl App {
         self.hide_palette();
         self.rebuild_profiles_modal_list();
         self.new_profile_entry.set_text("");
+        self.new_profile_error_lbl.set_visible(false);
+        self.new_profile_entry.remove_css_class("error");
         self.select_new_profile_color(0);
         self.profiles_modal.set_visible(true);
         self.new_profile_entry.grab_focus();
@@ -1109,24 +1222,43 @@ impl App {
             }
 
             let avatar = gtk::Label::new(Some(&p.initial_letter()));
-            avatar.add_css_class("profile-item-dot");
+            avatar.add_css_class("profile-avatar-circle");
             avatar.add_css_class(&format!("prof-bg-{}", p.color_idx));
+            avatar.set_valign(gtk::Align::Center);
+            avatar.set_halign(gtk::Align::Center);
+            avatar.set_width_request(32);
+            avatar.set_height_request(32);
+
+            let info_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
+            info_box.set_hexpand(true);
+            info_box.set_valign(gtk::Align::Center);
 
             let name_lbl = gtk::Label::new(Some(&p.name));
-            name_lbl.add_css_class("profile-item-name");
-            name_lbl.set_hexpand(true);
+            name_lbl.add_css_class("profile-card-name");
             name_lbl.set_xalign(0.0);
 
-            row.append(&avatar);
-            row.append(&name_lbl);
+            let sub_text = if p.id == "default" {
+                "@default • System Default".to_string()
+            } else {
+                format!("@{}", p.id)
+            };
+            let sub_lbl = gtk::Label::new(Some(&sub_text));
+            sub_lbl.add_css_class("profile-card-sub");
+            sub_lbl.set_xalign(0.0);
+
+            info_box.append(&name_lbl);
+            info_box.append(&sub_lbl);
+
+            let actions_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            actions_box.set_valign(gtk::Align::Center);
 
             if p.id == active_id {
                 let active_badge = gtk::Label::new(Some("Active"));
                 active_badge.add_css_class("profile-badge-active");
-                row.append(&active_badge);
+                actions_box.append(&active_badge);
             } else {
                 let set_act_btn = gtk::Button::with_label("Make Active");
-                set_act_btn.add_css_class("pill");
+                set_act_btn.add_css_class("btn-make-active");
                 let app = self.clone();
                 let pid = p.id.clone();
                 set_act_btn.connect_clicked(move |_| {
@@ -1134,12 +1266,12 @@ impl App {
                     app.rebuild_profiles_modal_list();
                     app.rebuild_profile_popover();
                 });
-                row.append(&set_act_btn);
+                actions_box.append(&set_act_btn);
             }
 
             if can_delete && p.id != "default" {
                 let del_btn = gtk::Button::from_icon_name("window-close-symbolic");
-                del_btn.add_css_class("flat-icon");
+                del_btn.add_css_class("btn-del-profile");
                 del_btn.set_tooltip_text(Some("Delete Profile"));
                 let app = self.clone();
                 let pid = p.id.clone();
@@ -1149,8 +1281,12 @@ impl App {
                     app.rebuild_profile_popover();
                     app.refresh_sidebar();
                 });
-                row.append(&del_btn);
+                actions_box.append(&del_btn);
             }
+
+            row.append(&avatar);
+            row.append(&info_box);
+            row.append(&actions_box);
 
             self.profiles_list_box.append(&row);
         }
@@ -1170,13 +1306,29 @@ impl App {
 
     fn create_new_profile_action(self: &Rc<Self>) {
         let name = self.new_profile_entry.text().to_string();
-        if !name.trim().is_empty() {
-            let color_idx = self.new_profile_color_idx.get();
-            self.profiles.borrow_mut().create_profile(&name, color_idx);
-            self.new_profile_entry.set_text("");
-            self.rebuild_profiles_modal_list();
-            self.rebuild_profile_popover();
-            self.refresh_sidebar();
+        let clean = name.trim();
+        if clean.is_empty() {
+            self.new_profile_error_lbl.set_text("⚠ Profile name cannot be empty");
+            self.new_profile_error_lbl.set_visible(true);
+            self.new_profile_entry.add_css_class("error");
+            return;
+        }
+
+        let color_idx = self.new_profile_color_idx.get();
+        match self.profiles.borrow_mut().create_profile(clean, color_idx) {
+            Ok(_) => {
+                self.new_profile_error_lbl.set_visible(false);
+                self.new_profile_entry.remove_css_class("error");
+                self.new_profile_entry.set_text("");
+                self.rebuild_profiles_modal_list();
+                self.rebuild_profile_popover();
+                self.refresh_sidebar();
+            }
+            Err(err) => {
+                self.new_profile_error_lbl.set_text(&format!("⚠ {}", err));
+                self.new_profile_error_lbl.set_visible(true);
+                self.new_profile_entry.add_css_class("error");
+            }
         }
     }
 
@@ -1548,28 +1700,29 @@ fn build(gapp: &gtk::Application) {
     modal_list_scroll.set_child(Some(&profiles_list_box));
 
     let sep = gtk::Separator::new(gtk::Orientation::Horizontal);
-    sep.set_margin_top(4);
-    sep.set_margin_bottom(4);
+    sep.set_margin_top(8);
+    sep.set_margin_bottom(8);
 
     let new_lbl = gtk::Label::new(Some("CREATE NEW PROFILE"));
-    new_lbl.add_css_class("hint");
+    new_lbl.add_css_class("profile-section-label");
     new_lbl.set_xalign(0.0);
 
     let new_profile_entry = gtk::Entry::new();
-    new_profile_entry.add_css_class("palette-entry");
-    new_profile_entry.set_placeholder_text(Some("Profile name (e.g. Work, School)..."));
+    new_profile_entry.add_css_class("profile-entry-box");
+    new_profile_entry.set_placeholder_text(Some("Enter unique profile name (e.g. Work, School)..."));
     new_profile_entry.set_hexpand(true);
 
+    let new_profile_error_lbl = gtk::Label::new(None);
+    new_profile_error_lbl.add_css_class("profile-error-label");
+    new_profile_error_lbl.set_xalign(0.0);
+    new_profile_error_lbl.set_visible(false);
+
     let add_prof_btn = gtk::Button::with_label("Create Profile");
-    add_prof_btn.add_css_class("pill");
+    add_prof_btn.add_css_class("btn-create-profile");
+    add_prof_btn.set_valign(gtk::Align::Center);
 
-    let create_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    create_row.append(&new_profile_entry);
-    create_row.append(&add_prof_btn);
-
-    let color_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    color_box.set_margin_top(4);
-    color_box.set_margin_bottom(4);
+    let color_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    color_box.set_valign(gtk::Align::Center);
     let mut color_btns = Vec::new();
     let new_profile_color_idx = Cell::new(0usize);
 
@@ -1577,6 +1730,8 @@ fn build(gapp: &gtk::Application) {
         let cb = gtk::Button::new();
         cb.add_css_class("color-choice");
         cb.add_css_class(&format!("prof-bg-{}", i));
+        cb.set_valign(gtk::Align::Center);
+        cb.set_halign(gtk::Align::Center);
         if i == 0 {
             cb.add_css_class("selected");
         }
@@ -1584,7 +1739,15 @@ fn build(gapp: &gtk::Application) {
         color_btns.push(cb);
     }
 
-    let profiles_modal = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    let create_bottom_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    create_bottom_row.set_margin_top(4);
+    create_bottom_row.append(&color_box);
+    let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    spacer.set_hexpand(true);
+    create_bottom_row.append(&spacer);
+    create_bottom_row.append(&add_prof_btn);
+
+    let profiles_modal = gtk::Box::new(gtk::Orientation::Vertical, 8);
     profiles_modal.add_css_class("profiles-modal");
     profiles_modal.set_halign(gtk::Align::Center);
     profiles_modal.set_valign(gtk::Align::Center);
@@ -1595,8 +1758,9 @@ fn build(gapp: &gtk::Application) {
     profiles_modal.append(&modal_list_scroll);
     profiles_modal.append(&sep);
     profiles_modal.append(&new_lbl);
-    profiles_modal.append(&create_row);
-    profiles_modal.append(&color_box);
+    profiles_modal.append(&new_profile_entry);
+    profiles_modal.append(&new_profile_error_lbl);
+    profiles_modal.append(&create_bottom_row);
 
     // ---- overview hint ----
     let ov_hint = gtk::Label::new(Some("h/l/j/k  move      Enter  open      x  close      Esc  cancel"));
@@ -1661,6 +1825,7 @@ fn build(gapp: &gtk::Application) {
         profiles_modal: profiles_modal.clone(),
         profiles_list_box: profiles_list_box.clone(),
         new_profile_entry: new_profile_entry.clone(),
+        new_profile_error_lbl: new_profile_error_lbl.clone(),
         new_profile_color_idx,
         color_buttons: RefCell::new(color_btns),
     });
@@ -1676,6 +1841,23 @@ fn build(gapp: &gtk::Application) {
     add_prof_btn.connect_clicked(move |_| a.create_new_profile_action());
     let a = app.clone();
     new_profile_entry.connect_activate(move |_| a.create_new_profile_action());
+
+    let a = app.clone();
+    new_profile_entry.connect_changed(move |entry| {
+        let text = entry.text().to_string();
+        let clean = text.trim();
+        if clean.is_empty() {
+            a.new_profile_error_lbl.set_visible(false);
+            a.new_profile_entry.remove_css_class("error");
+        } else if a.profiles.borrow().profile_exists(clean) {
+            a.new_profile_error_lbl.set_text("⚠ Profile already exists");
+            a.new_profile_error_lbl.set_visible(true);
+            a.new_profile_entry.add_css_class("error");
+        } else {
+            a.new_profile_error_lbl.set_visible(false);
+            a.new_profile_entry.remove_css_class("error");
+        }
+    });
 
     let a = app.clone();
     layout.connect_resized(move || {
