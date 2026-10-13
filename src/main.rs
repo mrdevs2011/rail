@@ -878,6 +878,7 @@ impl App {
             if cols.is_empty() || new_col {
                 let box_widget = gtk::Box::new(gtk::Orientation::Vertical, 6);
                 box_widget.add_css_class("rail-col");
+                box_widget.add_css_class("full");
                 box_widget.set_vexpand(true);
                 box_widget.set_hexpand(true);
                 box_widget.set_homogeneous(true);
@@ -959,6 +960,9 @@ impl App {
             } else {
                 r_idx.saturating_sub(1).min(cols[next_c].tabs.len().saturating_sub(1))
             };
+            if cols.len() == 1 {
+                cols[0].container.add_css_class("full");
+            }
             drop(cols);
             self.focus_coords(next_c, next_r);
         }
@@ -1120,6 +1124,7 @@ impl App {
 
                 let box_widget = gtk::Box::new(gtk::Orientation::Vertical, 6);
                 box_widget.add_css_class("rail-col");
+                box_widget.add_css_class("full");
                 box_widget.set_vexpand(true);
                 box_widget.set_hexpand(true);
                 box_widget.set_homogeneous(true);
@@ -1205,6 +1210,9 @@ impl App {
                     col.container.remove_css_class("full");
                 }
             }
+        }
+        if cols.len() == 1 {
+            cols[0].container.add_css_class("full");
         }
         drop(cols);
 
