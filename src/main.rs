@@ -1044,17 +1044,27 @@ impl App {
         let cur_c = self.focus_col.get();
         let cur_r = self.focus_row.get();
         let mut cols = self.cols.borrow_mut();
-        let Some(col) = cols.get_mut(cur_c) else { return };
-        let Some(target_r) = cur_r.checked_add_signed(dir).filter(|&t| t < col.tabs.len()) else { return };
-        col.tabs.swap(cur_r, target_r);
-        let mut prev: Option<&gtk::Widget> = None;
-        for t in col.tabs.iter() {
-            col.container.reorder_child_after(&t.view, prev);
-            prev = Some(t.view.as_ref());
+        if cur_c >= cols.len() {
+            return;
         }
-        drop(cols);
-        self.focus_row.set(target_r);
-        self.focus_coords(cur_c, target_r);
+        if cols[cur_c].tabs.len() > 1 {
+            let col = &mut cols[cur_c];
+            let Some(target_r) = cur_r.checked_add_signed(dir).filter(|&t| t < col.tabs.len()) else { return };
+            col.tabs.swap(cur_r, target_r);
+            let mut prev: Option<&gtk::Widget> = None;
+            for t in col.tabs.iter() {
+                col.container.reorder_child_after(&t.view, prev);
+                prev = Some(t.view.as_ref());
+            }
+            col.container.queue_allocate();
+            drop(cols);
+            self.focus_row.set(target_r);
+            self.focus_coords(cur_c, target_r);
+            self.strip.queue_allocate();
+        } else if dir > 0 {
+            drop(cols);
+            self.move_tab_to_vertical_slot(1);
+        }
     }
 
     fn move_tab_to_vertical_slot(self: &Rc<Self>, target_slot: usize) {
@@ -1065,64 +1075,127 @@ impl App {
             return;
         }
 
-        if target_slot == 1 {
-            // Ctrl+Shift+2: move down to slot 2 (row index 1)
-            if cols[cur_c].tabs.len() > 1 {
-                if cur_r == 0 {
-                    let tab = cols[cur_c].tabs.remove(0);
-                    cols[cur_c].tabs.insert(1, tab);
+        // Case 1: Current column has multiple tabs.
+        if cols[cur_c].tabs.len() > 1 {
+            if target_slot == 0 {
+                // Ctrl+Shift+1: move tab to top row (slot 1) if not already there;
+                // if already at top row, pop out to its own column!
+                if cur_r > 0 {
+                    let tab = cols[cur_c].tabs.remove(cur_r);
+                    cols[cur_c].tabs.insert(0, tab);
                     let col = &cols[cur_c];
                     let mut prev: Option<&gtk::Widget> = None;
                     for t in col.tabs.iter() {
                         col.container.reorder_child_after(&t.view, prev);
                         prev = Some(t.view.as_ref());
                     }
+                    col.container.queue_allocate();
                     drop(cols);
-                    self.focus_coords(cur_c, 1);
+                    self.focus_coords(cur_c, 0);
+                    self.strip.queue_allocate();
+                    self.reveal_focus();
+                    self.refresh_sidebar();
+                    self.save_session();
+                    return;
+                } else {
+                    // Already at row 0: pop out to its own column
+                    let tab = cols[cur_c].tabs.remove(0);
+                    cols[cur_c].container.remove(&tab.view);
+                    cols[cur_c].container.queue_allocate();
+
+                    let box_widget = gtk::Box::new(gtk::Orientation::Vertical, 6);
+                    box_widget.add_css_class("rail-col");
+                    box_widget.add_css_class("full");
+                    box_widget.set_vexpand(true);
+                    box_widget.set_hexpand(true);
+                    box_widget.set_homogeneous(true);
+                    box_widget.append(&tab.view);
+
+                    let prev = cols[cur_c].container.clone();
+                    self.strip.insert_child_after(&box_widget, Some(&prev));
+                    self.strip.queue_allocate();
+
+                    let new_col_idx = cur_c + 1;
+                    cols.insert(new_col_idx, Column {
+                        container: box_widget,
+                        tabs: vec![tab],
+                    });
+                    drop(cols);
+                    self.focus_coords(new_col_idx, 0);
+                    self.strip.queue_allocate();
+                    self.reveal_focus();
+                    self.refresh_sidebar();
+                    self.save_session();
                     return;
                 }
-            } else if cols.len() > 1 {
-                // Single tab in column: merge down into previous (or next) column as row 1
-                let target_c = if cur_c > 0 { cur_c - 1 } else { 1 };
-                let tab = cols[cur_c].tabs.remove(0);
-                let old_box = cols[cur_c].container.clone();
-                self.strip.remove(&old_box);
-                cols.remove(cur_c);
-
-                let dest_c = if cur_c < target_c { target_c - 1 } else { target_c };
-                cols[dest_c].container.append(&tab.view);
-                cols[dest_c].tabs.push(tab);
-                let new_r = cols[dest_c].tabs.len() - 1;
-                drop(cols);
-                self.focus_coords(dest_c, new_r);
-                return;
+            } else {
+                // target_slot >= 1 (e.g. Ctrl+Shift+2 -> slot 2, index 1)
+                let dest_idx = target_slot.min(cols[cur_c].tabs.len() - 1);
+                if cur_r != dest_idx {
+                    let tab = cols[cur_c].tabs.remove(cur_r);
+                    cols[cur_c].tabs.insert(dest_idx, tab);
+                    let col = &cols[cur_c];
+                    let mut prev: Option<&gtk::Widget> = None;
+                    for t in col.tabs.iter() {
+                        col.container.reorder_child_after(&t.view, prev);
+                        prev = Some(t.view.as_ref());
+                    }
+                    col.container.queue_allocate();
+                    drop(cols);
+                    self.focus_coords(cur_c, dest_idx);
+                    self.strip.queue_allocate();
+                    self.reveal_focus();
+                    self.refresh_sidebar();
+                    self.save_session();
+                    return;
+                }
             }
-        } else if target_slot == 0 {
-            // Ctrl+Shift+1: move up to slot 1 / pop out to its own column
-            if cols[cur_c].tabs.len() > 1 && cur_r > 0 {
-                let tab = cols[cur_c].tabs.remove(cur_r);
-                cols[cur_c].container.remove(&tab.view);
+        } else if cols.len() > 1 && target_slot >= 1 {
+            // Case 2: Single tab in current column, but multiple columns exist.
+            // Move this tab down into adjacent column as row 2 (vertical split).
+            let target_c = if cur_c > 0 { cur_c - 1 } else { 1 };
+            let tab = cols[cur_c].tabs.remove(0);
+            let old_box = cols[cur_c].container.clone();
+            old_box.remove(&tab.view); // CRITICAL: unparent before adding to new container!
+            self.strip.remove(&old_box);
+            cols.remove(cur_c);
 
-                let box_widget = gtk::Box::new(gtk::Orientation::Vertical, 6);
-                box_widget.add_css_class("rail-col");
-                box_widget.add_css_class("full");
-                box_widget.set_vexpand(true);
-                box_widget.set_hexpand(true);
-                box_widget.set_homogeneous(true);
-                box_widget.append(&tab.view);
-
-                let prev = cols[cur_c].container.clone();
-                self.strip.insert_child_after(&box_widget, Some(&prev));
-
-                let new_col_idx = cur_c + 1;
-                cols.insert(new_col_idx, Column {
-                    container: box_widget,
-                    tabs: vec![tab],
-                });
+            let dest_c = if cur_c < target_c { target_c - 1 } else { target_c };
+            cols[dest_c].container.append(&tab.view);
+            cols[dest_c].tabs.push(tab);
+            cols[dest_c].container.queue_allocate();
+            self.strip.queue_allocate();
+            let new_r = cols[dest_c].tabs.len() - 1;
+            drop(cols);
+            self.focus_coords(dest_c, new_r);
+            self.strip.queue_allocate();
+            self.reveal_focus();
+            self.refresh_sidebar();
+            self.save_session();
+            return;
+        } else if cols.len() == 1 && cols[0].tabs.len() == 1 && target_slot >= 1 {
+            // Case 3: Only one tab in the entire window.
+            // Ctrl+Shift+2 creates a vertical split and drops the current tab to row 2!
+            drop(cols);
+            self.split_vertical();
+            let mut cols = self.cols.borrow_mut();
+            if !cols.is_empty() && cols[0].tabs.len() > 1 {
+                cols[0].tabs.swap(0, 1);
+                let col = &cols[0];
+                let mut prev: Option<&gtk::Widget> = None;
+                for t in col.tabs.iter() {
+                    col.container.reorder_child_after(&t.view, prev);
+                    prev = Some(t.view.as_ref());
+                }
+                col.container.queue_allocate();
                 drop(cols);
-                self.focus_coords(new_col_idx, 0);
-                return;
+                self.focus_coords(0, 1);
+                self.strip.queue_allocate();
+                self.reveal_focus();
+                self.refresh_sidebar();
+                self.save_session();
             }
+            return;
         }
         drop(cols);
         self.save_session();
@@ -1876,9 +1949,11 @@ impl App {
 
     // ---- keys ------------------------------------------------------------
 
-    fn on_key(self: &Rc<Self>, key: gdk::Key, state: gdk::ModifierType) -> bool {
+    fn on_key(self: &Rc<Self>, key: gdk::Key, keycode: u32, state: gdk::ModifierType) -> bool {
         use gdk::ModifierType as M;
-        let m = state & gtk::accelerator_get_default_mod_mask();
+        let ctrl = state.contains(M::CONTROL_MASK);
+        let shift = state.contains(M::SHIFT_MASK);
+        let alt = state.contains(M::ALT_MASK);
         let k = key.to_lower();
 
         if k == gdk::Key::Escape {
@@ -1896,15 +1971,15 @@ impl App {
             }
             return false;
         }
-        let global = m == M::CONTROL_MASK && matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::q | gdk::Key::p);
-        if self.overview_open() && !global && self.ov_key(k, m) {
+        let global = ctrl && !shift && !alt && matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::q | gdk::Key::p);
+        if self.overview_open() && !global && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
             return true;
         }
-        if m.is_empty() && k == gdk::Key::F11 {
+        if !ctrl && !shift && !alt && k == gdk::Key::F11 {
             self.win.set_fullscreened(!self.win.is_fullscreen());
             return true;
         }
-        if m == M::ALT_MASK {
+        if alt && !ctrl && !shift {
             let v = self.focused_view();
             match k {
                 gdk::Key::Left => v.map(|v| v.go_back()),
@@ -1914,26 +1989,14 @@ impl App {
             return true;
         }
 
-        if m == M::CONTROL_MASK {
+        if ctrl && !shift && !alt {
             match k {
                 gdk::Key::p => self.toggle_profiles_modal(),
                 gdk::Key::t => self.new_tab(),
                 gdk::Key::v => self.split_vertical(),
                 gdk::Key::f => self.toggle_full(),
-                // Vertical window selection in current column
-                gdk::Key::_1 | gdk::Key::KP_1 => self.focus_coords(self.focus_col.get(), 0),
-                gdk::Key::_2 | gdk::Key::KP_2 => self.focus_coords(self.focus_col.get(), 1),
-                gdk::Key::_3 | gdk::Key::KP_3 => self.focus_coords(self.focus_col.get(), 2),
-                gdk::Key::_4 | gdk::Key::KP_4 => self.focus_coords(self.focus_col.get(), 3),
-                gdk::Key::_5 | gdk::Key::KP_5 => self.focus_coords(self.focus_col.get(), 4),
-                gdk::Key::_6 | gdk::Key::KP_6 => self.focus_coords(self.focus_col.get(), 5),
-                gdk::Key::_7 | gdk::Key::KP_7 => self.focus_coords(self.focus_col.get(), 6),
-                gdk::Key::_8 | gdk::Key::KP_8 => self.focus_coords(self.focus_col.get(), 7),
-                gdk::Key::_9 | gdk::Key::KP_9 => self.focus_coords(self.focus_col.get(), 8),
-                // Horizontal navigation (columns)
                 gdk::Key::h | gdk::Key::Left => self.focus_column_left(),
                 gdk::Key::l | gdk::Key::Right => self.focus_column_right(),
-                // Vertical navigation (windows in column)
                 gdk::Key::j | gdk::Key::Down => self.focus_window_down(),
                 gdk::Key::k | gdk::Key::Up => self.focus_window_up(),
                 gdk::Key::w => {
@@ -1956,21 +2019,88 @@ impl App {
                     }
                 }
                 gdk::Key::q => self.win.close(),
-                _ => return false,
+                _ => {
+                    // Vertical window selection in current column (Ctrl+1..9)
+                    if keycode == 10 || keycode == 87 || k == gdk::Key::_1 || k == gdk::Key::KP_1 || key.to_unicode() == Some('1') {
+                        self.focus_coords(self.focus_col.get(), 0);
+                        return true;
+                    }
+                    if keycode == 11 || keycode == 88 || k == gdk::Key::_2 || k == gdk::Key::KP_2 || key.to_unicode() == Some('2') {
+                        self.focus_coords(self.focus_col.get(), 1);
+                        return true;
+                    }
+                    if keycode == 12 || keycode == 89 || k == gdk::Key::_3 || k == gdk::Key::KP_3 || key.to_unicode() == Some('3') {
+                        self.focus_coords(self.focus_col.get(), 2);
+                        return true;
+                    }
+                    if keycode == 13 || keycode == 90 || k == gdk::Key::_4 || k == gdk::Key::KP_4 || key.to_unicode() == Some('4') {
+                        self.focus_coords(self.focus_col.get(), 3);
+                        return true;
+                    }
+                    if keycode == 14 || keycode == 91 || k == gdk::Key::_5 || k == gdk::Key::KP_5 || key.to_unicode() == Some('5') {
+                        self.focus_coords(self.focus_col.get(), 4);
+                        return true;
+                    }
+                    if keycode == 15 || keycode == 92 || k == gdk::Key::_6 || k == gdk::Key::KP_6 || key.to_unicode() == Some('6') {
+                        self.focus_coords(self.focus_col.get(), 5);
+                        return true;
+                    }
+                    if keycode == 16 || keycode == 93 || k == gdk::Key::_7 || k == gdk::Key::KP_7 || key.to_unicode() == Some('7') {
+                        self.focus_coords(self.focus_col.get(), 6);
+                        return true;
+                    }
+                    if keycode == 17 || keycode == 94 || k == gdk::Key::_8 || k == gdk::Key::KP_8 || key.to_unicode() == Some('8') {
+                        self.focus_coords(self.focus_col.get(), 7);
+                        return true;
+                    }
+                    if keycode == 18 || keycode == 95 || k == gdk::Key::_9 || k == gdk::Key::KP_9 || key.to_unicode() == Some('9') {
+                        self.focus_coords(self.focus_col.get(), 8);
+                        return true;
+                    }
+                    return false;
+                }
             }
             return true;
         }
-        if m == M::CONTROL_MASK | M::SHIFT_MASK {
+
+        if ctrl && shift && !alt {
             match k {
                 gdk::Key::p | gdk::Key::P => self.toggle_profiles_modal(),
                 gdk::Key::t | gdk::Key::T => self.toggle_touchpad_mode(),
-                gdk::Key::_2 | gdk::Key::at | gdk::Key::KP_2 => self.move_tab_to_vertical_slot(1),
-                gdk::Key::_1 | gdk::Key::exclam | gdk::Key::KP_1 => self.move_tab_to_vertical_slot(0),
                 gdk::Key::h | gdk::Key::Left => self.move_column(-1),
                 gdk::Key::l | gdk::Key::Right => self.move_column(1),
                 gdk::Key::j | gdk::Key::Down => self.move_window(1),
                 gdk::Key::k | gdk::Key::Up => self.move_window(-1),
-                _ => return false,
+                _ => {
+                    // Ctrl+Shift+1 -> slot 1 (row index 0)
+                    if keycode == 10 || keycode == 87
+                        || k == gdk::Key::_1 || k == gdk::Key::exclam || k == gdk::Key::KP_1
+                        || key == gdk::Key::_1 || key == gdk::Key::exclam || key == gdk::Key::KP_1
+                        || key.to_unicode() == Some('1') || key.to_unicode() == Some('!')
+                    {
+                        self.move_tab_to_vertical_slot(0);
+                        return true;
+                    }
+                    // Ctrl+Shift+2 -> slot 2 (row index 1)
+                    if keycode == 11 || keycode == 88
+                        || k == gdk::Key::_2 || k == gdk::Key::at || k == gdk::Key::quotedbl || k == gdk::Key::KP_2
+                        || key == gdk::Key::_2 || key == gdk::Key::at || key == gdk::Key::quotedbl || key == gdk::Key::KP_2
+                        || key.to_unicode() == Some('2') || key.to_unicode() == Some('@') || key.to_unicode() == Some('"')
+                    {
+                        self.move_tab_to_vertical_slot(1);
+                        return true;
+                    }
+                    // Ctrl+Shift+3 -> slot 3 (row index 2)
+                    if keycode == 12 || keycode == 89
+                        || k == gdk::Key::_3 || k == gdk::Key::numbersign || k == gdk::Key::KP_3
+                        || key == gdk::Key::_3 || key == gdk::Key::numbersign || key == gdk::Key::KP_3
+                        || key.to_unicode() == Some('3') || key.to_unicode() == Some('#')
+                    {
+                        self.move_tab_to_vertical_slot(2);
+                        return true;
+                    }
+                    return false;
+                }
             }
             return true;
         }
@@ -2405,8 +2535,8 @@ fn build(gapp: &gtk::Application) {
     let keys = gtk::EventControllerKey::new();
     keys.set_propagation_phase(gtk::PropagationPhase::Capture);
     let a = app.clone();
-    keys.connect_key_pressed(move |_, key, _, state| {
-        if a.on_key(key, state) { glib::Propagation::Stop } else { glib::Propagation::Proceed }
+    keys.connect_key_pressed(move |_, key, keycode, state| {
+        if a.on_key(key, keycode, state) { glib::Propagation::Stop } else { glib::Propagation::Proceed }
     });
     win.add_controller(keys);
 
