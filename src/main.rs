@@ -930,6 +930,9 @@ impl App {
         });
         let app = self.clone();
         view.connect_close(move |v| app.close_view(v));
+        view.connect_web_process_terminated(move |v, _reason| {
+            v.reload();
+        });
     }
 
     fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_row: bool) {
@@ -987,6 +990,9 @@ impl App {
         }
 
         let mut rows = self.rows.borrow_mut();
+        if r_idx >= rows.len() || c_idx >= rows[r_idx].tabs.len() {
+            return;
+        }
         let tab = rows[r_idx].tabs.remove(c_idx);
         self.strip.remove(&tab.container);
 
@@ -1005,9 +1011,20 @@ impl App {
         } else {
             let next_r = r_idx.min(total_rows.saturating_sub(1));
             let rows = self.rows.borrow();
-            let next_c = c_idx.saturating_sub(1).min(rows[next_r].tabs.len().saturating_sub(1));
-            drop(rows);
-            self.focus_coords(next_r, next_c);
+            if rows.is_empty() || rows[next_r].tabs.is_empty() {
+                if let Some((first_r, _)) = rows.iter().enumerate().find(|(_, r)| !r.tabs.is_empty()) {
+                    let next_c = c_idx.min(rows[first_r].tabs.len().saturating_sub(1));
+                    drop(rows);
+                    self.focus_coords(first_r, next_c);
+                } else {
+                    drop(rows);
+                    self.new_tab();
+                }
+            } else {
+                let next_c = c_idx.min(rows[next_r].tabs.len().saturating_sub(1));
+                drop(rows);
+                self.focus_coords(next_r, next_c);
+            }
         }
     }
 
@@ -1109,7 +1126,7 @@ impl App {
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
         let mut rows = self.rows.borrow_mut();
-        if cur_r >= rows.len() {
+        if cur_r >= rows.len() || cur_c >= rows[cur_r].tabs.len() {
             return;
         }
         let Some(target_c) = cur_c.checked_add_signed(dir).filter(|&t| t < rows[cur_r].tabs.len()) else { return };
@@ -1201,11 +1218,7 @@ impl App {
             if t.row > max_row { max_row = t.row; }
         }
 
-        let mut rows = self.rows.borrow_mut();
-        while rows.len() <= max_row {
-            rows.push(Row { tabs: Vec::new() });
-        }
-
+        let mut loaded_tabs: Vec<(usize, Tab)> = Vec::new();
         for item in tab_items {
             let session = self.profiles.borrow_mut().get_or_create_session(&item.profile_id);
             let view = WebView::builder().network_session(&session).build();
@@ -1219,7 +1232,15 @@ impl App {
                 container.remove_css_class("full");
             }
             self.setup_view_signals(&view);
-            rows[item.row].tabs.push(Tab { container, view, profile_id: item.profile_id });
+            loaded_tabs.push((item.row, Tab { container, view, profile_id: item.profile_id }));
+        }
+
+        let mut rows = self.rows.borrow_mut();
+        while rows.len() <= max_row {
+            rows.push(Row { tabs: Vec::new() });
+        }
+        for (row_idx, tab) in loaded_tabs {
+            rows[row_idx].tabs.push(tab);
         }
         drop(rows);
 
@@ -1453,10 +1474,12 @@ impl App {
         title.set_margin_bottom(4);
         box_menu.append(&title);
 
-        let mgr = self.profiles.borrow();
-        let selected_id = self.selected_palette_profile.borrow().clone();
+        let (profiles, selected_id) = {
+            let mgr = self.profiles.borrow();
+            (mgr.profiles().to_vec(), self.selected_palette_profile.borrow().clone())
+        };
 
-        for p in mgr.profiles() {
+        for p in profiles {
             let row_btn = gtk::Button::new();
             row_btn.add_css_class("profile-item-btn");
             if p.id == selected_id {
@@ -1638,10 +1661,10 @@ impl App {
             self.profiles_list_box.remove(&r);
         }
 
-        let mgr = self.profiles.borrow();
-        let profiles = mgr.profiles().to_vec();
-        let active_id = mgr.active_id().to_string();
-        let can_delete = profiles.len() > 1;
+        let (profiles, active_id, can_delete) = {
+            let mgr = self.profiles.borrow();
+            (mgr.profiles().to_vec(), mgr.active_id().to_string(), mgr.profiles().len() > 1)
+        };
 
         for p in profiles {
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
@@ -1692,8 +1715,12 @@ impl App {
                 let pid = p.id.clone();
                 set_act_btn.connect_clicked(move |_| {
                     app.profiles.borrow_mut().set_active(&pid);
-                    app.rebuild_profiles_modal_list();
-                    app.rebuild_profile_popover();
+                    let a = app.clone();
+                    glib::idle_add_local_once(move || {
+                        a.rebuild_profiles_modal_list();
+                        a.rebuild_profile_popover();
+                        a.refresh_sidebar();
+                    });
                 });
                 actions_box.append(&set_act_btn);
             }
@@ -1706,9 +1733,22 @@ impl App {
                 let pid = p.id.clone();
                 del_btn.connect_clicked(move |_| {
                     app.profiles.borrow_mut().delete_profile(&pid);
-                    app.rebuild_profiles_modal_list();
-                    app.rebuild_profile_popover();
-                    app.refresh_sidebar();
+                    {
+                        let mut rows = app.rows.borrow_mut();
+                        for row in rows.iter_mut() {
+                            for tab in row.tabs.iter_mut() {
+                                if tab.profile_id == pid {
+                                    tab.profile_id = "default".to_string();
+                                }
+                            }
+                        }
+                    }
+                    let a = app.clone();
+                    glib::idle_add_local_once(move || {
+                        a.rebuild_profiles_modal_list();
+                        a.rebuild_profile_popover();
+                        a.refresh_sidebar();
+                    });
                 });
                 actions_box.append(&del_btn);
             }
@@ -1757,14 +1797,15 @@ impl App {
 
     fn create_new_profile_action(self: &Rc<Self>) {
         let name = self.new_profile_entry.text().to_string();
-        let clean = name.trim();
+        let clean = name.trim().to_string();
         if clean.is_empty() {
             self.update_create_profile_btn_state();
             return;
         }
 
         let color_idx = self.new_profile_color_idx.get();
-        match self.profiles.borrow_mut().create_profile(clean, color_idx) {
+        let create_res = self.profiles.borrow_mut().create_profile(&clean, color_idx);
+        match create_res {
             Ok(_) => {
                 self.new_profile_entry.set_text("");
                 self.update_create_profile_btn_state();
@@ -1922,11 +1963,20 @@ impl App {
         let alt = state.contains(M::ALT_MASK);
         let k = key.to_lower();
 
-        if k == gdk::Key::Escape {
-            if self.profiles_modal_open() {
+        if self.profiles_modal_open() {
+            if k == gdk::Key::Escape {
                 self.hide_profiles_modal();
                 return true;
             }
+            if ctrl && !shift && !alt && (k == gdk::Key::p || k == gdk::Key::P) {
+                self.hide_profiles_modal();
+                return true;
+            }
+            // All other keystrokes pass directly to profiles_modal without triggering window shortcuts
+            return false;
+        }
+
+        if k == gdk::Key::Escape {
             if self.palette_open() {
                 self.cancel_palette();
                 return true;
@@ -1966,8 +2016,10 @@ impl App {
                 gdk::Key::j | gdk::Key::Down => self.focus_row_down(),
                 gdk::Key::k | gdk::Key::Up => self.focus_row_up(),
                 gdk::Key::w => {
-                    if let Some(v) = self.focused_view() {
-                        self.close_view(&v);
+                    if !self.palette_open() {
+                        if let Some(v) = self.focused_view() {
+                            self.close_view(&v);
+                        }
                     }
                 }
                 gdk::Key::b => self.toggle_sidebar(),
