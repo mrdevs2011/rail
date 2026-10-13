@@ -1,5 +1,5 @@
-//! The niri-style horizontal strip: a custom GTK layout manager that places
-//! columns side by side in a strip and slides the whole strip by `offset`.
+//! The niri-style 2D tiled layout: a custom GTK layout manager that places
+//! columns horizontally and rows (workspaces) vertically, sliding by (offset_x, offset_y).
 
 use gtk::glib;
 use gtk::prelude::*;
@@ -9,18 +9,16 @@ use gtk4 as gtk;
 
 pub const GAP: f64 = 6.0;
 
-/// Space between columns, in strip coordinates. It grows as the strip zooms
+/// Space between columns and rows, in strip coordinates. It grows as the strip zooms
 /// out so scaled-down tabs keep a readable gap instead of nearly touching.
 pub fn gap(zoom: f64) -> f64 {
     GAP + (1.0 - zoom) * 40.0
 }
 
-/// Minimum width for a column to be usable. If the strip viewport cannot comfortably
-/// fit two columns of at least MIN_COL_W, columns expand to fill the full viewport.
+/// Minimum width for a column to be usable.
 pub const MIN_COL_W: f64 = 480.0;
 
-/// Half columns fill two-per-screen when wide; if the viewport is narrow (< MIN_COL_W*2 + GAP)
-/// or if `full` is true, the column fills the viewport (adaptive single-column mode).
+/// Column width calculation
 pub fn col_width(full: bool, viewport: f64) -> f64 {
     if full || viewport < (MIN_COL_W * 2.0 + GAP) {
         viewport.max(280.0)
@@ -37,12 +35,17 @@ mod imp {
 
     #[derive(Default)]
     pub struct StripLayout {
-        /// Left edge of the visible region, in unscaled strip coordinates.
-        pub offset: Cell<f64>,
-        /// 1.0 normally; < 1.0 in overview, where the live columns are scaled down.
+        /// Left edge of the visible region (X), in unscaled coordinates.
+        pub offset_x: Cell<f64>,
+        /// Top edge of the visible region (Y), in unscaled coordinates.
+        pub offset_y: Cell<f64>,
+        /// 1.0 normally; < 1.0 in overview, where the 2D grid is scaled down.
         pub zoom: Cell<f64>,
         pub width: Cell<i32>,
+        pub height: Cell<i32>,
         pub on_resize: RefCell<Option<Rc<dyn Fn()>>>,
+        /// For each row: list of is_full flags for each column
+        pub grid: RefCell<Vec<Vec<bool>>>,
     }
 
     #[glib::object_subclass]
@@ -56,33 +59,53 @@ mod imp {
 
     impl LayoutManagerImpl for StripLayout {
         fn measure(&self, _w: &gtk::Widget, _o: gtk::Orientation, _for_size: i32) -> (i32, i32, i32, i32) {
-            // The strip never dictates window size; content scrolls instead.
             (0, 0, -1, -1)
         }
 
         fn allocate(&self, widget: &gtk::Widget, width: i32, height: i32, _baseline: i32) {
-            if self.width.replace(width) != width {
-                // Deferred: we must not touch layout state from inside allocate.
+            let resized = self.width.replace(width) != width || self.height.replace(height) != height;
+            if resized {
                 if let Some(cb) = self.on_resize.borrow().clone() {
                     glib::idle_add_local_once(move || cb());
                 }
             }
             let vw = width as f64;
-            let (offset, z) = (self.offset.get(), self.zoom.get());
-            // Scaled content stays vertically centered (niri-style zoom-out).
-            let ty = height as f64 / 2.0 * (1.0 - z);
-            let mut x = 0.0;
+            let vh = height as f64;
+            let (off_x, off_y, z) = (self.offset_x.get(), self.offset_y.get(), self.zoom.get());
+            let g = gap(z);
+            let grid = self.grid.borrow();
             let mut child = widget.first_child();
-            while let Some(c) = child {
-                let cw = col_width(c.has_css_class("full"), vw);
-                // Children keep their real size; the transform does the scaling,
-                // so pages never re-layout while zooming.
-                let t = gsk::Transform::new()
-                    .translate(&graphene::Point::new(((x - offset) * z) as f32, ty as f32))
-                    .scale(z as f32, z as f32);
-                c.allocate(cw as i32, height, -1, Some(t));
-                x += cw + gap(z);
-                child = c.next_sibling();
+
+            if grid.is_empty() {
+                let mut x = 0.0;
+                while let Some(c) = child {
+                    let cw = col_width(c.has_css_class("full"), vw);
+                    let t = gsk::Transform::new()
+                        .translate(&graphene::Point::new(((x - off_x) * z) as f32, ((0.0 - off_y) * z) as f32))
+                        .scale(z as f32, z as f32);
+                    c.allocate(cw as i32, height, -1, Some(t));
+                    x += cw + g;
+                    child = c.next_sibling();
+                }
+                return;
+            }
+
+            for (r_idx, row) in grid.iter().enumerate() {
+                let row_y = r_idx as f64 * (vh + g);
+                let mut col_x = 0.0;
+                for &is_full in row.iter() {
+                    if let Some(c) = child {
+                        let cw = col_width(is_full, vw);
+                        let tx = ((col_x - off_x) * z) as f32;
+                        let ty = ((row_y - off_y) * z) as f32;
+                        let t = gsk::Transform::new()
+                            .translate(&graphene::Point::new(tx, ty))
+                            .scale(z as f32, z as f32);
+                        c.allocate(cw as i32, height, -1, Some(t));
+                        col_x += cw + g;
+                        child = c.next_sibling();
+                    }
+                }
             }
         }
     }
@@ -98,17 +121,26 @@ impl StripLayout {
         l.imp().zoom.set(1.0);
         l
     }
-    pub fn offset(&self) -> f64 {
-        self.imp().offset.get()
+    pub fn offset_x(&self) -> f64 {
+        self.imp().offset_x.get()
     }
-    pub fn set_offset(&self, v: f64) {
-        self.imp().offset.set(v);
+    pub fn set_offset_x(&self, v: f64) {
+        self.imp().offset_x.set(v);
+    }
+    pub fn offset_y(&self) -> f64 {
+        self.imp().offset_y.get()
+    }
+    pub fn set_offset_y(&self, v: f64) {
+        self.imp().offset_y.set(v);
     }
     pub fn zoom(&self) -> f64 {
         self.imp().zoom.get()
     }
     pub fn set_zoom(&self, v: f64) {
         self.imp().zoom.set(v);
+    }
+    pub fn set_grid(&self, grid: Vec<Vec<bool>>) {
+        *self.imp().grid.borrow_mut() = grid;
     }
     pub fn connect_resized(&self, f: impl Fn() + 'static) {
         *self.imp().on_resize.borrow_mut() = Some(std::rc::Rc::new(f));

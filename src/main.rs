@@ -31,21 +31,21 @@ kbd{font:11px ui-monospace,monospace;background:#090a0f;border:1px solid #1c1d29
   kbd{padding:1px 4px;font-size:10px}
 }
 </style>
-<div class=w><h1>rail<b>.</b></h1><p>a niri-style tiled browser (horizontal strip, vertical stacks & isolated profiles)</p><div class=k>
+<div class=w><h1>rail<b>.</b></h1><p>a niri-style 2D tiled browser (workspaces, horizontal strips & isolated profiles)</p><div class=k>
 <span><kbd>Ctrl</kbd><kbd>G</kbd></span><span>go to address</span>
 <span><kbd>Ctrl</kbd><kbd>Enter</kbd></span><span>edit current URL</span>
-<span><kbd>Ctrl</kbd><kbd>T</kbd></span><span>new column tab</span>
-<span><kbd>Ctrl</kbd><kbd>V</kbd></span><span>split vertically (down stack)</span>
-<span><kbd>Ctrl</kbd><kbd>1</kbd> <kbd>2</kbd></span><span>focus row 1 / 2 in column</span>
-<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>2</kbd> <kbd>1</kbd></span><span>move tab down into stack / pop out</span>
+<span><kbd>Ctrl</kbd><kbd>T</kbd></span><span>new tab (current row)</span>
+<span><kbd>Ctrl</kbd><kbd>V</kbd></span><span>new row tab (workspace below)</span>
+<span><kbd>Ctrl</kbd><kbd>1</kbd> <kbd>2</kbd></span><span>focus workspace 1 / 2 (row)</span>
+<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>2</kbd> <kbd>1</kbd></span><span>move tab to workspace 2 / 1</span>
 <span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>T</kbd></span><span>touchpad mode (2-finger slide tabs)</span>
 <span><kbd>Ctrl</kbd><kbd>P</kbd> / <kbd>Shift</kbd><kbd>P</kbd></span><span>manage profiles</span>
-<span><kbd>Ctrl</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>focus left / right column</span>
-<span><kbd>Ctrl</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>focus down / up window</span>
-<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>move column left / right</span>
-<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>move window down / up</span>
+<span><kbd>Ctrl</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>focus left / right tab</span>
+<span><kbd>Ctrl</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>focus workspace down / up</span>
+<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>move tab left / right</span>
+<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>move tab down / up workspace</span>
 <span><kbd>Ctrl</kbd><kbd>F</kbd></span><span>full / half width</span>
-<span><kbd>Ctrl</kbd><kbd>O</kbd></span><span>overview</span>
+<span><kbd>Ctrl</kbd><kbd>O</kbd></span><span>overview (2D grid zoom out)</span>
 <span><kbd>Ctrl</kbd><kbd>B</kbd></span><span>sidebar</span>
 </div></div>"#;
 
@@ -164,7 +164,6 @@ button.pill:hover .pill-chip {
     border-radius: 4px;
     padding: 1px 4px;
     min-width: 14px;
-    text-align: center;
 }
 row:selected .tab-index {
     color: #38bdf8;
@@ -255,7 +254,7 @@ entry.palette-entry, entry.palette-entry:focus-within {
     margin-top: 6px;
 }
 
-/* ---- overview (the live strip, zoomed out) ---- */
+/* ---- overview (the live strip, zoomed out in 2D) ---- */
 .zoomed .tab { opacity: 0.85; border-radius: 16px; border: 1.5px solid #20222e; }
 .zoomed .tab.focused { opacity: 1; outline: 4px solid #38bdf8; outline-offset: -2px; }
 .ov-hint {
@@ -282,9 +281,7 @@ entry.palette-entry, entry.palette-entry:focus-within {
 /* ---- profile circle button in URL palette ---- */
 button.profile-circle-btn {
     min-width: 30px;
-    max-width: 30px;
     min-height: 30px;
-    max-height: 30px;
     padding: 0;
     border-radius: 9999px;
     border: 1.5px solid #1e202d;
@@ -336,9 +333,7 @@ button.profile-item-btn.selected {
 }
 .profile-item-dot {
     min-width: 22px;
-    max-width: 22px;
     min-height: 22px;
-    max-height: 22px;
     border-radius: 9999px;
     font-size: 11px;
     font-weight: 800;
@@ -365,7 +360,6 @@ button.profile-item-btn.selected {
     padding: 22px 26px;
     box-shadow: 0 32px 80px rgba(0,0,0,0.98);
     min-width: 440px;
-    max-width: 480px;
     margin-left: 16px;
     margin-right: 16px;
 }
@@ -399,9 +393,7 @@ button.profile-item-btn.selected {
 }
 .profile-avatar-circle {
     min-width: 30px;
-    max-width: 30px;
     min-height: 30px;
-    max-height: 30px;
     border-radius: 9999px;
     font-size: 12px;
     font-weight: 800;
@@ -528,9 +520,7 @@ button.btn-create-profile.active-ready:hover label {
     font-size: 9px;
     font-weight: 800;
     min-width: 16px;
-    max-width: 16px;
     min-height: 16px;
-    max-height: 16px;
     border-radius: 9999px;
     margin-left: 2px;
     margin-right: 4px;
@@ -540,9 +530,7 @@ button.btn-create-profile.active-ready:hover label {
 }
 button.color-choice {
     min-width: 22px;
-    max-width: 22px;
     min-height: 22px;
-    max-height: 22px;
     padding: 0;
     border-radius: 9999px;
     border: 2px solid transparent;
@@ -562,12 +550,12 @@ button.color-choice.selected {
 const OV_ZOOM: f64 = 0.4;
 
 struct Tab {
+    container: gtk::Box,
     view: WebView,
     profile_id: String,
 }
 
-struct Column {
-    container: gtk::Box,
+struct Row {
     tabs: Vec<Tab>,
 }
 
@@ -586,15 +574,17 @@ struct App {
     ov_hint: gtk::Label,
     /// Overview is active: the strip is zoomed out and tabs ignore the pointer.
     ov: Cell<bool>,
-    /// Tab coordinates that were focused when overview opened; Esc returns here.
+    /// Tab coordinates (row, col) that were focused when overview opened; Esc returns here.
     ov_return: Cell<(usize, usize)>,
-    /// Scroll position before the overview, restored when zooming back in.
-    ov_saved: Cell<f64>,
+    /// Scroll position before overview, restored when zooming back in.
+    ov_saved_x: Cell<f64>,
+    ov_saved_y: Cell<f64>,
     target_zoom: Cell<f64>,
-    cols: RefCell<Vec<Column>>,
-    focus_col: Cell<usize>,
+    rows: RefCell<Vec<Row>>,
     focus_row: Cell<usize>,
-    target: Cell<f64>,
+    focus_col: Cell<usize>,
+    target_x: Cell<f64>,
+    target_y: Cell<f64>,
     animating: Cell<bool>,
     side_open: Cell<bool>,
     side_gen: Cell<u32>,
@@ -636,10 +626,18 @@ fn host_of(uri: &str) -> Option<String> {
     Some(h.trim_start_matches("www.").to_string())
 }
 
-fn parse_session_content(content: &str) -> ((usize, usize), Vec<(usize, bool)>, Vec<(usize, String, String)>) {
+#[derive(Debug, PartialEq)]
+struct SessionTabItem {
+    row: usize,
+    col: usize,
+    full: bool,
+    profile_id: String,
+    url: String,
+}
+
+fn parse_session_content(content: &str) -> ((usize, usize), Vec<SessionTabItem>) {
     let mut target_focus = (0usize, 0usize);
-    let mut col_flags: Vec<(usize, bool)> = Vec::new();
-    let mut tab_items: Vec<(usize, String, String)> = Vec::new();
+    let mut tabs: Vec<SessionTabItem> = Vec::new();
 
     for line in content.lines() {
         let parts: Vec<&str> = line.split('\t').collect();
@@ -648,32 +646,35 @@ fn parse_session_content(content: &str) -> ((usize, usize), Vec<(usize, bool)>, 
         }
         match parts[0] {
             "focus" if parts.len() >= 3 => {
-                let c = parts[1].parse().unwrap_or(0);
-                let r = parts[2].parse().unwrap_or(0);
-                target_focus = (c, r);
+                let r = parts[1].parse().unwrap_or(0);
+                let c = parts[2].parse().unwrap_or(0);
+                target_focus = (r, c);
             }
-            "col" if parts.len() >= 3 => {
-                let c = parts[1].parse().unwrap_or(0);
-                let full = parts[2] == "1";
-                col_flags.push((c, full));
+            "tab" if parts.len() >= 6 => {
+                let r = parts[1].parse().unwrap_or(0);
+                let c = parts[2].parse().unwrap_or(0);
+                let full = parts[3] == "1";
+                let pid = parts[4].to_string();
+                let url = parts[5].to_string();
+                tabs.push(SessionTabItem { row: r, col: c, full, profile_id: pid, url });
             }
-            "tab" if parts.len() >= 4 => {
+            "tab" if parts.len() == 4 => {
                 let c = parts[1].parse().unwrap_or(0);
                 let pid = parts[2].to_string();
                 let url = parts[3].to_string();
-                tab_items.push((c, pid, url));
+                tabs.push(SessionTabItem { row: 0, col: c, full: true, profile_id: pid, url });
             }
             _ => {}
         }
     }
-    (target_focus, col_flags, tab_items)
+    (target_focus, tabs)
 }
 
 impl App {
     fn focused_view(&self) -> Option<WebView> {
-        let cols = self.cols.borrow();
-        cols.get(self.focus_col.get())
-            .and_then(|c| c.tabs.get(self.focus_row.get()))
+        let rows = self.rows.borrow();
+        rows.get(self.focus_row.get())
+            .and_then(|r| r.tabs.get(self.focus_col.get()))
             .map(|t| t.view.clone())
     }
 
@@ -685,58 +686,139 @@ impl App {
         self.ov.get()
     }
 
+    fn create_tab_widget(view: &WebView) -> gtk::Box {
+        view.add_css_class("tab");
+        view.set_overflow(gtk::Overflow::Hidden);
+        view.set_vexpand(true);
+        view.set_hexpand(true);
+
+        let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        container.add_css_class("rail-col");
+        container.add_css_class("full");
+        container.set_vexpand(true);
+        container.set_hexpand(true);
+        container.append(view);
+        container
+    }
+
+    fn sync_strip(&self) {
+        let rows = self.rows.borrow();
+        let mut grid = Vec::new();
+        let mut prev: Option<gtk::Widget> = None;
+        for row in rows.iter() {
+            let mut row_grid = Vec::new();
+            for tab in row.tabs.iter() {
+                row_grid.push(tab.container.has_css_class("full"));
+                if tab.container.parent().as_ref() != Some(self.strip.upcast_ref()) {
+                    self.strip.append(&tab.container);
+                }
+                self.strip.reorder_child_after(&tab.container, prev.as_ref());
+                prev = Some(tab.container.clone().upcast());
+            }
+            grid.push(row_grid);
+        }
+        drop(rows);
+        self.layout.set_grid(grid);
+        self.strip.queue_allocate();
+    }
+
     // ---- strip scrolling -------------------------------------------------
 
-    /// Normal mode: scroll the minimum needed to show the focused column.
-    /// Overview: center the focused column in the zoomed-out strip.
+    /// Normal mode: scroll 2D minimum needed to show focused row and column.
+    /// Overview: center the 2D grid in the zoomed-out plane.
     fn reveal_focus(self: &Rc<Self>) {
         let vw = self.strip.width() as f64;
-        if vw <= 0.0 {
+        let vh = self.strip.height() as f64;
+        if vw <= 0.0 || vh <= 0.0 {
             return;
         }
-        let visible = vw / self.target_zoom.get(); // strip width that fits on screen
-        let g = gap(self.target_zoom.get());
-        let cols = self.cols.borrow();
-        let mut x = 0.0;
-        let mut span = None;
-        for (i, col) in cols.iter().enumerate() {
-            let w = col_width(col.container.has_css_class("full"), vw);
-            if i == self.focus_col.get() {
-                span = Some((x, x + w));
-            }
-            x += w + g;
+        let z = self.target_zoom.get();
+        let visible_w = vw / z;
+        let visible_h = vh / z;
+        let g = gap(z);
+        let cur_r = self.focus_row.get();
+        let cur_c = self.focus_col.get();
+
+        let rows = self.rows.borrow();
+        if rows.is_empty() {
+            return;
         }
-        let total = x - g;
-        let Some((l, r)) = span else { return };
-        let max = (total - visible).max(0.0);
-        let t = if self.ov.get() {
-            if total <= visible {
-                -(visible - total) / 2.0 // everything fits: center it all
+
+        let total_h = rows.len() as f64 * vh + (rows.len().saturating_sub(1) as f64) * g;
+        let mut max_w: f64 = 0.0;
+        let mut active_span: Option<(f64, f64)> = None;
+        let mut active_row_total_w = 0.0;
+
+        for (ri, row) in rows.iter().enumerate() {
+            let mut x = 0.0;
+            for (ci, tab) in row.tabs.iter().enumerate() {
+                let w = col_width(tab.container.has_css_class("full"), vw);
+                if ri == cur_r && ci == cur_c {
+                    active_span = Some((x, x + w));
+                }
+                x += w + g;
+            }
+            let row_w = (x - g).max(0.0);
+            if ri == cur_r {
+                active_row_total_w = row_w;
+            }
+            if row_w > max_w {
+                max_w = row_w;
+            }
+        }
+        drop(rows);
+
+        let (target_x, target_y) = if self.ov.get() {
+            let ty = if total_h <= visible_h {
+                -(visible_h - total_h) / 2.0
             } else {
-                ((l + r) / 2.0 - visible / 2.0).clamp(0.0, max)
-            }
+                let row_center_y = cur_r as f64 * (vh + g) + vh / 2.0;
+                let max_y = (total_h - visible_h).max(0.0);
+                (row_center_y - visible_h / 2.0).clamp(0.0, max_y)
+            };
+
+            let tx = if max_w <= visible_w {
+                -(visible_w - max_w) / 2.0
+            } else {
+                let max_x = (max_w - visible_w).max(0.0);
+                let col_center_x = active_span.map_or(0.0, |(l, r)| (l + r) / 2.0);
+                (col_center_x - visible_w / 2.0).clamp(0.0, max_x)
+            };
+            (tx, ty)
         } else {
-            let mut t = self.target.get().clamp(0.0, max);
-            if l < t {
-                t = l;
-            } else if r > t + visible {
-                t = r - visible;
-            }
-            t.clamp(0.0, max)
+            let ty = cur_r as f64 * (vh + g);
+            let tx = if let Some((l, r)) = active_span {
+                let max_x = (active_row_total_w - visible_w).max(0.0);
+                let mut t = self.target_x.get().clamp(0.0, max_x);
+                if l < t {
+                    t = l;
+                } else if r > t + visible_w {
+                    t = r - visible_w;
+                }
+                t.clamp(0.0, max_x)
+            } else {
+                0.0
+            };
+            (tx, ty)
         };
-        self.target.set(t);
-        drop(cols);
+
+        self.target_x.set(target_x);
+        self.target_y.set(target_y);
         self.animate();
     }
 
-    /// Ease both the scroll offset and the zoom toward their targets.
+    /// Ease both the scroll offsets (X, Y) and zoom toward their targets.
     fn animate(self: &Rc<Self>) {
         if self.animating.get() {
             return;
         }
         let near = |a: f64, b: f64, eps: f64| (a - b).abs() < eps;
-        if near(self.target.get(), self.layout.offset(), 0.5) && near(self.target_zoom.get(), self.layout.zoom(), 0.002) {
-            self.layout.set_offset(self.target.get());
+        if near(self.target_x.get(), self.layout.offset_x(), 0.5)
+            && near(self.target_y.get(), self.layout.offset_y(), 0.5)
+            && near(self.target_zoom.get(), self.layout.zoom(), 0.002)
+        {
+            self.layout.set_offset_x(self.target_x.get());
+            self.layout.set_offset_y(self.target_y.get());
             self.layout.set_zoom(self.target_zoom.get());
             self.strip.queue_allocate();
             return;
@@ -748,24 +830,25 @@ impl App {
             let now = clock.frame_time();
             let dt = last.replace(Some(now)).map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
             let k = 1.0 - (-dt / 0.06).exp();
-            let w = (strip.width() as f64).max(1.0);
-            let (oc, ot) = (app.layout.offset(), app.target.get());
+
+            let (oxc, oxt) = (app.layout.offset_x(), app.target_x.get());
+            let (oyc, oyt) = (app.layout.offset_y(), app.target_y.get());
             let (zc, zt) = (app.layout.zoom(), app.target_zoom.get());
-            let (cc, ct) = (oc + w / (2.0 * zc), ot + w / (2.0 * zt));
-            let mut cn = cc + (ct - cc) * k;
-            let mut znext = zc + (zt - zc) * k;
-            if near(ct, cn, 0.5) {
-                cn = ct;
-            }
-            if near(zt, znext, 0.002) {
-                znext = zt;
-            }
-            let next = if cn == ct && znext == zt { ot } else { cn - w / (2.0 * znext) };
-            let tgt = ot;
-            app.layout.set_offset(next);
-            app.layout.set_zoom(znext);
+
+            let mut nx = oxc + (oxt - oxc) * k;
+            let mut ny = oyc + (oyt - oyc) * k;
+            let mut nz = zc + (zt - zc) * k;
+
+            if near(oxt, nx, 0.5) { nx = oxt; }
+            if near(oyt, ny, 0.5) { ny = oyt; }
+            if near(zt, nz, 0.002) { nz = zt; }
+
+            app.layout.set_offset_x(nx);
+            app.layout.set_offset_y(ny);
+            app.layout.set_zoom(nz);
             strip.queue_allocate();
-            if next == tgt && znext == zt {
+
+            if nx == oxt && ny == oyt && nz == zt {
                 app.animating.set(false);
                 glib::ControlFlow::Break
             } else {
@@ -774,19 +857,21 @@ impl App {
         });
     }
 
-    // ---- tabs & columns --------------------------------------------------
+    // ---- tabs & workspaces -----------------------------------------------
 
     fn focused_tab_profile(&self) -> Option<String> {
-        let cur_c = self.focus_col.get();
         let cur_r = self.focus_row.get();
-        let cols = self.cols.borrow();
-        cols.get(cur_c).and_then(|c| c.tabs.get(cur_r)).map(|t| t.profile_id.clone())
+        let cur_c = self.focus_col.get();
+        let rows = self.rows.borrow();
+        rows.get(cur_r)
+            .and_then(|r| r.tabs.get(cur_c))
+            .map(|t| t.profile_id.clone())
     }
 
     fn find_view_profile(&self, view: &WebView) -> Option<String> {
-        let cols = self.cols.borrow();
-        for col in cols.iter() {
-            for tab in col.tabs.iter() {
+        let rows = self.rows.borrow();
+        for row in rows.iter() {
+            for tab in row.tabs.iter() {
                 if &tab.view == view {
                     return Some(tab.profile_id.clone());
                 }
@@ -802,7 +887,7 @@ impl App {
         let view = WebView::builder().network_session(&session).build();
         view.load_html(START_PAGE, None);
         *self.fresh.borrow_mut() = Some(view.clone());
-        self.add_view(view, prof_id.clone(), true); // new column
+        self.add_view(view, prof_id.clone(), false);
         self.select_palette_profile(&prof_id);
         self.show_palette();
     }
@@ -814,7 +899,7 @@ impl App {
         let view = WebView::builder().network_session(&session).build();
         view.load_html(START_PAGE, None);
         *self.fresh.borrow_mut() = Some(view.clone());
-        self.add_view(view, prof_id.clone(), false); // in current column below
+        self.add_view(view, prof_id.clone(), true);
         self.select_palette_profile(&prof_id);
         self.show_palette();
     }
@@ -840,72 +925,55 @@ impl App {
         view.connect_create(move |v, _| {
             let parent_prof = app.find_view_profile(v).unwrap_or_else(|| app.profiles.borrow().active_profile().id);
             let nv = WebView::builder().related_view(v).build();
-            app.add_view(nv.clone(), parent_prof, true);
+            app.add_view(nv.clone(), parent_prof, false);
             Some(nv.upcast())
         });
         let app = self.clone();
         view.connect_close(move |v| app.close_view(v));
     }
 
-    fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_col: bool) {
-        view.add_css_class("tab");
-        view.set_overflow(gtk::Overflow::Hidden);
+    fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_row: bool) {
         view.set_can_target(!self.ov.get());
-        view.set_vexpand(true);
-        view.set_hexpand(true);
+        let container = Self::create_tab_widget(&view);
 
-        let (target_c, target_r) = {
-            let mut cols = self.cols.borrow_mut();
-            if cols.is_empty() || new_col {
-                let box_widget = gtk::Box::new(gtk::Orientation::Vertical, 6);
-                box_widget.add_css_class("rail-col");
-                box_widget.add_css_class("full");
-                box_widget.set_vexpand(true);
-                box_widget.set_hexpand(true);
-                box_widget.set_homogeneous(true);
-                box_widget.append(&view);
-
-                let c_idx = if cols.is_empty() {
-                    self.strip.prepend(&box_widget);
+        let (target_r, target_c) = {
+            let mut rows = self.rows.borrow_mut();
+            if rows.is_empty() {
+                rows.push(Row { tabs: Vec::new() });
+            }
+            if new_row {
+                let cur_r = self.focus_row.get();
+                let next_r = cur_r + 1;
+                while rows.len() <= next_r {
+                    rows.push(Row { tabs: Vec::new() });
+                }
+                rows[next_r].tabs.push(Tab { container, view: view.clone(), profile_id });
+                let c_idx = rows[next_r].tabs.len() - 1;
+                (next_r, c_idx)
+            } else {
+                let cur_r = self.focus_row.get().min(rows.len() - 1);
+                let cur_c = self.focus_col.get();
+                let col_idx = if rows[cur_r].tabs.is_empty() {
                     0
                 } else {
-                    let cur = self.focus_col.get();
-                    let prev = &cols[cur].container;
-                    self.strip.insert_child_after(&box_widget, Some(prev));
-                    cur + 1
+                    (cur_c + 1).min(rows[cur_r].tabs.len())
                 };
-
-                cols.insert(c_idx, Column {
-                    container: box_widget,
-                    tabs: vec![Tab { view: view.clone(), profile_id }],
-                });
-                (c_idx, 0)
-            } else {
-                let cur_c = self.focus_col.get();
-                let cur_r = self.focus_row.get();
-                let col = &mut cols[cur_c];
-                let next_r = (cur_r + 1).min(col.tabs.len());
-                if next_r == 0 {
-                    col.container.prepend(&view);
-                } else {
-                    let prev_tab = &col.tabs[next_r - 1].view;
-                    col.container.insert_child_after(&view, Some(prev_tab));
-                }
-                col.tabs.insert(next_r, Tab { view: view.clone(), profile_id });
-                (cur_c, next_r)
+                rows[cur_r].tabs.insert(col_idx, Tab { container, view: view.clone(), profile_id });
+                (cur_r, col_idx)
             }
         };
 
         self.setup_view_signals(&view);
-        self.focus_coords(target_c, target_r);
+        self.sync_strip();
+        self.focus_coords(target_r, target_c);
     }
 
     fn find_view_coords(&self, view: &WebView) -> Option<(usize, usize)> {
-        let cols = self.cols.borrow();
-        for (c_idx, col) in cols.iter().enumerate() {
-            for (r_idx, tab) in col.tabs.iter().enumerate() {
+        let rows = self.rows.borrow();
+        for (r_idx, row) in rows.iter().enumerate() {
+            for (c_idx, tab) in row.tabs.iter().enumerate() {
                 if &tab.view == view {
-                    return Some((c_idx, r_idx));
+                    return Some((r_idx, c_idx));
                 }
             }
         }
@@ -913,54 +981,52 @@ impl App {
     }
 
     fn close_view(self: &Rc<Self>, view: &WebView) {
-        let Some((c_idx, r_idx)) = self.find_view_coords(view) else { return };
+        let Some((r_idx, c_idx)) = self.find_view_coords(view) else { return };
         if self.fresh.borrow().as_ref() == Some(view) {
             *self.fresh.borrow_mut() = None;
         }
 
-        let mut cols = self.cols.borrow_mut();
-        cols[c_idx].container.remove(view);
-        cols[c_idx].tabs.remove(r_idx);
+        let mut rows = self.rows.borrow_mut();
+        let tab = rows[r_idx].tabs.remove(c_idx);
+        self.strip.remove(&tab.container);
 
-        let col_empty = cols[c_idx].tabs.is_empty();
-        if col_empty {
-            self.strip.remove(&cols[c_idx].container);
-            cols.remove(c_idx);
+        if rows[r_idx].tabs.is_empty() && rows.len() > 1 {
+            rows.remove(r_idx);
         }
 
-        let total_cols = cols.len();
-        drop(cols);
+        let total_tabs: usize = rows.iter().map(|r| r.tabs.len()).sum();
+        let total_rows = rows.len();
+        drop(rows);
 
-        if total_cols == 0 {
+        self.sync_strip();
+
+        if total_tabs == 0 {
             self.new_tab();
         } else {
-            let next_c = c_idx.min(total_cols - 1);
-            let cols = self.cols.borrow();
-            let next_r = if col_empty {
-                0
-            } else {
-                r_idx.saturating_sub(1).min(cols[next_c].tabs.len().saturating_sub(1))
-            };
-            if cols.len() == 1 {
-                cols[0].container.add_css_class("full");
-            }
-            drop(cols);
-            self.focus_coords(next_c, next_r);
+            let next_r = r_idx.min(total_rows.saturating_sub(1));
+            let rows = self.rows.borrow();
+            let next_c = c_idx.saturating_sub(1).min(rows[next_r].tabs.len().saturating_sub(1));
+            drop(rows);
+            self.focus_coords(next_r, next_c);
         }
     }
 
-    fn focus_coords(self: &Rc<Self>, c_idx: usize, r_idx: usize) {
-        let cols = self.cols.borrow();
-        if c_idx >= cols.len() {
+    fn focus_coords(self: &Rc<Self>, r_idx: usize, c_idx: usize) {
+        let rows = self.rows.borrow();
+        if rows.is_empty() {
             return;
         }
-        let r_clamped = r_idx.min(cols[c_idx].tabs.len().saturating_sub(1));
-        self.focus_col.set(c_idx);
+        let r_clamped = r_idx.min(rows.len() - 1);
+        if rows[r_clamped].tabs.is_empty() {
+            return;
+        }
+        let c_clamped = c_idx.min(rows[r_clamped].tabs.len() - 1);
         self.focus_row.set(r_clamped);
+        self.focus_col.set(c_clamped);
 
-        for (ci, col) in cols.iter().enumerate() {
-            for (ri, tab) in col.tabs.iter().enumerate() {
-                if ci == c_idx && ri == r_clamped {
+        for (ri, row) in rows.iter().enumerate() {
+            for (ci, tab) in row.tabs.iter().enumerate() {
+                if ri == r_clamped && ci == c_clamped {
                     tab.view.add_css_class("focused");
                 } else {
                     tab.view.remove_css_class("focused");
@@ -968,12 +1034,12 @@ impl App {
             }
         }
 
-        if let Some(tab) = cols[c_idx].tabs.get(r_clamped) {
+        if let Some(tab) = rows[r_clamped].tabs.get(c_clamped) {
             if !tab.view.is_loading() {
                 self.load_bar.set_visible(false);
             }
         }
-        drop(cols);
+        drop(rows);
 
         self.update_load_bar();
         self.reveal_focus();
@@ -990,215 +1056,115 @@ impl App {
     fn focus_column_left(self: &Rc<Self>) {
         let cur_c = self.focus_col.get();
         if cur_c > 0 {
-            self.focus_coords(cur_c - 1, self.focus_row.get());
+            self.focus_coords(self.focus_row.get(), cur_c - 1);
         }
     }
 
     fn focus_column_right(self: &Rc<Self>) {
+        let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
-        let cols = self.cols.borrow();
-        if cur_c + 1 < cols.len() {
-            drop(cols);
-            self.focus_coords(cur_c + 1, self.focus_row.get());
+        let rows = self.rows.borrow();
+        if cur_r < rows.len() && cur_c + 1 < rows[cur_r].tabs.len() {
+            drop(rows);
+            self.focus_coords(cur_r, cur_c + 1);
         }
     }
 
-    fn focus_window_up(self: &Rc<Self>) {
+    fn focus_row_up(self: &Rc<Self>) {
         let cur_r = self.focus_row.get();
         if cur_r > 0 {
-            self.focus_coords(self.focus_col.get(), cur_r - 1);
+            let cur_c = self.focus_col.get();
+            let rows = self.rows.borrow();
+            let dest_c = cur_c.min(rows[cur_r - 1].tabs.len().saturating_sub(1));
+            drop(rows);
+            self.focus_coords(cur_r - 1, dest_c);
         }
     }
 
-    fn focus_window_down(self: &Rc<Self>) {
-        let cur_c = self.focus_col.get();
+    fn focus_row_down(self: &Rc<Self>) {
         let cur_r = self.focus_row.get();
-        let cols = self.cols.borrow();
-        if let Some(col) = cols.get(cur_c) {
-            if cur_r + 1 < col.tabs.len() {
-                drop(cols);
-                self.focus_coords(cur_c, cur_r + 1);
-            }
+        let rows = self.rows.borrow();
+        if cur_r + 1 < rows.len() {
+            let cur_c = self.focus_col.get();
+            let dest_c = cur_c.min(rows[cur_r + 1].tabs.len().saturating_sub(1));
+            drop(rows);
+            self.focus_coords(cur_r + 1, dest_c);
+        }
+    }
+
+    fn focus_row(self: &Rc<Self>, target_r: usize) {
+        let rows = self.rows.borrow();
+        if target_r < rows.len() {
+            let cur_c = self.focus_col.get();
+            let dest_c = cur_c.min(rows[target_r].tabs.len().saturating_sub(1));
+            drop(rows);
+            self.focus_coords(target_r, dest_c);
+        } else if target_r == rows.len() {
+            drop(rows);
+            self.split_vertical();
         }
     }
 
     fn move_column(self: &Rc<Self>, dir: isize) {
-        let cur = self.focus_col.get();
-        let mut cols = self.cols.borrow_mut();
-        let Some(target) = cur.checked_add_signed(dir).filter(|&t| t < cols.len()) else { return };
-        cols.swap(cur, target);
-        let mut prev: Option<&gtk::Widget> = None;
-        for c in cols.iter() {
-            self.strip.reorder_child_after(&c.container, prev);
-            prev = Some(c.container.as_ref());
+        let cur_r = self.focus_row.get();
+        let cur_c = self.focus_col.get();
+        let mut rows = self.rows.borrow_mut();
+        if cur_r >= rows.len() {
+            return;
         }
-        drop(cols);
-        self.focus_col.set(target);
-        self.strip.queue_allocate();
-        self.reveal_focus();
-        self.refresh_sidebar();
-        self.save_session();
+        let Some(target_c) = cur_c.checked_add_signed(dir).filter(|&t| t < rows[cur_r].tabs.len()) else { return };
+        rows[cur_r].tabs.swap(cur_c, target_c);
+        drop(rows);
+        self.sync_strip();
+        self.focus_coords(cur_r, target_c);
     }
 
-    fn move_window(self: &Rc<Self>, dir: isize) {
-        let cur_c = self.focus_col.get();
+    fn move_tab_to_row(self: &Rc<Self>, target_r: usize) {
         let cur_r = self.focus_row.get();
-        let mut cols = self.cols.borrow_mut();
-        if cur_c >= cols.len() {
-            return;
-        }
-        if cols[cur_c].tabs.len() > 1 {
-            let col = &mut cols[cur_c];
-            let Some(target_r) = cur_r.checked_add_signed(dir).filter(|&t| t < col.tabs.len()) else { return };
-            col.tabs.swap(cur_r, target_r);
-            let mut prev: Option<&gtk::Widget> = None;
-            for t in col.tabs.iter() {
-                col.container.reorder_child_after(&t.view, prev);
-                prev = Some(t.view.as_ref());
-            }
-            col.container.queue_allocate();
-            drop(cols);
-            self.focus_row.set(target_r);
-            self.focus_coords(cur_c, target_r);
-            self.strip.queue_allocate();
-        } else if dir > 0 {
-            drop(cols);
-            self.move_tab_to_vertical_slot(1);
-        }
-    }
-
-    fn move_tab_to_vertical_slot(self: &Rc<Self>, target_slot: usize) {
         let cur_c = self.focus_col.get();
-        let cur_r = self.focus_row.get();
-        let mut cols = self.cols.borrow_mut();
-        if cur_c >= cols.len() {
+        if cur_r == target_r {
             return;
         }
 
-        // Case 1: Current column has multiple tabs.
-        if cols[cur_c].tabs.len() > 1 {
-            if target_slot == 0 {
-                // Ctrl+Shift+1: move tab to top row (slot 1) if not already there;
-                // if already at top row, pop out to its own column!
-                if cur_r > 0 {
-                    let tab = cols[cur_c].tabs.remove(cur_r);
-                    cols[cur_c].tabs.insert(0, tab);
-                    let col = &cols[cur_c];
-                    let mut prev: Option<&gtk::Widget> = None;
-                    for t in col.tabs.iter() {
-                        col.container.reorder_child_after(&t.view, prev);
-                        prev = Some(t.view.as_ref());
-                    }
-                    col.container.queue_allocate();
-                    drop(cols);
-                    self.focus_coords(cur_c, 0);
-                    self.strip.queue_allocate();
-                    self.reveal_focus();
-                    self.refresh_sidebar();
-                    self.save_session();
-                    return;
-                } else {
-                    // Already at row 0: pop out to its own column
-                    let tab = cols[cur_c].tabs.remove(0);
-                    cols[cur_c].container.remove(&tab.view);
-                    cols[cur_c].container.queue_allocate();
-
-                    let box_widget = gtk::Box::new(gtk::Orientation::Vertical, 6);
-                    box_widget.add_css_class("rail-col");
-                    box_widget.add_css_class("full");
-                    box_widget.set_vexpand(true);
-                    box_widget.set_hexpand(true);
-                    box_widget.set_homogeneous(true);
-                    box_widget.append(&tab.view);
-
-                    let prev = cols[cur_c].container.clone();
-                    self.strip.insert_child_after(&box_widget, Some(&prev));
-                    self.strip.queue_allocate();
-
-                    let new_col_idx = cur_c + 1;
-                    cols.insert(new_col_idx, Column {
-                        container: box_widget,
-                        tabs: vec![tab],
-                    });
-                    drop(cols);
-                    self.focus_coords(new_col_idx, 0);
-                    self.strip.queue_allocate();
-                    self.reveal_focus();
-                    self.refresh_sidebar();
-                    self.save_session();
-                    return;
-                }
-            } else {
-                // target_slot >= 1 (e.g. Ctrl+Shift+2 -> slot 2, index 1)
-                let dest_idx = target_slot.min(cols[cur_c].tabs.len() - 1);
-                if cur_r != dest_idx {
-                    let tab = cols[cur_c].tabs.remove(cur_r);
-                    cols[cur_c].tabs.insert(dest_idx, tab);
-                    let col = &cols[cur_c];
-                    let mut prev: Option<&gtk::Widget> = None;
-                    for t in col.tabs.iter() {
-                        col.container.reorder_child_after(&t.view, prev);
-                        prev = Some(t.view.as_ref());
-                    }
-                    col.container.queue_allocate();
-                    drop(cols);
-                    self.focus_coords(cur_c, dest_idx);
-                    self.strip.queue_allocate();
-                    self.reveal_focus();
-                    self.refresh_sidebar();
-                    self.save_session();
-                    return;
-                }
-            }
-        } else if cols.len() > 1 && target_slot >= 1 {
-            // Case 2: Single tab in current column, but multiple columns exist.
-            // Move this tab down into adjacent column as row 2 (vertical split).
-            let target_c = if cur_c > 0 { cur_c - 1 } else { 1 };
-            let tab = cols[cur_c].tabs.remove(0);
-            let old_box = cols[cur_c].container.clone();
-            old_box.remove(&tab.view); // CRITICAL: unparent before adding to new container!
-            self.strip.remove(&old_box);
-            cols.remove(cur_c);
-
-            let dest_c = if cur_c < target_c { target_c - 1 } else { target_c };
-            cols[dest_c].container.append(&tab.view);
-            cols[dest_c].tabs.push(tab);
-            cols[dest_c].container.queue_allocate();
-            self.strip.queue_allocate();
-            let new_r = cols[dest_c].tabs.len() - 1;
-            drop(cols);
-            self.focus_coords(dest_c, new_r);
-            self.strip.queue_allocate();
-            self.reveal_focus();
-            self.refresh_sidebar();
-            self.save_session();
-            return;
-        } else if cols.len() == 1 && cols[0].tabs.len() == 1 && target_slot >= 1 {
-            // Case 3: Only one tab in the entire window.
-            // Ctrl+Shift+2 creates a vertical split and drops the current tab to row 2!
-            drop(cols);
-            self.split_vertical();
-            let mut cols = self.cols.borrow_mut();
-            if !cols.is_empty() && cols[0].tabs.len() > 1 {
-                cols[0].tabs.swap(0, 1);
-                let col = &cols[0];
-                let mut prev: Option<&gtk::Widget> = None;
-                for t in col.tabs.iter() {
-                    col.container.reorder_child_after(&t.view, prev);
-                    prev = Some(t.view.as_ref());
-                }
-                col.container.queue_allocate();
-                drop(cols);
-                self.focus_coords(0, 1);
-                self.strip.queue_allocate();
-                self.reveal_focus();
-                self.refresh_sidebar();
-                self.save_session();
-            }
+        let mut rows = self.rows.borrow_mut();
+        if cur_r >= rows.len() || cur_c >= rows[cur_r].tabs.len() {
             return;
         }
-        drop(cols);
-        self.save_session();
+
+        let tab = rows[cur_r].tabs.remove(cur_c);
+        let cur_row_empty = rows[cur_r].tabs.is_empty();
+
+        while rows.len() <= target_r {
+            rows.push(Row { tabs: Vec::new() });
+        }
+        rows[target_r].tabs.push(tab);
+        let dest_c = rows[target_r].tabs.len() - 1;
+
+        let need_fresh_in_row_0 = cur_row_empty && cur_r == 0;
+        drop(rows);
+
+        if need_fresh_in_row_0 {
+            let prof_id = self.profiles.borrow().active_profile().id;
+            let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
+            let view = WebView::builder().network_session(&session).build();
+            view.load_html(START_PAGE, None);
+            view.set_can_target(!self.ov.get());
+            let container = Self::create_tab_widget(&view);
+            self.setup_view_signals(&view);
+
+            let mut rows = self.rows.borrow_mut();
+            rows[0].tabs.push(Tab { container, view, profile_id: prof_id });
+            drop(rows);
+        } else if cur_row_empty && cur_r > 0 {
+            let mut rows = self.rows.borrow_mut();
+            while rows.len() > 1 && rows.last().map_or(false, |r| r.tabs.is_empty()) {
+                rows.pop();
+            }
+            drop(rows);
+        }
+
+        self.sync_strip();
+        self.focus_coords(target_r, dest_c);
     }
 
     fn toggle_touchpad_mode(self: &Rc<Self>) {
@@ -1208,14 +1174,13 @@ impl App {
     fn save_session(&self) {
         let path = glib::user_data_dir().join("rail").join("session.txt");
         let mut out = String::new();
-        out.push_str(&format!("focus\t{}\t{}\n", self.focus_col.get(), self.focus_row.get()));
-        let cols = self.cols.borrow();
-        for (ci, col) in cols.iter().enumerate() {
-            let is_full = if col.container.has_css_class("full") { 1 } else { 0 };
-            out.push_str(&format!("col\t{}\t{}\n", ci, is_full));
-            for tab in col.tabs.iter() {
+        out.push_str(&format!("focus\t{}\t{}\n", self.focus_row.get(), self.focus_col.get()));
+        let rows = self.rows.borrow();
+        for (ri, row) in rows.iter().enumerate() {
+            for (ci, tab) in row.tabs.iter().enumerate() {
+                let is_full = if tab.container.has_css_class("full") { 1 } else { 0 };
                 let uri = tab.view.uri().unwrap_or_default();
-                out.push_str(&format!("tab\t{}\t{}\t{}\n", ci, tab.profile_id, uri));
+                out.push_str(&format!("tab\t{}\t{}\t{}\t{}\t{}\n", ri, ci, is_full, tab.profile_id, uri));
             }
         }
         let _ = std::fs::write(path, out);
@@ -1224,64 +1189,57 @@ impl App {
     fn restore_session(self: &Rc<Self>) -> bool {
         let path = glib::user_data_dir().join("rail").join("session.txt");
         let Ok(content) = std::fs::read_to_string(path) else { return false; };
-        let (target_focus, col_flags, tab_items) = parse_session_content(&content);
+        let (target_focus, mut tab_items) = parse_session_content(&content);
         if tab_items.is_empty() {
             return false;
         }
 
-        let mut max_col = 0;
-        for (c, _, _) in &tab_items {
-            if *c > max_col { max_col = *c; }
+        tab_items.sort_by_key(|t| (t.row, t.col));
+
+        let mut max_row = 0;
+        for t in &tab_items {
+            if t.row > max_row { max_row = t.row; }
         }
 
-        for ci in 0..=max_col {
-            let col_tabs: Vec<_> = tab_items.iter().filter(|(c, _, _)| *c == ci).collect();
-            if col_tabs.is_empty() { continue; }
+        let mut rows = self.rows.borrow_mut();
+        while rows.len() <= max_row {
+            rows.push(Row { tabs: Vec::new() });
+        }
 
-            let mut first = true;
-            for (_, pid, url) in col_tabs {
-                let session = self.profiles.borrow_mut().get_or_create_session(pid);
-                let view = WebView::builder().network_session(&session).build();
-                if url.is_empty() || url.starts_with("about:") {
-                    view.load_html(START_PAGE, None);
-                } else {
-                    view.load_uri(url);
-                }
-                self.add_view(view, pid.clone(), first);
-                first = false;
+        for item in tab_items {
+            let session = self.profiles.borrow_mut().get_or_create_session(&item.profile_id);
+            let view = WebView::builder().network_session(&session).build();
+            if item.url.is_empty() || item.url.starts_with("about:") {
+                view.load_html(START_PAGE, None);
+            } else {
+                view.load_uri(&item.url);
             }
-        }
-
-        let cols = self.cols.borrow();
-        for (ci, full) in col_flags {
-            if let Some(col) = cols.get(ci) {
-                if full {
-                    col.container.add_css_class("full");
-                } else {
-                    col.container.remove_css_class("full");
-                }
+            let container = Self::create_tab_widget(&view);
+            if !item.full {
+                container.remove_css_class("full");
             }
+            self.setup_view_signals(&view);
+            rows[item.row].tabs.push(Tab { container, view, profile_id: item.profile_id });
         }
-        if cols.len() == 1 {
-            cols[0].container.add_css_class("full");
-        }
-        drop(cols);
+        drop(rows);
 
+        self.sync_strip();
         self.focus_coords(target_focus.0, target_focus.1);
         true
     }
 
     fn toggle_full(self: &Rc<Self>) {
+        let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
-        let cols = self.cols.borrow();
-        let Some(col) = cols.get(cur_c) else { return };
-        if col.container.has_css_class("full") {
-            col.container.remove_css_class("full");
+        let rows = self.rows.borrow();
+        let Some(tab) = rows.get(cur_r).and_then(|r| r.tabs.get(cur_c)) else { return };
+        if tab.container.has_css_class("full") {
+            tab.container.remove_css_class("full");
         } else {
-            col.container.add_css_class("full");
+            tab.container.add_css_class("full");
         }
-        drop(cols);
-        self.strip.queue_allocate();
+        drop(rows);
+        self.sync_strip();
         self.reveal_focus();
         self.save_session();
     }
@@ -1327,17 +1285,18 @@ impl App {
         while let Some(r) = self.list.row_at_index(0) {
             self.list.remove(&r);
         }
-        let cols = self.cols.borrow();
-        let cur_c = self.focus_col.get();
+        let rows = self.rows.borrow();
         let cur_r = self.focus_row.get();
-        let mut row_idx = 0;
-        let mut selected_row_idx = None;
+        let cur_c = self.focus_col.get();
+        let multi_row = rows.len() > 1;
+        let mut list_item_idx = 0;
+        let mut selected_item_idx = None;
 
-        for (ci, col) in cols.iter().enumerate() {
-            for (ri, t) in col.tabs.iter().enumerate() {
-                let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-                row.add_css_class("tabrow");
-                row.append(&Self::tab_icon(t, 16));
+        for (ri, row) in rows.iter().enumerate() {
+            for (ci, t) in row.tabs.iter().enumerate() {
+                let item = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+                item.add_css_class("tabrow");
+                item.append(&Self::tab_icon(t, 16));
 
                 let mgr = self.profiles.borrow();
                 if mgr.profiles().len() > 1 {
@@ -1350,20 +1309,20 @@ impl App {
                         p_dot.set_width_request(16);
                         p_dot.set_height_request(16);
                         p_dot.set_tooltip_text(Some(&format!("Profile: {}", p.name)));
-                        row.append(&p_dot);
+                        item.append(&p_dot);
                     }
                 }
                 drop(mgr);
 
-                let index_str = if col.tabs.len() > 1 {
-                    format!("{}:{}", ci + 1, ri + 1)
+                let index_str = if multi_row {
+                    format!("{}:{}", ri + 1, ci + 1)
                 } else {
                     format!("{}", ci + 1)
                 };
                 let index_lbl = gtk::Label::new(Some(&index_str));
                 index_lbl.add_css_class("tab-index");
                 index_lbl.set_valign(gtk::Align::Center);
-                row.append(&index_lbl);
+                item.append(&index_lbl);
 
                 let title_lbl = gtk::Label::new(Some(&Self::tab_label(t)));
                 title_lbl.add_css_class("tab-title");
@@ -1371,25 +1330,25 @@ impl App {
                 title_lbl.set_hexpand(true);
                 title_lbl.set_width_chars(1);
                 title_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
-                row.append(&title_lbl);
+                item.append(&title_lbl);
 
                 let close = gtk::Button::from_icon_name("window-close-symbolic");
                 close.add_css_class("tab-close");
                 close.set_valign(gtk::Align::Center);
                 let (app, v) = (self.clone(), t.view.clone());
                 close.connect_clicked(move |_| app.close_view(&v));
-                row.append(&close);
+                item.append(&close);
 
-                self.list.append(&row);
-                if ci == cur_c && ri == cur_r {
-                    selected_row_idx = Some(row_idx);
+                self.list.append(&item);
+                if ri == cur_r && ci == cur_c {
+                    selected_item_idx = Some(list_item_idx);
                 }
-                row_idx += 1;
+                list_item_idx += 1;
             }
         }
-        drop(cols);
+        drop(rows);
 
-        if let Some(s_idx) = selected_row_idx {
+        if let Some(s_idx) = selected_item_idx {
             if let Some(row) = self.list.row_at_index(s_idx as i32) {
                 self.list.select_row(Some(&row));
             }
@@ -1586,7 +1545,7 @@ impl App {
         let fresh = self.fresh.borrow().clone();
         self.hide_palette();
         if let (Some(v), Some(f)) = (view, fresh) {
-            let total_tabs: usize = self.cols.borrow().iter().map(|c| c.tabs.len()).sum();
+            let total_tabs: usize = self.rows.borrow().iter().map(|r| r.tabs.len()).sum();
             if v == f && total_tabs > 1 {
                 self.close_view(&v);
             }
@@ -1596,14 +1555,14 @@ impl App {
     fn navigate(self: &Rc<Self>, text: &str) {
         if !text.trim().is_empty() {
             let target_profile_id = self.selected_palette_profile.borrow().clone();
-            let cur_c = self.focus_col.get();
             let cur_r = self.focus_row.get();
+            let cur_c = self.focus_col.get();
             let uri = to_uri(text);
 
             let needs_view_recreation = {
-                let cols = self.cols.borrow();
-                cols.get(cur_c)
-                    .and_then(|c| c.tabs.get(cur_r))
+                let rows = self.rows.borrow();
+                rows.get(cur_r)
+                    .and_then(|r| r.tabs.get(cur_c))
                     .map(|t| t.profile_id != target_profile_id)
                     .unwrap_or(false)
             };
@@ -1611,29 +1570,29 @@ impl App {
             if needs_view_recreation {
                 let session = self.profiles.borrow_mut().get_or_create_session(&target_profile_id);
                 let new_view = WebView::builder().network_session(&session).build();
-                new_view.add_css_class("tab");
-                new_view.set_overflow(gtk::Overflow::Hidden);
                 new_view.set_can_target(!self.ov.get());
-                new_view.set_vexpand(true);
-                new_view.set_hexpand(true);
                 self.setup_view_signals(&new_view);
 
-                let mut cols = self.cols.borrow_mut();
-                if let Some(col) = cols.get_mut(cur_c) {
-                    if let Some(tab) = col.tabs.get_mut(cur_r) {
-                        col.container.insert_child_after(&new_view, Some(&tab.view));
-                        col.container.remove(&tab.view);
+                let mut rows = self.rows.borrow_mut();
+                if let Some(row) = rows.get_mut(cur_r) {
+                    if let Some(tab) = row.tabs.get_mut(cur_c) {
+                        tab.container.remove(&tab.view);
+                        tab.container.append(&new_view);
+                        new_view.add_css_class("tab");
+                        new_view.set_overflow(gtk::Overflow::Hidden);
+                        new_view.set_vexpand(true);
+                        new_view.set_hexpand(true);
                         tab.view = new_view.clone();
                         tab.profile_id = target_profile_id;
                     }
                 }
-                drop(cols);
+                drop(rows);
 
                 self.pill_label.set_text(&host_of(&uri).unwrap_or(uri.clone()));
                 new_view.load_uri(&uri);
                 *self.fresh.borrow_mut() = None;
                 self.refresh_sidebar();
-                self.focus_coords(cur_c, cur_r);
+                self.focus_coords(cur_r, cur_c);
             } else if let Some(v) = self.focused_view() {
                 self.pill_label.set_text(&host_of(&uri).unwrap_or(uri.clone()));
                 v.load_uri(&uri);
@@ -1823,7 +1782,7 @@ impl App {
         }
     }
 
-    // ---- overview (niri-style: zoomed out) --------------------------------
+    // ---- overview (niri-style 2D grid: zoomed out) -----------------------
 
     fn toggle_overview(self: &Rc<Self>) {
         if self.ov.get() {
@@ -1834,17 +1793,18 @@ impl App {
     }
 
     fn enter_overview(self: &Rc<Self>) {
-        if self.ov.get() || self.cols.borrow().is_empty() {
+        if self.ov.get() || self.rows.borrow().is_empty() {
             return;
         }
         self.palette.set_visible(false);
         self.ov.set(true);
-        self.ov_return.set((self.focus_col.get(), self.focus_row.get()));
-        self.ov_saved.set(self.target.get());
+        self.ov_return.set((self.focus_row.get(), self.focus_col.get()));
+        self.ov_saved_x.set(self.target_x.get());
+        self.ov_saved_y.set(self.target_y.get());
         self.strip.add_css_class("zoomed");
         self.ov_hint.set_visible(true);
-        for col in self.cols.borrow().iter() {
-            for t in col.tabs.iter() {
+        for row in self.rows.borrow().iter() {
+            for t in row.tabs.iter() {
                 t.view.set_can_target(false);
             }
         }
@@ -1859,13 +1819,12 @@ impl App {
         self.ov.set(false);
         self.strip.remove_css_class("zoomed");
         self.ov_hint.set_visible(false);
-        for col in self.cols.borrow().iter() {
-            for t in col.tabs.iter() {
+        for row in self.rows.borrow().iter() {
+            for t in row.tabs.iter() {
                 t.view.set_can_target(true);
             }
         }
         self.target_zoom.set(1.0);
-        self.target.set(self.ov_saved.get());
         self.reveal_focus();
         if let Some(v) = self.focused_view() {
             v.grab_focus();
@@ -1873,38 +1832,45 @@ impl App {
     }
 
     fn cancel_overview(self: &Rc<Self>) {
-        let (c, r) = self.ov_return.get();
-        self.focus_coords(c, r);
+        let (r, c) = self.ov_return.get();
+        self.focus_coords(r, c);
         self.exit_overview();
     }
 
-    fn ov_click(self: &Rc<Self>, x: f64, y: f64) {
+    fn ov_click(self: &Rc<Self>, click_x: f64, click_y: f64) {
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
-        let (z, off) = (self.layout.zoom(), self.layout.offset());
+        let z = self.layout.zoom();
+        let off_x = self.layout.offset_x();
+        let off_y = self.layout.offset_y();
         let g = gap(z);
+
+        let unscaled_x = click_x / z + off_x;
+        let unscaled_y = click_y / z + off_y;
+
+        let rows = self.rows.borrow();
         let mut hit = None;
-        let mut cx = 0.0;
-        let cols = self.cols.borrow();
-        for (i, col) in cols.iter().enumerate() {
-            let w = col_width(col.container.has_css_class("full"), vw);
-            let left = (cx - off) * z;
-            if x >= left && x <= left + w * z {
-                let tab_count = col.tabs.len();
-                let row = if tab_count > 1 && vh > 0.0 {
-                    let r = ((y / vh) * (tab_count as f64)).floor() as usize;
-                    r.min(tab_count - 1)
-                } else {
-                    0
-                };
-                hit = Some((i, row));
-                break;
+        for (r_idx, row) in rows.iter().enumerate() {
+            let row_y = r_idx as f64 * (vh + g);
+            if unscaled_y >= row_y && unscaled_y <= row_y + vh {
+                let mut col_x = 0.0;
+                for (c_idx, tab) in row.tabs.iter().enumerate() {
+                    let cw = col_width(tab.container.has_css_class("full"), vw);
+                    if unscaled_x >= col_x && unscaled_x <= col_x + cw {
+                        hit = Some((r_idx, c_idx));
+                        break;
+                    }
+                    col_x += cw + g;
+                }
+                if hit.is_some() {
+                    break;
+                }
             }
-            cx += w + g;
         }
-        drop(cols);
-        if let Some((i, r)) = hit {
-            self.focus_coords(i, r);
+        drop(rows);
+
+        if let Some((r, c)) = hit {
+            self.focus_coords(r, c);
         }
         self.exit_overview();
     }
@@ -1923,11 +1889,11 @@ impl App {
                     return true;
                 }
                 gdk::Key::j | gdk::Key::Down => {
-                    self.focus_window_down();
+                    self.focus_row_down();
                     return true;
                 }
                 gdk::Key::k | gdk::Key::Up => {
-                    self.focus_window_up();
+                    self.focus_row_up();
                     return true;
                 }
                 _ => {}
@@ -1997,8 +1963,8 @@ impl App {
                 gdk::Key::f => self.toggle_full(),
                 gdk::Key::h | gdk::Key::Left => self.focus_column_left(),
                 gdk::Key::l | gdk::Key::Right => self.focus_column_right(),
-                gdk::Key::j | gdk::Key::Down => self.focus_window_down(),
-                gdk::Key::k | gdk::Key::Up => self.focus_window_up(),
+                gdk::Key::j | gdk::Key::Down => self.focus_row_down(),
+                gdk::Key::k | gdk::Key::Up => self.focus_row_up(),
                 gdk::Key::w => {
                     if let Some(v) = self.focused_view() {
                         self.close_view(&v);
@@ -2020,41 +1986,41 @@ impl App {
                 }
                 gdk::Key::q => self.win.close(),
                 _ => {
-                    // Vertical window selection in current column (Ctrl+1..9)
+                    // Vertical workspace selection (Ctrl+1..9)
                     if keycode == 10 || keycode == 87 || k == gdk::Key::_1 || k == gdk::Key::KP_1 || key.to_unicode() == Some('1') {
-                        self.focus_coords(self.focus_col.get(), 0);
+                        self.focus_row(0);
                         return true;
                     }
                     if keycode == 11 || keycode == 88 || k == gdk::Key::_2 || k == gdk::Key::KP_2 || key.to_unicode() == Some('2') {
-                        self.focus_coords(self.focus_col.get(), 1);
+                        self.focus_row(1);
                         return true;
                     }
                     if keycode == 12 || keycode == 89 || k == gdk::Key::_3 || k == gdk::Key::KP_3 || key.to_unicode() == Some('3') {
-                        self.focus_coords(self.focus_col.get(), 2);
+                        self.focus_row(2);
                         return true;
                     }
                     if keycode == 13 || keycode == 90 || k == gdk::Key::_4 || k == gdk::Key::KP_4 || key.to_unicode() == Some('4') {
-                        self.focus_coords(self.focus_col.get(), 3);
+                        self.focus_row(3);
                         return true;
                     }
                     if keycode == 14 || keycode == 91 || k == gdk::Key::_5 || k == gdk::Key::KP_5 || key.to_unicode() == Some('5') {
-                        self.focus_coords(self.focus_col.get(), 4);
+                        self.focus_row(4);
                         return true;
                     }
                     if keycode == 15 || keycode == 92 || k == gdk::Key::_6 || k == gdk::Key::KP_6 || key.to_unicode() == Some('6') {
-                        self.focus_coords(self.focus_col.get(), 5);
+                        self.focus_row(5);
                         return true;
                     }
                     if keycode == 16 || keycode == 93 || k == gdk::Key::_7 || k == gdk::Key::KP_7 || key.to_unicode() == Some('7') {
-                        self.focus_coords(self.focus_col.get(), 6);
+                        self.focus_row(6);
                         return true;
                     }
                     if keycode == 17 || keycode == 94 || k == gdk::Key::_8 || k == gdk::Key::KP_8 || key.to_unicode() == Some('8') {
-                        self.focus_coords(self.focus_col.get(), 7);
+                        self.focus_row(7);
                         return true;
                     }
                     if keycode == 18 || keycode == 95 || k == gdk::Key::_9 || k == gdk::Key::KP_9 || key.to_unicode() == Some('9') {
-                        self.focus_coords(self.focus_col.get(), 8);
+                        self.focus_row(8);
                         return true;
                     }
                     return false;
@@ -2069,34 +2035,48 @@ impl App {
                 gdk::Key::t | gdk::Key::T => self.toggle_touchpad_mode(),
                 gdk::Key::h | gdk::Key::Left => self.move_column(-1),
                 gdk::Key::l | gdk::Key::Right => self.move_column(1),
-                gdk::Key::j | gdk::Key::Down => self.move_window(1),
-                gdk::Key::k | gdk::Key::Up => self.move_window(-1),
+                gdk::Key::j | gdk::Key::Down => self.move_tab_to_row(self.focus_row.get() + 1),
+                gdk::Key::k | gdk::Key::Up => {
+                    if self.focus_row.get() > 0 {
+                        self.move_tab_to_row(self.focus_row.get() - 1);
+                    }
+                }
                 _ => {
-                    // Ctrl+Shift+1 -> slot 1 (row index 0)
+                    // Ctrl+Shift+1 -> move to workspace/row 1
                     if keycode == 10 || keycode == 87
                         || k == gdk::Key::_1 || k == gdk::Key::exclam || k == gdk::Key::KP_1
                         || key == gdk::Key::_1 || key == gdk::Key::exclam || key == gdk::Key::KP_1
                         || key.to_unicode() == Some('1') || key.to_unicode() == Some('!')
                     {
-                        self.move_tab_to_vertical_slot(0);
+                        self.move_tab_to_row(0);
                         return true;
                     }
-                    // Ctrl+Shift+2 -> slot 2 (row index 1)
+                    // Ctrl+Shift+2 -> move to workspace/row 2
                     if keycode == 11 || keycode == 88
                         || k == gdk::Key::_2 || k == gdk::Key::at || k == gdk::Key::quotedbl || k == gdk::Key::KP_2
                         || key == gdk::Key::_2 || key == gdk::Key::at || key == gdk::Key::quotedbl || key == gdk::Key::KP_2
                         || key.to_unicode() == Some('2') || key.to_unicode() == Some('@') || key.to_unicode() == Some('"')
                     {
-                        self.move_tab_to_vertical_slot(1);
+                        self.move_tab_to_row(1);
                         return true;
                     }
-                    // Ctrl+Shift+3 -> slot 3 (row index 2)
+                    // Ctrl+Shift+3 -> move to workspace/row 3
                     if keycode == 12 || keycode == 89
                         || k == gdk::Key::_3 || k == gdk::Key::numbersign || k == gdk::Key::KP_3
                         || key == gdk::Key::_3 || key == gdk::Key::numbersign || key == gdk::Key::KP_3
                         || key.to_unicode() == Some('3') || key.to_unicode() == Some('#')
                     {
-                        self.move_tab_to_vertical_slot(2);
+                        self.move_tab_to_row(2);
+                        return true;
+                    }
+                    // Ctrl+Shift+4 -> move to workspace/row 4
+                    if keycode == 13 || keycode == 90 || k == gdk::Key::_4 || k == gdk::Key::KP_4 || key.to_unicode() == Some('4') {
+                        self.move_tab_to_row(3);
+                        return true;
+                    }
+                    // Ctrl+Shift+5 -> move to workspace/row 5
+                    if keycode == 14 || keycode == 91 || k == gdk::Key::_5 || k == gdk::Key::KP_5 || key.to_unicode() == Some('5') {
+                        self.move_tab_to_row(4);
                         return true;
                     }
                     return false;
@@ -2130,7 +2110,7 @@ fn build(gapp: &gtk::Application) {
     brand.set_xalign(0.0);
     let add = gtk::Button::from_icon_name("list-add-symbolic");
     add.add_css_class("btn-add-tab");
-    add.set_tooltip_text(Some("New column tab  (Ctrl+T)"));
+    add.set_tooltip_text(Some("New tab  (Ctrl+T)"));
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     head.set_margin_start(4);
     head.append(&brand);
@@ -2163,7 +2143,7 @@ fn build(gapp: &gtk::Application) {
     list_scroll.set_vexpand(true);
     list_scroll.set_child(Some(&list));
 
-    let hint = gtk::Label::new(Some("ctrl+h/l cols  ·  ctrl+j/k rows  ·  ctrl+v split"));
+    let hint = gtk::Label::new(Some("ctrl+h/l tabs  ·  ctrl+j/k rows  ·  ctrl+v new row"));
     hint.add_css_class("side-hint");
     hint.set_xalign(0.0);
     hint.set_margin_start(4);
@@ -2382,12 +2362,14 @@ fn build(gapp: &gtk::Application) {
         ov_hint,
         ov: Cell::new(false),
         ov_return: Cell::new((0, 0)),
-        ov_saved: Cell::new(0.0),
+        ov_saved_x: Cell::new(0.0),
+        ov_saved_y: Cell::new(0.0),
         target_zoom: Cell::new(1.0),
-        cols: RefCell::new(Vec::new()),
-        focus_col: Cell::new(0),
+        rows: RefCell::new(Vec::new()),
         focus_row: Cell::new(0),
-        target: Cell::new(0.0),
+        focus_col: Cell::new(0),
+        target_x: Cell::new(0.0),
+        target_y: Cell::new(0.0),
         animating: Cell::new(false),
         side_open: Cell::new(true),
         side_gen: Cell::new(0),
@@ -2436,15 +2418,15 @@ fn build(gapp: &gtk::Application) {
     list.connect_row_activated(move |_, row| {
         let idx = row.index() as usize;
         let mut counted = 0;
-        let cols = a.cols.borrow();
-        for (ci, col) in cols.iter().enumerate() {
-            if idx < counted + col.tabs.len() {
-                let ri = idx - counted;
-                drop(cols);
-                a.focus_coords(ci, ri);
+        let rows = a.rows.borrow();
+        for (ri, r) in rows.iter().enumerate() {
+            if idx < counted + r.tabs.len() {
+                let ci = idx - counted;
+                drop(rows);
+                a.focus_coords(ri, ci);
                 return;
             }
-            counted += col.tabs.len();
+            counted += r.tabs.len();
         }
     });
 
@@ -2517,10 +2499,10 @@ fn build(gapp: &gtk::Application) {
 
         if ny > THRESHOLD {
             ay.set(0.0);
-            a.focus_window_down();
+            a.focus_row_down();
         } else if ny < -THRESHOLD {
             ay.set(0.0);
-            a.focus_window_up();
+            a.focus_row_up();
         }
         glib::Propagation::Stop
     });
@@ -2588,14 +2570,23 @@ mod tests {
 
     #[test]
     fn test_parse_session_content() {
-        let sample = "focus\t2\t1\ncol\t0\t0\ntab\t0\tdefault\thttps://google.com\ncol\t1\t1\ntab\t1\twork\thttps://github.com\ntab\t1\twork\thttps://docs.rs\n";
-        let (focus, col_flags, tabs) = parse_session_content(sample);
-        assert_eq!(focus, (2, 1));
-        assert_eq!(col_flags, vec![(0, false), (1, true)]);
-        assert_eq!(tabs.len(), 3);
-        assert_eq!(tabs[0], (0, "default".to_string(), "https://google.com".to_string()));
-        assert_eq!(tabs[1], (1, "work".to_string(), "https://github.com".to_string()));
-        assert_eq!(tabs[2], (1, "work".to_string(), "https://docs.rs".to_string()));
+        let sample = "focus\t1\t0\ntab\t0\t0\t1\tdefault\thttps://google.com\ntab\t1\t0\t1\twork\thttps://github.com\n";
+        let (focus, tabs) = parse_session_content(sample);
+        assert_eq!(focus, (1, 0));
+        assert_eq!(tabs.len(), 2);
+        assert_eq!(tabs[0], SessionTabItem {
+            row: 0,
+            col: 0,
+            full: true,
+            profile_id: "default".to_string(),
+            url: "https://google.com".to_string()
+        });
+        assert_eq!(tabs[1], SessionTabItem {
+            row: 1,
+            col: 0,
+            full: true,
+            profile_id: "work".to_string(),
+            url: "https://github.com".to_string()
+        });
     }
 }
-
