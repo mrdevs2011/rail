@@ -1748,7 +1748,7 @@ fn build(gapp: &gtk::Application) {
 fn main() -> glib::ExitCode {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--version" || a == "-v") {
-        println!("rail 0.1.0");
+        println!("rail {}", env!("CARGO_PKG_VERSION"));
         return glib::ExitCode::SUCCESS;
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {

@@ -4,6 +4,7 @@ set -euo pipefail
 
 APP_NAME="Rail"
 REPO="${RAIL_REPO:-mrdevs2011/rail}"
+VERSION="${RAIL_VERSION:-v0.2.0}"
 INSTALL_DIR="${RAIL_DIR:-$HOME/MR/Applictions}"
 BIN_DIR="$HOME/.local/bin"
 BIN_LINK="$BIN_DIR/rail"
@@ -65,7 +66,7 @@ if [ "$USE_STANDALONE" -eq 0 ]; then
   # Faqat ~400 KB binar fayl yuklanadi
   TARGET="$BIN_LINK"
   echo "==> Rail binar fayli yuklab olinmoqda (atigi ~400 KB)..."
-  download "https://github.com/${REPO}/releases/download/v0.1.0/rail-x86_64" "$TARGET"
+  download "https://github.com/${REPO}/releases/download/${VERSION}/rail-x86_64" "$TARGET"
   chmod +x "$TARGET"
 else
   # WebKit bo'lmasa, to'liq AppImage yuklanadi
