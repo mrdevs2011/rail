@@ -1739,13 +1739,26 @@ fn build(gapp: &gtk::Application) {
     win.add_controller(keys);
 
     app.new_tab();
-    if let Some(url) = std::env::args().nth(1) {
+    if let Some(url) = std::env::args().nth(1).filter(|u| !u.starts_with('-')) {
         app.navigate(&url);
     }
     win.present();
 }
 
 fn main() -> glib::ExitCode {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--version" || a == "-v") {
+        println!("rail 0.1.0");
+        return glib::ExitCode::SUCCESS;
+    }
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        println!("Usage: rail [URL]");
+        return glib::ExitCode::SUCCESS;
+    }
+    if args.iter().any(|a| a.starts_with("--appimage-")) {
+        return glib::ExitCode::FAILURE;
+    }
+
     let app = gtk::Application::builder()
         .application_id("dev.rail.browser")
         .flags(gio::ApplicationFlags::NON_UNIQUE)
