@@ -15,16 +15,16 @@ use webkit6::WebView;
 const START_PAGE: &str = r#"<!doctype html><meta charset=utf-8><meta name=color-scheme content=dark>
 <style>
 html,body{height:100%;margin:0;box-sizing:border-box}
-body{display:grid;place-items:center;background:#16161e;color:#6b7399;font:14px/1.5 system-ui,-apple-system,sans-serif;padding:16px;overflow-y:auto;overflow-x:hidden}
+body{display:grid;place-items:center;background:#000000;color:#64748b;font:13px/1.5 ui-monospace,monospace,system-ui;padding:16px;overflow-y:auto;overflow-x:hidden}
 .w{text-align:center;max-width:540px;width:100%;margin:auto;box-sizing:border-box}
-h1{font-weight:600;font-size:clamp(30px, 7vw, 56px);letter-spacing:-.03em;margin:0;color:#c0caf5}
-h1 b{color:#7aa2f7}
-p{margin:4px 0 24px;font-size:clamp(12px, 2.5vw, 14px);color:#7982a9}
-.k{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;text-align:left;justify-content:center;align-items:center;font-size:13px}
+h1{font-weight:800;font-size:clamp(32px, 7vw, 54px);letter-spacing:-.04em;margin:0;color:#f8fafc;font-family:ui-monospace,monospace}
+h1 b{color:#38bdf8}
+p{margin:4px 0 24px;font-size:clamp(12px, 2.5vw, 13px);color:#64748b}
+.k{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;text-align:left;justify-content:center;align-items:center;font-size:12px}
 .k span:nth-child(odd){text-align:right;white-space:nowrap}
-.k span:nth-child(even){text-align:left;color:#a9b1d6}
-kbd{font:11px ui-monospace,monospace;background:#1f2335;border:1px solid #2f334d;border-bottom-width:2px;
-    border-radius:6px;padding:2px 6px;color:#c0caf5;margin-left:3px;white-space:nowrap}
+.k span:nth-child(even){text-align:left;color:#94a3b8}
+kbd{font:11px ui-monospace,monospace;background:#090a0f;border:1px solid #1c1d29;border-bottom-width:2px;
+    border-radius:5px;padding:2px 6px;color:#f1f5f9;margin-left:3px;white-space:nowrap}
 @media (max-width: 440px) {
   body{padding:8px}
   .k{font-size:11px;gap:6px 10px}
@@ -35,7 +35,7 @@ kbd{font:11px ui-monospace,monospace;background:#1f2335;border:1px solid #2f334d
 <span><kbd>Ctrl</kbd><kbd>G</kbd></span><span>go to address</span>
 <span><kbd>Ctrl</kbd><kbd>Enter</kbd></span><span>edit current URL</span>
 <span><kbd>Ctrl</kbd><kbd>T</kbd></span><span>new column tab</span>
-<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>T</kbd> / <kbd>Ctrl</kbd><kbd>V</kbd></span><span>split vertically (new window down)</span>
+<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>T</kbd> / <kbd>Ctrl</kbd><kbd>V</kbd></span><span>split vertically (down stack)</span>
 <span><kbd>Ctrl</kbd><kbd>P</kbd> / <kbd>Shift</kbd><kbd>P</kbd></span><span>manage profiles</span>
 <span><kbd>Ctrl</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>focus left / right column</span>
 <span><kbd>Ctrl</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>focus down / up window</span>
@@ -47,299 +47,477 @@ kbd{font:11px ui-monospace,monospace;background:#1f2335;border:1px solid #2f334d
 </div></div>"#;
 
 const CSS: &str = "
-window { background: #0f1016; border-radius: 0; box-shadow: none; }
-label { color: #a9b1d6; }
+window { background: #000000; border-radius: 0; box-shadow: none; }
+label { color: #94a3b8; }
 
 /* ---- columns & tabs ---- */
 .rail-col { background: transparent; }
-.tab { border-radius: 12px; border: 2px solid #1a1b26; }
-.tab.focused { border-color: #7aa2f7; }
+.tab { border-radius: 8px; border: 1.5px solid #14141c; background: #000000; }
+.tab.focused { border-color: #38bdf8; box-shadow: 0 0 16px rgba(56, 189, 248, 0.2); }
 
-/* ---- sidebar ---- */
-.brand { font-weight: 700; font-size: 17px; letter-spacing: -0.02em; color: #c0caf5; }
-.brand-dot { color: #7aa2f7; }
-button.flat-icon { background: transparent; border: none; box-shadow: none; min-width: 28px; min-height: 28px;
-                   padding: 0; border-radius: 8px; color: #7982a9; }
-button.flat-icon:hover { background: #1f2335; color: #c0caf5; }
-button.pill { background: #1a1b26; border: 1px solid #272a40; border-radius: 10px; padding: 8px 12px;
-              box-shadow: none; color: #a9b1d6; }
-button.pill:hover { background: #1f2335; border-color: #3b4261; }
-button.pill label { color: #c0caf5; }
-.tablist, .tablist row { background: transparent; }
-.tablist row { padding: 0; margin: 1px 0; border-radius: 10px; }
-.tablist row:hover { background: #151620; }
-.tablist row:selected { background: #24283b; }
-.tabrow { padding: 8px 8px 8px 10px; }
-.tabrow label { color: #8089b3; font-size: 13px; }
-row:selected .tabrow label { color: #c0caf5; }
-.tabrow image { color: #7982a9; }
-.tab-close { opacity: 0; min-width: 22px; min-height: 22px; padding: 0; border-radius: 6px;
-             background: transparent; border: none; box-shadow: none; color: #7982a9; transition: opacity 120ms; }
-.tab-close:hover { background: #3b4261; color: #c0caf5; }
-row:hover .tab-close, row:selected .tab-close { opacity: 1; }
-.hint { color: #3f4561; font-size: 11px; }
+/* ---- sidebar (pure pitch black 000 dev style) ---- */
+.side-bar { background: #000000; border-right: 1px solid #14141c; padding-right: 6px; }
+.brand { font-family: ui-monospace, monospace; font-weight: 800; font-size: 16px; letter-spacing: -0.04em; color: #f8fafc; }
+.brand-dot { color: #38bdf8; }
+button.btn-add-tab {
+    background: #090a0f;
+    border: 1px solid #1c1d29;
+    border-radius: 6px;
+    min-width: 26px;
+    min-height: 26px;
+    color: #64748b;
+    padding: 0;
+    transition: all 120ms;
+}
+button.btn-add-tab:hover {
+    background: #141622;
+    border-color: #38bdf8;
+    color: #f8fafc;
+}
+button.flat-icon {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    min-width: 26px;
+    min-height: 26px;
+    padding: 0;
+    border-radius: 6px;
+    color: #64748b;
+}
+button.flat-icon:hover {
+    background: #13141f;
+    color: #f1f5f9;
+}
+button.pill {
+    background: #07080c;
+    border: 1px solid #171822;
+    border-radius: 8px;
+    padding: 7px 10px;
+    box-shadow: none;
+    color: #64748b;
+    transition: all 120ms;
+}
+button.pill:hover {
+    background: #0d0e14;
+    border-color: #26293a;
+    color: #cbd5e1;
+}
+button.pill label {
+    color: #64748b;
+    font-size: 12.5px;
+}
+button.pill:hover label {
+    color: #cbd5e1;
+}
+.pill-icon {
+    color: #475569;
+}
+button.pill:hover .pill-icon {
+    color: #38bdf8;
+}
+.pill-chip {
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: #475569;
+    background: #0f1017;
+    border: 1px solid #1c1d29;
+    border-radius: 4px;
+    padding: 1px 5px;
+}
+button.pill:hover .pill-chip {
+    color: #94a3b8;
+    border-color: #2b2e40;
+}
+.tablist, .tablist row {
+    background: transparent;
+}
+.tablist row {
+    padding: 0;
+    margin: 2px 0;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    transition: all 100ms ease;
+}
+.tablist row:hover {
+    background: #090a0f;
+    border-color: #171824;
+}
+.tablist row:selected {
+    background: #0e1017;
+    border-color: #222638;
+    border-left: 3px solid #38bdf8;
+}
+.tabrow {
+    padding: 6px 8px;
+}
+.tab-index {
+    font-family: ui-monospace, monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #475569;
+    background: #08090d;
+    border: 1px solid #14151f;
+    border-radius: 4px;
+    padding: 1px 4px;
+    min-width: 14px;
+    text-align: center;
+}
+row:selected .tab-index {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+    border-color: rgba(56, 189, 248, 0.35);
+}
+.tab-title {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #8892b0;
+}
+row:selected .tab-title {
+    color: #f8fafc;
+    font-weight: 600;
+}
+.tabrow image {
+    color: #64748b;
+}
+.tab-close {
+    opacity: 0;
+    min-width: 20px;
+    min-height: 20px;
+    padding: 0;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: #64748b;
+    transition: all 100ms;
+}
+.tab-close:hover {
+    background: rgba(244, 63, 94, 0.2);
+    color: #fb7185;
+}
+row:hover .tab-close, row:selected .tab-close {
+    opacity: 1;
+}
+.side-hint {
+    font-family: ui-monospace, monospace;
+    font-size: 9.5px;
+    color: #334155;
+    letter-spacing: -0.01em;
+}
 
-.fav, .tabrow label.fav, row:selected .tabrow label.fav { border-radius: 5px; font-size: 10px; font-weight: 700; color: #0f1016; }
-.fav-0 { background: #7aa2f7; } .fav-1 { background: #bb9af7; } .fav-2 { background: #9ece6a; }
-.fav-3 { background: #e0af68; } .fav-4 { background: #f7768e; } .fav-5 { background: #7dcfff; }
-.fav-6 { background: #ff9e64; } .fav-7 { background: #73daca; }
+.fav, .tabrow label.fav, row:selected .tabrow label.fav {
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    color: #000000;
+    font-family: ui-monospace, monospace;
+}
+.fav-0 { background: #38bdf8; } .fav-1 { background: #c084fc; } .fav-2 { background: #4ade80; }
+.fav-3 { background: #facc15; } .fav-4 { background: #f87171; } .fav-5 { background: #22d3ee; }
+.fav-6 { background: #fb923c; } .fav-7 { background: #2dd4bf; }
 
 /* ---- load progress ---- */
-progressbar.load-bar { min-height: 3px; margin: 0 8px; }
-progressbar.load-bar trough { min-height: 3px; background: transparent; border: none; }
-progressbar.load-bar progress { min-height: 3px; background: #7aa2f7; border-radius: 3px;
-                                box-shadow: 0 0 10px rgba(122,162,247,0.7); }
+progressbar.load-bar { min-height: 2.5px; margin: 0 8px; }
+progressbar.load-bar trough { min-height: 2.5px; background: transparent; border: none; }
+progressbar.load-bar progress { min-height: 2.5px; background: #38bdf8; border-radius: 2px;
+                                box-shadow: 0 0 10px rgba(56,189,248,0.8); }
 
 /* ---- address palette ---- */
-.palette { background: #1a1b26; border-radius: 16px; border: 1px solid #2f334d; padding: 14px 18px 12px;
-           box-shadow: 0 24px 64px rgba(0,0,0,0.55); }
-.palette image { color: #7982a9; }
-entry.palette-entry, entry.palette-entry:focus-within { background: none; border: none; box-shadow: none; outline: none;
-    padding: 0; min-height: 0; font-size: 16px; color: #c0caf5; }
-.palette-hint { color: #565f89; font-size: 11px; margin-top: 6px; }
+.palette {
+    background: #06070a;
+    border-radius: 12px;
+    border: 1px solid #1e202d;
+    padding: 12px 16px 10px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.95);
+}
+.palette image {
+    color: #64748b;
+}
+entry.palette-entry, entry.palette-entry:focus-within {
+    background: none;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    padding: 0;
+    min-height: 0;
+    font-size: 15px;
+    color: #f1f5f9;
+    font-family: ui-monospace, monospace, system-ui;
+}
+.palette-hint {
+    color: #475569;
+    font-size: 10.5px;
+    font-family: ui-monospace, monospace;
+    margin-top: 6px;
+}
 
 /* ---- overview (the live strip, zoomed out) ---- */
-.zoomed .tab { opacity: 0.88; border-radius: 28px; }
-.zoomed .tab.focused { opacity: 1; outline: 7px solid #7aa2f7; outline-offset: -5px; }
-.ov-hint { background: #1a1b26; color: #8089b3; border: 1px solid #2f334d; border-radius: 10px;
-           padding: 8px 16px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.zoomed .tab { opacity: 0.85; border-radius: 16px; border: 1.5px solid #20222e; }
+.zoomed .tab.focused { opacity: 1; outline: 4px solid #38bdf8; outline-offset: -2px; }
+.ov-hint {
+    background: #08090d;
+    color: #94a3b8;
+    border: 1px solid #1e202d;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 11px;
+    font-family: ui-monospace, monospace;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+}
 
-/* ---- profile colors (Tokyo Night) ---- */
-.prof-bg-0 { background-color: #7aa2f7; color: #0f1016; }
-.prof-bg-1 { background-color: #bb9af7; color: #0f1016; }
-.prof-bg-2 { background-color: #9ece6a; color: #0f1016; }
-.prof-bg-3 { background-color: #e0af68; color: #0f1016; }
-.prof-bg-4 { background-color: #f7768e; color: #0f1016; }
-.prof-bg-5 { background-color: #7dcfff; color: #0f1016; }
-.prof-bg-6 { background-color: #ff9e64; color: #0f1016; }
-.prof-bg-7 { background-color: #73daca; color: #0f1016; }
+/* ---- profile colors (True Dark Dev Neon) ---- */
+.prof-bg-0 { background-color: #38bdf8; color: #000000; }
+.prof-bg-1 { background-color: #c084fc; color: #000000; }
+.prof-bg-2 { background-color: #4ade80; color: #000000; }
+.prof-bg-3 { background-color: #facc15; color: #000000; }
+.prof-bg-4 { background-color: #f87171; color: #000000; }
+.prof-bg-5 { background-color: #22d3ee; color: #000000; }
+.prof-bg-6 { background-color: #fb923c; color: #000000; }
+.prof-bg-7 { background-color: #2dd4bf; color: #000000; }
 
 /* ---- profile circle button in URL palette ---- */
 button.profile-circle-btn {
-    min-width: 32px;
-    min-height: 32px;
+    min-width: 30px;
+    max-width: 30px;
+    min-height: 30px;
+    max-height: 30px;
     padding: 0;
     border-radius: 9999px;
-    border: 2px solid #2f334d;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border: 1.5px solid #1e202d;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     transition: transform 120ms, border-color 120ms;
 }
 button.profile-circle-btn:hover {
-    transform: scale(1.1);
-    border-color: #c0caf5;
+    transform: scale(1.08);
+    border-color: #38bdf8;
 }
 .profile-circle-label {
     font-weight: 800;
-    font-size: 13px;
-    color: #0f1016;
+    font-size: 12px;
+    color: #000000;
+    font-family: ui-monospace, monospace;
 }
 
 /* ---- profile popover dropdown ---- */
 .profile-popover {
-    background: #1a1b26;
-    border: 1px solid #2f334d;
-    border-radius: 14px;
+    background: #06070a;
+    border: 1px solid #1e202d;
+    border-radius: 12px;
     padding: 6px;
-    box-shadow: 0 16px 48px rgba(0,0,0,0.65);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.9);
 }
 .profile-popover-title {
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #565f89;
+    color: #475569;
+    font-family: ui-monospace, monospace;
     padding: 4px 8px 2px;
 }
 button.profile-item-btn {
     background: transparent;
     border: none;
     box-shadow: none;
-    border-radius: 10px;
-    padding: 6px 10px;
+    border-radius: 8px;
+    padding: 5px 8px;
     transition: background 100ms;
 }
 button.profile-item-btn:hover {
-    background: #24283b;
+    background: #0f111a;
 }
 button.profile-item-btn.selected {
-    background: #1f2335;
+    background: #131622;
+    border-left: 2px solid #38bdf8;
 }
 .profile-item-dot {
-    min-width: 24px;
-    max-width: 24px;
-    min-height: 24px;
-    max-height: 24px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
     border-radius: 9999px;
     font-size: 11px;
     font-weight: 800;
-    color: #16161e;
+    color: #000000;
+    font-family: ui-monospace, monospace;
     padding: 0;
 }
 .profile-item-name {
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 600;
-    color: #c0caf5;
+    color: #f1f5f9;
 }
 .profile-item-check {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
-    color: #7aa2f7;
+    color: #38bdf8;
 }
 
 /* ---- profiles manager modal (Ctrl+P / Ctrl+Shift+P) ---- */
 .profiles-modal {
-    background: #16161e;
-    border: 1px solid #2f334d;
-    border-radius: 20px;
-    padding: 24px 28px;
-    box-shadow: 0 32px 80px rgba(0,0,0,0.85);
+    background: #06070a;
+    border: 1px solid #1e202d;
+    border-radius: 16px;
+    padding: 22px 26px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.98);
     min-width: 440px;
     max-width: 480px;
     margin-left: 16px;
     margin-right: 16px;
 }
 .profiles-modal-title {
-    font-size: 19px;
-    font-weight: 700;
-    color: #c0caf5;
-    letter-spacing: -0.02em;
+    font-size: 18px;
+    font-weight: 800;
+    color: #f8fafc;
+    letter-spacing: -0.03em;
+    font-family: ui-monospace, monospace, system-ui;
 }
 .profiles-modal-subtitle {
-    font-size: 12px;
-    color: #565f89;
+    font-size: 11.5px;
+    color: #64748b;
     margin-top: 2px;
 }
 .profile-card {
-    background: #1a1b26;
-    border: 1px solid #24283b;
-    border-radius: 12px;
-    padding: 10px 14px;
-    margin-bottom: 8px;
+    background: #0a0b10;
+    border: 1px solid #161722;
+    border-radius: 10px;
+    padding: 9px 12px;
+    margin-bottom: 6px;
     transition: all 120ms ease;
 }
 .profile-card:hover {
-    border-color: #3b4261;
+    border-color: #242738;
 }
 .profile-card.active-profile {
-    border-color: #7aa2f7;
-    background: #1d2033;
-    box-shadow: 0 0 16px rgba(122, 162, 247, 0.12);
+    border-color: #38bdf8;
+    background: #0d101a;
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.12);
 }
 .profile-avatar-circle {
-    min-width: 32px;
-    max-width: 32px;
-    min-height: 32px;
-    max-height: 32px;
+    min-width: 30px;
+    max-width: 30px;
+    min-height: 30px;
+    max-height: 30px;
     border-radius: 9999px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 800;
-    color: #16161e;
+    color: #000000;
+    font-family: ui-monospace, monospace;
     margin: 0;
     padding: 0;
 }
 .profile-card-name {
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 600;
-    color: #c0caf5;
+    color: #f1f5f9;
 }
 .profile-card-sub {
-    font-size: 11px;
-    color: #565f89;
+    font-size: 10.5px;
+    color: #475569;
     font-family: ui-monospace, monospace;
 }
 .profile-badge-active {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 700;
     border-radius: 9999px;
-    padding: 3px 10px;
-    background: rgba(122, 162, 247, 0.14);
-    color: #7aa2f7;
-    border: 1px solid rgba(122, 162, 247, 0.35);
+    padding: 2px 8px;
+    background: rgba(56, 189, 248, 0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    font-family: ui-monospace, monospace;
 }
 button.btn-make-active {
-    background: #24283b;
-    color: #a9b1d6;
-    border: 1px solid #3b4261;
-    border-radius: 8px;
-    padding: 4px 12px;
-    font-size: 12px;
+    background: #11131c;
+    color: #94a3b8;
+    border: 1px solid #222536;
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 11.5px;
     font-weight: 600;
     transition: all 120ms;
 }
 button.btn-make-active:hover {
-    background: #7aa2f7;
-    color: #16161e;
-    border-color: #7aa2f7;
+    background: #38bdf8;
+    color: #000000;
+    border-color: #38bdf8;
 }
 button.btn-del-profile {
     background: transparent;
     border: none;
-    border-radius: 8px;
-    padding: 4px 6px;
-    color: #565f89;
+    border-radius: 6px;
+    padding: 4px;
+    color: #475569;
     transition: all 120ms;
 }
 button.btn-del-profile:hover {
-    background: rgba(247, 118, 142, 0.15);
-    color: #f7768e;
+    background: rgba(244, 63, 94, 0.18);
+    color: #fb7185;
 }
 .profile-section-label {
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
-    color: #565f89;
-    letter-spacing: 0.05em;
+    color: #475569;
+    letter-spacing: 0.06em;
+    font-family: ui-monospace, monospace;
     margin-top: 4px;
 }
 .profile-entry-box {
-    background: #13141c;
-    border: 1px solid #2f334d;
-    border-radius: 10px;
-    padding: 8px 12px;
-    color: #c0caf5;
+    background: #090a0e;
+    border: 1px solid #1c1d29;
+    border-radius: 8px;
+    padding: 7px 11px;
+    color: #f1f5f9;
     font-size: 13px;
+    font-family: ui-monospace, monospace, system-ui;
     transition: all 120ms;
 }
 .profile-entry-box:focus {
-    border-color: #7aa2f7;
-    box-shadow: 0 0 0 1px #7aa2f7;
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 1px #38bdf8;
 }
 .profile-entry-box.error {
-    border-color: #f7768e;
-    box-shadow: 0 0 0 1px #f7768e;
+    border-color: #f87171;
+    box-shadow: 0 0 0 1px #f87171;
 }
 .profile-error-label {
     font-size: 11px;
     font-weight: 600;
-    color: #f7768e;
+    color: #f87171;
     margin-top: 2px;
 }
 button.btn-create-profile {
-    background: #7aa2f7;
-    color: #16161e;
+    background: #38bdf8;
+    color: #000000;
     font-weight: 700;
     font-size: 12px;
     border: none;
-    border-radius: 8px;
+    border-radius: 7px;
     padding: 6px 16px;
     transition: all 120ms;
 }
 button.btn-create-profile:hover {
-    background: #89b4fa;
+    background: #7dd3fc;
 }
 .profile-badge-mini {
     font-size: 9px;
-    font-weight: 700;
-    min-width: 15px;
-    min-height: 15px;
+    font-weight: 800;
+    min-width: 16px;
+    max-width: 16px;
+    min-height: 16px;
+    max-height: 16px;
     border-radius: 9999px;
-    margin-right: 6px;
-    color: #0f1016;
+    margin-left: 2px;
+    margin-right: 4px;
+    color: #000000;
+    padding: 0;
+    font-family: ui-monospace, monospace;
 }
 button.color-choice {
-    min-width: 24px;
-    max-width: 24px;
-    min-height: 24px;
-    max-height: 24px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
     padding: 0;
     border-radius: 9999px;
     border: 2px solid transparent;
@@ -350,7 +528,7 @@ button.color-choice:hover {
 }
 button.color-choice.selected {
     border-color: #ffffff;
-    box-shadow: 0 0 0 2px #16161e;
+    box-shadow: 0 0 0 2px #06070a;
     transform: scale(1.15);
 }
 ";
@@ -857,6 +1035,7 @@ impl App {
         badge.add_css_class(&format!("fav-{}", seed % 8));
         badge.set_size_request(size, size);
         badge.set_valign(gtk::Align::Center);
+        badge.set_halign(gtk::Align::Center);
         badge.upcast()
     }
 
@@ -872,7 +1051,7 @@ impl App {
 
         for (ci, col) in cols.iter().enumerate() {
             for (ri, t) in col.tabs.iter().enumerate() {
-                let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+                let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
                 row.add_css_class("tabrow");
                 row.append(&Self::tab_icon(t, 16));
 
@@ -883,24 +1062,32 @@ impl App {
                         p_dot.add_css_class("profile-badge-mini");
                         p_dot.add_css_class(&format!("prof-bg-{}", p.color_idx));
                         p_dot.set_valign(gtk::Align::Center);
+                        p_dot.set_halign(gtk::Align::Center);
+                        p_dot.set_width_request(16);
+                        p_dot.set_height_request(16);
                         p_dot.set_tooltip_text(Some(&format!("Profile: {}", p.name)));
                         row.append(&p_dot);
                     }
                 }
                 drop(mgr);
 
-                let title_prefix = if col.tabs.len() > 1 {
-                    format!("[{}:{}] ", ci + 1, ri + 1)
+                let index_str = if col.tabs.len() > 1 {
+                    format!("{}:{}", ci + 1, ri + 1)
                 } else {
-                    format!("[{}] ", ci + 1)
+                    format!("{}", ci + 1)
                 };
-                let full_title = format!("{}{}", title_prefix, Self::tab_label(t));
-                let label = gtk::Label::new(Some(&full_title));
-                label.set_xalign(0.0);
-                label.set_hexpand(true);
-                label.set_width_chars(1);
-                label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-                row.append(&label);
+                let index_lbl = gtk::Label::new(Some(&index_str));
+                index_lbl.add_css_class("tab-index");
+                index_lbl.set_valign(gtk::Align::Center);
+                row.append(&index_lbl);
+
+                let title_lbl = gtk::Label::new(Some(&Self::tab_label(t)));
+                title_lbl.add_css_class("tab-title");
+                title_lbl.set_xalign(0.0);
+                title_lbl.set_hexpand(true);
+                title_lbl.set_width_chars(1);
+                title_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                row.append(&title_lbl);
 
                 let close = gtk::Button::from_icon_name("window-close-symbolic");
                 close.add_css_class("tab-close");
@@ -1557,14 +1744,14 @@ fn build(gapp: &gtk::Application) {
 
     // ---- sidebar ----
     let brand = gtk::Label::new(None);
-    brand.set_markup("<span weight='bold' size='large' foreground='#c0caf5'>rail</span><span weight='bold' size='large' foreground='#7aa2f7'>.</span>");
+    brand.set_markup("<span weight='bold' font_family='monospace' size='large' foreground='#f8fafc'>rail</span><span weight='bold' size='large' foreground='#38bdf8'>.</span>");
     brand.set_hexpand(true);
     brand.set_xalign(0.0);
     let add = gtk::Button::from_icon_name("list-add-symbolic");
-    add.add_css_class("flat-icon");
+    add.add_css_class("btn-add-tab");
     add.set_tooltip_text(Some("New column tab  (Ctrl+T)"));
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    head.set_margin_start(8);
+    head.set_margin_start(4);
     head.append(&brand);
     head.append(&add);
 
@@ -1574,8 +1761,13 @@ fn build(gapp: &gtk::Application) {
     pill_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
     pill_label.set_width_chars(1);
     let pill_inner = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    pill_inner.append(&gtk::Image::from_icon_name("system-search-symbolic"));
+    let s_icon = gtk::Image::from_icon_name("system-search-symbolic");
+    s_icon.add_css_class("pill-icon");
+    pill_inner.append(&s_icon);
     pill_inner.append(&pill_label);
+    let pill_chip = gtk::Label::new(Some("Ctrl+G"));
+    pill_chip.add_css_class("pill-chip");
+    pill_inner.append(&pill_chip);
     let pill = gtk::Button::new();
     pill.add_css_class("pill");
     pill.set_child(Some(&pill_inner));
@@ -1591,11 +1783,12 @@ fn build(gapp: &gtk::Application) {
     list_scroll.set_child(Some(&list));
 
     let hint = gtk::Label::new(Some("ctrl+h/l cols  ·  ctrl+j/k rows  ·  ctrl+v split"));
-    hint.add_css_class("hint");
+    hint.add_css_class("side-hint");
     hint.set_xalign(0.0);
-    hint.set_margin_start(8);
+    hint.set_margin_start(4);
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    side.add_css_class("side-bar");
     side.set_margin_top(10);
     side.set_margin_bottom(10);
     side.set_margin_start(10);

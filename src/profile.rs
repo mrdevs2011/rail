@@ -5,14 +5,14 @@ use std::path::PathBuf;
 use webkit6::NetworkSession;
 
 pub const PROFILE_COLORS: &[(&str, &str)] = &[
-    ("#7aa2f7", "Blue"),
-    ("#bb9af7", "Purple"),
-    ("#9ece6a", "Green"),
-    ("#e0af68", "Yellow"),
-    ("#f7768e", "Pink"),
-    ("#7dcfff", "Cyan"),
-    ("#ff9e64", "Orange"),
-    ("#73daca", "Teal"),
+    ("#38bdf8", "Cyan"),
+    ("#c084fc", "Purple"),
+    ("#4ade80", "Green"),
+    ("#facc15", "Yellow"),
+    ("#f87171", "Red"),
+    ("#22d3ee", "Sky"),
+    ("#fb923c", "Orange"),
+    ("#2dd4bf", "Teal"),
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
