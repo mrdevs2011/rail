@@ -1,69 +1,93 @@
 # Rail
 
-**Rail** — a niri-inspired keyboard-driven web browser built with GTK4 and WebKitGTK. It features an infinite horizontal strip of columns, vertical window stacks, and completely isolated multi-profiles.
+> **Rail** — a blazing-fast, keyboard-driven web browser built with GTK4 and WebKitGTK. Inspired by the **Niri** Wayland compositor, it features an infinite horizontal ribbon of columns, vertical window stacks, and 100% isolated multi-profiles.
 
-![Rail Screenshot](https://raw.githubusercontent.com/mrdevs2011/rail/main/screenshot.png) <!-- if available or omit -->
+---
 
-## Features
+## 🚀 Quick Install (Tezkor o‘rnatish)
 
-- **Niri-Style 2D Tiling**:
-  - Horizontal columns that pan smoothly across an infinite ribbon.
-  - Vertical window stacks within columns (`Ctrl+V` / `Ctrl+Shift+T`).
-  - Seamless 2D keyboard navigation (`Ctrl+H/J/K/L`) and window movement (`Ctrl+Shift+H/J/K/L`).
-- **Completely Isolated Multi-Profiles**:
-  - Independent cookies, localStorage, indexedDB, caches, and sessions per profile via isolated `WebKitNetworkSession` directories (`~/.local/share/rail/profiles/<id>`).
-  - Profile manager modal (`Ctrl+P` or `Ctrl+Shift+P`).
-  - Quick profile selector directly within the URL bar dropdown.
-- **Responsive Layout**:
-  - Adapts smoothly to half-screen window snapping and narrow viewports without collapsing layout elements.
-- **Lightweight & Fast**:
-  - Written in Rust using GTK4 and WebKitGTK 6.0.
-  - Native binary is only ~500 KB.
+### Usul 1: Bir qatorli avtomatik o‘rnatish (Tavsiya etiladi)
 
-## Quick Install (Linux)
-
-To install Rail via a single command:
+Terminalni oching va quyidagi buyruqni bering. Skript kerakli kutubxonalarni tekshiradi, dasturni `~/.local/bin/rail` ga joylaydi va ilovalar menyusiga (`.desktop` fayl va ikonka) qo‘shadi:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh | bash
 ```
 
-Run with:
+### Usul 2: Binar faylni to‘g‘ridan-to‘g‘ri yuklab olish (~500 KB)
+
+Agar tizimingizda `libwebkitgtk-6.0` mavjud bo‘lsa, to‘g‘ridan-to‘g‘ri reliz binar faylini yuklab olishingiz mumkin:
+
 ```bash
-rail
+mkdir -p ~/.local/bin
+curl -fL -o ~/.local/bin/rail https://github.com/mrdevs2011/rail/releases/download/v0.2.0/rail-x86_64
+chmod +x ~/.local/bin/rail
 ```
-or launch it with a URL:
+
+---
+
+## 🏃 Ishga tushirish (Usage)
+
+Terminaldan:
 ```bash
+# Yangi oynada bosh sahifa bilan ochish
+rail
+
+# Ma'lum bir manzilni ochish
 rail https://github.com
 ```
 
-## Keyboard Shortcuts
+Yoki ilovalar ro‘yxatidan (Rofi / Wofi / GNOME / KDE) **Rail** deb qidirib ochishingiz mumkin.
 
-| Shortcut | Action |
+---
+
+## ⚡ Asosiy imkoniyatlar (Features)
+
+- **Niri-Style 2D Tiling**:
+  - Gorizontal cheksiz lenta (horizontal strip): har bir tab alohida ustun ko‘rinishida.
+  - Har bir ustun ichida vertikal oynalar steki (`Ctrl+V` yoki `Ctrl+Shift+T`).
+  - To‘liq klaviatura orqali boshqaruv (`Ctrl+H/J/K/L`) va oynalarni siljitish (`Ctrl+Shift+H/J/K/L`).
+- **100% Izolyatsiyalangan Multi-Profile tizimi**:
+  - Har bir profil uchun to‘liq alohida kuki, kesh, localStorage va sessiyalar (`WebKitNetworkSession`).
+  - Profillar menejeri: `Ctrl+P` yoki `Ctrl+Shift+P`.
+  - URL kiritish maydonida dumaloq profil tugmasi orqali tezkor almashtirish.
+- **Responsiv va moslashuvchan dizayn**:
+  - Kichik ekranlar, tor oynalar va yarim ekran (half-screen snapping) holatlarida ham qulay ishlaydi.
+- **Yengil va tezkor**:
+  - Rust + GTK4 + WebKitGTK 6.0 negizida yaratilgan.
+  - Binar fayl hajmi atigi ~500 KB.
+
+---
+
+## ⌨️ Klaviatura qisqa klavishlari (Keybindings)
+
+| Klavishlar | Vazifasi |
 | :--- | :--- |
-| `Ctrl + G` | Open URL address bar |
-| `Ctrl + Enter` | Edit URL of currently focused window |
-| `Ctrl + T` | New tab (create column to the right) |
-| `Ctrl + V` / `Ctrl + Shift + T` | Split vertically (new window down in column) |
-| `Ctrl + W` | Close focused window |
-| `Ctrl + H` / `Ctrl + L` | Focus column Left / Right |
-| `Ctrl + J` / `Ctrl + K` | Focus window Down / Up |
-| `Ctrl + Shift + H` / `Ctrl + Shift + L` | Move column Left / Right |
-| `Ctrl + Shift + J` / `Ctrl + Shift + K` | Move window Down / Up |
-| `Ctrl + P` / `Ctrl + Shift + P` | Open Profiles Manager |
-| `Ctrl + F` | Toggle Full / Default column width |
-| `Ctrl + O` | Toggle Overview mode |
-| `Ctrl + B` | Toggle Sidebar |
-| `Alt + Left` / `Alt + Right` | Navigate Back / Forward |
-| `Ctrl + R` | Reload page |
-| `Ctrl + +` / `Ctrl + -` / `Ctrl + 0` | Zoom in / Zoom out / Reset zoom |
+| `Ctrl + G` | Manzil kiritish panelini ochish (URL bar) |
+| `Ctrl + Enter` | Joriy oynadagi URL'ni tahrirlash |
+| `Ctrl + T` | Yangi ustun yaratish (o‘ng tomonga yangi tab) |
+| `Ctrl + V` / `Ctrl + Shift + T` | Vertikal bo‘lish (ustun ichida pastga yangi oyna) |
+| `Ctrl + W` | Fokusdagi oynani yopish |
+| `Ctrl + H` / `Ctrl + L` | Chap / O‘ng ustunga fokusni o‘tkazish |
+| `Ctrl + J` / `Ctrl + K` | Pastki / Yuqori oynaga fokusni o‘tkazish |
+| `Ctrl + Shift + H` / `Ctrl + Shift + L` | Ustunni chapga / o‘ngga ko‘chirish |
+| `Ctrl + Shift + J` / `Ctrl + Shift + K` | Oynani pastga / yuqoriga ko‘chirish |
+| `Ctrl + P` / `Ctrl + Shift + P` | Profillar boshqaruv oynasini ochish |
+| `Ctrl + F` | To‘liq kenglik / Standart kenglik rejimini almashtirish |
+| `Ctrl + O` | Umumiy ko‘rinish (Overview) rejimini yoqish/o‘chirish |
+| `Ctrl + B` | Yon panelni (Sidebar) yashirish/ko‘rsatish |
+| `Alt + Left` / `Alt + Right` | Orqaga / Oldinga o‘tish |
+| `Ctrl + R` | Sahifani yangilash (Reload) |
+| `Ctrl + +` / `Ctrl + -` / `Ctrl + 0` | Masshtabni kattalashtirish / kichiklashtirish / tiklash |
 
-## Building from Source
+---
 
-Prerequisites:
+## 🛠 Manba kodidan yig‘ish (Building from Source)
+
+Talablar:
 - Rust (Cargo 1.85+)
-- GTK4 development headers (`gtk4-devel` / `libgtk-4-dev`)
-- WebKitGTK 6.0 development headers (`webkitgtk-6.0-devel` / `libwebkitgtk-6.0-dev`)
+- GTK4 development paketlari (`gtk4-devel` yoki `libgtk-4-dev`)
+- WebKitGTK 6.0 development paketlari (`webkitgtk-6.0-devel` yoki `libwebkitgtk-6.0-dev`)
 
 ```bash
 git clone https://github.com/mrdevs2011/rail.git
@@ -71,4 +95,4 @@ cd rail
 cargo build --release
 ```
 
-The compiled binary will be located at `target/release/rail`.
+Yig‘ilgan binar fayl: `target/release/rail`
