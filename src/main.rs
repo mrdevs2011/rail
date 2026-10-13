@@ -35,7 +35,10 @@ kbd{font:11px ui-monospace,monospace;background:#090a0f;border:1px solid #1c1d29
 <span><kbd>Ctrl</kbd><kbd>G</kbd></span><span>go to address</span>
 <span><kbd>Ctrl</kbd><kbd>Enter</kbd></span><span>edit current URL</span>
 <span><kbd>Ctrl</kbd><kbd>T</kbd></span><span>new column tab</span>
-<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>T</kbd> / <kbd>Ctrl</kbd><kbd>V</kbd></span><span>split vertically (down stack)</span>
+<span><kbd>Ctrl</kbd><kbd>V</kbd></span><span>split vertically (down stack)</span>
+<span><kbd>Ctrl</kbd><kbd>1</kbd> <kbd>2</kbd></span><span>focus row 1 / 2 in column</span>
+<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>2</kbd> <kbd>1</kbd></span><span>move tab down into stack / pop out</span>
+<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>T</kbd></span><span>touchpad mode (2-finger slide tabs)</span>
 <span><kbd>Ctrl</kbd><kbd>P</kbd> / <kbd>Shift</kbd><kbd>P</kbd></span><span>manage profiles</span>
 <span><kbd>Ctrl</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>focus left / right column</span>
 <span><kbd>Ctrl</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>focus down / up window</span>
@@ -487,17 +490,57 @@ button.btn-del-profile:hover {
     margin-top: 2px;
 }
 button.btn-create-profile {
-    background: #38bdf8;
-    color: #000000;
-    font-weight: 700;
-    font-size: 12px;
-    border: none;
+    background: #0d0e14;
+    border: 1px solid #1c1d29;
     border-radius: 7px;
     padding: 6px 16px;
     transition: all 120ms;
 }
-button.btn-create-profile:hover {
+button.btn-create-profile label {
+    color: #475569;
+    font-weight: 700;
+    font-size: 12px;
+}
+button.btn-create-profile:disabled {
+    background: #0a0b10;
+    border-color: #161720;
+}
+button.btn-create-profile:disabled label {
+    color: #475569;
+}
+button.btn-create-profile.active-ready {
+    background: #38bdf8;
+    border-color: #38bdf8;
+}
+button.btn-create-profile.active-ready label {
+    color: #000000;
+    font-weight: 800;
+}
+button.btn-create-profile.active-ready:hover {
     background: #7dd3fc;
+    border-color: #7dd3fc;
+}
+button.btn-create-profile.active-ready:hover label {
+    color: #000000;
+}
+
+/* ---- touchpad mode floating HUD toast ---- */
+.touchpad-toast {
+    background: #06070a;
+    border: 1.5px solid #38bdf8;
+    border-radius: 9px;
+    padding: 7px 16px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.95), 0 0 18px rgba(56, 189, 248, 0.25);
+}
+.touchpad-toast label {
+    color: #38bdf8;
+    font-size: 11.5px;
+    font-weight: 700;
+    font-family: ui-monospace, monospace;
+}
+.touchpad-toast label.touchpad-icon {
+    font-size: 13px;
+    margin-right: 2px;
 }
 .profile-badge-mini {
     font-size: 9px;
@@ -585,8 +628,11 @@ struct App {
     profiles_list_box: gtk::ListBox,
     new_profile_entry: gtk::Entry,
     new_profile_error_lbl: gtk::Label,
+    add_prof_btn: gtk::Button,
     new_profile_color_idx: Cell<usize>,
     color_buttons: RefCell<Vec<gtk::Button>>,
+    touchpad_mode: Cell<bool>,
+    touchpad_indicator: gtk::Box,
 }
 
 fn to_uri(input: &str) -> String {
@@ -607,6 +653,39 @@ fn host_of(uri: &str) -> Option<String> {
     let u = glib::Uri::parse(uri, glib::UriFlags::NONE).ok()?;
     let h = u.host()?;
     Some(h.trim_start_matches("www.").to_string())
+}
+
+fn parse_session_content(content: &str) -> ((usize, usize), Vec<(usize, bool)>, Vec<(usize, String, String)>) {
+    let mut target_focus = (0usize, 0usize);
+    let mut col_flags: Vec<(usize, bool)> = Vec::new();
+    let mut tab_items: Vec<(usize, String, String)> = Vec::new();
+
+    for line in content.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.is_empty() {
+            continue;
+        }
+        match parts[0] {
+            "focus" if parts.len() >= 3 => {
+                let c = parts[1].parse().unwrap_or(0);
+                let r = parts[2].parse().unwrap_or(0);
+                target_focus = (c, r);
+            }
+            "col" if parts.len() >= 3 => {
+                let c = parts[1].parse().unwrap_or(0);
+                let full = parts[2] == "1";
+                col_flags.push((c, full));
+            }
+            "tab" if parts.len() >= 4 => {
+                let c = parts[1].parse().unwrap_or(0);
+                let pid = parts[2].to_string();
+                let url = parts[3].to_string();
+                tab_items.push((c, pid, url));
+            }
+            _ => {}
+        }
+    }
+    (target_focus, col_flags, tab_items)
 }
 
 impl App {
@@ -763,7 +842,10 @@ impl App {
         let app = self.clone();
         view.connect_title_notify(move |_| app.refresh_sidebar());
         let app = self.clone();
-        view.connect_uri_notify(move |_| app.refresh_sidebar());
+        view.connect_uri_notify(move |_| {
+            app.refresh_sidebar();
+            app.save_session();
+        });
         let app = self.clone();
         view.connect_favicon_notify(move |_| app.refresh_sidebar());
         let app = self.clone();
@@ -911,6 +993,7 @@ impl App {
         self.update_load_bar();
         self.reveal_focus();
         self.refresh_sidebar();
+        self.save_session();
 
         if !self.palette_open() && !self.ov.get() {
             if let Some(v) = self.focused_view() {
@@ -969,6 +1052,7 @@ impl App {
         self.strip.queue_allocate();
         self.reveal_focus();
         self.refresh_sidebar();
+        self.save_session();
     }
 
     fn move_window(self: &Rc<Self>, dir: isize) {
@@ -988,6 +1072,146 @@ impl App {
         self.focus_coords(cur_c, target_r);
     }
 
+    fn move_tab_to_vertical_slot(self: &Rc<Self>, target_slot: usize) {
+        let cur_c = self.focus_col.get();
+        let cur_r = self.focus_row.get();
+        let mut cols = self.cols.borrow_mut();
+        if cur_c >= cols.len() {
+            return;
+        }
+
+        if target_slot == 1 {
+            // Ctrl+Shift+2: move down to slot 2 (row index 1)
+            if cols[cur_c].tabs.len() > 1 {
+                if cur_r == 0 {
+                    let tab = cols[cur_c].tabs.remove(0);
+                    cols[cur_c].tabs.insert(1, tab);
+                    let col = &cols[cur_c];
+                    let mut prev: Option<&gtk::Widget> = None;
+                    for t in col.tabs.iter() {
+                        col.container.reorder_child_after(&t.view, prev);
+                        prev = Some(t.view.as_ref());
+                    }
+                    drop(cols);
+                    self.focus_coords(cur_c, 1);
+                    return;
+                }
+            } else if cols.len() > 1 {
+                // Single tab in column: merge down into previous (or next) column as row 1
+                let target_c = if cur_c > 0 { cur_c - 1 } else { 1 };
+                let tab = cols[cur_c].tabs.remove(0);
+                let old_box = cols[cur_c].container.clone();
+                self.strip.remove(&old_box);
+                cols.remove(cur_c);
+
+                let dest_c = if cur_c < target_c { target_c - 1 } else { target_c };
+                cols[dest_c].container.append(&tab.view);
+                cols[dest_c].tabs.push(tab);
+                let new_r = cols[dest_c].tabs.len() - 1;
+                drop(cols);
+                self.focus_coords(dest_c, new_r);
+                return;
+            }
+        } else if target_slot == 0 {
+            // Ctrl+Shift+1: move up to slot 1 / pop out to its own column
+            if cols[cur_c].tabs.len() > 1 && cur_r > 0 {
+                let tab = cols[cur_c].tabs.remove(cur_r);
+                cols[cur_c].container.remove(&tab.view);
+
+                let box_widget = gtk::Box::new(gtk::Orientation::Vertical, 6);
+                box_widget.add_css_class("rail-col");
+                box_widget.set_vexpand(true);
+                box_widget.set_hexpand(true);
+                box_widget.set_homogeneous(true);
+                box_widget.append(&tab.view);
+
+                let prev = cols[cur_c].container.clone();
+                self.strip.insert_child_after(&box_widget, Some(&prev));
+
+                let new_col_idx = cur_c + 1;
+                cols.insert(new_col_idx, Column {
+                    container: box_widget,
+                    tabs: vec![tab],
+                });
+                drop(cols);
+                self.focus_coords(new_col_idx, 0);
+                return;
+            }
+        }
+        drop(cols);
+        self.save_session();
+    }
+
+    fn toggle_touchpad_mode(self: &Rc<Self>) {
+        let current = self.touchpad_mode.get();
+        let next = !current;
+        self.touchpad_mode.set(next);
+        self.touchpad_indicator.set_visible(next);
+    }
+
+    fn save_session(&self) {
+        let path = glib::user_data_dir().join("rail").join("session.txt");
+        let mut out = String::new();
+        out.push_str(&format!("focus\t{}\t{}\n", self.focus_col.get(), self.focus_row.get()));
+        let cols = self.cols.borrow();
+        for (ci, col) in cols.iter().enumerate() {
+            let is_full = if col.container.has_css_class("full") { 1 } else { 0 };
+            out.push_str(&format!("col\t{}\t{}\n", ci, is_full));
+            for tab in col.tabs.iter() {
+                let uri = tab.view.uri().unwrap_or_default();
+                out.push_str(&format!("tab\t{}\t{}\t{}\n", ci, tab.profile_id, uri));
+            }
+        }
+        let _ = std::fs::write(path, out);
+    }
+
+    fn restore_session(self: &Rc<Self>) -> bool {
+        let path = glib::user_data_dir().join("rail").join("session.txt");
+        let Ok(content) = std::fs::read_to_string(path) else { return false; };
+        let (target_focus, col_flags, tab_items) = parse_session_content(&content);
+        if tab_items.is_empty() {
+            return false;
+        }
+
+        let mut max_col = 0;
+        for (c, _, _) in &tab_items {
+            if *c > max_col { max_col = *c; }
+        }
+
+        for ci in 0..=max_col {
+            let col_tabs: Vec<_> = tab_items.iter().filter(|(c, _, _)| *c == ci).collect();
+            if col_tabs.is_empty() { continue; }
+
+            let mut first = true;
+            for (_, pid, url) in col_tabs {
+                let session = self.profiles.borrow_mut().get_or_create_session(pid);
+                let view = WebView::builder().network_session(&session).build();
+                if url.is_empty() || url.starts_with("about:") {
+                    view.load_html(START_PAGE, None);
+                } else {
+                    view.load_uri(url);
+                }
+                self.add_view(view, pid.clone(), first);
+                first = false;
+            }
+        }
+
+        let cols = self.cols.borrow();
+        for (ci, full) in col_flags {
+            if let Some(col) = cols.get(ci) {
+                if full {
+                    col.container.add_css_class("full");
+                } else {
+                    col.container.remove_css_class("full");
+                }
+            }
+        }
+        drop(cols);
+
+        self.focus_coords(target_focus.0, target_focus.1);
+        true
+    }
+
     fn toggle_full(self: &Rc<Self>) {
         let cur_c = self.focus_col.get();
         let cols = self.cols.borrow();
@@ -1000,6 +1224,7 @@ impl App {
         drop(cols);
         self.strip.queue_allocate();
         self.reveal_focus();
+        self.save_session();
     }
 
     // ---- sidebar ---------------------------------------------------------
@@ -1377,9 +1602,8 @@ impl App {
         self.hide_palette();
         self.rebuild_profiles_modal_list();
         self.new_profile_entry.set_text("");
-        self.new_profile_error_lbl.set_visible(false);
-        self.new_profile_entry.remove_css_class("error");
         self.select_new_profile_color(0);
+        self.update_create_profile_btn_state();
         self.profiles_modal.set_visible(true);
         self.new_profile_entry.grab_focus();
     }
@@ -1491,22 +1715,41 @@ impl App {
         }
     }
 
+    fn update_create_profile_btn_state(self: &Rc<Self>) {
+        let text = self.new_profile_entry.text().to_string();
+        let clean = text.trim();
+        if clean.is_empty() {
+            self.new_profile_error_lbl.set_visible(false);
+            self.new_profile_entry.remove_css_class("error");
+            self.add_prof_btn.set_sensitive(false);
+            self.add_prof_btn.remove_css_class("active-ready");
+        } else if self.profiles.borrow().profile_exists(clean) {
+            self.new_profile_error_lbl.set_text("⚠ Profile already exists");
+            self.new_profile_error_lbl.set_visible(true);
+            self.new_profile_entry.add_css_class("error");
+            self.add_prof_btn.set_sensitive(false);
+            self.add_prof_btn.remove_css_class("active-ready");
+        } else {
+            self.new_profile_error_lbl.set_visible(false);
+            self.new_profile_entry.remove_css_class("error");
+            self.add_prof_btn.set_sensitive(true);
+            self.add_prof_btn.add_css_class("active-ready");
+        }
+    }
+
     fn create_new_profile_action(self: &Rc<Self>) {
         let name = self.new_profile_entry.text().to_string();
         let clean = name.trim();
         if clean.is_empty() {
-            self.new_profile_error_lbl.set_text("⚠ Profile name cannot be empty");
-            self.new_profile_error_lbl.set_visible(true);
-            self.new_profile_entry.add_css_class("error");
+            self.update_create_profile_btn_state();
             return;
         }
 
         let color_idx = self.new_profile_color_idx.get();
         match self.profiles.borrow_mut().create_profile(clean, color_idx) {
             Ok(_) => {
-                self.new_profile_error_lbl.set_visible(false);
-                self.new_profile_entry.remove_css_class("error");
                 self.new_profile_entry.set_text("");
+                self.update_create_profile_btn_state();
                 self.rebuild_profiles_modal_list();
                 self.rebuild_profile_popover();
                 self.refresh_sidebar();
@@ -1515,6 +1758,8 @@ impl App {
                 self.new_profile_error_lbl.set_text(&format!("⚠ {}", err));
                 self.new_profile_error_lbl.set_visible(true);
                 self.new_profile_entry.add_css_class("error");
+                self.add_prof_btn.set_sensitive(false);
+                self.add_prof_btn.remove_css_class("active-ready");
             }
         }
     }
@@ -1574,8 +1819,9 @@ impl App {
         self.exit_overview();
     }
 
-    fn ov_click(self: &Rc<Self>, x: f64) {
+    fn ov_click(self: &Rc<Self>, x: f64, y: f64) {
         let vw = self.strip.width() as f64;
+        let vh = self.strip.height() as f64;
         let (z, off) = (self.layout.zoom(), self.layout.offset());
         let g = gap(z);
         let mut hit = None;
@@ -1585,14 +1831,21 @@ impl App {
             let w = col_width(col.container.has_css_class("full"), vw);
             let left = (cx - off) * z;
             if x >= left && x <= left + w * z {
-                hit = Some(i);
+                let tab_count = col.tabs.len();
+                let row = if tab_count > 1 && vh > 0.0 {
+                    let r = ((y / vh) * (tab_count as f64)).floor() as usize;
+                    r.min(tab_count - 1)
+                } else {
+                    0
+                };
+                hit = Some((i, row));
                 break;
             }
             cx += w + g;
         }
         drop(cols);
-        if let Some(i) = hit {
-            self.focus_coords(i, 0);
+        if let Some((i, r)) = hit {
+            self.focus_coords(i, r);
         }
         self.exit_overview();
     }
@@ -1681,6 +1934,16 @@ impl App {
                 gdk::Key::t => self.new_tab(),
                 gdk::Key::v => self.split_vertical(),
                 gdk::Key::f => self.toggle_full(),
+                // Vertical window selection in current column
+                gdk::Key::_1 | gdk::Key::KP_1 => self.focus_coords(self.focus_col.get(), 0),
+                gdk::Key::_2 | gdk::Key::KP_2 => self.focus_coords(self.focus_col.get(), 1),
+                gdk::Key::_3 | gdk::Key::KP_3 => self.focus_coords(self.focus_col.get(), 2),
+                gdk::Key::_4 | gdk::Key::KP_4 => self.focus_coords(self.focus_col.get(), 3),
+                gdk::Key::_5 | gdk::Key::KP_5 => self.focus_coords(self.focus_col.get(), 4),
+                gdk::Key::_6 | gdk::Key::KP_6 => self.focus_coords(self.focus_col.get(), 5),
+                gdk::Key::_7 | gdk::Key::KP_7 => self.focus_coords(self.focus_col.get(), 6),
+                gdk::Key::_8 | gdk::Key::KP_8 => self.focus_coords(self.focus_col.get(), 7),
+                gdk::Key::_9 | gdk::Key::KP_9 => self.focus_coords(self.focus_col.get(), 8),
                 // Horizontal navigation (columns)
                 gdk::Key::h | gdk::Key::Left => self.focus_column_left(),
                 gdk::Key::l | gdk::Key::Right => self.focus_column_right(),
@@ -1714,7 +1977,9 @@ impl App {
         if m == M::CONTROL_MASK | M::SHIFT_MASK {
             match k {
                 gdk::Key::p | gdk::Key::P => self.toggle_profiles_modal(),
-                gdk::Key::t => self.split_vertical(),
+                gdk::Key::t | gdk::Key::T => self.toggle_touchpad_mode(),
+                gdk::Key::_2 | gdk::Key::at | gdk::Key::KP_2 => self.move_tab_to_vertical_slot(1),
+                gdk::Key::_1 | gdk::Key::exclam | gdk::Key::KP_1 => self.move_tab_to_vertical_slot(0),
                 gdk::Key::h | gdk::Key::Left => self.move_column(-1),
                 gdk::Key::l | gdk::Key::Right => self.move_column(1),
                 gdk::Key::j | gdk::Key::Down => self.move_window(1),
@@ -1912,6 +2177,7 @@ fn build(gapp: &gtk::Application) {
 
     let add_prof_btn = gtk::Button::with_label("Create Profile");
     add_prof_btn.add_css_class("btn-create-profile");
+    add_prof_btn.set_sensitive(false);
     add_prof_btn.set_valign(gtk::Align::Center);
 
     let color_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -1964,6 +2230,20 @@ fn build(gapp: &gtk::Application) {
     ov_hint.set_can_target(false);
     ov_hint.set_visible(false);
 
+    let touchpad_indicator = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    touchpad_indicator.add_css_class("touchpad-toast");
+    touchpad_indicator.set_halign(gtk::Align::Center);
+    touchpad_indicator.set_valign(gtk::Align::End);
+    touchpad_indicator.set_margin_bottom(28);
+    touchpad_indicator.set_can_target(false);
+    touchpad_indicator.set_visible(false);
+
+    let tp_icon = gtk::Label::new(Some("✦"));
+    tp_icon.add_css_class("touchpad-icon");
+    let tp_lbl = gtk::Label::new(Some("TOUCHPAD MODE ON  ·  2-finger swipe: ◄ ► columns, ▲ ▼ rows  ·  Ctrl+Shift+T to exit"));
+    touchpad_indicator.append(&tp_icon);
+    touchpad_indicator.append(&tp_lbl);
+
     let load_bar = gtk::ProgressBar::new();
     load_bar.add_css_class("load-bar");
     load_bar.set_valign(gtk::Align::Start);
@@ -1975,6 +2255,7 @@ fn build(gapp: &gtk::Application) {
     overlay.add_overlay(&load_bar);
     overlay.add_overlay(&palette);
     overlay.add_overlay(&ov_hint);
+    overlay.add_overlay(&touchpad_indicator);
     overlay.add_overlay(&profiles_modal);
 
     let win = gtk::ApplicationWindow::builder()
@@ -2019,8 +2300,11 @@ fn build(gapp: &gtk::Application) {
         profiles_list_box: profiles_list_box.clone(),
         new_profile_entry: new_profile_entry.clone(),
         new_profile_error_lbl: new_profile_error_lbl.clone(),
+        add_prof_btn: add_prof_btn.clone(),
         new_profile_color_idx,
         color_buttons: RefCell::new(color_btns),
+        touchpad_mode: Cell::new(false),
+        touchpad_indicator,
     });
 
     for (i, btn) in app.color_buttons.borrow().iter().enumerate() {
@@ -2036,20 +2320,8 @@ fn build(gapp: &gtk::Application) {
     new_profile_entry.connect_activate(move |_| a.create_new_profile_action());
 
     let a = app.clone();
-    new_profile_entry.connect_changed(move |entry| {
-        let text = entry.text().to_string();
-        let clean = text.trim();
-        if clean.is_empty() {
-            a.new_profile_error_lbl.set_visible(false);
-            a.new_profile_entry.remove_css_class("error");
-        } else if a.profiles.borrow().profile_exists(clean) {
-            a.new_profile_error_lbl.set_text("⚠ Profile already exists");
-            a.new_profile_error_lbl.set_visible(true);
-            a.new_profile_entry.add_css_class("error");
-        } else {
-            a.new_profile_error_lbl.set_visible(false);
-            a.new_profile_entry.remove_css_class("error");
-        }
+    new_profile_entry.connect_changed(move |_| {
+        a.update_create_profile_btn_state();
     });
 
     let a = app.clone();
@@ -2085,9 +2357,9 @@ fn build(gapp: &gtk::Application) {
 
     let pick = gtk::GestureClick::new();
     let a = app.clone();
-    pick.connect_released(move |_, _, x, _| {
+    pick.connect_released(move |_, _, x, y| {
         if a.ov.get() {
-            a.ov_click(x);
+            a.ov_click(x, y);
         }
     });
     app.strip.add_controller(pick);
@@ -2105,6 +2377,59 @@ fn build(gapp: &gtk::Application) {
     });
     shell.add_controller(click);
 
+    let scroll = gtk::EventControllerScroll::new(
+        gtk::EventControllerScrollFlags::BOTH_AXES | gtk::EventControllerScrollFlags::KINETIC,
+    );
+    scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let accum_x = Rc::new(Cell::new(0.0f64));
+    let accum_y = Rc::new(Cell::new(0.0f64));
+    let last_scroll = Rc::new(Cell::new(0i64));
+    let a = app.clone();
+    let ax = accum_x.clone();
+    let ay = accum_y.clone();
+    let ls = last_scroll.clone();
+    scroll.connect_scroll(move |_, dx, dy| {
+        if !a.touchpad_mode.get() {
+            return glib::Propagation::Proceed;
+        }
+        let now = glib::monotonic_time();
+        if now - ls.get() > 300_000 {
+            ax.set(0.0);
+            ay.set(0.0);
+        }
+        ls.set(now);
+
+        let nx = ax.get() + dx;
+        let ny = ay.get() + dy;
+        ax.set(nx);
+        ay.set(ny);
+
+        const THRESHOLD: f64 = 6.0;
+        if nx > THRESHOLD {
+            ax.set(0.0);
+            a.focus_column_right();
+        } else if nx < -THRESHOLD {
+            ax.set(0.0);
+            a.focus_column_left();
+        }
+
+        if ny > THRESHOLD {
+            ay.set(0.0);
+            a.focus_window_down();
+        } else if ny < -THRESHOLD {
+            ay.set(0.0);
+            a.focus_window_up();
+        }
+        glib::Propagation::Stop
+    });
+    let ax2 = accum_x.clone();
+    let ay2 = accum_y.clone();
+    scroll.connect_decelerate(move |_, _, _| {
+        ax2.set(0.0);
+        ay2.set(0.0);
+    });
+    overlay.add_controller(scroll);
+
     let keys = gtk::EventControllerKey::new();
     keys.set_propagation_phase(gtk::PropagationPhase::Capture);
     let a = app.clone();
@@ -2113,9 +2438,22 @@ fn build(gapp: &gtk::Application) {
     });
     win.add_controller(keys);
 
-    app.new_tab();
+    let a = app.clone();
+    win.connect_close_request(move |_| {
+        a.save_session();
+        glib::Propagation::Proceed
+    });
+
+    let restored = app.restore_session();
     if let Some(url) = std::env::args().nth(1).filter(|u| !u.starts_with('-')) {
-        app.navigate(&url);
+        if restored {
+            app.new_tab();
+            app.navigate(&url);
+        } else {
+            app.navigate(&url);
+        }
+    } else if !restored {
+        app.new_tab();
     }
     win.present();
 }
@@ -2141,3 +2479,21 @@ fn main() -> glib::ExitCode {
     app.connect_activate(build);
     app.run_with_args::<&str>(&[])
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_session_content() {
+        let sample = "focus\t2\t1\ncol\t0\t0\ntab\t0\tdefault\thttps://google.com\ncol\t1\t1\ntab\t1\twork\thttps://github.com\ntab\t1\twork\thttps://docs.rs\n";
+        let (focus, col_flags, tabs) = parse_session_content(sample);
+        assert_eq!(focus, (2, 1));
+        assert_eq!(col_flags, vec![(0, false), (1, true)]);
+        assert_eq!(tabs.len(), 3);
+        assert_eq!(tabs[0], (0, "default".to_string(), "https://google.com".to_string()));
+        assert_eq!(tabs[1], (1, "work".to_string(), "https://github.com".to_string()));
+        assert_eq!(tabs[2], (1, "work".to_string(), "https://docs.rs".to_string()));
+    }
+}
+
