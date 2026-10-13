@@ -1,12 +1,14 @@
+mod profile;
 mod strip;
 
 use gtk::glib;
 use gtk::{gdk, gio};
 use gtk4 as gtk;
+use profile::ProfileManager;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
-use strip::{SIDE_W, ShellLayout, StripLayout, col_width, gap};
+use strip::{col_width, gap, ShellLayout, StripLayout, SIDE_W};
 use webkit6::prelude::*;
 use webkit6::WebView;
 
@@ -29,11 +31,12 @@ kbd{font:11px ui-monospace,monospace;background:#1f2335;border:1px solid #2f334d
   kbd{padding:1px 4px;font-size:10px}
 }
 </style>
-<div class=w><h1>rail<b>.</b></h1><p>a niri-style tiled browser (horizontal strip & vertical stacks)</p><div class=k>
+<div class=w><h1>rail<b>.</b></h1><p>a niri-style tiled browser (horizontal strip, vertical stacks & isolated profiles)</p><div class=k>
 <span><kbd>Ctrl</kbd><kbd>G</kbd></span><span>go to address</span>
 <span><kbd>Ctrl</kbd><kbd>Enter</kbd></span><span>edit current URL</span>
 <span><kbd>Ctrl</kbd><kbd>T</kbd></span><span>new column tab</span>
 <span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>T</kbd> / <kbd>Ctrl</kbd><kbd>V</kbd></span><span>split vertically (new window down)</span>
+<span><kbd>Ctrl</kbd><kbd>P</kbd> / <kbd>Shift</kbd><kbd>P</kbd></span><span>manage profiles</span>
 <span><kbd>Ctrl</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>focus left / right column</span>
 <span><kbd>Ctrl</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>focus down / up window</span>
 <span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>move column left / right</span>
@@ -100,6 +103,150 @@ entry.palette-entry, entry.palette-entry:focus-within { background: none; border
 .zoomed .tab.focused { opacity: 1; outline: 7px solid #7aa2f7; outline-offset: -5px; }
 .ov-hint { background: #1a1b26; color: #8089b3; border: 1px solid #2f334d; border-radius: 10px;
            padding: 8px 16px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+
+/* ---- profile colors (Tokyo Night) ---- */
+.prof-bg-0 { background-color: #7aa2f7; color: #0f1016; }
+.prof-bg-1 { background-color: #bb9af7; color: #0f1016; }
+.prof-bg-2 { background-color: #9ece6a; color: #0f1016; }
+.prof-bg-3 { background-color: #e0af68; color: #0f1016; }
+.prof-bg-4 { background-color: #f7768e; color: #0f1016; }
+.prof-bg-5 { background-color: #7dcfff; color: #0f1016; }
+.prof-bg-6 { background-color: #ff9e64; color: #0f1016; }
+.prof-bg-7 { background-color: #73daca; color: #0f1016; }
+
+/* ---- profile circle button in URL palette ---- */
+button.profile-circle-btn {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    border-radius: 9999px;
+    border: 2px solid #2f334d;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: transform 120ms, border-color 120ms;
+}
+button.profile-circle-btn:hover {
+    transform: scale(1.1);
+    border-color: #c0caf5;
+}
+.profile-circle-label {
+    font-weight: 800;
+    font-size: 13px;
+    color: #0f1016;
+}
+
+/* ---- profile popover dropdown ---- */
+.profile-popover {
+    background: #1a1b26;
+    border: 1px solid #2f334d;
+    border-radius: 14px;
+    padding: 6px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.65);
+}
+.profile-popover-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #565f89;
+    padding: 4px 8px 2px;
+}
+button.profile-item-btn {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 10px;
+    padding: 6px 10px;
+    transition: background 100ms;
+}
+button.profile-item-btn:hover {
+    background: #24283b;
+}
+button.profile-item-btn.selected {
+    background: #1f2335;
+}
+.profile-item-dot {
+    min-width: 22px;
+    min-height: 22px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #0f1016;
+}
+.profile-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #c0caf5;
+}
+.profile-item-check {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7aa2f7;
+}
+
+/* ---- profiles manager modal (Ctrl+P / Ctrl+Shift+P) ---- */
+.profiles-modal {
+    background: #1a1b26;
+    border: 1px solid #2f334d;
+    border-radius: 20px;
+    padding: 22px 24px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.7);
+    min-width: 320px;
+    max-width: 480px;
+    margin-left: 16px;
+    margin-right: 16px;
+}
+.profiles-modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #c0caf5;
+}
+.profiles-modal-subtitle {
+    font-size: 12px;
+    color: #6b7399;
+}
+.profile-card {
+    background: #16161e;
+    border: 1px solid #24283b;
+    border-radius: 12px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+}
+.profile-card.active-profile {
+    border-color: #7aa2f7;
+    background: #1a1e2f;
+}
+.profile-badge-active {
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 2px 7px;
+    background: #24283b;
+    color: #7aa2f7;
+}
+.profile-badge-mini {
+    font-size: 9px;
+    font-weight: 700;
+    min-width: 15px;
+    min-height: 15px;
+    border-radius: 9999px;
+    margin-right: 6px;
+    color: #0f1016;
+}
+button.color-choice {
+    min-width: 22px;
+    min-height: 22px;
+    padding: 0;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    transition: transform 100ms, border-color 100ms;
+}
+button.color-choice:hover {
+    transform: scale(1.15);
+}
+button.color-choice.selected {
+    border-color: #ffffff;
+    transform: scale(1.2);
+}
 ";
 
 /// How far the strip zooms out in overview (niri uses a similar factor).
@@ -107,6 +254,7 @@ const OV_ZOOM: f64 = 0.4;
 
 struct Tab {
     view: WebView,
+    profile_id: String,
 }
 
 struct Column {
@@ -143,6 +291,17 @@ struct App {
     side_gen: Cell<u32>,
     /// A just-created tab that has never navigated; Esc discards it.
     fresh: RefCell<Option<WebView>>,
+    // Profiles
+    profiles: RefCell<ProfileManager>,
+    selected_palette_profile: RefCell<String>,
+    profile_btn: gtk::Button,
+    profile_btn_lbl: gtk::Label,
+    profile_popover: gtk::Popover,
+    profiles_modal: gtk::Box,
+    profiles_list_box: gtk::ListBox,
+    new_profile_entry: gtk::Entry,
+    new_profile_color_idx: Cell<usize>,
+    color_buttons: RefCell<Vec<gtk::Button>>,
 }
 
 fn to_uri(input: &str) -> String {
@@ -272,25 +431,75 @@ impl App {
 
     // ---- tabs & columns --------------------------------------------------
 
+    fn focused_tab_profile(&self) -> Option<String> {
+        let cur_c = self.focus_col.get();
+        let cur_r = self.focus_row.get();
+        let cols = self.cols.borrow();
+        cols.get(cur_c).and_then(|c| c.tabs.get(cur_r)).map(|t| t.profile_id.clone())
+    }
+
+    fn find_view_profile(&self, view: &WebView) -> Option<String> {
+        let cols = self.cols.borrow();
+        for col in cols.iter() {
+            for tab in col.tabs.iter() {
+                if &tab.view == view {
+                    return Some(tab.profile_id.clone());
+                }
+            }
+        }
+        None
+    }
+
     fn new_tab(self: &Rc<Self>) {
         self.exit_overview();
-        let view = WebView::new();
+        let prof_id = self.profiles.borrow().active_profile().id;
+        let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
+        let view = WebView::builder().network_session(&session).build();
         view.load_html(START_PAGE, None);
         *self.fresh.borrow_mut() = Some(view.clone());
-        self.add_view(view, true); // new column
+        self.add_view(view, prof_id.clone(), true); // new column
+        self.select_palette_profile(&prof_id);
         self.show_palette();
     }
 
     fn split_vertical(self: &Rc<Self>) {
         self.exit_overview();
-        let view = WebView::new();
+        let prof_id = self.focused_tab_profile().unwrap_or_else(|| self.profiles.borrow().active_profile().id);
+        let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
+        let view = WebView::builder().network_session(&session).build();
         view.load_html(START_PAGE, None);
         *self.fresh.borrow_mut() = Some(view.clone());
-        self.add_view(view, false); // in current column below
+        self.add_view(view, prof_id.clone(), false); // in current column below
+        self.select_palette_profile(&prof_id);
         self.show_palette();
     }
 
-    fn add_view(self: &Rc<Self>, view: WebView, new_col: bool) {
+    fn setup_view_signals(self: &Rc<Self>, view: &WebView) {
+        let app = self.clone();
+        view.connect_title_notify(move |_| app.refresh_sidebar());
+        let app = self.clone();
+        view.connect_uri_notify(move |_| app.refresh_sidebar());
+        let app = self.clone();
+        view.connect_favicon_notify(move |_| app.refresh_sidebar());
+        let app = self.clone();
+        view.connect_is_loading_notify(move |_| {
+            app.refresh_sidebar();
+            app.update_load_bar();
+        });
+        let app = self.clone();
+        view.connect_estimated_load_progress_notify(move |_| app.update_load_bar());
+        let app = self.clone();
+        view.connect_create(move |v, _| {
+            let parent_prof = app.find_view_profile(v).unwrap_or_else(|| app.profiles.borrow().active_profile().id);
+            let nv = WebView::builder().related_view(v).build();
+            app.add_view(nv.clone(), parent_prof, true);
+            Some(nv.upcast())
+        });
+        let app = self.clone();
+        view.connect_close(move |v| app.close_view(v));
+    }
+
+    fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_col: bool) {
         view.add_css_class("tab");
         view.set_overflow(gtk::Overflow::Hidden);
         view.set_can_target(!self.ov.get());
@@ -319,7 +528,7 @@ impl App {
 
                 cols.insert(c_idx, Column {
                     container: box_widget,
-                    tabs: vec![Tab { view: view.clone() }],
+                    tabs: vec![Tab { view: view.clone(), profile_id }],
                 });
                 (c_idx, 0)
             } else {
@@ -333,33 +542,12 @@ impl App {
                     let prev_tab = &col.tabs[next_r - 1].view;
                     col.container.insert_child_after(&view, Some(prev_tab));
                 }
-                col.tabs.insert(next_r, Tab { view: view.clone() });
+                col.tabs.insert(next_r, Tab { view: view.clone(), profile_id });
                 (cur_c, next_r)
             }
         };
 
-        let app = self.clone();
-        view.connect_title_notify(move |_| app.refresh_sidebar());
-        let app = self.clone();
-        view.connect_uri_notify(move |_| app.refresh_sidebar());
-        let app = self.clone();
-        view.connect_favicon_notify(move |_| app.refresh_sidebar());
-        let app = self.clone();
-        view.connect_is_loading_notify(move |_| {
-            app.refresh_sidebar();
-            app.update_load_bar();
-        });
-        let app = self.clone();
-        view.connect_estimated_load_progress_notify(move |_| app.update_load_bar());
-        let app = self.clone();
-        view.connect_create(move |v, _| {
-            let nv = WebView::builder().related_view(v).build();
-            app.add_view(nv.clone(), true);
-            Some(nv.upcast())
-        });
-        let app = self.clone();
-        view.connect_close(move |v| app.close_view(v));
-
+        self.setup_view_signals(&view);
         self.focus_coords(target_c, target_r);
     }
 
@@ -581,6 +769,19 @@ impl App {
                 row.add_css_class("tabrow");
                 row.append(&Self::tab_icon(t, 16));
 
+                let mgr = self.profiles.borrow();
+                if mgr.profiles().len() > 1 {
+                    if let Some(p) = mgr.get_profile(&t.profile_id) {
+                        let p_dot = gtk::Label::new(Some(&p.initial_letter()));
+                        p_dot.add_css_class("profile-badge-mini");
+                        p_dot.add_css_class(&format!("prof-bg-{}", p.color_idx));
+                        p_dot.set_valign(gtk::Align::Center);
+                        p_dot.set_tooltip_text(Some(&format!("Profile: {}", p.name)));
+                        row.append(&p_dot);
+                    }
+                }
+                drop(mgr);
+
                 let title_prefix = if col.tabs.len() > 1 {
                     format!("[{}:{}] ", ci + 1, ri + 1)
                 } else {
@@ -687,7 +888,79 @@ impl App {
         }
     }
 
-    // ---- address palette -------------------------------------------------
+    // ---- address palette & profiles --------------------------------------
+
+    fn select_palette_profile(&self, id: &str) {
+        *self.selected_palette_profile.borrow_mut() = id.to_string();
+        if let Some(p) = self.profiles.borrow().get_profile(id) {
+            self.profile_btn_lbl.set_text(&p.initial_letter());
+            for i in 0..8 {
+                self.profile_btn.remove_css_class(&format!("prof-bg-{}", i));
+            }
+            self.profile_btn.add_css_class(&format!("prof-bg-{}", p.color_idx));
+            self.profile_btn.set_tooltip_text(Some(&format!("Profile: {} (Click to switch)", p.name)));
+        }
+    }
+
+    fn rebuild_profile_popover(self: &Rc<Self>) {
+        let box_menu = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        box_menu.set_margin_top(4);
+        box_menu.set_margin_bottom(4);
+        box_menu.set_margin_start(4);
+        box_menu.set_margin_end(4);
+
+        let title = gtk::Label::new(Some("Select Profile"));
+        title.add_css_class("profile-popover-title");
+        title.set_xalign(0.0);
+        title.set_margin_start(8);
+        title.set_margin_bottom(4);
+        box_menu.append(&title);
+
+        let mgr = self.profiles.borrow();
+        let selected_id = self.selected_palette_profile.borrow().clone();
+
+        for p in mgr.profiles() {
+            let row_btn = gtk::Button::new();
+            row_btn.add_css_class("profile-item-btn");
+            if p.id == selected_id {
+                row_btn.add_css_class("selected");
+            }
+
+            let row_box = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+
+            let dot = gtk::Label::new(Some(&p.initial_letter()));
+            dot.add_css_class("profile-item-dot");
+            dot.add_css_class(&format!("prof-bg-{}", p.color_idx));
+
+            let name_lbl = gtk::Label::new(Some(&p.name));
+            name_lbl.add_css_class("profile-item-name");
+            name_lbl.set_hexpand(true);
+            name_lbl.set_xalign(0.0);
+
+            row_box.append(&dot);
+            row_box.append(&name_lbl);
+
+            if p.id == selected_id {
+                let check = gtk::Label::new(Some("✓"));
+                check.add_css_class("profile-item-check");
+                row_box.append(&check);
+            }
+
+            row_btn.set_child(Some(&row_box));
+
+            let app = self.clone();
+            let pid = p.id.clone();
+            row_btn.connect_clicked(move |_| {
+                app.select_palette_profile(&pid);
+                app.profile_popover.popdown();
+                app.entry.grab_focus();
+            });
+
+            box_menu.append(&row_btn);
+        }
+
+        self.profile_popover.set_child(Some(&box_menu));
+    }
 
     fn update_palette_size(&self) {
         let win_w = self.win.width();
@@ -702,9 +975,14 @@ impl App {
         self.palette.set_margin_top(target_top);
     }
 
-    fn show_palette(&self) {
+    fn show_palette(self: &Rc<Self>) {
         let uri = self.focused_view().and_then(|v| v.uri()).filter(|u| !u.starts_with("about:"));
         self.entry.set_text(uri.as_deref().unwrap_or(""));
+
+        let prof_id = self.focused_tab_profile().unwrap_or_else(|| self.profiles.borrow().active_profile().id);
+        self.select_palette_profile(&prof_id);
+        self.rebuild_profile_popover();
+
         self.update_palette_size();
         self.palette.set_visible(true);
         self.entry.grab_focus();
@@ -712,9 +990,12 @@ impl App {
     }
 
     fn hide_palette(&self) {
+        self.profile_popover.popdown();
         self.palette.set_visible(false);
-        if let Some(v) = self.focused_view() {
-            v.grab_focus();
+        if !self.profiles_modal_open() {
+            if let Some(v) = self.focused_view() {
+                v.grab_focus();
+            }
         }
     }
 
@@ -732,14 +1013,171 @@ impl App {
 
     fn navigate(self: &Rc<Self>, text: &str) {
         if !text.trim().is_empty() {
-            if let Some(v) = self.focused_view() {
-                let uri = to_uri(text);
+            let target_profile_id = self.selected_palette_profile.borrow().clone();
+            let cur_c = self.focus_col.get();
+            let cur_r = self.focus_row.get();
+            let uri = to_uri(text);
+
+            let needs_view_recreation = {
+                let cols = self.cols.borrow();
+                cols.get(cur_c)
+                    .and_then(|c| c.tabs.get(cur_r))
+                    .map(|t| t.profile_id != target_profile_id)
+                    .unwrap_or(false)
+            };
+
+            if needs_view_recreation {
+                let session = self.profiles.borrow_mut().get_or_create_session(&target_profile_id);
+                let new_view = WebView::builder().network_session(&session).build();
+                new_view.add_css_class("tab");
+                new_view.set_overflow(gtk::Overflow::Hidden);
+                new_view.set_can_target(!self.ov.get());
+                new_view.set_vexpand(true);
+                new_view.set_hexpand(true);
+                self.setup_view_signals(&new_view);
+
+                let mut cols = self.cols.borrow_mut();
+                if let Some(col) = cols.get_mut(cur_c) {
+                    if let Some(tab) = col.tabs.get_mut(cur_r) {
+                        col.container.insert_child_after(&new_view, Some(&tab.view));
+                        col.container.remove(&tab.view);
+                        tab.view = new_view.clone();
+                        tab.profile_id = target_profile_id;
+                    }
+                }
+                drop(cols);
+
+                self.pill_label.set_text(&host_of(&uri).unwrap_or(uri.clone()));
+                new_view.load_uri(&uri);
+                *self.fresh.borrow_mut() = None;
+                self.refresh_sidebar();
+                self.focus_coords(cur_c, cur_r);
+            } else if let Some(v) = self.focused_view() {
                 self.pill_label.set_text(&host_of(&uri).unwrap_or(uri.clone()));
                 v.load_uri(&uri);
                 *self.fresh.borrow_mut() = None;
             }
         }
         self.hide_palette();
+    }
+
+    // ---- profiles manager modal (Ctrl+P / Ctrl+Shift+P) ------------------
+
+    fn profiles_modal_open(&self) -> bool {
+        self.profiles_modal.is_visible()
+    }
+
+    fn toggle_profiles_modal(self: &Rc<Self>) {
+        if self.profiles_modal_open() {
+            self.hide_profiles_modal();
+        } else {
+            self.show_profiles_modal();
+        }
+    }
+
+    fn show_profiles_modal(self: &Rc<Self>) {
+        self.hide_palette();
+        self.rebuild_profiles_modal_list();
+        self.new_profile_entry.set_text("");
+        self.select_new_profile_color(0);
+        self.profiles_modal.set_visible(true);
+        self.new_profile_entry.grab_focus();
+    }
+
+    fn hide_profiles_modal(&self) {
+        self.profiles_modal.set_visible(false);
+        if let Some(v) = self.focused_view() {
+            v.grab_focus();
+        }
+    }
+
+    fn rebuild_profiles_modal_list(self: &Rc<Self>) {
+        while let Some(r) = self.profiles_list_box.row_at_index(0) {
+            self.profiles_list_box.remove(&r);
+        }
+
+        let mgr = self.profiles.borrow();
+        let profiles = mgr.profiles().to_vec();
+        let active_id = mgr.active_id().to_string();
+        let can_delete = profiles.len() > 1;
+
+        for p in profiles {
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+            row.add_css_class("profile-card");
+            if p.id == active_id {
+                row.add_css_class("active-profile");
+            }
+
+            let avatar = gtk::Label::new(Some(&p.initial_letter()));
+            avatar.add_css_class("profile-item-dot");
+            avatar.add_css_class(&format!("prof-bg-{}", p.color_idx));
+
+            let name_lbl = gtk::Label::new(Some(&p.name));
+            name_lbl.add_css_class("profile-item-name");
+            name_lbl.set_hexpand(true);
+            name_lbl.set_xalign(0.0);
+
+            row.append(&avatar);
+            row.append(&name_lbl);
+
+            if p.id == active_id {
+                let active_badge = gtk::Label::new(Some("Active"));
+                active_badge.add_css_class("profile-badge-active");
+                row.append(&active_badge);
+            } else {
+                let set_act_btn = gtk::Button::with_label("Make Active");
+                set_act_btn.add_css_class("pill");
+                let app = self.clone();
+                let pid = p.id.clone();
+                set_act_btn.connect_clicked(move |_| {
+                    app.profiles.borrow_mut().set_active(&pid);
+                    app.rebuild_profiles_modal_list();
+                    app.rebuild_profile_popover();
+                });
+                row.append(&set_act_btn);
+            }
+
+            if can_delete && p.id != "default" {
+                let del_btn = gtk::Button::from_icon_name("window-close-symbolic");
+                del_btn.add_css_class("flat-icon");
+                del_btn.set_tooltip_text(Some("Delete Profile"));
+                let app = self.clone();
+                let pid = p.id.clone();
+                del_btn.connect_clicked(move |_| {
+                    app.profiles.borrow_mut().delete_profile(&pid);
+                    app.rebuild_profiles_modal_list();
+                    app.rebuild_profile_popover();
+                    app.refresh_sidebar();
+                });
+                row.append(&del_btn);
+            }
+
+            self.profiles_list_box.append(&row);
+        }
+    }
+
+    fn select_new_profile_color(&self, idx: usize) {
+        self.new_profile_color_idx.set(idx);
+        let btns = self.color_buttons.borrow();
+        for (i, b) in btns.iter().enumerate() {
+            if i == idx {
+                b.add_css_class("selected");
+            } else {
+                b.remove_css_class("selected");
+            }
+        }
+    }
+
+    fn create_new_profile_action(self: &Rc<Self>) {
+        let name = self.new_profile_entry.text().to_string();
+        if !name.trim().is_empty() {
+            let color_idx = self.new_profile_color_idx.get();
+            self.profiles.borrow_mut().create_profile(&name, color_idx);
+            self.new_profile_entry.set_text("");
+            self.rebuild_profiles_modal_list();
+            self.rebuild_profile_popover();
+            self.refresh_sidebar();
+        }
     }
 
     // ---- overview (niri-style: zoomed out) --------------------------------
@@ -866,6 +1304,10 @@ impl App {
         let k = key.to_lower();
 
         if k == gdk::Key::Escape {
+            if self.profiles_modal_open() {
+                self.hide_profiles_modal();
+                return true;
+            }
             if self.palette_open() {
                 self.cancel_palette();
                 return true;
@@ -876,7 +1318,7 @@ impl App {
             }
             return false;
         }
-        let global = m == M::CONTROL_MASK && matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::q);
+        let global = m == M::CONTROL_MASK && matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::q | gdk::Key::p);
         if self.overview_open() && !global && self.ov_key(k, m) {
             return true;
         }
@@ -896,6 +1338,7 @@ impl App {
 
         if m == M::CONTROL_MASK {
             match k {
+                gdk::Key::p => self.toggle_profiles_modal(),
                 gdk::Key::t => self.new_tab(),
                 gdk::Key::v => self.split_vertical(),
                 gdk::Key::f => self.toggle_full(),
@@ -931,6 +1374,7 @@ impl App {
         }
         if m == M::CONTROL_MASK | M::SHIFT_MASK {
             match k {
+                gdk::Key::p | gdk::Key::P => self.toggle_profiles_modal(),
                 gdk::Key::t => self.split_vertical(),
                 gdk::Key::h | gdk::Key::Left => self.move_column(-1),
                 gdk::Key::l | gdk::Key::Right => self.move_column(1),
@@ -944,19 +1388,7 @@ impl App {
     }
 }
 
-fn setup_storage() {
-    let dir = glib::user_data_dir().join("rail");
-    let _ = std::fs::create_dir_all(&dir);
-    if let Some(cookies) = webkit6::NetworkSession::default().and_then(|s| s.cookie_manager()) {
-        cookies.set_persistent_storage(
-            dir.join("cookies.sqlite").to_str().unwrap_or("cookies.sqlite"),
-            webkit6::CookiePersistentStorage::Sqlite,
-        );
-    }
-}
-
 fn build(gapp: &gtk::Application) {
-    setup_storage();
     if let Some(s) = gtk::Settings::default() {
         s.set_gtk_application_prefer_dark_theme(true);
     }
@@ -967,6 +1399,9 @@ fn build(gapp: &gtk::Application) {
         &provider,
         gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
+
+    let profile_mgr = ProfileManager::new();
+    let initial_prof_id = profile_mgr.active_profile().id;
 
     // ---- sidebar ----
     let brand = gtk::Label::new(None);
@@ -1043,12 +1478,29 @@ fn build(gapp: &gtk::Application) {
     entry.add_css_class("palette-entry");
     entry.set_hexpand(true);
     entry.set_placeholder_text(Some("Search or enter address"));
-    let prow = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+
     let sicon = gtk::Image::from_icon_name("system-search-symbolic");
     sicon.set_pixel_size(20);
+
+    let profile_btn = gtk::Button::new();
+    profile_btn.add_css_class("profile-circle-btn");
+    profile_btn.set_valign(gtk::Align::Center);
+    profile_btn.set_halign(gtk::Align::End);
+    let profile_btn_lbl = gtk::Label::new(Some("D"));
+    profile_btn_lbl.add_css_class("profile-circle-label");
+    profile_btn.set_child(Some(&profile_btn_lbl));
+
+    let profile_popover = gtk::Popover::new();
+    profile_popover.add_css_class("profile-popover");
+    profile_popover.set_parent(&profile_btn);
+    profile_popover.set_has_arrow(true);
+
+    let prow = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     prow.append(&sicon);
     prow.append(&entry);
-    let phint = gtk::Label::new(Some("Enter  go      Esc  cancel"));
+    prow.append(&profile_btn);
+
+    let phint = gtk::Label::new(Some("Enter  go      Esc  cancel      Ctrl+P  profiles"));
     phint.add_css_class("palette-hint");
     phint.set_xalign(0.0);
     let palette = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -1061,6 +1513,90 @@ fn build(gapp: &gtk::Application) {
     palette.append(&prow);
     palette.append(&phint);
     palette.set_visible(false);
+
+    let pop_c = profile_popover.clone();
+    profile_btn.connect_clicked(move |_| {
+        pop_c.popup();
+    });
+
+    // ---- profiles modal (Ctrl+P / Ctrl+Shift+P) ----
+    let modal_title = gtk::Label::new(Some("Profiles"));
+    modal_title.add_css_class("profiles-modal-title");
+    modal_title.set_xalign(0.0);
+    modal_title.set_hexpand(true);
+
+    let modal_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
+    modal_close_btn.add_css_class("flat-icon");
+    modal_close_btn.set_tooltip_text(Some("Close (Esc)"));
+
+    let modal_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    modal_header.append(&modal_title);
+    modal_header.append(&modal_close_btn);
+
+    let modal_subtitle = gtk::Label::new(Some("Isolated workspaces, sessions & cookie storage  (Ctrl+P)"));
+    modal_subtitle.add_css_class("profiles-modal-subtitle");
+    modal_subtitle.set_xalign(0.0);
+
+    let profiles_list_box = gtk::ListBox::new();
+    profiles_list_box.add_css_class("tablist");
+    profiles_list_box.set_selection_mode(gtk::SelectionMode::None);
+
+    let modal_list_scroll = gtk::ScrolledWindow::new();
+    modal_list_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    modal_list_scroll.set_max_content_height(240);
+    modal_list_scroll.set_propagate_natural_height(true);
+    modal_list_scroll.set_child(Some(&profiles_list_box));
+
+    let sep = gtk::Separator::new(gtk::Orientation::Horizontal);
+    sep.set_margin_top(4);
+    sep.set_margin_bottom(4);
+
+    let new_lbl = gtk::Label::new(Some("CREATE NEW PROFILE"));
+    new_lbl.add_css_class("hint");
+    new_lbl.set_xalign(0.0);
+
+    let new_profile_entry = gtk::Entry::new();
+    new_profile_entry.add_css_class("palette-entry");
+    new_profile_entry.set_placeholder_text(Some("Profile name (e.g. Work, School)..."));
+    new_profile_entry.set_hexpand(true);
+
+    let add_prof_btn = gtk::Button::with_label("Create Profile");
+    add_prof_btn.add_css_class("pill");
+
+    let create_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    create_row.append(&new_profile_entry);
+    create_row.append(&add_prof_btn);
+
+    let color_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    color_box.set_margin_top(4);
+    color_box.set_margin_bottom(4);
+    let mut color_btns = Vec::new();
+    let new_profile_color_idx = Cell::new(0usize);
+
+    for i in 0..8 {
+        let cb = gtk::Button::new();
+        cb.add_css_class("color-choice");
+        cb.add_css_class(&format!("prof-bg-{}", i));
+        if i == 0 {
+            cb.add_css_class("selected");
+        }
+        color_box.append(&cb);
+        color_btns.push(cb);
+    }
+
+    let profiles_modal = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    profiles_modal.add_css_class("profiles-modal");
+    profiles_modal.set_halign(gtk::Align::Center);
+    profiles_modal.set_valign(gtk::Align::Center);
+    profiles_modal.set_visible(false);
+
+    profiles_modal.append(&modal_header);
+    profiles_modal.append(&modal_subtitle);
+    profiles_modal.append(&modal_list_scroll);
+    profiles_modal.append(&sep);
+    profiles_modal.append(&new_lbl);
+    profiles_modal.append(&create_row);
+    profiles_modal.append(&color_box);
 
     // ---- overview hint ----
     let ov_hint = gtk::Label::new(Some("h/l/j/k  move      Enter  open      x  close      Esc  cancel"));
@@ -1082,6 +1618,7 @@ fn build(gapp: &gtk::Application) {
     overlay.add_overlay(&load_bar);
     overlay.add_overlay(&palette);
     overlay.add_overlay(&ov_hint);
+    overlay.add_overlay(&profiles_modal);
 
     let win = gtk::ApplicationWindow::builder()
         .application(gapp)
@@ -1116,7 +1653,29 @@ fn build(gapp: &gtk::Application) {
         side_open: Cell::new(true),
         side_gen: Cell::new(0),
         fresh: RefCell::new(None),
+        profiles: RefCell::new(profile_mgr),
+        selected_palette_profile: RefCell::new(initial_prof_id),
+        profile_btn: profile_btn.clone(),
+        profile_btn_lbl: profile_btn_lbl.clone(),
+        profile_popover: profile_popover.clone(),
+        profiles_modal: profiles_modal.clone(),
+        profiles_list_box: profiles_list_box.clone(),
+        new_profile_entry: new_profile_entry.clone(),
+        new_profile_color_idx,
+        color_buttons: RefCell::new(color_btns),
     });
+
+    for (i, btn) in app.color_buttons.borrow().iter().enumerate() {
+        let a = app.clone();
+        btn.connect_clicked(move |_| a.select_new_profile_color(i));
+    }
+
+    let a = app.clone();
+    modal_close_btn.connect_clicked(move |_| a.hide_profiles_modal());
+    let a = app.clone();
+    add_prof_btn.connect_clicked(move |_| a.create_new_profile_action());
+    let a = app.clone();
+    new_profile_entry.connect_activate(move |_| a.create_new_profile_action());
 
     let a = app.clone();
     layout.connect_resized(move || {
@@ -1164,6 +1723,9 @@ fn build(gapp: &gtk::Application) {
     click.connect_pressed(move |_, _, _, _| {
         if a.palette_open() {
             a.hide_palette();
+        }
+        if a.profiles_modal_open() {
+            a.hide_profiles_modal();
         }
     });
     shell.add_controller(click);
