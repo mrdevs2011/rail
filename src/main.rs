@@ -524,24 +524,6 @@ button.btn-create-profile.active-ready:hover label {
     color: #000000;
 }
 
-/* ---- touchpad mode floating HUD toast ---- */
-.touchpad-toast {
-    background: #06070a;
-    border: 1.5px solid #38bdf8;
-    border-radius: 9px;
-    padding: 7px 16px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.95), 0 0 18px rgba(56, 189, 248, 0.25);
-}
-.touchpad-toast label {
-    color: #38bdf8;
-    font-size: 11.5px;
-    font-weight: 700;
-    font-family: ui-monospace, monospace;
-}
-.touchpad-toast label.touchpad-icon {
-    font-size: 13px;
-    margin-right: 2px;
-}
 .profile-badge-mini {
     font-size: 9px;
     font-weight: 800;
@@ -632,7 +614,6 @@ struct App {
     new_profile_color_idx: Cell<usize>,
     color_buttons: RefCell<Vec<gtk::Button>>,
     touchpad_mode: Cell<bool>,
-    touchpad_indicator: gtk::Box,
 }
 
 fn to_uri(input: &str) -> String {
@@ -1148,10 +1129,7 @@ impl App {
     }
 
     fn toggle_touchpad_mode(self: &Rc<Self>) {
-        let current = self.touchpad_mode.get();
-        let next = !current;
-        self.touchpad_mode.set(next);
-        self.touchpad_indicator.set_visible(next);
+        self.touchpad_mode.set(!self.touchpad_mode.get());
     }
 
     fn save_session(&self) {
@@ -2238,20 +2216,6 @@ fn build(gapp: &gtk::Application) {
     ov_hint.set_can_target(false);
     ov_hint.set_visible(false);
 
-    let touchpad_indicator = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    touchpad_indicator.add_css_class("touchpad-toast");
-    touchpad_indicator.set_halign(gtk::Align::Center);
-    touchpad_indicator.set_valign(gtk::Align::End);
-    touchpad_indicator.set_margin_bottom(28);
-    touchpad_indicator.set_can_target(false);
-    touchpad_indicator.set_visible(false);
-
-    let tp_icon = gtk::Label::new(Some("✦"));
-    tp_icon.add_css_class("touchpad-icon");
-    let tp_lbl = gtk::Label::new(Some("TOUCHPAD MODE ON  ·  2-finger swipe: ◄ ► columns, ▲ ▼ rows  ·  Ctrl+Shift+T to exit"));
-    touchpad_indicator.append(&tp_icon);
-    touchpad_indicator.append(&tp_lbl);
-
     let load_bar = gtk::ProgressBar::new();
     load_bar.add_css_class("load-bar");
     load_bar.set_valign(gtk::Align::Start);
@@ -2263,7 +2227,6 @@ fn build(gapp: &gtk::Application) {
     overlay.add_overlay(&load_bar);
     overlay.add_overlay(&palette);
     overlay.add_overlay(&ov_hint);
-    overlay.add_overlay(&touchpad_indicator);
     overlay.add_overlay(&profiles_modal);
 
     let win = gtk::ApplicationWindow::builder()
@@ -2312,7 +2275,6 @@ fn build(gapp: &gtk::Application) {
         new_profile_color_idx,
         color_buttons: RefCell::new(color_btns),
         touchpad_mode: Cell::new(false),
-        touchpad_indicator,
     });
 
     for (i, btn) in app.color_buttons.borrow().iter().enumerate() {
@@ -2386,7 +2348,9 @@ fn build(gapp: &gtk::Application) {
     shell.add_controller(click);
 
     let scroll = gtk::EventControllerScroll::new(
-        gtk::EventControllerScrollFlags::BOTH_AXES | gtk::EventControllerScrollFlags::KINETIC,
+        gtk::EventControllerScrollFlags::BOTH_AXES
+            | gtk::EventControllerScrollFlags::KINETIC
+            | gtk::EventControllerScrollFlags::DISCRETE,
     );
     scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
     let accum_x = Rc::new(Cell::new(0.0f64));
@@ -2401,7 +2365,7 @@ fn build(gapp: &gtk::Application) {
             return glib::Propagation::Proceed;
         }
         let now = glib::monotonic_time();
-        if now - ls.get() > 300_000 {
+        if now - ls.get() > 400_000 {
             ax.set(0.0);
             ay.set(0.0);
         }
@@ -2412,7 +2376,7 @@ fn build(gapp: &gtk::Application) {
         ax.set(nx);
         ay.set(ny);
 
-        const THRESHOLD: f64 = 6.0;
+        const THRESHOLD: f64 = 2.5;
         if nx > THRESHOLD {
             ax.set(0.0);
             a.focus_column_right();
@@ -2436,7 +2400,7 @@ fn build(gapp: &gtk::Application) {
         ax2.set(0.0);
         ay2.set(0.0);
     });
-    overlay.add_controller(scroll);
+    win.add_controller(scroll);
 
     let keys = gtk::EventControllerKey::new();
     keys.set_propagation_phase(gtk::PropagationPhase::Capture);
