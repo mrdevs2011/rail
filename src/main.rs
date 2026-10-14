@@ -2856,6 +2856,23 @@ impl App {
         self.focus_coords(cur_r, target_c);
     }
 
+    fn reorder_tab_in_row(self: &Rc<Self>, r: usize, from_c: usize, to_c: usize) {
+        if from_c == to_c {
+            return;
+        }
+        let mut rows = self.rows.borrow_mut();
+        if r >= rows.len() || from_c >= rows[r].tabs.len() || to_c >= rows[r].tabs.len() {
+            return;
+        }
+        let tab = rows[r].tabs.remove(from_c);
+        rows[r].tabs.insert(to_c, tab);
+        drop(rows);
+        self.sync_strip();
+        self.focus_coords(r, to_c);
+        self.refresh_sidebar();
+        self.schedule_save_session();
+    }
+
     fn move_tab_to_row(self: &Rc<Self>, target_r: usize) {
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
@@ -2902,6 +2919,54 @@ impl App {
 
         self.sync_strip();
         self.focus_coords(target_r, dest_c);
+    }
+
+    fn move_tab_to_row_pos(self: &Rc<Self>, from_r: usize, from_c: usize, to_r: usize, to_c: usize) {
+        if from_r == to_r {
+            self.reorder_tab_in_row(from_r, from_c, to_c);
+            return;
+        }
+
+        let mut rows = self.rows.borrow_mut();
+        if from_r >= rows.len() || from_c >= rows[from_r].tabs.len() {
+            return;
+        }
+
+        let tab = rows[from_r].tabs.remove(from_c);
+        let cur_row_empty = rows[from_r].tabs.is_empty();
+
+        while rows.len() <= to_r {
+            rows.push(Row { tabs: Vec::new() });
+        }
+        let insert_c = to_c.min(rows[to_r].tabs.len());
+        rows[to_r].tabs.insert(insert_c, tab);
+
+        let need_fresh_in_row_0 = cur_row_empty && from_r == 0;
+        drop(rows);
+
+        if need_fresh_in_row_0 {
+            let prof_id = self.profiles.borrow().active_profile().id;
+            let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
+            let view = Self::create_web_view(&session, &prof_id);
+            view.load_html(START_PAGE, None);
+            view.set_can_target(!self.ov.get());
+            let (container, resize_handle) = Self::create_tab_widget(&view);
+            self.setup_tab_signals(&container, &view, &resize_handle);
+
+            let mut rows = self.rows.borrow_mut();
+            rows[0].tabs.push(Tab { container, view, profile_id: prof_id, custom_width: Cell::new(None) });
+            drop(rows);
+        } else if cur_row_empty && from_r > 0 {
+            let mut rows = self.rows.borrow_mut();
+            while rows.len() > 1 && rows.last().map_or(false, |r| r.tabs.is_empty()) {
+                rows.pop();
+            }
+            drop(rows);
+        }
+
+        self.sync_strip();
+        self.focus_coords(to_r, insert_c);
+        self.schedule_save_session();
     }
 
     fn toggle_touchpad_mode(self: &Rc<Self>) {
@@ -3227,11 +3292,68 @@ impl App {
                 }
 
                 let app = self.clone();
-                let tab_click = gtk::GestureClick::new();
-                tab_click.connect_released(move |_, _, _, _| {
-                    app.focus_coords(ri, ci);
+                let drag = gtk::GestureDrag::new();
+                drag.set_button(gdk::BUTTON_PRIMARY);
+
+                let item_drag = item.clone();
+                let drag_dist = Rc::new(Cell::new(0.0f64));
+
+                drag.connect_drag_begin({
+                    let item_drag = item_drag.clone();
+                    let drag_dist = drag_dist.clone();
+                    move |_gesture, _start_x, _start_y| {
+                        drag_dist.set(0.0);
+                        item_drag.add_css_class("dragging");
+                        item_drag.set_cursor_from_name(Some("grabbing"));
+                    }
                 });
-                content_box.add_controller(tab_click);
+
+                drag.connect_drag_update({
+                    let drag_dist = drag_dist.clone();
+                    move |_gesture, offset_x, offset_y| {
+                        drag_dist.set(offset_x.hypot(offset_y));
+                    }
+                });
+
+                let item_end = item.clone();
+                let app_end = app.clone();
+                let drag_dist_end = drag_dist.clone();
+
+                drag.connect_drag_end(move |_gesture, _offset_x, offset_y| {
+                    item_end.remove_css_class("dragging");
+                    item_end.set_cursor_from_name(Some("grab"));
+
+                    let d = drag_dist_end.get();
+                    if d < 6.0 {
+                        app_end.focus_coords(ri, ci);
+                        return;
+                    }
+
+                    let tab_h = 32.0f64;
+                    let delta = (offset_y / tab_h).round() as isize;
+                    let rows_borrow = app_end.rows.borrow();
+                    let cur_tabs_len = rows_borrow.get(ri).map_or(0, |r| r.tabs.len());
+                    let total_rows = rows_borrow.len();
+                    drop(rows_borrow);
+
+                    if delta != 0 {
+                        let new_col_idx = (ci as isize) + delta;
+                        if new_col_idx >= 0 && (new_col_idx as usize) < cur_tabs_len {
+                            app_end.reorder_tab_in_row(ri, ci, new_col_idx as usize);
+                        } else if new_col_idx < 0 && ri > 0 {
+                            let target_r = ri - 1;
+                            let rows_borrow = app_end.rows.borrow();
+                            let target_len = rows_borrow.get(target_r).map_or(0, |r| r.tabs.len());
+                            drop(rows_borrow);
+                            app_end.move_tab_to_row_pos(ri, ci, target_r, target_len);
+                        } else if new_col_idx >= cur_tabs_len as isize && ri + 1 < total_rows {
+                            let target_r = ri + 1;
+                            app_end.move_tab_to_row_pos(ri, ci, target_r, 0);
+                        }
+                    }
+                });
+
+                content_box.add_controller(drag);
 
                 let close = gtk::Button::from_icon_name("window-close-symbolic");
                 close.add_css_class("tab-close");
@@ -4327,6 +4449,8 @@ impl App {
             drag_handle.set_valign(gtk::Align::Center);
             drag_handle.set_tooltip_text(Some("Drag up or down to reorder profiles"));
 
+            row.set_cursor_from_name(Some("grab"));
+
             if total_profiles > 1 {
                 let drag = gtk::GestureDrag::new();
                 drag.set_button(gdk::BUTTON_PRIMARY);
@@ -4335,6 +4459,7 @@ impl App {
                 let handle_drag = drag_handle.clone();
                 drag.connect_drag_begin(move |_gesture, _start_x, _start_y| {
                     row_drag.add_css_class("dragging");
+                    row_drag.set_cursor_from_name(Some("grabbing"));
                     handle_drag.set_cursor_from_name(Some("grabbing"));
                 });
 
@@ -4344,6 +4469,7 @@ impl App {
                 let from_idx = idx;
                 drag.connect_drag_end(move |_gesture, _offset_x, offset_y| {
                     row_end.remove_css_class("dragging");
+                    row_end.set_cursor_from_name(Some("grab"));
                     handle_end.set_cursor_from_name(Some("grab"));
 
                     let card_height = 54.0f64;
@@ -4362,7 +4488,7 @@ impl App {
                     }
                 });
 
-                drag_handle.add_controller(drag);
+                row.add_controller(drag);
             }
 
             let avatar = gtk::Label::new(Some(&p.initial_letter()));
