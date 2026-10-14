@@ -14,7 +14,10 @@ use std::sync::OnceLock;
 use std::time::Duration;
 use strip::{col_width, gap, ShellLayout, StripLayout, SIDE_W};
 use webkit6::prelude::*;
-use webkit6::WebView;
+use webkit6::{
+    ContextMenu, ContextMenuAction, ContextMenuItem, HitTestResult,
+    ScriptDialog, ScriptDialogType, WebView,
+};
 
 static CUSTOM_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 static TARGET_URL: OnceLock<String> = OnceLock::new();
@@ -60,7 +63,8 @@ kbd{font:11px ui-monospace,monospace;background:#090a0f;border:1px solid #1c1d29
 <span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>2</kbd> <kbd>1</kbd></span><span>move tab to workspace 2 / 1</span>
 <span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>T</kbd></span><span>touchpad mode (2-finger slide tabs)</span>
 <span><kbd>Ctrl</kbd><kbd>P</kbd> / <kbd>Shift</kbd><kbd>P</kbd></span><span>manage profiles</span>
-<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>I</kbd></span><span>import / export all data</span>
+<span><kbd>Ctrl</kbd><kbd>I</kbd></span><span>import / export all data</span>
+<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>I</kbd></span><span>developer console & inspector</span>
 <span><kbd>Ctrl</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>focus left / right tab</span>
 <span><kbd>Ctrl</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>focus workspace down / up</span>
 <span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>move tab left / right</span>
@@ -710,7 +714,63 @@ button.color-choice.selected {
     transform: scale(1.15);
 }
 
-/* ---- data backup & migration modal (Ctrl+Shift+I) ---- */
+/* ---- JS script dialogs (alert, confirm, prompt) ---- */
+.js-dialog-window {
+    background: #08090d;
+    border: 1px solid #1e202d;
+    border-radius: 12px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.9);
+}
+.js-dialog-title {
+    color: #60a5fa;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+}
+.js-dialog-message {
+    color: #e2e8f0;
+    font-size: 13px;
+    line-height: 1.45;
+}
+.js-dialog-entry {
+    background: #0f1118;
+    color: #ffffff;
+    border: 1px solid #2d3142;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+}
+.js-dialog-entry:focus {
+    border-color: #3b82f6;
+    outline: none;
+}
+.js-dialog-btn-ok {
+    background: #2563eb;
+    color: #ffffff;
+    border-radius: 6px;
+    padding: 6px 18px;
+    font-size: 12.5px;
+    font-weight: 600;
+    border: none;
+}
+.js-dialog-btn-ok:hover {
+    background: #1d4ed8;
+}
+.js-dialog-btn-cancel {
+    background: #1e202d;
+    color: #94a3b8;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 12.5px;
+    font-weight: 500;
+    border: none;
+}
+.js-dialog-btn-cancel:hover {
+    background: #282b3d;
+    color: #ffffff;
+}
+
+/* ---- data backup & migration modal (Ctrl+I) ---- */
 .data-modal {
     background: #06070a;
     border: 1px solid #1e202d;
@@ -980,6 +1040,7 @@ struct App {
     map_drawing_area: gtk::DrawingArea,
     map_location_btn: gtk::Button,
     map_state: RefCell<MinimapState>,
+    devtools_open: Cell<bool>,
 }
 
 fn to_uri(input: &str) -> String {
@@ -1323,6 +1384,357 @@ impl App {
         self.show_palette();
     }
 
+    fn new_tab_with_url(self: &Rc<Self>, url: &str) {
+        self.exit_overview();
+        let prof_id = self.profiles.borrow().active_id().to_string();
+        let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
+        let view = Self::create_web_view(&session);
+        view.load_uri(url);
+        self.add_view(view, prof_id, false);
+    }
+
+    fn split_with_url(self: &Rc<Self>, url: &str) {
+        self.exit_overview();
+        let prof_id = self.profiles.borrow().active_id().to_string();
+        let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
+        let view = Self::create_web_view(&session);
+        view.load_uri(url);
+        self.add_view(view, prof_id, true);
+    }
+
+    fn toggle_devtools(self: &Rc<Self>) {
+        if let Some(v) = self.focused_view() {
+            if let Some(insp) = v.inspector() {
+                if self.devtools_open.get() {
+                    insp.close();
+                    self.devtools_open.set(false);
+                } else {
+                    insp.show();
+                    self.devtools_open.set(true);
+                }
+            }
+        }
+    }
+
+    fn show_script_dialog(self: &Rc<Self>, view: &WebView, dialog: &ScriptDialog) {
+        let dialog_type = dialog.dialog_type();
+        let message = dialog.message().map(|s| s.to_string()).unwrap_or_default();
+        let default_prompt = dialog.prompt_get_default_text().map(|s| s.to_string()).unwrap_or_default();
+
+        let host = view.uri()
+            .and_then(|u| glib::Uri::parse(&u, glib::UriFlags::NONE).ok())
+            .and_then(|u| u.host().map(|h| h.to_string()))
+            .unwrap_or_else(|| "This page".to_string());
+
+        let title_text = match dialog_type {
+            ScriptDialogType::Alert => format!("{} says:", host),
+            ScriptDialogType::Confirm => format!("Confirm from {}", host),
+            ScriptDialogType::Prompt => format!("Prompt from {}", host),
+            ScriptDialogType::BeforeUnloadConfirm => "Leave Site?".to_string(),
+            _ => format!("Message from {}", host),
+        };
+
+        let dlg_win = gtk::Window::builder()
+            .title(&title_text)
+            .transient_for(&self.win)
+            .modal(true)
+            .resizable(false)
+            .default_width(380)
+            .build();
+        dlg_win.add_css_class("js-dialog-window");
+
+        let vbox = gtk::Box::new(gtk::Orientation::Vertical, 14);
+        vbox.set_margin_top(16);
+        vbox.set_margin_bottom(16);
+        vbox.set_margin_start(18);
+        vbox.set_margin_end(18);
+
+        let header_lbl = gtk::Label::new(Some(&title_text));
+        header_lbl.add_css_class("js-dialog-title");
+        header_lbl.set_xalign(0.0);
+        vbox.append(&header_lbl);
+
+        let msg_text = if dialog_type == ScriptDialogType::BeforeUnloadConfirm && message.is_empty() {
+            "Changes you made may not be saved. Are you sure you want to leave?".to_string()
+        } else {
+            message
+        };
+        let msg_lbl = gtk::Label::new(Some(&msg_text));
+        msg_lbl.add_css_class("js-dialog-message");
+        msg_lbl.set_wrap(true);
+        msg_lbl.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+        msg_lbl.set_selectable(true);
+        msg_lbl.set_xalign(0.0);
+        msg_lbl.set_max_width_chars(50);
+        vbox.append(&msg_lbl);
+
+        let prompt_entry = if dialog_type == ScriptDialogType::Prompt {
+            let entry = gtk::Entry::new();
+            entry.add_css_class("js-dialog-entry");
+            entry.set_text(&default_prompt);
+            vbox.append(&entry);
+            Some(entry)
+        } else {
+            None
+        };
+
+        let btn_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        btn_row.set_halign(gtk::Align::End);
+        btn_row.set_margin_top(6);
+
+        let handled = Rc::new(Cell::new(false));
+
+        let close_dialog = {
+            let handled = handled.clone();
+            let dialog = dialog.clone();
+            let dlg_win = dlg_win.clone();
+            let prompt_entry = prompt_entry.clone();
+            move |confirmed: bool| {
+                if !handled.get() {
+                    handled.set(true);
+                    match dialog_type {
+                        ScriptDialogType::Alert => {
+                            dialog.close();
+                        }
+                        ScriptDialogType::Confirm | ScriptDialogType::BeforeUnloadConfirm => {
+                            dialog.confirm_set_confirmed(confirmed);
+                            dialog.close();
+                        }
+                        ScriptDialogType::Prompt => {
+                            if confirmed {
+                                let text = prompt_entry.as_ref().map(|e| e.text().to_string()).unwrap_or_default();
+                                dialog.prompt_set_text(&text);
+                                dialog.confirm_set_confirmed(true);
+                            } else {
+                                dialog.confirm_set_confirmed(false);
+                            }
+                            dialog.close();
+                        }
+                        _ => {
+                            dialog.close();
+                        }
+                    }
+                    dlg_win.close();
+                }
+            }
+        };
+
+        if dialog_type != ScriptDialogType::Alert {
+            let cancel_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm { "Stay" } else { "Cancel" };
+            let cancel_btn = gtk::Button::with_label(cancel_label);
+            cancel_btn.add_css_class("js-dialog-btn-cancel");
+            let cd = close_dialog.clone();
+            cancel_btn.connect_clicked(move |_| cd(false));
+            btn_row.append(&cancel_btn);
+        }
+
+        let ok_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm { "Leave" } else { "OK" };
+        let ok_btn = gtk::Button::with_label(ok_label);
+        ok_btn.add_css_class("js-dialog-btn-ok");
+        let cd_ok = close_dialog.clone();
+        ok_btn.connect_clicked(move |_| cd_ok(true));
+        btn_row.append(&ok_btn);
+
+        vbox.append(&btn_row);
+        dlg_win.set_child(Some(&vbox));
+
+        if let Some(entry) = &prompt_entry {
+            let cd_ent = close_dialog.clone();
+            entry.connect_activate(move |_| cd_ent(true));
+        }
+
+        let key_ctl = gtk::EventControllerKey::new();
+        let cd_key = close_dialog.clone();
+        key_ctl.connect_key_pressed(move |_, keyval, _, _| {
+            if keyval == gdk::Key::Escape {
+                cd_key(false);
+                glib::Propagation::Stop
+            } else if keyval == gdk::Key::Return || keyval == gdk::Key::KP_Enter {
+                cd_key(true);
+                glib::Propagation::Stop
+            } else {
+                glib::Propagation::Proceed
+            }
+        });
+        dlg_win.add_controller(key_ctl);
+
+        let cd_close = close_dialog.clone();
+        dlg_win.connect_close_request(move |_| {
+            cd_close(false);
+            glib::Propagation::Proceed
+        });
+
+        dlg_win.present();
+        if let Some(entry) = &prompt_entry {
+            entry.grab_focus();
+        } else {
+            ok_btn.grab_focus();
+        }
+    }
+
+    fn customize_context_menu(self: &Rc<Self>, view: &WebView, menu: &ContextMenu, hit: &HitTestResult) {
+        let is_link = hit.context_is_link();
+        let link_uri = hit.link_uri().map(|s| s.to_string());
+        let is_image = hit.context_is_image();
+        let image_uri = hit.image_uri().map(|s| s.to_string());
+        let is_media = hit.context_is_media();
+        let is_editable = hit.context_is_editable();
+        let is_selection = hit.context_is_selection();
+
+        menu.remove_all();
+
+        // 1. Link items
+        if is_link {
+            if let Some(uri) = &link_uri {
+                let uri_t = uri.clone();
+                let app_t = self.clone();
+                let act_tab = gio::SimpleAction::new("ctx-open-tab", None);
+                act_tab.connect_activate(move |_, _| {
+                    app_t.new_tab_with_url(&uri_t);
+                });
+                self.win.add_action(&act_tab);
+                menu.append(&ContextMenuItem::from_gaction(&act_tab, "Open Link in New Tab", None));
+
+                let uri_s = uri.clone();
+                let app_s = self.clone();
+                let act_split = gio::SimpleAction::new("ctx-open-split", None);
+                act_split.connect_activate(move |_, _| {
+                    app_s.split_with_url(&uri_s);
+                });
+                self.win.add_action(&act_split);
+                menu.append(&ContextMenuItem::from_gaction(&act_split, "Open Link in Split View", None));
+
+                menu.append(&ContextMenuItem::from_stock_action_with_label(
+                    ContextMenuAction::CopyLinkToClipboard,
+                    "Copy Link Address",
+                ));
+
+                menu.append(&ContextMenuItem::from_stock_action_with_label(
+                    ContextMenuAction::DownloadLinkToDisk,
+                    "Save Link As...",
+                ));
+
+                menu.append(&ContextMenuItem::new_separator());
+            }
+        }
+
+        // 2. Image items
+        if is_image {
+            if let Some(img_url) = &image_uri {
+                let img_t = img_url.clone();
+                let app_t = self.clone();
+                let act_img = gio::SimpleAction::new("ctx-open-img", None);
+                act_img.connect_activate(move |_, _| {
+                    app_t.new_tab_with_url(&img_t);
+                });
+                self.win.add_action(&act_img);
+                menu.append(&ContextMenuItem::from_gaction(&act_img, "Open Image in New Tab", None));
+
+                menu.append(&ContextMenuItem::from_stock_action_with_label(
+                    ContextMenuAction::CopyImageUrlToClipboard,
+                    "Copy Image Address",
+                ));
+
+                menu.append(&ContextMenuItem::from_stock_action_with_label(
+                    ContextMenuAction::CopyImageToClipboard,
+                    "Copy Image",
+                ));
+
+                menu.append(&ContextMenuItem::from_stock_action_with_label(
+                    ContextMenuAction::DownloadImageToDisk,
+                    "Save Image As...",
+                ));
+
+                menu.append(&ContextMenuItem::new_separator());
+            }
+        }
+
+        // 3. Media items
+        if is_media {
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::OpenVideoInNewWindow,
+                "Open Media in New Tab",
+            ));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::CopyVideoLinkToClipboard,
+                "Copy Media Address",
+            ));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::DownloadVideoToDisk,
+                "Save Media As...",
+            ));
+            menu.append(&ContextMenuItem::new_separator());
+        }
+
+        // 4. Editable text
+        if is_editable {
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Cut, "Cut"));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Copy, "Copy"));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Paste, "Paste"));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::PasteAsPlainText, "Paste as Plain Text"));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::SelectAll, "Select All"));
+            menu.append(&ContextMenuItem::new_separator());
+        } else if is_selection {
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Copy, "Copy"));
+
+            let app_sel = self.clone();
+            let v_sel = view.clone();
+            let act_search = gio::SimpleAction::new("ctx-search-sel", None);
+            act_search.connect_activate(move |_, _| {
+                let app_s = app_sel.clone();
+                v_sel.evaluate_javascript(
+                    "window.getSelection() ? window.getSelection().toString() : ''",
+                    None,
+                    None,
+                    None::<&gio::Cancellable>,
+                    move |res| {
+                        if let Ok(js_val) = res {
+                            let text = js_val.to_string();
+                            let trimmed = text.trim();
+                            if !trimmed.is_empty() {
+                                let search_url = format!("https://www.google.com/search?q={}", glib::Uri::escape_string(trimmed, None, false));
+                                app_s.new_tab_with_url(&search_url);
+                            }
+                        }
+                    },
+                );
+            });
+            self.win.add_action(&act_search);
+            menu.append(&ContextMenuItem::from_gaction(&act_search, "Search Google for Selection", None));
+            menu.append(&ContextMenuItem::new_separator());
+        }
+
+        // 5. Page navigation
+        if !is_link && !is_editable && !is_selection {
+            if view.can_go_back() {
+                menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::GoBack, "Back"));
+            }
+            if view.can_go_forward() {
+                menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::GoForward, "Forward"));
+            }
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Reload, "Reload"));
+            menu.append(&ContextMenuItem::new_separator());
+        }
+
+        // 6. Developer Tools (Always present at bottom!)
+        let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_default();
+        if !cur_uri.is_empty() && !cur_uri.starts_with("view-source:") && !cur_uri.starts_with("about:") {
+            let app_src = self.clone();
+            let src_uri = format!("view-source:{}", cur_uri);
+            let act_src = gio::SimpleAction::new("ctx-view-source", None);
+            act_src.connect_activate(move |_, _| {
+                app_src.new_tab_with_url(&src_uri);
+            });
+            self.win.add_action(&act_src);
+            menu.append(&ContextMenuItem::from_gaction(&act_src, "View Page Source", None));
+        }
+
+        menu.append(&ContextMenuItem::from_stock_action_with_label(
+            ContextMenuAction::InspectElement,
+            "Inspect Element  (Ctrl+Shift+I)",
+        ));
+    }
+
     fn setup_view_signals(self: &Rc<Self>, view: &WebView) {
         let app = self.clone();
         let v = view.clone();
@@ -1339,6 +1751,33 @@ impl App {
             }
         });
         view.add_controller(click);
+
+        // Track developer tools window state
+        if let Some(insp) = view.inspector() {
+            let dt_open = self.devtools_open.clone();
+            insp.connect_closed(move |_| {
+                dt_open.set(false);
+            });
+            let dt_open = self.devtools_open.clone();
+            insp.connect_bring_to_front(move |_| {
+                dt_open.set(true);
+                false
+            });
+        }
+
+        // JavaScript dialogs (alert, confirm, prompt, beforeunload)
+        let app = self.clone();
+        view.connect_script_dialog(move |v, dialog| {
+            app.show_script_dialog(v, dialog);
+            true
+        });
+
+        // Developer context menu (Right-click & 2-finger touchpad tap)
+        let app = self.clone();
+        view.connect_context_menu(move |v, menu, hit| {
+            app.customize_context_menu(v, menu, hit);
+            false
+        });
 
         let app = self.clone();
         let v = view.clone();
@@ -3153,7 +3592,7 @@ impl App {
                 self.hide_data_modal();
                 return true;
             }
-            if ctrl && shift && !alt && (k == gdk::Key::i || k == gdk::Key::I) {
+            if ctrl && !alt && (k == gdk::Key::i || k == gdk::Key::I) {
                 self.hide_data_modal();
                 return true;
             }
@@ -3183,7 +3622,7 @@ impl App {
             }
             return false;
         }
-        let global = ctrl && !shift && !alt && matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::q | gdk::Key::p | gdk::Key::m);
+        let global = ctrl && !shift && !alt && matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I);
         if self.overview_open() && !global && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
             return true;
         }
@@ -3203,7 +3642,8 @@ impl App {
 
         if ctrl && !shift && !alt {
             match k {
-                gdk::Key::p => self.toggle_profiles_modal(),
+                gdk::Key::p | gdk::Key::P => self.toggle_profiles_modal(),
+                gdk::Key::i | gdk::Key::I => self.toggle_data_modal(),
                 gdk::Key::t => self.new_tab(),
                 gdk::Key::v => self.split_vertical(),
                 gdk::Key::f => self.toggle_full(),
@@ -3281,7 +3721,7 @@ impl App {
         if ctrl && shift && !alt {
             match k {
                 gdk::Key::p | gdk::Key::P => self.toggle_profiles_modal(),
-                gdk::Key::i | gdk::Key::I => self.toggle_data_modal(),
+                gdk::Key::i | gdk::Key::I => self.toggle_devtools(),
                 gdk::Key::t | gdk::Key::T => self.toggle_touchpad_mode(),
                 gdk::Key::h | gdk::Key::Left => self.move_column(-1),
                 gdk::Key::l | gdk::Key::Right => self.move_column(1),
@@ -3587,7 +4027,7 @@ fn build(gapp: &gtk::Application) {
     load_bar.set_can_target(false);
     load_bar.set_visible(false);
 
-    // ---- data backup & migration modal (Ctrl+Shift+I) ----
+    // ---- data backup & migration modal (Ctrl+I) ----
     let data_modal_title = gtk::Label::new(Some("Data Backup & Migration"));
     data_modal_title.add_css_class("data-modal-title");
     data_modal_title.set_hexpand(true);
@@ -3601,7 +4041,7 @@ fn build(gapp: &gtk::Application) {
     data_header_row.append(&data_modal_title);
     data_header_row.append(&data_modal_close_btn);
 
-    let data_modal_subtitle = gtk::Label::new(Some("Export or import all workspaces, profiles, logins & cookies  (Ctrl+Shift+I)"));
+    let data_modal_subtitle = gtk::Label::new(Some("Export or import all workspaces, profiles, logins & cookies  (Ctrl+I)"));
     data_modal_subtitle.add_css_class("data-modal-subtitle");
     data_modal_subtitle.set_xalign(0.0);
 
@@ -3830,6 +4270,7 @@ fn build(gapp: &gtk::Application) {
         map_drawing_area: map_drawing_area.clone(),
         map_location_btn: map_location_btn.clone(),
         map_state: RefCell::new(MinimapState::default()),
+        devtools_open: Cell::new(false),
     });
 
     let a_close = app.clone();
