@@ -46,21 +46,17 @@ pub struct ProfileManager {
     sessions: HashMap<String, NetworkSession>,
     config_file: PathBuf,
     active_file: PathBuf,
-    base_data_dir: PathBuf,
-    base_cache_dir: PathBuf,
+    base_dir: PathBuf,
 }
 
 impl ProfileManager {
-    pub fn new() -> Self {
-        let base_data = glib::user_data_dir().join("rail").join("profiles");
-        let base_cache = glib::user_cache_dir().join("rail").join("profiles");
-        let config_dir = glib::user_data_dir().join("rail");
-        let _ = fs::create_dir_all(&config_dir);
-        let _ = fs::create_dir_all(&base_data);
-        let _ = fs::create_dir_all(&base_cache);
+    pub fn new(root: PathBuf) -> Self {
+        let _ = fs::create_dir_all(&root);
+        let base_dir = root.join("profiles");
+        let _ = fs::create_dir_all(&base_dir);
 
-        let config_file = config_dir.join("profiles.txt");
-        let active_file = config_dir.join("active_profile.txt");
+        let config_file = root.join("profiles.txt");
+        let active_file = root.join("active_profile.txt");
 
         let mut mgr = Self {
             profiles: Vec::new(),
@@ -68,8 +64,7 @@ impl ProfileManager {
             sessions: HashMap::new(),
             config_file,
             active_file,
-            base_data_dir: base_data,
-            base_cache_dir: base_cache,
+            base_dir,
         };
 
         mgr.load();
@@ -219,11 +214,9 @@ impl ProfileManager {
             self.profiles.remove(pos);
             self.sessions.remove(id);
 
-            // Clean up directories in background
-            let d = self.base_data_dir.join(id);
-            let c = self.base_cache_dir.join(id);
-            let _ = fs::remove_dir_all(&d);
-            let _ = fs::remove_dir_all(&c);
+            // Clean up profile directory
+            let prof_dir = self.base_dir.join(id);
+            let _ = fs::remove_dir_all(&prof_dir);
 
             if self.active_id == id {
                 self.active_id = self.profiles[0].id.clone();
@@ -240,10 +233,17 @@ impl ProfileManager {
             return s.clone();
         }
 
-        let p_data = self.base_data_dir.join(profile_id).join("data");
-        let p_cache = self.base_cache_dir.join(profile_id).join("cache");
+        let prof_dir = self.base_dir.join(profile_id);
+        let p_data = prof_dir.join("data");
+        let p_cache = prof_dir.join("cache");
         let _ = fs::create_dir_all(&p_data);
         let _ = fs::create_dir_all(&p_cache);
+
+        // Migrate old cache from ~/.cache if present
+        let old_cache = glib::user_cache_dir().join("rail").join("profiles").join(profile_id).join("cache");
+        if old_cache.exists() && (!p_cache.exists() || fs::read_dir(&p_cache).map(|mut d| d.next().is_none()).unwrap_or(false)) {
+            let _ = fs::rename(&old_cache, &p_cache);
+        }
 
         let session = NetworkSession::new(
             Some(p_data.to_str().unwrap_or("")),
@@ -278,8 +278,7 @@ mod tests {
             sessions: HashMap::new(),
             config_file: PathBuf::from("/tmp/test_rail_profiles.txt"),
             active_file: PathBuf::from("/tmp/test_rail_active.txt"),
-            base_data_dir: PathBuf::from("/tmp/test_rail_data"),
-            base_cache_dir: PathBuf::from("/tmp/test_rail_cache"),
+            base_dir: PathBuf::from("/tmp/test_rail_profiles"),
         };
 
         // Existing matches (case-insensitive name and id)

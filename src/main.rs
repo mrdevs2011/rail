@@ -6,11 +6,29 @@ use gtk::{gdk, gio};
 use gtk4 as gtk;
 use profile::ProfileManager;
 use std::cell::{Cell, RefCell};
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::OnceLock;
 use std::time::Duration;
 use strip::{col_width, gap, ShellLayout, StripLayout, SIDE_W};
 use webkit6::prelude::*;
 use webkit6::WebView;
+
+static CUSTOM_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
+static TARGET_URL: OnceLock<String> = OnceLock::new();
+
+pub fn rail_data_dir() -> PathBuf {
+    if let Some(dir) = CUSTOM_DATA_DIR.get() {
+        return dir.clone();
+    }
+    if let Ok(dir) = std::env::var("RAIL_DATA_DIR") {
+        let p = PathBuf::from(dir.trim());
+        if !p.as_os_str().is_empty() {
+            return p;
+        }
+    }
+    glib::user_data_dir().join("rail")
+}
 
 const START_PAGE: &str = r#"<!doctype html><meta charset=utf-8><meta name=color-scheme content=dark>
 <style>
@@ -1322,8 +1340,10 @@ impl App {
     fn save_session_internal(&self, sync: bool) {
         let rows = self.rows.borrow();
         let total_tabs: usize = rows.iter().map(|r| r.tabs.len()).sum();
-        let path = glib::user_data_dir().join("rail").join("session.txt");
-        let temp_path = glib::user_data_dir().join("rail").join("session.txt.tmp");
+        let dir = rail_data_dir();
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("session.txt");
+        let temp_path = dir.join("session.txt.tmp");
 
         if total_tabs == 0 {
             *self.last_saved_session.borrow_mut() = String::new();
@@ -1394,7 +1414,7 @@ impl App {
     }
 
     fn restore_session(self: &Rc<Self>) -> bool {
-        let path = glib::user_data_dir().join("rail").join("session.txt");
+        let path = rail_data_dir().join("session.txt");
         let Ok(content) = std::fs::read_to_string(path) else { return false; };
         let state = parse_session_content(&content);
         if state.tabs.is_empty() {
@@ -2430,7 +2450,7 @@ fn build(gapp: &gtk::Application) {
         gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
 
-    let profile_mgr = ProfileManager::new();
+    let profile_mgr = ProfileManager::new(rail_data_dir());
     let initial_prof_id = profile_mgr.active_profile().id;
 
     // ---- sidebar ----
@@ -2845,12 +2865,12 @@ fn build(gapp: &gtk::Application) {
     });
 
     let restored = app.restore_session();
-    if let Some(url) = std::env::args().nth(1).filter(|u| !u.starts_with('-')) {
+    if let Some(url) = TARGET_URL.get() {
         if restored {
             app.new_tab();
-            app.navigate(&url);
+            app.navigate(url);
         } else {
-            app.navigate(&url);
+            app.navigate(url);
         }
     } else if !restored {
         app.new_tab();
@@ -2858,18 +2878,206 @@ fn build(gapp: &gtk::Application) {
     win.present();
 }
 
+fn export_data(archive_path: &Path) -> Result<(), String> {
+    let dir = rail_data_dir();
+    if !dir.exists() {
+        return Err(format!("Storage directory does not exist: {}", dir.display()));
+    }
+    let parent = dir.parent().unwrap_or(&dir);
+    let name = dir.file_name().ok_or_else(|| "Invalid directory name".to_string())?;
+
+    let abs_archive = if archive_path.is_absolute() {
+        archive_path.to_path_buf()
+    } else {
+        std::env::current_dir().map_err(|e| e.to_string())?.join(archive_path)
+    };
+
+    let status = std::process::Command::new("tar")
+        .arg("-czf")
+        .arg(&abs_archive)
+        .arg("-C")
+        .arg(parent)
+        .arg(name)
+        .status()
+        .map_err(|e| format!("Failed to run tar command: {}", e))?;
+
+    if status.success() {
+        println!("Successfully exported all Rail data to: {}", abs_archive.display());
+        println!("This file contains all your tabs, workspaces, profiles, logins, and cookies.");
+        Ok(())
+    } else {
+        Err(format!("tar command failed with status: {}", status))
+    }
+}
+
+fn import_data(archive_path: &Path) -> Result<(), String> {
+    let abs_archive = if archive_path.is_absolute() {
+        archive_path.to_path_buf()
+    } else {
+        std::env::current_dir().map_err(|e| e.to_string())?.join(archive_path)
+    };
+
+    if !abs_archive.exists() {
+        return Err(format!("Archive file does not exist: {}", abs_archive.display()));
+    }
+
+    let dest_dir = rail_data_dir();
+    let parent = dest_dir.parent().unwrap_or(&dest_dir);
+    let _ = std::fs::create_dir_all(parent);
+
+    let status = std::process::Command::new("tar")
+        .arg("-xzf")
+        .arg(&abs_archive)
+        .arg("-C")
+        .arg(parent)
+        .status()
+        .map_err(|e| format!("Failed to run tar command: {}", e))?;
+
+    if status.success() {
+        println!("Successfully imported all Rail data into: {}", dest_dir.display());
+        println!("You can now launch 'rail' and all tabs, workspaces, logins, and accounts will be active.");
+        Ok(())
+    } else {
+        Err(format!("tar command failed with status: {}", status))
+    }
+}
+
+fn print_data_info() {
+    let dir = rail_data_dir();
+    println!("Rail Unified Storage Directory: {}", dir.display());
+    println!("--------------------------------------------------");
+    if !dir.exists() {
+        println!("Status: Directory does not exist yet (clean slate)");
+        return;
+    }
+
+    let session_file = dir.join("session.txt");
+    if session_file.exists() {
+        if let Ok(c) = std::fs::read_to_string(&session_file) {
+            let tabs = c.lines().filter(|l| l.starts_with("tab\t")).count();
+            println!("  Session:       {} saved tabs", tabs);
+        }
+    } else {
+        println!("  Session:       No saved session (clean start on next launch)");
+    }
+
+    let profiles_file = dir.join("profiles.txt");
+    if profiles_file.exists() {
+        if let Ok(c) = std::fs::read_to_string(&profiles_file) {
+            let count = c.lines().filter(|l| !l.trim().is_empty()).count();
+            println!("  Profiles:      {} profiles configured", count);
+        }
+    }
+
+    let profiles_dir = dir.join("profiles");
+    if profiles_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&profiles_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    let name = p.file_name().unwrap_or_default().to_string_lossy();
+                    let has_cookies = p.join("data").join("cookies.sqlite").exists();
+                    let has_storage = p.join("data").join("storage").exists();
+                    println!("    • Profile '{}': accounts/cookies={}, localStorage/IndexedDB={}", name, has_cookies, has_storage);
+                }
+            }
+        }
+    }
+
+    println!();
+    println!("To share your exact environment with a friend:");
+    println!("  Export:   rail --export rail_backup.tar.gz");
+    println!("  Import:   rail --import rail_backup.tar.gz");
+    println!("  Or copy:  cp -r {} /path/to/destination", dir.display());
+}
+
 fn main() -> glib::ExitCode {
     let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|a| a == "--version" || a == "-v") {
-        println!("rail {}", env!("CARGO_PKG_VERSION"));
-        return glib::ExitCode::SUCCESS;
-    }
-    if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("Usage: rail [URL]");
-        return glib::ExitCode::SUCCESS;
-    }
     if args.iter().any(|a| a.starts_with("--appimage-")) {
         return glib::ExitCode::FAILURE;
+    }
+
+    // First pass: extract custom data directory if specified
+    for (idx, arg) in args.iter().enumerate() {
+        if arg == "-d" || arg == "--data-dir" {
+            if let Some(next) = args.get(idx + 1) {
+                let _ = CUSTOM_DATA_DIR.set(PathBuf::from(next));
+                break;
+            }
+        } else if arg.starts_with("--data-dir=") {
+            let val = &arg["--data-dir=".len()..];
+            let _ = CUSTOM_DATA_DIR.set(PathBuf::from(val));
+            break;
+        }
+    }
+
+    let mut target_url: Option<String> = None;
+    let mut i = 1;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--version" || arg == "-v" {
+            println!("rail {}", env!("CARGO_PKG_VERSION"));
+            return glib::ExitCode::SUCCESS;
+        }
+        if arg == "--help" || arg == "-h" {
+            println!("Usage: rail [OPTIONS] [URL]");
+            println!();
+            println!("Options:");
+            println!("  -d, --data-dir <PATH>      Use custom storage directory for 100% portable environment");
+            println!("      --export <FILE.tar.gz> Export all tabs, profiles, logins & cookies into archive");
+            println!("      --import <FILE.tar.gz> Import all tabs, profiles, logins & cookies from archive");
+            println!("      --data-info            Show current storage directory and environment details");
+            println!("  -v, --version              Show version");
+            println!("  -h, --help                 Show help message");
+            println!();
+            println!("Environment Variables:");
+            println!("  RAIL_DATA_DIR              Override default storage directory (~/.local/share/rail)");
+            return glib::ExitCode::SUCCESS;
+        }
+        if arg == "--data-info" {
+            print_data_info();
+            return glib::ExitCode::SUCCESS;
+        }
+        if arg == "--export" {
+            if i + 1 < args.len() {
+                let out = PathBuf::from(&args[i + 1]);
+                if let Err(e) = export_data(&out) {
+                    eprintln!("Error exporting data: {}", e);
+                    return glib::ExitCode::FAILURE;
+                }
+                return glib::ExitCode::SUCCESS;
+            } else {
+                eprintln!("Error: --export requires an output filename (e.g. rail --export backup.tar.gz)");
+                return glib::ExitCode::FAILURE;
+            }
+        }
+        if arg == "--import" {
+            if i + 1 < args.len() {
+                let inp = PathBuf::from(&args[i + 1]);
+                if let Err(e) = import_data(&inp) {
+                    eprintln!("Error importing data: {}", e);
+                    return glib::ExitCode::FAILURE;
+                }
+                return glib::ExitCode::SUCCESS;
+            } else {
+                eprintln!("Error: --import requires an archive filename (e.g. rail --import backup.tar.gz)");
+                return glib::ExitCode::FAILURE;
+            }
+        }
+        if arg == "-d" || arg == "--data-dir" {
+            i += 2;
+            continue;
+        } else if arg.starts_with("--data-dir=") {
+            i += 1;
+            continue;
+        } else if !arg.starts_with('-') && target_url.is_none() {
+            target_url = Some(arg.clone());
+        }
+        i += 1;
+    }
+
+    if let Some(u) = target_url {
+        let _ = TARGET_URL.set(u);
     }
 
     let app = gtk::Application::builder()
