@@ -2391,13 +2391,6 @@ impl App {
                 continue;
             }
 
-            // Subtle workspace track guide
-            cr.set_source_rgba(0.12, 0.18, 0.28, 0.3);
-            cr.set_line_width(1.0);
-            cr.move_to(0.0, sy + sh + (MAP_GAP_Y * zoom) / 2.0);
-            cr.line_to(width, sy + sh + (MAP_GAP_Y * zoom) / 2.0);
-            let _ = cr.stroke();
-
             // Workspace label (e.g. W1, W2)
             let ws_lbl_x = width / 2.0 + (0.0 - cam_x) * zoom - 22.0 * zoom;
             if ws_lbl_x > -30.0 && ws_lbl_x < width {
@@ -2450,11 +2443,6 @@ impl App {
                     cr.set_source_rgb(0.118, 0.161, 0.231);
                     cr.set_line_width((1.4 * zoom).clamp(0.9, 1.8));
                     let _ = cr.stroke();
-
-                    // Subtle cyan accent strip on top
-                    cr.set_source_rgba(0.22, 0.74, 0.97, 0.35);
-                    cr.rectangle(sx + corner_r, sy, (sw - corner_r * 2.0).max(1.0), (1.4 * zoom).clamp(1.0, 2.0));
-                    let _ = cr.fill();
                 }
             }
         }
