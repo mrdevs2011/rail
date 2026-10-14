@@ -332,6 +332,20 @@ label {
     box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35), 0 12px 36px rgba(0, 0, 0, 0.7);
 }
 
+/* ---- interactive tab resize splitter handle ---- */
+.tab-resize-handle {
+    min-width: 6px;
+    width: 6px;
+    background: transparent;
+    cursor: col-resize;
+    transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+.tab-resize-handle:hover,
+.tab-resize-handle.active {
+    background: #38bdf8;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+}
+
 /* ---- overview (the live strip, zoomed out in 2D) ---- */
 .zoomed .tab {
     opacity: 0.88;
@@ -1359,6 +1373,7 @@ struct Tab {
     container: gtk::Box,
     view: WebView,
     profile_id: String,
+    custom_width: Cell<Option<f64>>,
 }
 
 struct Row {
@@ -1483,18 +1498,12 @@ struct App {
     map_drawing_area: gtk::DrawingArea,
     map_location_btn: gtk::Button,
     map_state: RefCell<MinimapState>,
-    // DevTools Panel (Ctrl+Shift+I)
+    // DevTools Panel (F12 / Ctrl+Shift+I)
     devtools_open: Cell<bool>,
     devtools_panel: gtk::Box,
-    devtools_stack: gtk::Stack,
-    devtools_console_box: gtk::Box,
-    devtools_console_entry: gtk::Entry,
-    devtools_elements_view: gtk::TextView,
-    devtools_network_box: gtk::Box,
-    devtools_storage_box: gtk::Box,
-    devtools_history: RefCell<Vec<String>>,
-    devtools_history_idx: Cell<Option<usize>>,
-    devtools_tab_buttons: RefCell<Vec<gtk::Button>>,
+    devtools_content_box: gtk::Box,
+    devtools_url_lbl: gtk::Label,
+    devtools_window: RefCell<Option<gtk::Window>>,
 }
 
 fn to_uri(input: &str) -> String {
@@ -1518,16 +1527,17 @@ fn host_of(uri: &str) -> Option<String> {
     Some(h.trim_start_matches("www.").to_string())
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 struct SessionTabItem {
     row: usize,
     col: usize,
     full: bool,
     profile_id: String,
     url: String,
+    custom_width: Option<f64>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 struct SessionState {
     focus: (usize, usize),
     sidebar_open: Option<bool>,
@@ -1572,13 +1582,14 @@ fn parse_session_content(content: &str) -> SessionState {
                 let full = parts[3] == "1";
                 let pid = parts[4].to_string();
                 let url = parts[5].to_string();
-                tabs.push(SessionTabItem { row: r, col: c, full, profile_id: pid, url });
+                let custom_width = parts.get(6).and_then(|s| s.parse::<f64>().ok());
+                tabs.push(SessionTabItem { row: r, col: c, full, profile_id: pid, url, custom_width });
             }
             "tab" if parts.len() == 4 => {
                 let c = parts[1].parse().unwrap_or(0);
                 let pid = parts[2].to_string();
                 let url = parts[3].to_string();
-                tabs.push(SessionTabItem { row: 0, col: c, full: true, profile_id: pid, url });
+                tabs.push(SessionTabItem { row: 0, col: c, full: true, profile_id: pid, url, custom_width: None });
             }
             _ => {}
         }
@@ -1608,29 +1619,75 @@ impl App {
         self.ov.get()
     }
 
-    fn create_tab_widget(view: &WebView) -> gtk::Box {
+    fn create_tab_widget(view: &WebView) -> (gtk::Box, gtk::Box) {
         view.add_css_class("tab");
         view.set_overflow(gtk::Overflow::Hidden);
         view.set_vexpand(true);
         view.set_hexpand(true);
 
-        let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let container = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         container.add_css_class("rail-col");
         container.add_css_class("full");
         container.set_vexpand(true);
         container.set_hexpand(true);
+
+        let resize_handle = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        resize_handle.add_css_class("tab-resize-handle");
+        resize_handle.set_cursor_from_name(Some("col-resize"));
+
         container.append(view);
-        container
+        container.append(&resize_handle);
+        (container, resize_handle)
+    }
+
+    fn set_tab_width(&self, r: usize, c: usize, width: f64) {
+        let vw = self.strip.width() as f64;
+        let clamped = width.clamp(280.0, vw);
+        let rows = self.rows.borrow();
+        if let Some(row) = rows.get(r) {
+            if let Some(tab) = row.tabs.get(c) {
+                tab.custom_width.set(Some(clamped));
+                if (clamped - vw).abs() < 10.0 {
+                    tab.container.add_css_class("full");
+                } else {
+                    tab.container.remove_css_class("full");
+                }
+            }
+        }
+        drop(rows);
+        self.layout.set_column_width(r, c, Some(clamped));
+        self.strip.queue_allocate();
+    }
+
+    fn update_window_title(&self) {
+        let focused_title = self.focused_view().and_then(|v| {
+            v.title().map(|s| s.to_string()).filter(|s| !s.trim().is_empty())
+        });
+        let title = match focused_title {
+            Some(t) => {
+                let clean = t.trim();
+                if clean.to_lowercase().contains("rail") {
+                    clean.to_string()
+                } else {
+                    format!("{} — rail", clean)
+                }
+            }
+            None => "rail".to_string(),
+        };
+        self.win.set_title(Some(&title));
     }
 
     fn sync_strip(&self) {
         let rows = self.rows.borrow();
         let mut grid = Vec::new();
+        let mut custom_widths = Vec::new();
         let mut prev: Option<gtk::Widget> = None;
         for row in rows.iter() {
             let mut row_grid = Vec::new();
+            let mut row_widths = Vec::new();
             for tab in row.tabs.iter() {
                 row_grid.push(tab.container.has_css_class("full"));
+                row_widths.push(tab.custom_width.get());
                 if tab.container.parent().as_ref() != Some(self.strip.upcast_ref()) {
                     self.strip.append(&tab.container);
                 }
@@ -1638,9 +1695,11 @@ impl App {
                 prev = Some(tab.container.clone().upcast());
             }
             grid.push(row_grid);
+            custom_widths.push(row_widths);
         }
         drop(rows);
         self.layout.set_grid(grid);
+        self.layout.set_custom_widths(custom_widths);
         self.strip.queue_allocate();
     }
 
@@ -1674,7 +1733,7 @@ impl App {
         for (ri, row) in rows.iter().enumerate() {
             let mut x = 0.0;
             for (ci, tab) in row.tabs.iter().enumerate() {
-                let w = col_width(tab.container.has_css_class("full"), vw);
+                let w = tab.custom_width.get().unwrap_or_else(|| col_width(tab.container.has_css_class("full"), vw));
                 if ri == cur_r && ci == cur_c {
                     active_span = Some((x, x + w));
                 }
@@ -1895,13 +1954,52 @@ impl App {
     }
 
     fn show_devtools(self: &Rc<Self>) {
+        let Some(view) = self.focused_view() else { return };
+        let Some(insp) = view.inspector() else { return };
+
+        // If inspector is inside detached window and that window is open, present it
+        if let Some(win) = self.devtools_window.borrow().as_ref() {
+            if win.is_visible() {
+                insp.show();
+                win.present();
+                self.devtools_open.set(true);
+                return;
+            }
+        }
+
+        insp.show();
+
+        // Update URL and host badge in devtools header
+        let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_else(|| "about:blank".to_string());
+        let host = host_of(&cur_uri).unwrap_or_else(|| "localhost".to_string());
+        self.devtools_url_lbl.set_markup(&format!("<span foreground='#38bdf8'>{}</span> <span color='#64748b'>•</span> <span color='#94a3b8'>{}</span>", glib::markup_escape_text(&host), glib::markup_escape_text(&cur_uri)));
+
+        // Attach WebKit's full WebInspector widget to content_box
+        if let Some(w) = insp.web_view() {
+            let widget: gtk::Widget = w.upcast();
+            if widget.parent().as_ref() != Some(self.devtools_content_box.upcast_ref()) {
+                while let Some(c) = self.devtools_content_box.first_child() {
+                    self.devtools_content_box.remove(&c);
+                }
+                widget.set_vexpand(true);
+                widget.set_hexpand(true);
+                self.devtools_content_box.append(&widget);
+            }
+        }
+
         self.devtools_panel.set_visible(true);
         self.devtools_open.set(true);
-        self.devtools_console_entry.grab_focus();
-        self.refresh_active_devtools_tab();
     }
 
     fn hide_devtools(&self) {
+        if let Some(view) = self.focused_view() {
+            if let Some(insp) = view.inspector() {
+                insp.close();
+            }
+        }
+        if let Some(win) = self.devtools_window.borrow().as_ref() {
+            win.set_visible(false);
+        }
         self.devtools_panel.set_visible(false);
         self.devtools_open.set(false);
         if let Some(v) = self.focused_view() {
@@ -1909,237 +2007,50 @@ impl App {
         }
     }
 
-    fn devtools_switch_tab(self: &Rc<Self>, idx: usize) {
-        let name = match idx {
-            1 => "elements",
-            2 => "network",
-            3 => "application",
-            _ => "console",
-        };
-        self.devtools_stack.set_visible_child_name(name);
+    fn toggle_devtools_undocked(self: &Rc<Self>) {
+        let Some(view) = self.focused_view() else { return };
+        let Some(insp) = view.inspector() else { return };
+        let Some(w) = insp.web_view() else { return };
+        let widget: gtk::Widget = w.upcast();
 
-        let btns = self.devtools_tab_buttons.borrow();
-        for (i, btn) in btns.iter().enumerate() {
-            if i == idx {
-                btn.add_css_class("active");
-            } else {
-                btn.remove_css_class("active");
+        let mut win_opt = self.devtools_window.borrow_mut();
+        if let Some(win) = win_opt.take() {
+            // Re-dock into bottom drawer
+            win.set_child(None::<&gtk::Widget>);
+            win.close();
+            while let Some(c) = self.devtools_content_box.first_child() {
+                self.devtools_content_box.remove(&c);
             }
-        }
-        drop(btns);
-
-        match idx {
-            0 => { self.devtools_console_entry.grab_focus(); }
-            1 => { self.refresh_devtools_elements(); }
-            2 => { self.refresh_devtools_network(); }
-            3 => { self.refresh_devtools_storage(); }
-            _ => {}
-        }
-    }
-
-    fn refresh_active_devtools_tab(self: &Rc<Self>) {
-        let name = self.devtools_stack.visible_child_name().map(|s| s.to_string()).unwrap_or_default();
-        match name.as_str() {
-            "elements" => self.refresh_devtools_elements(),
-            "network" => self.refresh_devtools_network(),
-            "application" => self.refresh_devtools_storage(),
-            _ => {}
-        }
-    }
-
-    fn devtools_log(&self, level: &str, text: &str) {
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        row.add_css_class("devtools-log-row");
-        row.add_css_class(&format!("level-{}", level));
-
-        let lbl = gtk::Label::new(Some(text));
-        lbl.set_xalign(0.0);
-        lbl.set_hexpand(true);
-        lbl.set_wrap(true);
-        lbl.set_wrap_mode(gtk::pango::WrapMode::WordChar);
-        lbl.set_selectable(true);
-
-        row.append(&lbl);
-        self.devtools_console_box.append(&row);
-    }
-
-    fn devtools_clear_console(&self) {
-        while let Some(c) = self.devtools_console_box.first_child() {
-            self.devtools_console_box.remove(&c);
-        }
-        self.devtools_log("info", "Console cleared.");
-    }
-
-    fn devtools_execute_js(self: &Rc<Self>, code: &str) {
-        let clean = code.trim();
-        if clean.is_empty() { return; }
-
-        {
-            let mut hist = self.devtools_history.borrow_mut();
-            if hist.last().map(|s| s.as_str()) != Some(clean) {
-                hist.push(clean.to_string());
+            widget.set_vexpand(true);
+            widget.set_hexpand(true);
+            self.devtools_content_box.append(&widget);
+            self.devtools_panel.set_visible(true);
+        } else {
+            // Detach into dedicated window
+            self.devtools_panel.set_visible(false);
+            while let Some(c) = self.devtools_content_box.first_child() {
+                self.devtools_content_box.remove(&c);
             }
-            self.devtools_history_idx.set(None);
+
+            let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_default();
+            let host = host_of(&cur_uri).unwrap_or_else(|| "DevTools".to_string());
+            let win = gtk::Window::builder()
+                .title(&format!("Rail DevTools - {}", host))
+                .default_width(1050)
+                .default_height(720)
+                .child(&widget)
+                .build();
+            win.add_css_class("devtools-window");
+
+            let app_re_dock = self.clone();
+            win.connect_close_request(move |_| {
+                app_re_dock.hide_devtools();
+                glib::Propagation::Proceed
+            });
+
+            win.present();
+            *win_opt = Some(win);
         }
-
-        self.devtools_log("in", &format!("> {}", clean));
-        self.devtools_console_entry.set_text("");
-
-        let Some(view) = self.focused_view() else {
-            self.devtools_log("err", "< No active view available");
-            return;
-        };
-
-        let app = self.clone();
-        view.evaluate_javascript(
-            clean,
-            None,
-            None,
-            gio::Cancellable::NONE,
-            move |res| {
-                match res {
-                    Ok(val) => {
-                        let out_str = val.to_string();
-                        app.devtools_log("out", &format!("< {}", out_str));
-                    }
-                    Err(err) => {
-                        app.devtools_log("err", &format!("< Error: {}", err));
-                    }
-                }
-            },
-        );
-    }
-
-    fn refresh_devtools_elements(self: &Rc<Self>) {
-        let Some(view) = self.focused_view() else { return };
-        let tv = self.devtools_elements_view.clone();
-        view.evaluate_javascript(
-            "document.documentElement.outerHTML",
-            None,
-            None,
-            gio::Cancellable::NONE,
-            move |res| {
-                if let Ok(val) = res {
-                    let html = val.to_string();
-                    tv.buffer().set_text(&html);
-                }
-            },
-        );
-    }
-
-    fn refresh_devtools_network(self: &Rc<Self>) {
-        while let Some(c) = self.devtools_network_box.first_child() {
-            self.devtools_network_box.remove(&c);
-        }
-
-        let card = gtk::Box::new(gtk::Orientation::Vertical, 4);
-        card.add_css_class("devtools-card");
-
-        let title = gtk::Label::new(Some("ACTIVE SESSION & RESOURCE INSPECTION"));
-        title.add_css_class("devtools-card-title");
-        title.set_xalign(0.0);
-        card.append(&title);
-
-        let cur_uri = self.focused_view().and_then(|v| v.uri()).map(|s| s.to_string()).unwrap_or_else(|| "about:blank".to_string());
-        let uri_lbl = gtk::Label::new(None);
-        uri_lbl.set_markup(&format!("<b>URL:</b> <span foreground='#38bdf8'>{}</span>", glib::markup_escape_text(&cur_uri)));
-        uri_lbl.add_css_class("devtools-card-row");
-        uri_lbl.set_xalign(0.0);
-        card.append(&uri_lbl);
-
-        let host = host_of(&cur_uri).unwrap_or_else(|| "localhost".to_string());
-        let host_lbl = gtk::Label::new(None);
-        host_lbl.set_markup(&format!("<b>Host:</b> {}", glib::markup_escape_text(&host)));
-        host_lbl.add_css_class("devtools-card-row");
-        host_lbl.set_xalign(0.0);
-        card.append(&host_lbl);
-
-        let is_ssl = cur_uri.starts_with("https://");
-        let ssl_lbl = gtk::Label::new(None);
-        ssl_lbl.set_markup(&format!("<b>Security:</b> {}", if is_ssl { "<span foreground='#4ade80'>TLS/HTTPS Secured</span>" } else { "<span foreground='#f87171'>Insecure / Local</span>" }));
-        ssl_lbl.add_css_class("devtools-card-row");
-        ssl_lbl.set_xalign(0.0);
-        card.append(&ssl_lbl);
-
-        let prof_id = self.profiles.borrow().active_id().to_string();
-        let persona = ProfilePersona::for_id(&prof_id);
-        let prof_lbl = gtk::Label::new(None);
-        prof_lbl.set_markup(&format!("<b>Isolated Profile:</b> {} ({})", glib::markup_escape_text(&prof_id), persona.summary()));
-        prof_lbl.add_css_class("devtools-card-row");
-        prof_lbl.set_xalign(0.0);
-        card.append(&prof_lbl);
-
-        self.devtools_network_box.append(&card);
-    }
-
-    fn refresh_devtools_storage(self: &Rc<Self>) {
-        while let Some(c) = self.devtools_storage_box.first_child() {
-            self.devtools_storage_box.remove(&c);
-        }
-
-        let Some(view) = self.focused_view() else { return };
-        let box_storage = self.devtools_storage_box.clone();
-        let app = self.clone();
-
-        view.evaluate_javascript(
-            r#"(function() {
-                try {
-                    return JSON.stringify({
-                        local: Object.entries(localStorage),
-                        session: Object.entries(sessionStorage),
-                        cookie: document.cookie
-                    }, null, 2);
-                } catch(e) {
-                    return JSON.stringify({ local: [], session: [], cookie: "" });
-                }
-            })()"#,
-            None,
-            None,
-            gio::Cancellable::NONE,
-            move |res| {
-                if let Ok(val) = res {
-                    let json_str = val.to_string();
-                    let card = gtk::Box::new(gtk::Orientation::Vertical, 6);
-                    card.add_css_class("devtools-card");
-
-                    let title = gtk::Label::new(Some("CLIENT STORAGE (ISOLATED)"));
-                    title.add_css_class("devtools-card-title");
-                    title.set_xalign(0.0);
-                    card.append(&title);
-
-                    let body = gtk::Label::new(Some(&json_str));
-                    body.add_css_class("devtools-card-row");
-                    body.set_wrap(true);
-                    body.set_wrap_mode(gtk::pango::WrapMode::WordChar);
-                    body.set_selectable(true);
-                    body.set_xalign(0.0);
-                    card.append(&body);
-
-                    let btn_clear = gtk::Button::with_label("Clear Client Storage (localStorage & sessionStorage)");
-                    btn_clear.add_css_class("flat-btn");
-                    let app_clr = app.clone();
-                    btn_clear.connect_clicked(move |_| app_clr.devtools_clear_storage());
-                    card.append(&btn_clear);
-
-                    box_storage.append(&card);
-                }
-            },
-        );
-    }
-
-    fn devtools_clear_storage(self: &Rc<Self>) {
-        let Some(view) = self.focused_view() else { return };
-        let app = self.clone();
-        view.evaluate_javascript(
-            "try { localStorage.clear(); sessionStorage.clear(); } catch(e) {}",
-            None,
-            None,
-            gio::Cancellable::NONE,
-            move |_| {
-                app.devtools_log("info", "Storage cleared (localStorage & sessionStorage).");
-                app.refresh_devtools_storage();
-            },
-        );
     }
 
     fn show_script_dialog(self: &Rc<Self>, view: &WebView, dialog: &ScriptDialog) {
@@ -2442,25 +2353,22 @@ impl App {
             menu.append(&ContextMenuItem::new_separator());
         }
 
-        // 6. Developer Tools (Always present at bottom!)
+        // 6. Developer Tools (Inspect Element / View Source)
         let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_default();
         if !cur_uri.is_empty() && !cur_uri.starts_with("about:") {
             let app_src = self.clone();
             let act_src = gio::SimpleAction::new("ctx-view-source", None);
             act_src.connect_activate(move |_, _| {
-                app_src.toggle_devtools();
+                app_src.show_devtools();
             });
             self.win.add_action(&act_src);
-            menu.append(&ContextMenuItem::from_gaction(&act_src, "View Page Source  (Ctrl+Shift+I)", None));
+            menu.append(&ContextMenuItem::from_gaction(&act_src, "View Page Source  (F12)", None));
         }
 
-        let app_insp = self.clone();
-        let act_insp = gio::SimpleAction::new("ctx-inspect-elem", None);
-        act_insp.connect_activate(move |_, _| {
-            app_insp.toggle_devtools();
-        });
-        self.win.add_action(&act_insp);
-        menu.append(&ContextMenuItem::from_gaction(&act_insp, "Inspect Element  (F12 / Ctrl+Shift+I)", None));
+        menu.append(&ContextMenuItem::from_stock_action_with_label(
+            ContextMenuAction::InspectElement,
+            "Inspect Element  (F12 / Ctrl+Shift+I)",
+        ));
     }
 
     fn setup_view_signals(self: &Rc<Self>, view: &WebView) {
@@ -2480,16 +2388,21 @@ impl App {
         });
         view.add_controller(click);
 
-        // Track developer tools window state
+        // Track developer tools window state & auto-dock to Rail panel
         if let Some(insp) = view.inspector() {
-            let dt_open = self.devtools_open.clone();
-            insp.connect_closed(move |_| {
-                dt_open.set(false);
+            let app_insp = self.clone();
+            insp.connect_open_window(move |_| {
+                app_insp.show_devtools();
+                true
             });
-            let dt_open = self.devtools_open.clone();
+            let a_closed = self.clone();
+            insp.connect_closed(move |_| {
+                a_closed.hide_devtools();
+            });
+            let app_front = self.clone();
             insp.connect_bring_to_front(move |_| {
-                dt_open.set(true);
-                false
+                app_front.show_devtools();
+                true
             });
         }
 
@@ -2524,6 +2437,7 @@ impl App {
         let app = self.clone();
         view.connect_title_notify(move |v| {
             app.refresh_sidebar();
+            app.update_window_title();
             if let Some(u) = v.uri() {
                 let title = v.title().unwrap_or_default().to_string();
                 app.history.borrow_mut().record_visit(&u, &title);
@@ -2561,7 +2475,7 @@ impl App {
         });
     }
 
-    fn setup_tab_signals(self: &Rc<Self>, container: &gtk::Box, view: &WebView) {
+    fn setup_tab_signals(self: &Rc<Self>, container: &gtk::Box, view: &WebView, resize_handle: &gtk::Box) {
         self.setup_view_signals(view);
 
         let app = self.clone();
@@ -2579,11 +2493,89 @@ impl App {
             }
         });
         container.add_controller(click);
+
+        // Interactive splitter resize drag gesture
+        let drag = gtk::GestureDrag::new();
+        let app = self.clone();
+        let v = view.clone();
+        let h = resize_handle.clone();
+        let start_w0 = Rc::new(Cell::new(0.0f64));
+        let start_w1 = Rc::new(Cell::new(Option::<f64>::None));
+
+        drag.connect_drag_begin({
+            let app = app.clone();
+            let v = v.clone();
+            let h = h.clone();
+            let start_w0 = start_w0.clone();
+            let start_w1 = start_w1.clone();
+            move |_gesture, _start_x, _start_y| {
+                h.add_css_class("active");
+                if let Some((r, c)) = app.find_view_coords(&v) {
+                    let vw = app.strip.width() as f64;
+                    let rows = app.rows.borrow();
+                    if let Some(row) = rows.get(r) {
+                        let w0 = row.tabs.get(c).and_then(|t| t.custom_width.get()).unwrap_or_else(|| {
+                            let is_full = row.tabs.get(c).map(|t| t.container.has_css_class("full")).unwrap_or(false);
+                            col_width(is_full, vw)
+                        });
+                        start_w0.set(w0);
+
+                        let w1 = row.tabs.get(c + 1).map(|t| {
+                            t.custom_width.get().unwrap_or_else(|| {
+                                let is_full = t.container.has_css_class("full");
+                                col_width(is_full, vw)
+                            })
+                        });
+                        start_w1.set(w1);
+                    }
+                }
+            }
+        });
+
+        drag.connect_drag_update({
+            let app = app.clone();
+            let v = v.clone();
+            let start_w0 = start_w0.clone();
+            let start_w1 = start_w1.clone();
+            move |_gesture, offset_x, _offset_y| {
+                if let Some((r, c)) = app.find_view_coords(&v) {
+                    let vw = app.strip.width() as f64;
+                    let min_w = 280.0;
+                    let max_w = vw; // Fullscreen max: left edge to right edge
+                    let initial0 = start_w0.get();
+                    let new_w0 = (initial0 + offset_x).clamp(min_w, max_w);
+
+                    if let Some(initial1) = start_w1.get() {
+                        let total_pair = initial0 + initial1;
+                        if total_pair <= vw + 15.0 {
+                            let new_w1 = (total_pair - new_w0).max(min_w);
+                            app.set_tab_width(r, c, new_w0);
+                            app.set_tab_width(r, c + 1, new_w1);
+                            return;
+                        }
+                    }
+
+                    app.set_tab_width(r, c, new_w0);
+                }
+            }
+        });
+
+        drag.connect_drag_end({
+            let app = app.clone();
+            let h = h.clone();
+            move |_gesture, _offset_x, _offset_y| {
+                h.remove_css_class("active");
+                app.schedule_save_session();
+                app.reveal_focus();
+            }
+        });
+
+        resize_handle.add_controller(drag);
     }
 
     fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_row: bool) {
         view.set_can_target(!self.ov.get());
-        let container = Self::create_tab_widget(&view);
+        let (container, resize_handle) = Self::create_tab_widget(&view);
 
         let (target_r, target_c) = {
             let mut rows = self.rows.borrow_mut();
@@ -2596,7 +2588,7 @@ impl App {
                 while rows.len() <= next_r {
                     rows.push(Row { tabs: Vec::new() });
                 }
-                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), profile_id });
+                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), profile_id, custom_width: Cell::new(None) });
                 let c_idx = rows[next_r].tabs.len() - 1;
                 (next_r, c_idx)
             } else {
@@ -2607,12 +2599,12 @@ impl App {
                 } else {
                     (cur_c + 1).min(rows[cur_r].tabs.len())
                 };
-                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), profile_id });
+                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), profile_id, custom_width: Cell::new(None) });
                 (cur_r, col_idx)
             }
         };
 
-        self.setup_tab_signals(&container, &view);
+        self.setup_tab_signals(&container, &view, &resize_handle);
         self.sync_strip();
         self.focus_coords(target_r, target_c);
     }
@@ -2697,6 +2689,7 @@ impl App {
             self.focus_col.set(new_c);
 
             self.refresh_sidebar();
+            self.update_window_title();
             self.schedule_save_session();
             if self.map_open() {
                 self.trigger_map_animation();
@@ -2737,10 +2730,15 @@ impl App {
         self.update_load_bar();
         self.reveal_focus();
         self.refresh_sidebar();
+        self.update_window_title();
         self.schedule_save_session();
 
         if self.map_open() {
             self.trigger_map_animation();
+        }
+
+        if self.devtools_open.get() {
+            self.show_devtools();
         }
 
         if !self.palette_open() && !self.ov.get() {
@@ -2846,11 +2844,11 @@ impl App {
             let view = Self::create_web_view(&session, &prof_id);
             view.load_html(START_PAGE, None);
             view.set_can_target(!self.ov.get());
-            let container = Self::create_tab_widget(&view);
-            self.setup_tab_signals(&container, &view);
+            let (container, resize_handle) = Self::create_tab_widget(&view);
+            self.setup_tab_signals(&container, &view, &resize_handle);
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, profile_id: prof_id });
+            rows[0].tabs.push(Tab { container, view, profile_id: prof_id, custom_width: Cell::new(None) });
             drop(rows);
         } else if cur_row_empty && cur_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -2897,7 +2895,11 @@ impl App {
             for (ci, tab) in row.tabs.iter().enumerate() {
                 let is_full = if tab.container.has_css_class("full") { 1 } else { 0 };
                 let uri = tab.view.uri().unwrap_or_default();
-                out.push_str(&format!("tab\t{}\t{}\t{}\t{}\t{}\n", ri, ci, is_full, tab.profile_id, uri));
+                if let Some(cw) = tab.custom_width.get() {
+                    out.push_str(&format!("tab\t{}\t{}\t{}\t{}\t{}\t{:.1}\n", ri, ci, is_full, tab.profile_id, uri, cw));
+                } else {
+                    out.push_str(&format!("tab\t{}\t{}\t{}\t{}\t{}\n", ri, ci, is_full, tab.profile_id, uri));
+                }
             }
         }
         drop(rows);
@@ -3001,12 +3003,12 @@ impl App {
             } else {
                 view.load_uri(&item.url);
             }
-            let container = Self::create_tab_widget(&view);
+            let (container, resize_handle) = Self::create_tab_widget(&view);
             if !item.full {
                 container.remove_css_class("full");
             }
-            self.setup_tab_signals(&container, &view);
-            loaded_tabs.push((item.row, Tab { container, view, profile_id: item.profile_id }));
+            self.setup_tab_signals(&container, &view, &resize_handle);
+            loaded_tabs.push((item.row, Tab { container, view, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width) }));
         }
 
         let mut rows = self.rows.borrow_mut();
@@ -3028,12 +3030,14 @@ impl App {
         let cur_c = self.focus_col.get();
         let rows = self.rows.borrow();
         let Some(tab) = rows.get(cur_r).and_then(|r| r.tabs.get(cur_c)) else { return };
+        tab.custom_width.set(None);
         if tab.container.has_css_class("full") {
             tab.container.remove_css_class("full");
         } else {
             tab.container.add_css_class("full");
         }
         drop(rows);
+        self.layout.set_column_width(cur_r, cur_c, None);
         self.sync_strip();
         self.reveal_focus();
         self.schedule_save_session();
@@ -3682,7 +3686,7 @@ impl App {
         if let Some(row) = rows.get_mut(cur_r) {
             if let Some(tab) = row.tabs.get_mut(cur_c) {
                 tab.container.remove(&tab.view);
-                tab.container.append(&new_view);
+                tab.container.prepend(&new_view);
                 new_view.add_css_class("tab");
                 new_view.set_overflow(gtk::Overflow::Hidden);
                 new_view.set_vexpand(true);
@@ -4483,7 +4487,7 @@ impl App {
             if unscaled_y >= row_y && unscaled_y <= row_y + vh {
                 let mut col_x = 0.0;
                 for (c_idx, tab) in row.tabs.iter().enumerate() {
-                    let cw = col_width(tab.container.has_css_class("full"), vw);
+                    let cw = tab.custom_width.get().unwrap_or_else(|| col_width(tab.container.has_css_class("full"), vw));
                     if unscaled_x >= col_x && unscaled_x <= col_x + cw {
                         hit = Some((r_idx, c_idx));
                         break;
@@ -5246,130 +5250,58 @@ fn build(gapp: &gtk::Application) {
     map_container.append(&map_header_row);
     map_container.append(&map_overlay);
 
-    // ---- Native Rail Developer Console (Ctrl+Shift+I) ----
-    let devtools_header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    // ---- Native Rail Developer Console (F12 / Ctrl+Shift+I) ----
+    let devtools_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     devtools_header.add_css_class("devtools-header");
 
     let devtools_icon = gtk::Image::from_icon_name("utilities-terminal-symbolic");
     devtools_icon.add_css_class("devtools-brand-icon");
 
     let devtools_title = gtk::Label::new(None);
-    devtools_title.set_markup("<span font_family='ui-monospace' font_weight='800'>rail</span><span foreground='#38bdf8'>.dev</span>");
+    devtools_title.set_markup("<span font_family='ui-monospace' font_weight='800'>rail</span><span foreground='#38bdf8'>.devtools</span>");
     devtools_title.add_css_class("devtools-brand-label");
 
-    let devtools_badge = gtk::Label::new(Some("Ctrl+Shift+I"));
+    let devtools_badge = gtk::Label::new(Some("F12"));
     devtools_badge.add_css_class("devtools-badge");
 
-    let btn_tab_console = gtk::Button::with_label("Console");
-    btn_tab_console.add_css_class("devtools-tab-btn");
-    btn_tab_console.add_css_class("active");
-
-    let btn_tab_elements = gtk::Button::with_label("Elements");
-    btn_tab_elements.add_css_class("devtools-tab-btn");
-
-    let btn_tab_network = gtk::Button::with_label("Network");
-    btn_tab_network.add_css_class("devtools-tab-btn");
-
-    let btn_tab_application = gtk::Button::with_label("Application");
-    btn_tab_application.add_css_class("devtools-tab-btn");
+    let devtools_url_lbl = gtk::Label::new(None);
+    devtools_url_lbl.add_css_class("devtools-url-lbl");
+    devtools_url_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    devtools_url_lbl.set_max_width_chars(60);
 
     let dt_spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     dt_spacer.set_hexpand(true);
 
-    let devtools_clear_btn = gtk::Button::from_icon_name("edit-clear-symbolic");
-    devtools_clear_btn.add_css_class("flat-icon");
-    devtools_clear_btn.set_tooltip_text(Some("Clear Console"));
-
-    let devtools_refresh_btn = gtk::Button::from_icon_name("view-refresh-symbolic");
-    devtools_refresh_btn.add_css_class("flat-icon");
-    devtools_refresh_btn.set_tooltip_text(Some("Refresh Active DevTools Tab"));
+    let devtools_detach_btn = gtk::Button::from_icon_name("view-restore-symbolic");
+    devtools_detach_btn.add_css_class("flat-icon");
+    devtools_detach_btn.set_tooltip_text(Some("Detach to Separate Window / Dock"));
 
     let devtools_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
     devtools_close_btn.add_css_class("flat-icon");
-    devtools_close_btn.set_tooltip_text(Some("Close DevTools (Esc / Ctrl+Shift+I)"));
+    devtools_close_btn.set_tooltip_text(Some("Close DevTools (Esc / F12)"));
 
     devtools_header.append(&devtools_icon);
     devtools_header.append(&devtools_title);
     devtools_header.append(&devtools_badge);
-    devtools_header.append(&btn_tab_console);
-    devtools_header.append(&btn_tab_elements);
-    devtools_header.append(&btn_tab_network);
-    devtools_header.append(&btn_tab_application);
+    devtools_header.append(&devtools_url_lbl);
     devtools_header.append(&dt_spacer);
-    devtools_header.append(&devtools_clear_btn);
-    devtools_header.append(&devtools_refresh_btn);
+    devtools_header.append(&devtools_detach_btn);
     devtools_header.append(&devtools_close_btn);
 
-    // Page 0: Console
-    let devtools_console_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
-    devtools_console_box.add_css_class("devtools-log-box");
-
-    let console_scroll = gtk::ScrolledWindow::new();
-    console_scroll.add_css_class("devtools-log-scroll");
-    console_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-    console_scroll.set_vexpand(true);
-    console_scroll.set_child(Some(&devtools_console_box));
-
-    let devtools_console_entry = gtk::Entry::new();
-    devtools_console_entry.add_css_class("devtools-entry");
-    devtools_console_entry.set_hexpand(true);
-    devtools_console_entry.set_placeholder_text(Some("Evaluate JavaScript (e.g. document.title, location.href, 2+2)..."));
-
-    let prompt_sym = gtk::Label::new(Some(">"));
-    prompt_sym.add_css_class("devtools-prompt-char");
-
-    let devtools_input_bar = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-    devtools_input_bar.add_css_class("devtools-input-bar");
-    devtools_input_bar.append(&prompt_sym);
-    devtools_input_bar.append(&devtools_console_entry);
-
-    let console_page = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    console_page.append(&console_scroll);
-    console_page.append(&devtools_input_bar);
-
-    // Page 1: Elements
-    let devtools_elements_view = gtk::TextView::new();
-    devtools_elements_view.add_css_class("devtools-text-view");
-    devtools_elements_view.set_editable(false);
-    devtools_elements_view.set_wrap_mode(gtk::WrapMode::Char);
-    devtools_elements_view.set_cursor_visible(false);
-
-    let elements_scroll = gtk::ScrolledWindow::new();
-    elements_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
-    elements_scroll.set_vexpand(true);
-    elements_scroll.set_child(Some(&devtools_elements_view));
-
-    // Page 2: Network
-    let devtools_network_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
-    let network_scroll = gtk::ScrolledWindow::new();
-    network_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-    network_scroll.set_vexpand(true);
-    network_scroll.set_child(Some(&devtools_network_box));
-
-    // Page 3: Application
-    let devtools_storage_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
-    let storage_scroll = gtk::ScrolledWindow::new();
-    storage_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-    storage_scroll.set_vexpand(true);
-    storage_scroll.set_child(Some(&devtools_storage_box));
-
-    let devtools_stack = gtk::Stack::new();
-    devtools_stack.add_css_class("devtools-content-area");
-    devtools_stack.set_vexpand(true);
-    devtools_stack.add_named(&console_page, Some("console"));
-    devtools_stack.add_named(&elements_scroll, Some("elements"));
-    devtools_stack.add_named(&network_scroll, Some("network"));
-    devtools_stack.add_named(&storage_scroll, Some("application"));
+    let devtools_content_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    devtools_content_box.add_css_class("devtools-content-area");
+    devtools_content_box.set_vexpand(true);
+    devtools_content_box.set_hexpand(true);
 
     let devtools_panel = gtk::Box::new(gtk::Orientation::Vertical, 0);
     devtools_panel.add_css_class("devtools-panel");
     devtools_panel.set_halign(gtk::Align::Fill);
     devtools_panel.set_valign(gtk::Align::End);
-    devtools_panel.set_height_request(300);
+    devtools_panel.set_height_request(400);
     devtools_panel.set_visible(false);
 
     devtools_panel.append(&devtools_header);
-    devtools_panel.append(&devtools_stack);
+    devtools_panel.append(&devtools_content_box);
 
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&shell));
@@ -5449,20 +5381,9 @@ fn build(gapp: &gtk::Application) {
         map_state: RefCell::new(MinimapState::default()),
         devtools_open: Cell::new(false),
         devtools_panel: devtools_panel.clone(),
-        devtools_stack: devtools_stack.clone(),
-        devtools_console_box: devtools_console_box.clone(),
-        devtools_console_entry: devtools_console_entry.clone(),
-        devtools_elements_view: devtools_elements_view.clone(),
-        devtools_network_box: devtools_network_box.clone(),
-        devtools_storage_box: devtools_storage_box.clone(),
-        devtools_history: RefCell::new(Vec::new()),
-        devtools_history_idx: Cell::new(None),
-        devtools_tab_buttons: RefCell::new(vec![
-            btn_tab_console.clone(),
-            btn_tab_elements.clone(),
-            btn_tab_network.clone(),
-            btn_tab_application.clone(),
-        ]),
+        devtools_content_box: devtools_content_box.clone(),
+        devtools_url_lbl: devtools_url_lbl.clone(),
+        devtools_window: RefCell::new(None),
     });
 
     let a_close = app.clone();
@@ -5645,10 +5566,13 @@ fn build(gapp: &gtk::Application) {
         let start_b = header_start_margin_bottom.clone();
         let map_container = map_container.clone();
         let map_header_row = map_header_row.clone();
-        header_drag.connect_drag_begin(move |_gesture, _start_x, _start_y| {
+        header_drag.connect_drag_begin(move |gesture, _start_x, _start_y| {
             start_e.set(map_container.margin_end());
             start_b.set(map_container.margin_bottom());
             map_header_row.set_cursor_from_name(Some("grabbing"));
+            if let Some(ev) = gesture.current_event() {
+                let _ = ev.position();
+            }
         });
     }
 
@@ -5755,70 +5679,8 @@ fn build(gapp: &gtk::Application) {
     let a_dt_close = app.clone();
     devtools_close_btn.connect_clicked(move |_| a_dt_close.hide_devtools());
 
-    let a_dt_clear = app.clone();
-    devtools_clear_btn.connect_clicked(move |_| a_dt_clear.devtools_clear_console());
-
-    let a_dt_ref = app.clone();
-    devtools_refresh_btn.connect_clicked(move |_| a_dt_ref.refresh_active_devtools_tab());
-
-    let a_dt_c = app.clone();
-    btn_tab_console.connect_clicked(move |_| a_dt_c.devtools_switch_tab(0));
-
-    let a_dt_e = app.clone();
-    btn_tab_elements.connect_clicked(move |_| a_dt_e.devtools_switch_tab(1));
-
-    let a_dt_n = app.clone();
-    btn_tab_network.connect_clicked(move |_| a_dt_n.devtools_switch_tab(2));
-
-    let a_dt_a = app.clone();
-    btn_tab_application.connect_clicked(move |_| a_dt_a.devtools_switch_tab(3));
-
-    let a_dt_exec = app.clone();
-    devtools_console_entry.connect_activate(move |e| a_dt_exec.devtools_execute_js(&e.text()));
-
-    let dt_entry_keys = gtk::EventControllerKey::new();
-    let a_dt_hist = app.clone();
-    dt_entry_keys.connect_key_pressed(move |_, key, _, _| {
-        match key {
-            gdk::Key::Up => {
-                let hist = a_dt_hist.devtools_history.borrow();
-                if hist.is_empty() { return gtk::glib::Propagation::Proceed; }
-                let cur = a_dt_hist.devtools_history_idx.get();
-                let next = match cur {
-                    None => hist.len().saturating_sub(1),
-                    Some(idx) => idx.saturating_sub(1),
-                };
-                a_dt_hist.devtools_history_idx.set(Some(next));
-                if let Some(cmd) = hist.get(next) {
-                    a_dt_hist.devtools_console_entry.set_text(cmd);
-                    a_dt_hist.devtools_console_entry.set_position(-1);
-                }
-                gtk::glib::Propagation::Stop
-            }
-            gdk::Key::Down => {
-                let hist = a_dt_hist.devtools_history.borrow();
-                let cur = a_dt_hist.devtools_history_idx.get();
-                if let Some(idx) = cur {
-                    if idx + 1 < hist.len() {
-                        let next = idx + 1;
-                        a_dt_hist.devtools_history_idx.set(Some(next));
-                        if let Some(cmd) = hist.get(next) {
-                            a_dt_hist.devtools_console_entry.set_text(cmd);
-                            a_dt_hist.devtools_console_entry.set_position(-1);
-                        }
-                    } else {
-                        a_dt_hist.devtools_history_idx.set(None);
-                        a_dt_hist.devtools_console_entry.set_text("");
-                    }
-                    gtk::glib::Propagation::Stop
-                } else {
-                    gtk::glib::Propagation::Proceed
-                }
-            }
-            _ => gtk::glib::Propagation::Proceed,
-        }
-    });
-    devtools_console_entry.add_controller(dt_entry_keys);
+    let a_dt_detach = app.clone();
+    devtools_detach_btn.connect_clicked(move |_| a_dt_detach.toggle_devtools_undocked());
 
 
     let a = app.clone();
@@ -6037,6 +5899,7 @@ fn build(gapp: &gtk::Application) {
     } else if !restored {
         app.new_tab();
     }
+    app.update_window_title();
     win.present();
 }
 
@@ -6268,14 +6131,16 @@ mod tests {
             col: 0,
             full: true,
             profile_id: "default".to_string(),
-            url: "https://google.com".to_string()
+            url: "https://google.com".to_string(),
+            custom_width: None,
         });
         assert_eq!(state.tabs[1], SessionTabItem {
             row: 1,
             col: 0,
             full: true,
             profile_id: "work".to_string(),
-            url: "https://github.com".to_string()
+            url: "https://github.com".to_string(),
+            custom_width: None,
         });
     }
 
@@ -6299,7 +6164,16 @@ mod tests {
             col: 0,
             full: true,
             profile_id: "work".to_string(),
-            url: "https://news.ycombinator.com".to_string()
+            url: "https://news.ycombinator.com".to_string(),
+            custom_width: None,
         });
+    }
+
+    #[test]
+    fn test_parse_session_with_custom_width() {
+        let sample = "tab\t0\t0\t0\tdefault\thttps://claude.ai\t850.5\n";
+        let state = parse_session_content(sample);
+        assert_eq!(state.tabs.len(), 1);
+        assert_eq!(state.tabs[0].custom_width, Some(850.5));
     }
 }
