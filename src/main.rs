@@ -700,6 +700,8 @@ struct App {
     new_profile_color_idx: Cell<usize>,
     color_buttons: RefCell<Vec<gtk::Button>>,
     touchpad_mode: Cell<bool>,
+    last_saved_session: RefCell<String>,
+    save_session_gen: Cell<u64>,
 }
 
 fn to_uri(input: &str) -> String {
@@ -1036,7 +1038,7 @@ impl App {
         let app = self.clone();
         view.connect_uri_notify(move |_| {
             app.refresh_sidebar();
-            app.save_session();
+            app.schedule_save_session();
         });
         let app = self.clone();
         view.connect_favicon_notify(move |_| app.refresh_sidebar());
@@ -1133,7 +1135,7 @@ impl App {
         self.sync_strip();
 
         if total_tabs == 0 {
-            self.save_session();
+            self.save_session_immediate();
             self.win.close();
             return;
         } else {
@@ -1189,7 +1191,7 @@ impl App {
         self.update_load_bar();
         self.reveal_focus();
         self.refresh_sidebar();
-        self.save_session();
+        self.schedule_save_session();
 
         if !self.palette_open() && !self.ov.get() {
             if let Some(v) = self.focused_view() {
@@ -1314,16 +1316,17 @@ impl App {
 
     fn toggle_touchpad_mode(self: &Rc<Self>) {
         self.touchpad_mode.set(!self.touchpad_mode.get());
-        self.save_session();
+        self.schedule_save_session();
     }
 
-    fn save_session(&self) {
+    fn save_session_internal(&self, sync: bool) {
         let rows = self.rows.borrow();
         let total_tabs: usize = rows.iter().map(|r| r.tabs.len()).sum();
         let path = glib::user_data_dir().join("rail").join("session.txt");
         let temp_path = glib::user_data_dir().join("rail").join("session.txt.tmp");
 
         if total_tabs == 0 {
+            *self.last_saved_session.borrow_mut() = String::new();
             let _ = std::fs::remove_file(&path);
             let _ = std::fs::remove_file(&temp_path);
             return;
@@ -1347,15 +1350,47 @@ impl App {
         }
         drop(rows);
 
-        // Atomic write with sync_all (fsync) ensuring data is immediately flushed to physical hard disk
-        if let Ok(mut file) = std::fs::File::create(&temp_path) {
-            use std::io::Write;
-            if file.write_all(out.as_bytes()).is_ok() && file.sync_all().is_ok() {
-                let _ = std::fs::rename(&temp_path, &path);
-                return;
-            }
+        // Optimization: if session content hasn't changed, skip disk write completely (prevents SSD wear)
+        if *self.last_saved_session.borrow() == out {
+            return;
         }
-        let _ = std::fs::write(&path, &out);
+
+        // Atomic write via temp file + atomic rename
+        let write_ok = if let Ok(mut file) = std::fs::File::create(&temp_path) {
+            use std::io::Write;
+            if file.write_all(out.as_bytes()).is_ok() {
+                if sync {
+                    let _ = file.sync_all(); // Flush physical hardware to SSD before exit / reboot
+                }
+                std::fs::rename(&temp_path, &path).is_ok()
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if !write_ok {
+            let _ = std::fs::write(&path, &out);
+        }
+
+        *self.last_saved_session.borrow_mut() = out;
+    }
+
+    fn schedule_save_session(self: &Rc<Self>) {
+        let current_gen = self.save_session_gen.get().wrapping_add(1);
+        self.save_session_gen.set(current_gen);
+        let app = self.clone();
+        glib::timeout_add_local_once(Duration::from_millis(1000), move || {
+            if app.save_session_gen.get() == current_gen {
+                app.save_session_internal(false);
+            }
+        });
+    }
+
+    fn save_session_immediate(&self) {
+        self.save_session_gen.set(self.save_session_gen.get().wrapping_add(1));
+        self.save_session_internal(true);
     }
 
     fn restore_session(self: &Rc<Self>) -> bool {
@@ -1365,6 +1400,7 @@ impl App {
         if state.tabs.is_empty() {
             return false;
         }
+        *self.last_saved_session.borrow_mut() = content;
 
         if let Some((w, h, max)) = state.win_size {
             if w > 400 && h > 300 {
@@ -1437,7 +1473,7 @@ impl App {
         drop(rows);
         self.sync_strip();
         self.reveal_focus();
-        self.save_session();
+        self.schedule_save_session();
     }
 
     // ---- sidebar ---------------------------------------------------------
@@ -1629,7 +1665,7 @@ impl App {
 
     fn set_sidebar(self: &Rc<Self>, open: bool) {
         self.side_open.set(open);
-        self.save_session();
+        self.schedule_save_session();
         let epoch = self.side_gen.get().wrapping_add(1);
         self.side_gen.set(epoch);
         if open {
@@ -2680,6 +2716,8 @@ fn build(gapp: &gtk::Application) {
         new_profile_color_idx,
         color_buttons: RefCell::new(color_btns),
         touchpad_mode: Cell::new(false),
+        last_saved_session: RefCell::new(String::new()),
+        save_session_gen: Cell::new(0),
     });
 
     for (i, btn) in app.color_buttons.borrow().iter().enumerate() {
@@ -2802,7 +2840,7 @@ fn build(gapp: &gtk::Application) {
 
     let a = app.clone();
     win.connect_close_request(move |_| {
-        a.save_session();
+        a.save_session_immediate();
         glib::Propagation::Proceed
     });
 
