@@ -2422,20 +2422,6 @@ impl App {
                 continue;
             }
 
-            // Workspace label (e.g. W1, W2)
-            let ws_lbl_x = width / 2.0 + (0.0 - cam_x) * zoom - 22.0 * zoom;
-            if ws_lbl_x > -30.0 && ws_lbl_x < width {
-                cr.select_font_face("monospace", gtk::cairo::FontSlant::Normal, gtk::cairo::FontWeight::Bold);
-                cr.set_font_size((9.0 * zoom).clamp(7.0, 11.0));
-                if r == fr {
-                    cr.set_source_rgb(0.22, 0.74, 0.97); // Rail cyan (#38bdf8)
-                } else {
-                    cr.set_source_rgb(0.28, 0.35, 0.46); // Slate (#475569)
-                }
-                cr.move_to(ws_lbl_x, sy + sh * 0.7);
-                let _ = cr.show_text(&format!("W{}", r + 1));
-            }
-
             let mut x = 0.0;
             for (c, tab) in row.tabs.iter().enumerate() {
                 let w = if tab.container.has_css_class("full") { MAP_TAB_W_FULL } else { MAP_TAB_W };
