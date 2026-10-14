@@ -750,55 +750,78 @@ button.color-choice.selected {
 
 /* ---- floating minimap / roadmap (Ctrl+M) ---- */
 .minimap-window {
-    background: #080d1a;
-    border: 1.5px solid #1e293b;
-    border-radius: 12px;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.95), 0 0 0 1px rgba(56, 189, 248, 0.2);
+    background: #060913;
+    border: 1px solid #1a2336;
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.95), 0 0 0 1px rgba(56, 189, 248, 0.2);
     overflow: hidden;
 }
 .minimap-header {
-    background: #0a1020;
-    border-bottom: 1px solid #172033;
-    padding: 6px 12px;
+    background: #090e1a;
+    border-bottom: 1px solid #141c2c;
+    padding: 6px 10px;
+}
+.minimap-header-icon {
+    color: #38bdf8;
+    margin-right: 4px;
 }
 .minimap-header-title {
     font-size: 11px;
     font-weight: 800;
-    color: #38bdf8;
-    letter-spacing: 0.06em;
+    color: #f8fafc;
+    letter-spacing: 0.04em;
     font-family: ui-monospace, monospace;
+}
+.minimap-header-title b {
+    color: #38bdf8;
+}
+.minimap-badge {
+    font-family: ui-monospace, monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin: 0 4px;
 }
 .minimap-header-hint {
     font-size: 9.5px;
-    color: #475569;
+    color: #64748b;
     font-family: ui-monospace, monospace;
-    margin-left: 6px;
 }
 .minimap-canvas {
-    border-radius: 0 0 10px 10px;
+    border-radius: 0 0 9px 9px;
     cursor: grab;
 }
 .minimap-canvas:active {
     cursor: grabbing;
 }
 .minimap-location-btn {
-    background: rgba(15, 23, 42, 0.94);
+    background: #0b1120;
     border: 1px solid #38bdf8;
     border-radius: 20px;
-    padding: 4px 12px;
+    padding: 3px 10px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.85);
     transition: all 120ms ease;
 }
+.minimap-location-btn image {
+    color: #38bdf8;
+    margin-right: 4px;
+}
 .minimap-location-btn label {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
     color: #38bdf8;
     font-family: ui-monospace, monospace;
+    letter-spacing: 0.02em;
 }
 .minimap-location-btn:hover {
     background: #0284c7;
     border-color: #7dd3fc;
 }
+.minimap-location-btn:hover image,
 .minimap-location-btn:hover label {
     color: #ffffff;
 }
@@ -2341,8 +2364,8 @@ impl App {
     }
 
     fn draw_minimap(&self, cr: &gtk::cairo::Context, width: f64, height: f64) {
-        // Sky blue canvas background (#a2d2f8)
-        cr.set_source_rgb(0.635, 0.824, 0.973);
+        // Rail deep obsidian canvas background (#060913)
+        cr.set_source_rgb(0.024, 0.035, 0.075);
         let _ = cr.paint();
 
         let rows = self.rows.borrow();
@@ -2368,6 +2391,27 @@ impl App {
                 continue;
             }
 
+            // Subtle workspace track guide
+            cr.set_source_rgba(0.12, 0.18, 0.28, 0.3);
+            cr.set_line_width(1.0);
+            cr.move_to(0.0, sy + sh + (MAP_GAP_Y * zoom) / 2.0);
+            cr.line_to(width, sy + sh + (MAP_GAP_Y * zoom) / 2.0);
+            let _ = cr.stroke();
+
+            // Workspace label (e.g. W1, W2)
+            let ws_lbl_x = width / 2.0 + (0.0 - cam_x) * zoom - 22.0 * zoom;
+            if ws_lbl_x > -30.0 && ws_lbl_x < width {
+                cr.select_font_face("monospace", gtk::cairo::FontSlant::Normal, gtk::cairo::FontWeight::Bold);
+                cr.set_font_size((9.0 * zoom).clamp(7.0, 11.0));
+                if r == fr {
+                    cr.set_source_rgb(0.22, 0.74, 0.97); // Rail cyan (#38bdf8)
+                } else {
+                    cr.set_source_rgb(0.28, 0.35, 0.46); // Slate (#475569)
+                }
+                cr.move_to(ws_lbl_x, sy + sh * 0.7);
+                let _ = cr.show_text(&format!("W{}", r + 1));
+            }
+
             let mut x = 0.0;
             for (c, tab) in row.tabs.iter().enumerate() {
                 let w = if tab.container.has_css_class("full") { MAP_TAB_W_FULL } else { MAP_TAB_W };
@@ -2385,21 +2429,32 @@ impl App {
                 Self::draw_rounded_rect(cr, sx, sy, sw, sh, corner_r);
 
                 if is_active {
-                    // Vivid red fill (#ef4444)
-                    cr.set_source_rgb(0.937, 0.267, 0.267);
+                    // Electric Rail cyan (#0284c7)
+                    cr.set_source_rgb(0.008, 0.518, 0.780);
                     let _ = cr.fill_preserve();
-                    // Dark crisp border (#0f172a)
-                    cr.set_source_rgb(0.06, 0.09, 0.16);
-                    cr.set_line_width((2.0 * zoom).clamp(1.2, 2.5));
+                    // Radiant cyan border (#7dd3fc)
+                    cr.set_source_rgb(0.490, 0.827, 0.988);
+                    cr.set_line_width((2.0 * zoom).clamp(1.4, 2.8));
                     let _ = cr.stroke();
+
+                    // Bright center core indicator
+                    let dot_r = (2.2 * zoom).clamp(1.5, 3.2);
+                    cr.arc(sx + sw / 2.0, sy + sh / 2.0, dot_r, 0.0, std::f64::consts::PI * 2.0);
+                    cr.set_source_rgb(1.0, 1.0, 1.0);
+                    let _ = cr.fill();
                 } else {
-                    // Soft light blue fill (#cbe7ff)
-                    cr.set_source_rgb(0.796, 0.906, 0.996);
+                    // Sleek dark slate tile (#0f172a)
+                    cr.set_source_rgb(0.059, 0.090, 0.165);
                     let _ = cr.fill_preserve();
-                    // Dark crisp border (#0f172a)
-                    cr.set_source_rgb(0.06, 0.09, 0.16);
-                    cr.set_line_width((1.8 * zoom).clamp(1.0, 2.2));
+                    // Subtle border (#1e293b)
+                    cr.set_source_rgb(0.118, 0.161, 0.231);
+                    cr.set_line_width((1.4 * zoom).clamp(0.9, 1.8));
                     let _ = cr.stroke();
+
+                    // Subtle cyan accent strip on top
+                    cr.set_source_rgba(0.22, 0.74, 0.97, 0.35);
+                    cr.rectangle(sx + corner_r, sy, (sw - corner_r * 2.0).max(1.0), (1.4 * zoom).clamp(1.0, 2.0));
+                    let _ = cr.fill();
                 }
             }
         }
@@ -2565,7 +2620,7 @@ impl App {
             self.add_prof_btn.set_sensitive(false);
             self.add_prof_btn.remove_css_class("active-ready");
         } else if self.profiles.borrow().profile_exists(clean) {
-            self.new_profile_error_lbl.set_text("⚠ Profile already exists");
+            self.new_profile_error_lbl.set_text("Profile already exists");
             self.new_profile_error_lbl.set_visible(true);
             self.new_profile_entry.add_css_class("error");
             self.add_prof_btn.set_sensitive(false);
@@ -2597,7 +2652,7 @@ impl App {
                 self.refresh_sidebar();
             }
             Err(err) => {
-                self.new_profile_error_lbl.set_text(&format!("⚠ {}", err));
+                self.new_profile_error_lbl.set_text(&err);
                 self.new_profile_error_lbl.set_visible(true);
                 self.new_profile_entry.add_css_class("error");
                 self.add_prof_btn.set_sensitive(false);
@@ -3193,7 +3248,7 @@ fn build(gapp: &gtk::Application) {
     load_bar.set_visible(false);
 
     // ---- data backup & migration modal (Ctrl+Shift+I) ----
-    let data_modal_title = gtk::Label::new(Some("📦 Data Backup & Migration"));
+    let data_modal_title = gtk::Label::new(Some("Data Backup & Migration"));
     data_modal_title.add_css_class("data-modal-title");
     data_modal_title.set_hexpand(true);
     data_modal_title.set_xalign(0.0);
@@ -3219,7 +3274,7 @@ fn build(gapp: &gtk::Application) {
     let export_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
     export_box.add_css_class("data-section-box");
 
-    let export_title = gtk::Label::new(Some("📤 Export Environment (All Data)"));
+    let export_title = gtk::Label::new(Some("Export Environment (All Data)"));
     export_title.add_css_class("data-section-title");
     export_title.set_xalign(0.0);
 
@@ -3251,7 +3306,7 @@ fn build(gapp: &gtk::Application) {
     let import_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
     import_box.add_css_class("data-section-box");
 
-    let import_title = gtk::Label::new(Some("📥 Import Environment"));
+    let import_title = gtk::Label::new(Some("Import Environment"));
     import_title.add_css_class("data-section-title");
     import_title.set_xalign(0.0);
 
@@ -3302,12 +3357,19 @@ fn build(gapp: &gtk::Application) {
     let map_header_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     map_header_row.add_css_class("minimap-header");
 
-    let map_title = gtk::Label::new(Some("🗺️ ROADMAP"));
+    let map_icon = gtk::Image::from_icon_name("view-grid-symbolic");
+    map_icon.add_css_class("minimap-header-icon");
+
+    let map_title = gtk::Label::new(None);
+    map_title.set_markup("<span>roadmap</span><span foreground='#38bdf8'>.</span>");
     map_title.add_css_class("minimap-header-title");
     map_title.set_hexpand(true);
     map_title.set_xalign(0.0);
 
-    let map_hint = gtk::Label::new(Some("Drag to Pan • Scroll to Zoom"));
+    let map_badge = gtk::Label::new(Some("Ctrl+M"));
+    map_badge.add_css_class("minimap-badge");
+
+    let map_hint = gtk::Label::new(Some("Pinch / Drag"));
     map_hint.add_css_class("minimap-header-hint");
     map_hint.set_xalign(0.0);
 
@@ -3315,7 +3377,9 @@ fn build(gapp: &gtk::Application) {
     map_close_btn.add_css_class("flat-icon");
     map_close_btn.set_tooltip_text(Some("Close Map (Ctrl+M / Esc)"));
 
+    map_header_row.append(&map_icon);
     map_header_row.append(&map_title);
+    map_header_row.append(&map_badge);
     map_header_row.append(&map_hint);
     map_header_row.append(&map_close_btn);
 
@@ -3324,7 +3388,13 @@ fn build(gapp: &gtk::Application) {
     map_drawing_area.set_content_width(380);
     map_drawing_area.set_content_height(260);
 
-    let map_location_btn = gtk::Button::with_label("📍 My Location");
+    let map_location_btn = gtk::Button::new();
+    let loc_box = gtk::Box::new(gtk::Orientation::Horizontal, 5);
+    let loc_icon = gtk::Image::from_icon_name("find-location-symbolic");
+    let loc_lbl = gtk::Label::new(Some("recenter"));
+    loc_box.append(&loc_icon);
+    loc_box.append(&loc_lbl);
+    map_location_btn.set_child(Some(&loc_box));
     map_location_btn.add_css_class("minimap-location-btn");
     map_location_btn.set_halign(gtk::Align::Center);
     map_location_btn.set_valign(gtk::Align::End);
