@@ -147,12 +147,91 @@ button.pill:hover .pill-chip {
     border-color: #171824;
 }
 .tablist row:selected {
-    background: #0e1017;
-    border-color: #222638;
+    background: transparent;
+    border-color: transparent;
+}
+.workspace-header {
+    padding: 6px 8px;
+    margin: 8px 0 2px 0;
+    border-radius: 6px;
+    background: #0d0e15;
+    border: 1px solid #1a1c29;
+    cursor: pointer;
+    transition: all 120ms ease;
+}
+.workspace-header:hover {
+    background: #121420;
+    border-color: #24293d;
+}
+.workspace-header.active-workspace {
+    background: #111422;
+    border-color: #263352;
     border-left: 3px solid #38bdf8;
 }
+.workspace-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #94a3b8;
+    text-transform: uppercase;
+}
+.workspace-header.active-workspace .workspace-title {
+    color: #38bdf8;
+}
+.workspace-badge {
+    font-size: 9px;
+    font-weight: 700;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.15);
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-right: 2px;
+}
+.workspace-tab-count {
+    font-size: 10px;
+    color: #475569;
+    margin-right: 4px;
+}
+.btn-ws-add {
+    min-width: 20px;
+    min-height: 20px;
+    padding: 0;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    color: #64748b;
+    transition: all 100ms;
+}
+.btn-ws-add:hover {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+}
+
 .tabrow {
-    padding: 6px 8px;
+    padding: 6px 8px 6px 16px;
+    margin: 1px 0;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 100ms ease;
+}
+.tabrow:hover {
+    background: #090a0f;
+    border-color: #171824;
+}
+.tabrow.active-tab {
+    background: #0e121e;
+    border-color: #222c42;
+    border-left: 3px solid #38bdf8;
+}
+.tabrow.active-tab .tab-title {
+    color: #f8fafc;
+    font-weight: 600;
+}
+.tabrow.active-tab .tab-index {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+    border-color: rgba(56, 189, 248, 0.35);
 }
 .tab-index {
     font-family: ui-monospace, monospace;
@@ -162,22 +241,22 @@ button.pill:hover .pill-chip {
     background: #08090d;
     border: 1px solid #14151f;
     border-radius: 4px;
-    padding: 1px 4px;
+    padding: 1px 5px;
     min-width: 14px;
-}
-row:selected .tab-index {
-    color: #38bdf8;
-    background: rgba(56, 189, 248, 0.12);
-    border-color: rgba(56, 189, 248, 0.35);
 }
 .tab-title {
     font-size: 12.5px;
     font-weight: 500;
     color: #8892b0;
 }
-row:selected .tab-title {
-    color: #f8fafc;
-    font-weight: 600;
+.tab-full-badge {
+    font-size: 8.5px;
+    font-weight: 700;
+    color: #a78bfa;
+    background: rgba(167, 139, 250, 0.12);
+    border: 1px solid rgba(167, 139, 250, 0.3);
+    border-radius: 3px;
+    padding: 0 4px;
 }
 .tabrow image {
     color: #64748b;
@@ -198,8 +277,25 @@ row:selected .tab-title {
     background: rgba(244, 63, 94, 0.2);
     color: #fb7185;
 }
-row:hover .tab-close, row:selected .tab-close {
+.tabrow:hover .tab-close, .tabrow.active-tab .tab-close {
     opacity: 1;
+}
+.btn-new-workspace {
+    margin: 12px 4px 6px 4px;
+    padding: 6px 10px;
+    background: #0b0d14;
+    border: 1px dashed #202436;
+    border-radius: 6px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 120ms ease;
+}
+.btn-new-workspace:hover {
+    background: #121524;
+    border-color: #38bdf8;
+    color: #38bdf8;
 }
 .side-hint {
     font-family: ui-monospace, monospace;
@@ -1388,14 +1484,63 @@ impl App {
         let rows = self.rows.borrow();
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
-        let multi_row = rows.len() > 1;
-        let mut list_item_idx = 0;
-        let mut selected_item_idx = None;
 
         for (ri, row) in rows.iter().enumerate() {
+            // Workspace Header
+            let ws_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            ws_box.add_css_class("workspace-header");
+            if ri == cur_r {
+                ws_box.add_css_class("active-workspace");
+            }
+
+            let ws_title = gtk::Label::new(Some(&format!("Workspace {}", ri + 1)));
+            ws_title.add_css_class("workspace-title");
+            ws_title.set_xalign(0.0);
+            ws_title.set_hexpand(true);
+            ws_box.append(&ws_title);
+
+            if ri == cur_r {
+                let active_dot = gtk::Label::new(Some("● Active"));
+                active_dot.add_css_class("workspace-badge");
+                ws_box.append(&active_dot);
+            }
+
+            let count_text = if row.tabs.len() == 1 {
+                "1 tab".to_string()
+            } else {
+                format!("{} tabs", row.tabs.len())
+            };
+            let count_lbl = gtk::Label::new(Some(&count_text));
+            count_lbl.add_css_class("workspace-tab-count");
+            ws_box.append(&count_lbl);
+
+            let add_btn = gtk::Button::from_icon_name("list-add-symbolic");
+            add_btn.add_css_class("btn-ws-add");
+            add_btn.set_tooltip_text(Some(&format!("Add tab to Workspace {}", ri + 1)));
+            let app = self.clone();
+            add_btn.connect_clicked(move |_| {
+                app.focus_row(ri);
+                app.new_tab();
+            });
+            ws_box.append(&add_btn);
+
+            let app = self.clone();
+            let ws_click = gtk::GestureClick::new();
+            ws_click.connect_released(move |_, _, _, _| {
+                app.focus_row(ri);
+            });
+            ws_box.add_controller(ws_click);
+
+            self.list.append(&ws_box);
+
+            // Tabs inside this workspace
             for (ci, t) in row.tabs.iter().enumerate() {
                 let item = gtk::Box::new(gtk::Orientation::Horizontal, 8);
                 item.add_css_class("tabrow");
+                if ri == cur_r && ci == cur_c {
+                    item.add_css_class("active-tab");
+                }
+
                 item.append(&Self::tab_icon(t, 16));
 
                 let mgr = self.profiles.borrow();
@@ -1414,12 +1559,7 @@ impl App {
                 }
                 drop(mgr);
 
-                let index_str = if multi_row {
-                    format!("{}:{}", ri + 1, ci + 1)
-                } else {
-                    format!("{}", ci + 1)
-                };
-                let index_lbl = gtk::Label::new(Some(&index_str));
+                let index_lbl = gtk::Label::new(Some(&format!("{}", ci + 1)));
                 index_lbl.add_css_class("tab-index");
                 index_lbl.set_valign(gtk::Align::Center);
                 item.append(&index_lbl);
@@ -1432,6 +1572,13 @@ impl App {
                 title_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
                 item.append(&title_lbl);
 
+                if t.container.has_css_class("full") {
+                    let full_tag = gtk::Label::new(Some("FULL"));
+                    full_tag.add_css_class("tab-full-badge");
+                    full_tag.set_valign(gtk::Align::Center);
+                    item.append(&full_tag);
+                }
+
                 let close = gtk::Button::from_icon_name("window-close-symbolic");
                 close.add_css_class("tab-close");
                 close.set_valign(gtk::Align::Center);
@@ -1439,20 +1586,35 @@ impl App {
                 close.connect_clicked(move |_| app.close_view(&v));
                 item.append(&close);
 
+                let app = self.clone();
+                let tab_click = gtk::GestureClick::new();
+                tab_click.connect_released(move |_, _, _, _| {
+                    app.focus_coords(ri, ci);
+                });
+                item.add_controller(tab_click);
+
                 self.list.append(&item);
-                if ri == cur_r && ci == cur_c {
-                    selected_item_idx = Some(list_item_idx);
-                }
-                list_item_idx += 1;
             }
         }
         drop(rows);
 
-        if let Some(s_idx) = selected_item_idx {
-            if let Some(row) = self.list.row_at_index(s_idx as i32) {
-                self.list.select_row(Some(&row));
-            }
-        }
+        // Bottom "+ New Workspace" button
+        let new_ws_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        new_ws_box.add_css_class("btn-new-workspace");
+        new_ws_box.set_halign(gtk::Align::Fill);
+        let new_ws_icon = gtk::Image::from_icon_name("list-add-symbolic");
+        let new_ws_lbl = gtk::Label::new(Some("+ New Workspace (Ctrl+V)"));
+        new_ws_lbl.set_xalign(0.0);
+        new_ws_lbl.set_hexpand(true);
+        new_ws_box.append(&new_ws_icon);
+        new_ws_box.append(&new_ws_lbl);
+        let app = self.clone();
+        let new_ws_click = gtk::GestureClick::new();
+        new_ws_click.connect_released(move |_, _, _, _| {
+            app.split_vertical();
+        });
+        new_ws_box.add_controller(new_ws_click);
+        self.list.append(&new_ws_box);
 
         let text = match self.focused_view().and_then(|v| v.uri()) {
             Some(u) if !u.starts_with("about:") => host_of(&u).unwrap_or(u.to_string()),
@@ -2268,8 +2430,7 @@ fn build(gapp: &gtk::Application) {
 
     let list = gtk::ListBox::new();
     list.add_css_class("tablist");
-    list.set_selection_mode(gtk::SelectionMode::Single);
-    list.set_activate_on_single_click(true);
+    list.set_selection_mode(gtk::SelectionMode::None);
     let list_scroll = gtk::ScrolledWindow::new();
     list_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
     list_scroll.set_vexpand(true);
@@ -2546,21 +2707,6 @@ fn build(gapp: &gtk::Application) {
         }
     });
 
-    let a = app.clone();
-    list.connect_row_activated(move |_, row| {
-        let idx = row.index() as usize;
-        let mut counted = 0;
-        let rows = a.rows.borrow();
-        for (ri, r) in rows.iter().enumerate() {
-            if idx < counted + r.tabs.len() {
-                let ci = idx - counted;
-                drop(rows);
-                a.focus_coords(ri, ci);
-                return;
-            }
-            counted += r.tabs.len();
-        }
-    });
 
     let a = app.clone();
     add.connect_clicked(move |_| a.new_tab());
