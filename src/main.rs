@@ -1233,7 +1233,7 @@ impl App {
 
     fn new_tab(self: &Rc<Self>) {
         self.exit_overview();
-        let prof_id = self.focused_tab_profile().unwrap_or_else(|| self.profiles.borrow().active_profile().id);
+        let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = WebView::builder().network_session(&session).build();
         view.load_html(START_PAGE, None);
@@ -1245,7 +1245,7 @@ impl App {
 
     fn split_vertical(self: &Rc<Self>) {
         self.exit_overview();
-        let prof_id = self.focused_tab_profile().unwrap_or_else(|| self.profiles.borrow().active_profile().id);
+        let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = WebView::builder().network_session(&session).build();
         view.load_html(START_PAGE, None);
@@ -2034,8 +2034,10 @@ impl App {
             let app = self.clone();
             let pid = p.id.clone();
             row_btn.connect_clicked(move |_| {
+                app.profiles.borrow_mut().set_active(&pid);
                 app.select_palette_profile(&pid);
                 app.switch_focused_tab_profile(&pid);
+                app.rebuild_profile_popover();
                 app.profile_popover.popdown();
                 app.entry.grab_focus();
             });
@@ -2145,6 +2147,7 @@ impl App {
     fn navigate(self: &Rc<Self>, text: &str) {
         if !text.trim().is_empty() {
             let target_profile_id = self.selected_palette_profile.borrow().clone();
+            self.profiles.borrow_mut().set_active(&target_profile_id);
             let cur_r = self.focus_row.get();
             let cur_c = self.focus_col.get();
             let uri = to_uri(text);
@@ -2660,7 +2663,9 @@ impl App {
         let color_idx = self.new_profile_color_idx.get();
         let create_res = self.profiles.borrow_mut().create_profile(&clean, color_idx);
         match create_res {
-            Ok(_) => {
+            Ok(new_p) => {
+                self.profiles.borrow_mut().set_active(&new_p.id);
+                self.select_palette_profile(&new_p.id);
                 self.new_profile_entry.set_text("");
                 self.update_create_profile_btn_state();
                 self.rebuild_profiles_modal_list();

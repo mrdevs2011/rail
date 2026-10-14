@@ -309,4 +309,26 @@ mod tests {
         let _ = fs::remove_file(&mgr.config_file);
         let _ = fs::remove_file(&mgr.active_file);
     }
+
+    #[test]
+    fn test_profile_active_persistence() {
+        let temp_dir = std::env::temp_dir().join(format!("rail_test_{}", std::process::id()));
+        let _ = fs::create_dir_all(&temp_dir);
+
+        {
+            let mut mgr = ProfileManager::new(temp_dir.clone());
+            let _ = mgr.create_profile("Gaming", 4).expect("create profile");
+            mgr.set_active("gaming");
+            assert_eq!(mgr.active_id(), "gaming");
+        }
+
+        // Re-read from disk
+        {
+            let mgr2 = ProfileManager::new(temp_dir.clone());
+            assert_eq!(mgr2.active_id(), "gaming");
+            assert_eq!(mgr2.active_profile().name, "Gaming");
+        }
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
 }
