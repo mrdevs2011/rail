@@ -1233,7 +1233,7 @@ impl App {
 
     fn new_tab(self: &Rc<Self>) {
         self.exit_overview();
-        let prof_id = self.profiles.borrow().active_profile().id;
+        let prof_id = self.focused_tab_profile().unwrap_or_else(|| self.profiles.borrow().active_profile().id);
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = WebView::builder().network_session(&session).build();
         view.load_html(START_PAGE, None);
@@ -2035,6 +2035,7 @@ impl App {
             let pid = p.id.clone();
             row_btn.connect_clicked(move |_| {
                 app.select_palette_profile(&pid);
+                app.switch_focused_tab_profile(&pid);
                 app.profile_popover.popdown();
                 app.entry.grab_focus();
             });
@@ -2094,6 +2095,53 @@ impl App {
         }
     }
 
+    fn switch_focused_tab_profile(self: &Rc<Self>, target_profile_id: &str) {
+        let cur_r = self.focus_row.get();
+        let cur_c = self.focus_col.get();
+        let rows = self.rows.borrow();
+        let tab_info = rows.get(cur_r).and_then(|r| r.tabs.get(cur_c)).map(|t| (t.profile_id.clone(), t.view.uri()));
+        drop(rows);
+
+        let Some((current_pid, current_uri)) = tab_info else { return };
+        if current_pid == target_profile_id {
+            return;
+        }
+
+        let session = self.profiles.borrow_mut().get_or_create_session(target_profile_id);
+        let new_view = WebView::builder().network_session(&session).build();
+        new_view.set_can_target(!self.ov.get());
+        self.setup_view_signals(&new_view);
+
+        let mut rows = self.rows.borrow_mut();
+        if let Some(row) = rows.get_mut(cur_r) {
+            if let Some(tab) = row.tabs.get_mut(cur_c) {
+                tab.container.remove(&tab.view);
+                tab.container.append(&new_view);
+                new_view.add_css_class("tab");
+                new_view.set_overflow(gtk::Overflow::Hidden);
+                new_view.set_vexpand(true);
+                new_view.set_hexpand(true);
+                tab.view = new_view.clone();
+                tab.profile_id = target_profile_id.to_string();
+            }
+        }
+        drop(rows);
+
+        if let Some(uri) = current_uri {
+            if uri.starts_with("about:") || uri.is_empty() {
+                new_view.load_html(START_PAGE, None);
+            } else {
+                new_view.load_uri(&uri);
+            }
+        } else {
+            new_view.load_html(START_PAGE, None);
+        }
+
+        self.refresh_sidebar();
+        self.schedule_save_session();
+        self.focus_coords(cur_r, cur_c);
+    }
+
     fn navigate(self: &Rc<Self>, text: &str) {
         if !text.trim().is_empty() {
             let target_profile_id = self.selected_palette_profile.borrow().clone();
@@ -2110,35 +2158,15 @@ impl App {
             };
 
             if needs_view_recreation {
-                let session = self.profiles.borrow_mut().get_or_create_session(&target_profile_id);
-                let new_view = WebView::builder().network_session(&session).build();
-                new_view.set_can_target(!self.ov.get());
-                self.setup_view_signals(&new_view);
+                self.switch_focused_tab_profile(&target_profile_id);
+            }
 
-                let mut rows = self.rows.borrow_mut();
-                if let Some(row) = rows.get_mut(cur_r) {
-                    if let Some(tab) = row.tabs.get_mut(cur_c) {
-                        tab.container.remove(&tab.view);
-                        tab.container.append(&new_view);
-                        new_view.add_css_class("tab");
-                        new_view.set_overflow(gtk::Overflow::Hidden);
-                        new_view.set_vexpand(true);
-                        new_view.set_hexpand(true);
-                        tab.view = new_view.clone();
-                        tab.profile_id = target_profile_id;
-                    }
-                }
-                drop(rows);
-
-                self.pill_label.set_text(&host_of(&uri).unwrap_or(uri.clone()));
-                new_view.load_uri(&uri);
-                *self.fresh.borrow_mut() = None;
-                self.refresh_sidebar();
-                self.focus_coords(cur_r, cur_c);
-            } else if let Some(v) = self.focused_view() {
+            if let Some(v) = self.focused_view() {
                 self.pill_label.set_text(&host_of(&uri).unwrap_or(uri.clone()));
                 v.load_uri(&uri);
                 *self.fresh.borrow_mut() = None;
+                self.refresh_sidebar();
+                self.schedule_save_session();
             }
         }
         self.hide_palette();
