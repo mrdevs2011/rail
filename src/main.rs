@@ -292,19 +292,22 @@ button.pill:hover .pill-chip {
     min-width: 20px;
     min-height: 20px;
     padding: 0;
+    margin-right: 2px;
     border-radius: 4px;
     background: transparent;
     border: none;
     box-shadow: none;
     color: #64748b;
-    transition: all 100ms;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease, opacity 100ms ease;
 }
 .tab-close:hover {
     background: rgba(244, 63, 94, 0.2);
     color: #fb7185;
+    opacity: 1 !important;
 }
 .tabrow:hover .tab-close, .tabrow.active-tab .tab-close {
-    opacity: 1;
+    opacity: 0.7;
 }
 .btn-new-workspace {
     margin: 12px 4px 6px 4px;
@@ -1939,6 +1942,10 @@ impl App {
             *self.fresh.borrow_mut() = None;
         }
 
+        let cur_r = self.focus_row.get();
+        let cur_c = self.focus_col.get();
+        let is_closing_focused = r_idx == cur_r && c_idx == cur_c;
+
         let mut rows = self.rows.borrow_mut();
         if r_idx >= rows.len() || c_idx >= rows[r_idx].tabs.len() {
             return;
@@ -1946,9 +1953,12 @@ impl App {
         let tab = rows[r_idx].tabs.remove(c_idx);
         self.strip.remove(&tab.container);
 
-        if rows[r_idx].tabs.is_empty() && rows.len() > 1 {
+        let row_removed = if rows[r_idx].tabs.is_empty() && rows.len() > 1 {
             rows.remove(r_idx);
-        }
+            true
+        } else {
+            false
+        };
 
         let total_tabs: usize = rows.iter().map(|r| r.tabs.len()).sum();
         let total_rows = rows.len();
@@ -1960,7 +1970,9 @@ impl App {
             self.save_session_immediate();
             self.win.close();
             return;
-        } else {
+        }
+
+        if is_closing_focused {
             let next_r = r_idx.min(total_rows.saturating_sub(1));
             let rows = self.rows.borrow();
             if rows.is_empty() || rows[next_r].tabs.is_empty() {
@@ -1976,6 +1988,26 @@ impl App {
                 let next_c = c_idx.min(rows[next_r].tabs.len().saturating_sub(1));
                 drop(rows);
                 self.focus_coords(next_r, next_c);
+            }
+        } else {
+            let mut new_r = cur_r;
+            let mut new_c = cur_c;
+
+            if row_removed && r_idx < cur_r {
+                new_r = cur_r.saturating_sub(1);
+            }
+            if r_idx == cur_r && c_idx < cur_c {
+                new_c = cur_c.saturating_sub(1);
+            }
+
+            self.focus_row.set(new_r);
+            self.focus_col.set(new_c);
+
+            self.refresh_sidebar();
+            self.schedule_save_session();
+            if self.map_open() {
+                self.update_map_location_btn_visibility();
+                self.map_drawing_area.queue_draw();
             }
         }
     }
@@ -2411,13 +2443,15 @@ impl App {
 
             // Tabs inside this workspace
             for (ci, t) in row.tabs.iter().enumerate() {
-                let item = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+                let item = gtk::Box::new(gtk::Orientation::Horizontal, 4);
                 item.add_css_class("tabrow");
                 if ri == cur_r && ci == cur_c {
                     item.add_css_class("active-tab");
                 }
 
-                item.append(&Self::tab_icon(t, 16));
+                let content_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+                content_box.set_hexpand(true);
+                content_box.append(&Self::tab_icon(t, 16));
 
                 let mgr = self.profiles.borrow();
                 if mgr.profiles().len() > 1 {
@@ -2430,7 +2464,7 @@ impl App {
                         p_dot.set_width_request(16);
                         p_dot.set_height_request(16);
                         p_dot.set_tooltip_text(Some(&format!("Profile: {}", p.name)));
-                        item.append(&p_dot);
+                        content_box.append(&p_dot);
                     }
                 }
                 drop(mgr);
@@ -2438,7 +2472,7 @@ impl App {
                 let index_lbl = gtk::Label::new(Some(&format!("{}", ci + 1)));
                 index_lbl.add_css_class("tab-index");
                 index_lbl.set_valign(gtk::Align::Center);
-                item.append(&index_lbl);
+                content_box.append(&index_lbl);
 
                 let title_lbl = gtk::Label::new(Some(&Self::tab_label(t)));
                 title_lbl.add_css_class("tab-title");
@@ -2446,28 +2480,33 @@ impl App {
                 title_lbl.set_hexpand(true);
                 title_lbl.set_width_chars(1);
                 title_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
-                item.append(&title_lbl);
+                content_box.append(&title_lbl);
 
                 if t.container.has_css_class("full") {
                     let full_tag = gtk::Label::new(Some("FULL"));
                     full_tag.add_css_class("tab-full-badge");
                     full_tag.set_valign(gtk::Align::Center);
-                    item.append(&full_tag);
+                    content_box.append(&full_tag);
                 }
-
-                let close = gtk::Button::from_icon_name("window-close-symbolic");
-                close.add_css_class("tab-close");
-                close.set_valign(gtk::Align::Center);
-                let (app, v) = (self.clone(), t.view.clone());
-                close.connect_clicked(move |_| app.close_view(&v));
-                item.append(&close);
 
                 let app = self.clone();
                 let tab_click = gtk::GestureClick::new();
                 tab_click.connect_released(move |_, _, _, _| {
                     app.focus_coords(ri, ci);
                 });
-                item.add_controller(tab_click);
+                content_box.add_controller(tab_click);
+
+                let close = gtk::Button::from_icon_name("window-close-symbolic");
+                close.add_css_class("tab-close");
+                close.set_valign(gtk::Align::Center);
+                close.set_cursor_from_name(Some("pointer"));
+                let (app, v) = (self.clone(), t.view.clone());
+                close.connect_clicked(move |_| {
+                    app.close_view(&v);
+                });
+
+                item.append(&content_box);
+                item.append(&close);
 
                 self.list.append(&item);
             }
