@@ -35,129 +35,418 @@ pub fn rail_data_dir() -> PathBuf {
     glib::user_data_dir().join("rail")
 }
 
-const START_PAGE: &str = r#"<!doctype html><meta charset=utf-8><meta name=color-scheme content=dark>
+const START_PAGE: &str = r#"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Rail Browser</title>
 <style>
-html,body{height:100%;margin:0;box-sizing:border-box}
-body{display:grid;place-items:center;background:#000000;color:#64748b;font:13px/1.5 ui-monospace,monospace,system-ui;padding:16px;overflow-y:auto;overflow-x:hidden}
-.w{text-align:center;max-width:540px;width:100%;margin:auto;box-sizing:border-box}
-h1{font-weight:800;font-size:clamp(32px, 7vw, 54px);letter-spacing:-.04em;margin:0;color:#f8fafc;font-family:ui-monospace,monospace}
-h1 b{color:#38bdf8}
-p{margin:4px 0 24px;font-size:clamp(12px, 2.5vw, 13px);color:#64748b}
-.k{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;text-align:left;justify-content:center;align-items:center;font-size:12px}
-.k span:nth-child(odd){text-align:right;white-space:nowrap}
-.k span:nth-child(even){text-align:left;color:#94a3b8}
-kbd{font:11px ui-monospace,monospace;background:#090a0f;border:1px solid #1c1d29;border-bottom-width:2px;
-    border-radius:5px;padding:2px 6px;color:#f1f5f9;margin-left:3px;white-space:nowrap}
-@media (max-width: 440px) {
-  body{padding:8px}
-  .k{font-size:11px;gap:6px 10px}
-  kbd{padding:1px 4px;font-size:10px}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 15%, #13192b 0%, #080a10 70%, #05060a 100%);
+  color: #94a3b8;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "SF Pro Display", Inter, system-ui, sans-serif;
+  padding: 32px 20px;
+  overflow-y: auto;
+  user-select: none;
+}
+.container {
+  width: 100%;
+  max-width: 780px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  animation: fadeIn 250ms ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.brand-area {
+  text-align: center;
+}
+.brand-title {
+  font-size: clamp(42px, 7vw, 60px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #f8fafc;
+  line-height: 1.1;
+  display: inline-flex;
+  align-items: baseline;
+}
+.brand-title .dot {
+  color: #38bdf8;
+  text-shadow: 0 0 24px rgba(56, 189, 248, 0.6);
+}
+.brand-subtitle {
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: #64748b;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+.search-wrapper {
+  width: 100%;
+  max-width: 600px;
+  position: relative;
+}
+.search-bar {
+  width: 100%;
+  background: rgba(18, 22, 36, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 13px 18px 13px 44px;
+  font-size: 14.5px;
+  color: #f1f5f9;
+  outline: none;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: all 180ms ease;
+  backdrop-filter: blur(12px);
+}
+.search-bar:focus {
+  background: rgba(22, 28, 46, 0.95);
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2), 0 16px 44px rgba(0, 0, 0, 0.6);
+}
+.search-bar::placeholder {
+  color: #55657e;
+  font-weight: 400;
+}
+.search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+  pointer-events: none;
+}
+.search-hint {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  padding: 2px 7px;
+  pointer-events: none;
+}
+.cards-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+@media (max-width: 640px) {
+  .cards-grid { grid-template-columns: 1fr; }
+}
+.card {
+  background: rgba(15, 18, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 16px 18px;
+  backdrop-filter: blur(8px);
+  transition: all 150ms ease;
+}
+.card:hover {
+  background: rgba(20, 25, 42, 0.85);
+  border-color: rgba(56, 189, 248, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.card-icon {
+  width: 16px;
+  height: 16px;
+  color: #38bdf8;
+}
+.card-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f1f5f9;
+}
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.shortcut-desc {
+  color: #8896ab;
+}
+.keys {
+  display: flex;
+  gap: 4px;
+}
+kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #e2e8f0;
+  background: #111422;
+  border: 1px solid #22293e;
+  border-bottom: 2px solid #1a2032;
+  border-radius: 4px;
+  padding: 2px 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.footer {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #475569;
 }
 </style>
-<div class=w><h1>rail<b>.</b></h1><p>a niri-style 2D tiled browser (workspaces, horizontal strips & isolated profiles)</p><div class=k>
-<span><kbd>Ctrl</kbd><kbd>G</kbd></span><span>go to address</span>
-<span><kbd>Ctrl</kbd><kbd>Enter</kbd></span><span>edit current URL</span>
-<span><kbd>Ctrl</kbd><kbd>T</kbd></span><span>new tab (current row)</span>
-<span><kbd>Ctrl</kbd><kbd>V</kbd></span><span>new row tab (workspace below)</span>
-<span><kbd>Ctrl</kbd><kbd>1</kbd> <kbd>2</kbd></span><span>focus workspace 1 / 2 (row)</span>
-<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>2</kbd> <kbd>1</kbd></span><span>move tab to workspace 2 / 1</span>
-<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>T</kbd></span><span>touchpad mode (2-finger slide tabs)</span>
-<span><kbd>Ctrl</kbd><kbd>P</kbd> / <kbd>Shift</kbd><kbd>P</kbd></span><span>manage profiles</span>
-<span><kbd>Ctrl</kbd><kbd>I</kbd></span><span>import / export all data</span>
-<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>I</kbd></span><span>developer console & inspector</span>
-<span><kbd>Ctrl</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>focus left / right tab</span>
-<span><kbd>Ctrl</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>focus workspace down / up</span>
-<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>move tab left / right</span>
-<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>move tab down / up workspace</span>
-<span><kbd>Ctrl</kbd><kbd>F</kbd></span><span>full / half width</span>
-<span><kbd>Ctrl</kbd><kbd>O</kbd></span><span>overview (2D grid zoom out)</span>
-<span><kbd>Ctrl</kbd><kbd>M</kbd></span><span>roadmap map (floating 2D minimap)</span>
-<span><kbd>Ctrl</kbd><kbd>B</kbd></span><span>sidebar</span>
-</div></div>"#;
+</head>
+<body>
+<div class="container">
+  <div class="brand-area">
+    <div class="brand-title">rail<span class="dot">.</span></div>
+    <div class="brand-subtitle">Spatial 2D Tiled Web Browser • Clean & Isolated</div>
+  </div>
+
+  <div class="search-wrapper">
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+    <input
+      type="text"
+      class="search-bar"
+      placeholder="Search DuckDuckGo or enter web address..."
+      autocomplete="off"
+      spellcheck="false"
+      onkeydown="if(event.key==='Enter'){var q=this.value.trim();if(q){if(q.indexOf('://')!==-1||q.indexOf('.')!==-1&&q.indexOf(' ')===-1){location.href=q.indexOf('://')===-1?'https://'+q:q;}else{location.href='https://duckduckgo.com/?q='+encodeURIComponent(q);}}}"
+    />
+    <span class="search-hint">Ctrl + G</span>
+  </div>
+
+  <div class="cards-grid">
+    <div class="card">
+      <div class="card-header">
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+        <div class="card-title">Workspaces & Strips</div>
+      </div>
+      <div class="shortcuts-list">
+        <div class="shortcut-row"><span class="shortcut-desc">New Tab in row</span><div class="keys"><kbd>Ctrl</kbd><kbd>T</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">New Workspace Row</span><div class="keys"><kbd>Ctrl</kbd><kbd>V</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Close Current Tab</span><div class="keys"><kbd>Ctrl</kbd><kbd>W</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Switch Workspace</span><div class="keys"><kbd>Ctrl</kbd><kbd>1..9</kbd></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        <div class="card-title">Spatial Navigation</div>
+      </div>
+      <div class="shortcuts-list">
+        <div class="shortcut-row"><span class="shortcut-desc">Focus Left / Right Tab</span><div class="keys"><kbd>Ctrl</kbd><kbd>H</kbd><kbd>L</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Focus Up / Down Row</span><div class="keys"><kbd>Ctrl</kbd><kbd>K</kbd><kbd>J</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Full / Half Width Toggle</span><div class="keys"><kbd>Ctrl</kbd><kbd>F</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">2D Grid Overview</span><div class="keys"><kbd>Ctrl</kbd><kbd>O</kbd></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <div class="card-title">Profiles & Data</div>
+      </div>
+      <div class="shortcuts-list">
+        <div class="shortcut-row"><span class="shortcut-desc">Profiles Manager</span><div class="keys"><kbd>Ctrl</kbd><kbd>P</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Quick Profile Switcher</span><div class="keys"><kbd>Avatar</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Backup / Restore (.tar.gz)</span><div class="keys"><kbd>Ctrl</kbd><kbd>I</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Toggle Left Sidebar</span><div class="keys"><kbd>Ctrl</kbd><kbd>B</kbd></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <div class="card-title">Developer & Tools</div>
+      </div>
+      <div class="shortcuts-list">
+        <div class="shortcut-row"><span class="shortcut-desc">Rail DevTools Console</span><div class="keys"><kbd>F12</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Inspect Element</span><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>I</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Floating Minimap HUD</span><div class="keys"><kbd>Ctrl</kbd><kbd>M</kbd></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Fullscreen View</span><div class="keys"><kbd>F11</kbd></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Press <kbd>Ctrl</kbd> + <kbd>G</kbd> anytime to open the Command Palette</div>
+</div>
+</body>
+</html>"#;
 
 const CSS: &str = "
-window { background: #000000; border-radius: 0; box-shadow: none; }
-label { color: #94a3b8; }
+window {
+    background: #090b10;
+    border-radius: 0;
+    box-shadow: none;
+    color: #f1f5f9;
+    font-family: system-ui, -apple-system, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif;
+}
+label {
+    color: #94a3b8;
+}
 
-/* ---- columns & tabs ---- */
-.rail-col { background: transparent; }
-.tab { border-radius: 8px; border: 1.5px solid #14141c; background: #000000; }
-.tab.focused { border-color: #38bdf8; box-shadow: 0 0 16px rgba(56, 189, 248, 0.2); }
+/* ---- columns & tabs (Spatial 2D Strip) ---- */
+.rail-col {
+    background: transparent;
+}
+.tab {
+    border-radius: 12px;
+    border: 1px solid #1a2030;
+    background: #0d1017;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.tab.focused {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35), 0 12px 36px rgba(0, 0, 0, 0.7);
+}
 
-/* ---- sidebar (pure pitch black 000 dev style) ---- */
-.side-bar { background: #000000; border-right: 1px solid #14141c; padding-right: 6px; }
-.brand { font-family: ui-monospace, monospace; font-weight: 800; font-size: 16px; letter-spacing: -0.04em; color: #f8fafc; }
-.brand-dot { color: #38bdf8; }
+/* ---- overview (the live strip, zoomed out in 2D) ---- */
+.zoomed .tab {
+    opacity: 0.88;
+    border-radius: 14px;
+    border: 1px solid #23283c;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+}
+.zoomed .tab.focused {
+    opacity: 1;
+    border-color: #38bdf8;
+    outline: 2px solid #38bdf8;
+    outline-offset: 1px;
+    box-shadow: 0 0 24px rgba(56, 189, 248, 0.4);
+}
+.ov-hint {
+    background: #0e121d;
+    color: #cbd5e1;
+    border: 1px solid #232c44;
+    border-radius: 8px;
+    padding: 7px 16px;
+    font-size: 11.5px;
+    font-family: ui-monospace, monospace;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8);
+}
+
+/* ---- sidebar (Modern Obsidian Acrylic) ---- */
+.side-bar {
+    background: #0a0d15;
+    border-right: 1px solid #141824;
+    padding-right: 4px;
+}
+.brand {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.02em;
+    color: #f8fafc;
+}
+.brand-dot {
+    color: #38bdf8;
+}
 button.btn-add-tab {
-    background: #090a0f;
-    border: 1px solid #1c1d29;
-    border-radius: 6px;
-    min-width: 26px;
-    min-height: 26px;
-    color: #64748b;
+    background: #111422;
+    border: 1px solid #1c2234;
+    border-radius: 7px;
+    min-width: 28px;
+    min-height: 28px;
+    color: #94a3b8;
     padding: 0;
-    transition: all 120ms;
+    transition: all 120ms ease;
 }
 button.btn-add-tab:hover {
-    background: #141622;
+    background: #181d2e;
     border-color: #38bdf8;
-    color: #f8fafc;
+    color: #38bdf8;
 }
 button.flat-icon {
     background: transparent;
     border: none;
     box-shadow: none;
-    min-width: 26px;
-    min-height: 26px;
+    min-width: 28px;
+    min-height: 28px;
     padding: 0;
     border-radius: 6px;
     color: #64748b;
+    transition: all 100ms ease;
 }
 button.flat-icon:hover {
-    background: #13141f;
+    background: rgba(255, 255, 255, 0.06);
     color: #f1f5f9;
 }
 button.pill {
-    background: #07080c;
-    border: 1px solid #171822;
-    border-radius: 8px;
-    padding: 7px 10px;
-    box-shadow: none;
-    color: #64748b;
-    transition: all 120ms;
+    background: #101422;
+    border: 1px solid #1c2336;
+    border-radius: 9px;
+    padding: 7px 11px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    color: #94a3b8;
+    transition: all 120ms ease;
 }
 button.pill:hover {
-    background: #0d0e14;
-    border-color: #26293a;
-    color: #cbd5e1;
+    background: #151a2b;
+    border-color: #28334d;
+    color: #f1f5f9;
 }
 button.pill label {
-    color: #64748b;
-    font-size: 12.5px;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 500;
 }
 button.pill:hover label {
-    color: #cbd5e1;
+    color: #f1f5f9;
 }
 .pill-icon {
-    color: #475569;
+    color: #64748b;
 }
 button.pill:hover .pill-icon {
     color: #38bdf8;
 }
 .pill-chip {
     font-family: ui-monospace, monospace;
-    font-size: 10px;
-    font-weight: 700;
-    color: #475569;
-    background: #0f1017;
-    border: 1px solid #1c1d29;
+    font-size: 9.5px;
+    font-weight: 600;
+    color: #64748b;
+    background: #090c14;
+    border: 1px solid #1e2438;
     border-radius: 4px;
     padding: 1px 5px;
 }
 button.pill:hover .pill-chip {
-    color: #94a3b8;
-    border-color: #2b2e40;
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.3);
 }
+
+/* ---- tab list & workspaces ---- */
 .tablist, .tablist row {
     background: transparent;
 }
@@ -169,35 +458,35 @@ button.pill:hover .pill-chip {
     transition: all 100ms ease;
 }
 .tablist row:hover {
-    background: #090a0f;
-    border-color: #171824;
+    background: #101422;
+    border-color: #1a2034;
 }
 .tablist row:selected {
     background: transparent;
     border-color: transparent;
 }
 .workspace-header {
-    padding: 6px 8px;
-    margin: 8px 0 2px 0;
-    border-radius: 6px;
-    background: #0d0e15;
-    border: 1px solid #1a1c29;
+    padding: 6px 10px;
+    margin: 10px 4px 3px 4px;
+    border-radius: 8px;
+    background: #0d101a;
+    border: 1px solid #161b2b;
     cursor: pointer;
     transition: all 120ms ease;
 }
 .workspace-header:hover {
-    background: #121420;
-    border-color: #24293d;
+    background: #121726;
+    border-color: #222a42;
 }
 .workspace-header.active-workspace {
-    background: #111422;
-    border-color: #263352;
+    background: #14192a;
+    border-color: #273454;
     border-left: 3px solid #38bdf8;
 }
 .workspace-title {
     font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     color: #94a3b8;
     text-transform: uppercase;
 }
@@ -205,12 +494,12 @@ button.pill:hover .pill-chip {
     color: #38bdf8;
 }
 .workspace-badge {
-    font-size: 9px;
+    font-size: 8.5px;
     font-weight: 700;
     color: #38bdf8;
-    background: rgba(56, 189, 248, 0.15);
+    background: rgba(56, 189, 248, 0.12);
     border-radius: 3px;
-    padding: 1px 5px;
+    padding: 1px 4px;
     margin-right: 2px;
 }
 .workspace-tab-count {
@@ -219,35 +508,35 @@ button.pill:hover .pill-chip {
     margin-right: 4px;
 }
 .btn-ws-add {
-    min-width: 20px;
-    min-height: 20px;
+    min-width: 22px;
+    min-height: 22px;
     padding: 0;
-    border-radius: 4px;
+    border-radius: 5px;
     background: transparent;
     border: none;
     color: #64748b;
-    transition: all 100ms;
+    transition: all 100ms ease;
 }
 .btn-ws-add:hover {
-    background: rgba(56, 189, 248, 0.15);
+    background: rgba(56, 189, 248, 0.12);
     color: #38bdf8;
 }
 
 .tabrow {
-    padding: 6px 8px 6px 16px;
-    margin: 1px 0;
-    border-radius: 6px;
+    padding: 6px 10px 6px 14px;
+    margin: 2px 4px;
+    border-radius: 8px;
     border: 1px solid transparent;
     cursor: pointer;
-    transition: all 100ms ease;
+    transition: all 120ms ease;
 }
 .tabrow:hover {
-    background: #090a0f;
-    border-color: #171824;
+    background: #111420;
+    border-color: #1a2032;
 }
 .tabrow.active-tab {
-    background: #0e121e;
-    border-color: #222c42;
+    background: #151a2b;
+    border-color: #232d48;
     border-left: 3px solid #38bdf8;
 }
 .tabrow.active-tab .tab-title {
@@ -257,15 +546,15 @@ button.pill:hover .pill-chip {
 .tabrow.active-tab .tab-index {
     color: #38bdf8;
     background: rgba(56, 189, 248, 0.12);
-    border-color: rgba(56, 189, 248, 0.35);
+    border-color: rgba(56, 189, 248, 0.3);
 }
 .tab-index {
     font-family: ui-monospace, monospace;
-    font-size: 10.5px;
-    font-weight: 700;
+    font-size: 10px;
+    font-weight: 600;
     color: #475569;
-    background: #08090d;
-    border: 1px solid #14151f;
+    background: #090c14;
+    border: 1px solid #181d2e;
     border-radius: 4px;
     padding: 1px 5px;
     min-width: 14px;
@@ -273,7 +562,7 @@ button.pill:hover .pill-chip {
 .tab-title {
     font-size: 12.5px;
     font-weight: 500;
-    color: #8892b0;
+    color: #94a3b8;
 }
 .tab-full-badge {
     font-size: 8.5px;
@@ -292,17 +581,16 @@ button.pill:hover .pill-chip {
     min-width: 20px;
     min-height: 20px;
     padding: 0;
-    margin-right: 2px;
-    border-radius: 4px;
+    border-radius: 5px;
     background: transparent;
     border: none;
     box-shadow: none;
     color: #64748b;
     cursor: pointer;
-    transition: background 120ms ease, color 120ms ease, opacity 100ms ease;
+    transition: all 120ms ease;
 }
 .tab-close:hover {
-    background: rgba(244, 63, 94, 0.2);
+    background: rgba(244, 63, 94, 0.18);
     color: #fb7185;
     opacity: 1 !important;
 }
@@ -310,11 +598,11 @@ button.pill:hover .pill-chip {
     opacity: 0.7;
 }
 .btn-new-workspace {
-    margin: 12px 4px 6px 4px;
-    padding: 6px 10px;
-    background: #0b0d14;
-    border: 1px dashed #202436;
-    border-radius: 6px;
+    margin: 12px 6px 6px 6px;
+    padding: 7px 12px;
+    background: #0d101a;
+    border: 1px dashed #20273d;
+    border-radius: 7px;
     color: #64748b;
     font-size: 11px;
     font-weight: 600;
@@ -322,14 +610,14 @@ button.pill:hover .pill-chip {
     transition: all 120ms ease;
 }
 .btn-new-workspace:hover {
-    background: #121524;
+    background: #14192b;
     border-color: #38bdf8;
     color: #38bdf8;
 }
 .side-hint {
     font-family: ui-monospace, monospace;
     font-size: 9.5px;
-    color: #334155;
+    color: #475569;
     letter-spacing: -0.01em;
 }
 
@@ -344,19 +632,23 @@ button.pill:hover .pill-chip {
 .fav-3 { background: #facc15; } .fav-4 { background: #f87171; } .fav-5 { background: #22d3ee; }
 .fav-6 { background: #fb923c; } .fav-7 { background: #2dd4bf; }
 
-/* ---- load progress ---- */
-progressbar.load-bar { min-height: 2.5px; margin: 0 8px; }
-progressbar.load-bar trough { min-height: 2.5px; background: transparent; border: none; }
-progressbar.load-bar progress { min-height: 2.5px; background: #38bdf8; border-radius: 2px;
-                                box-shadow: 0 0 10px rgba(56,189,248,0.8); }
+/* ---- load progress bar ---- */
+progressbar.load-bar { min-height: 2px; margin: 0; }
+progressbar.load-bar trough { min-height: 2px; background: transparent; border: none; }
+progressbar.load-bar progress {
+    min-height: 2px;
+    background: #38bdf8;
+    border-radius: 1px;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+}
 
-/* ---- address palette ---- */
+/* ---- address & command palette (Spotlight / Raycast style) ---- */
 .palette {
-    background: #06070a;
-    border-radius: 12px;
-    border: 1px solid #1e202d;
-    padding: 12px 16px 10px;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.95);
+    background: #0d101a;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 14px 18px 12px;
+    box-shadow: 0 24px 72px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 .palette image {
     color: #64748b;
@@ -369,11 +661,12 @@ entry.palette-entry, entry.palette-entry:focus-within {
     padding: 0;
     min-height: 0;
     font-size: 15px;
-    color: #f1f5f9;
-    font-family: ui-monospace, monospace, system-ui;
+    font-weight: 500;
+    color: #f8fafc;
+    font-family: system-ui, -apple-system, sans-serif;
 }
 .palette-hint {
-    color: #475569;
+    color: #64748b;
     font-size: 10.5px;
     font-family: ui-monospace, monospace;
     margin-top: 6px;
@@ -387,7 +680,7 @@ entry.palette-entry, entry.palette-entry:focus-within {
     margin-bottom: 4px;
 }
 .palette-sug-item {
-    padding: 6px 10px;
+    padding: 7px 11px;
     border-radius: 8px;
     background: transparent;
     transition: background 100ms ease;
@@ -415,76 +708,61 @@ entry.palette-entry, entry.palette-entry:focus-within {
     margin-start: 8px;
 }
 .palette-sug-badge {
-    color: #475569;
+    color: #38bdf8;
     font-size: 9.5px;
     font-weight: 600;
     text-transform: uppercase;
-    background: #0b0f19;
-    border: 1px solid #1e293b;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.25);
     border-radius: 4px;
     padding: 1px 5px;
     margin-start: 8px;
 }
 
-/* ---- overview (the live strip, zoomed out in 2D) ---- */
-.zoomed .tab { opacity: 0.85; border-radius: 16px; border: 1.5px solid #20222e; }
-.zoomed .tab.focused { opacity: 1; outline: 4px solid #38bdf8; outline-offset: -2px; }
-.ov-hint {
-    background: #08090d;
-    color: #94a3b8;
-    border: 1px solid #1e202d;
-    border-radius: 8px;
-    padding: 6px 14px;
-    font-size: 11px;
-    font-family: ui-monospace, monospace;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.7);
-}
-
-/* ---- profile colors (True Dark Dev Neon) ---- */
-.prof-bg-0 { background-color: #38bdf8; color: #000000; }
-.prof-bg-1 { background-color: #c084fc; color: #000000; }
-.prof-bg-2 { background-color: #4ade80; color: #000000; }
-.prof-bg-3 { background-color: #facc15; color: #000000; }
-.prof-bg-4 { background-color: #f87171; color: #000000; }
-.prof-bg-5 { background-color: #22d3ee; color: #000000; }
-.prof-bg-6 { background-color: #fb923c; color: #000000; }
-.prof-bg-7 { background-color: #2dd4bf; color: #000000; }
+/* ---- profile colors (True Dark Multi-Persona) ---- */
+.prof-bg-0 { background-color: #38bdf8; color: #021220; }
+.prof-bg-1 { background-color: #c084fc; color: #180529; }
+.prof-bg-2 { background-color: #4ade80; color: #04200c; }
+.prof-bg-3 { background-color: #facc15; color: #231b02; }
+.prof-bg-4 { background-color: #f87171; color: #290808; }
+.prof-bg-5 { background-color: #22d3ee; color: #031b20; }
+.prof-bg-6 { background-color: #fb923c; color: #261102; }
+.prof-bg-7 { background-color: #2dd4bf; color: #021e1a; }
 
 /* ---- profile circle button in URL palette ---- */
 button.profile-circle-btn {
-    min-width: 30px;
-    min-height: 30px;
+    min-width: 28px;
+    min-height: 28px;
     padding: 0;
     border-radius: 9999px;
-    border: 1.5px solid #1e202d;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    transition: transform 120ms, border-color 120ms;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    transition: transform 120ms ease, border-color 120ms ease;
 }
 button.profile-circle-btn:hover {
     transform: scale(1.08);
     border-color: #38bdf8;
 }
 .profile-circle-label {
-    font-weight: 800;
-    font-size: 12px;
-    color: #000000;
-    font-family: ui-monospace, monospace;
+    font-weight: 700;
+    font-size: 11.5px;
+    font-family: system-ui, sans-serif;
 }
 
 /* ---- profile popover dropdown ---- */
 .profile-popover {
-    background: #06070a;
-    border: 1px solid #1e202d;
+    background: #0d101a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     padding: 6px;
-    box-shadow: 0 16px 48px rgba(0,0,0,0.9);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9);
 }
 .profile-popover-title {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #475569;
+    color: #64748b;
     font-family: ui-monospace, monospace;
     padding: 4px 8px 2px;
 }
@@ -492,25 +770,23 @@ button.profile-item-btn {
     background: transparent;
     border: none;
     box-shadow: none;
-    border-radius: 8px;
-    padding: 5px 8px;
+    border-radius: 7px;
+    padding: 6px 9px;
     transition: background 100ms;
 }
 button.profile-item-btn:hover {
-    background: #0f111a;
+    background: #14192b;
 }
 button.profile-item-btn.selected {
-    background: #131622;
+    background: #182036;
     border-left: 2px solid #38bdf8;
 }
 .profile-item-dot {
-    min-width: 22px;
-    min-height: 22px;
+    min-width: 20px;
+    min-height: 20px;
     border-radius: 9999px;
-    font-size: 11px;
-    font-weight: 800;
-    color: #000000;
-    font-family: ui-monospace, monospace;
+    font-size: 10.5px;
+    font-weight: 700;
     padding: 0;
 }
 .profile-item-name {
@@ -529,23 +805,23 @@ button.profile-item-btn.selected {
     color: #38bdf8;
 }
 
-/* ---- profiles manager modal (Ctrl+P / Ctrl+Shift+P) ---- */
+/* ---- profiles manager modal (Ctrl+P) ---- */
 .profiles-modal {
-    background: #06070a;
-    border: 1px solid #1e202d;
+    background: #0d101a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
-    padding: 22px 26px;
-    box-shadow: 0 32px 80px rgba(0,0,0,0.98);
+    padding: 24px 28px;
+    box-shadow: 0 32px 84px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.06);
     min-width: 440px;
     margin-left: 16px;
     margin-right: 16px;
 }
 .profiles-modal-title {
-    font-size: 18px;
-    font-weight: 800;
+    font-size: 17px;
+    font-weight: 700;
     color: #f8fafc;
-    letter-spacing: -0.03em;
-    font-family: ui-monospace, monospace, system-ui;
+    letter-spacing: -0.02em;
+    font-family: system-ui, sans-serif;
 }
 .profiles-modal-subtitle {
     font-size: 11.5px;
@@ -553,29 +829,28 @@ button.profile-item-btn.selected {
     margin-top: 2px;
 }
 .profile-card {
-    background: #0a0b10;
-    border: 1px solid #161722;
+    background: #111422;
+    border: 1px solid #1b2135;
     border-radius: 10px;
-    padding: 9px 12px;
+    padding: 10px 14px;
     margin-bottom: 6px;
     transition: all 120ms ease;
 }
 .profile-card:hover {
-    border-color: #242738;
+    border-color: #283350;
+    background: #141829;
 }
 .profile-card.active-profile {
     border-color: #38bdf8;
-    background: #0d101a;
-    box-shadow: 0 0 16px rgba(56, 189, 248, 0.12);
+    background: #13192c;
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
 }
 .profile-avatar-circle {
     min-width: 30px;
     min-height: 30px;
     border-radius: 9999px;
     font-size: 12px;
-    font-weight: 800;
-    color: #000000;
-    font-family: ui-monospace, monospace;
+    font-weight: 700;
     margin: 0;
     padding: 0;
 }
@@ -586,11 +861,11 @@ button.profile-item-btn.selected {
 }
 .profile-card-sub {
     font-size: 10.5px;
-    color: #475569;
+    color: #64748b;
     font-family: ui-monospace, monospace;
 }
 .profile-badge-active {
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 700;
     border-radius: 9999px;
     padding: 2px 8px;
@@ -600,18 +875,18 @@ button.profile-item-btn.selected {
     font-family: ui-monospace, monospace;
 }
 button.btn-make-active {
-    background: #11131c;
+    background: #141828;
     color: #94a3b8;
-    border: 1px solid #222536;
+    border: 1px solid #242c44;
     border-radius: 6px;
-    padding: 3px 10px;
-    font-size: 11.5px;
+    padding: 4px 10px;
+    font-size: 11px;
     font-weight: 600;
-    transition: all 120ms;
+    transition: all 120ms ease;
 }
 button.btn-make-active:hover {
     background: #38bdf8;
-    color: #000000;
+    color: #021220;
     border-color: #38bdf8;
 }
 button.btn-del-profile {
@@ -619,8 +894,8 @@ button.btn-del-profile {
     border: none;
     border-radius: 6px;
     padding: 4px;
-    color: #475569;
-    transition: all 120ms;
+    color: #64748b;
+    transition: all 120ms ease;
 }
 button.btn-del-profile:hover {
     background: rgba(244, 63, 94, 0.18);
@@ -629,20 +904,19 @@ button.btn-del-profile:hover {
 .profile-section-label {
     font-size: 10.5px;
     font-weight: 700;
-    color: #475569;
-    letter-spacing: 0.06em;
+    color: #64748b;
+    letter-spacing: 0.05em;
     font-family: ui-monospace, monospace;
-    margin-top: 4px;
+    margin-top: 6px;
 }
 .profile-entry-box {
-    background: #090a0e;
-    border: 1px solid #1c1d29;
+    background: #0f121d;
+    border: 1px solid #1f253a;
     border-radius: 8px;
-    padding: 7px 11px;
+    padding: 8px 12px;
     color: #f1f5f9;
     font-size: 13px;
-    font-family: ui-monospace, monospace, system-ui;
-    transition: all 120ms;
+    transition: all 120ms ease;
 }
 .profile-entry-box:focus {
     border-color: #38bdf8;
@@ -654,43 +928,37 @@ button.btn-del-profile:hover {
 }
 .profile-error-label {
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
     color: #f87171;
     margin-top: 2px;
 }
 button.btn-create-profile {
-    background: #0d0e14;
-    border: 1px solid #1c1d29;
-    border-radius: 7px;
-    padding: 6px 16px;
-    transition: all 120ms;
+    background: #121626;
+    border: 1px solid #1f273d;
+    border-radius: 8px;
+    padding: 7px 18px;
+    transition: all 120ms ease;
 }
 button.btn-create-profile label {
-    color: #475569;
-    font-weight: 700;
+    color: #64748b;
+    font-weight: 600;
     font-size: 12px;
 }
 button.btn-create-profile:disabled {
-    background: #0a0b10;
-    border-color: #161720;
-}
-button.btn-create-profile:disabled label {
-    color: #475569;
+    background: #0f121d;
+    border-color: #1a2032;
 }
 button.btn-create-profile.active-ready {
     background: #38bdf8;
     border-color: #38bdf8;
 }
 button.btn-create-profile.active-ready label {
-    color: #000000;
-    font-weight: 800;
+    color: #021220;
+    font-weight: 700;
 }
 button.btn-create-profile.active-ready:hover {
     background: #7dd3fc;
     border-color: #7dd3fc;
-}
-button.btn-create-profile.active-ready:hover label {
-    color: #000000;
 }
 
 .profile-badge-mini {
@@ -701,7 +969,6 @@ button.btn-create-profile.active-ready:hover label {
     border-radius: 9999px;
     margin-left: 2px;
     margin-right: 4px;
-    color: #000000;
     padding: 0;
     font-family: ui-monospace, monospace;
 }
@@ -711,29 +978,28 @@ button.color-choice {
     padding: 0;
     border-radius: 9999px;
     border: 2px solid transparent;
-    transition: transform 100ms, border-color 100ms;
+    transition: transform 100ms ease, border-color 100ms ease;
 }
 button.color-choice:hover {
     transform: scale(1.15);
 }
 button.color-choice.selected {
     border-color: #ffffff;
-    box-shadow: 0 0 0 2px #06070a;
+    box-shadow: 0 0 0 2px #0d101a;
     transform: scale(1.15);
 }
 
-/* ---- JS script dialogs (alert, confirm, prompt) ---- */
+/* ---- JS script dialogs ---- */
 .js-dialog-window {
-    background: #08090d;
-    border: 1px solid #1e202d;
+    background: #0d101a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.9);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9);
 }
 .js-dialog-title {
-    color: #60a5fa;
+    color: #38bdf8;
     font-size: 13px;
     font-weight: 700;
-    letter-spacing: 0.2px;
 }
 .js-dialog-message {
     color: #e2e8f0;
@@ -741,61 +1007,61 @@ button.color-choice.selected {
     line-height: 1.45;
 }
 .js-dialog-entry {
-    background: #0f1118;
+    background: #111422;
     color: #ffffff;
-    border: 1px solid #2d3142;
-    border-radius: 6px;
-    padding: 7px 10px;
+    border: 1px solid #232c44;
+    border-radius: 7px;
+    padding: 7px 11px;
     font-size: 13px;
 }
 .js-dialog-entry:focus {
-    border-color: #3b82f6;
+    border-color: #38bdf8;
     outline: none;
 }
 .js-dialog-btn-ok {
-    background: #2563eb;
+    background: #0284c7;
     color: #ffffff;
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 6px 18px;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
     border: none;
 }
 .js-dialog-btn-ok:hover {
-    background: #1d4ed8;
+    background: #0369a1;
 }
 .js-dialog-btn-cancel {
-    background: #1e202d;
+    background: #1a2034;
     color: #94a3b8;
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 6px 14px;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 500;
     border: none;
 }
 .js-dialog-btn-cancel:hover {
-    background: #282b3d;
+    background: #252e4a;
     color: #ffffff;
 }
 
 /* ---- data backup & migration modal (Ctrl+I) ---- */
 .data-modal {
-    background: #06070a;
-    border: 1px solid #1e202d;
+    background: #0d101a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
-    padding: 22px 26px;
-    box-shadow: 0 32px 80px rgba(0,0,0,0.98);
+    padding: 24px 28px;
+    box-shadow: 0 32px 84px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.06);
     min-width: 520px;
     max-width: 620px;
     margin-left: 16px;
     margin-right: 16px;
 }
 .data-modal-title {
-    font-size: 18px;
-    font-weight: 800;
+    font-size: 17px;
+    font-weight: 700;
     color: #f8fafc;
-    letter-spacing: -0.03em;
-    font-family: ui-monospace, monospace, system-ui;
+    letter-spacing: -0.02em;
+    font-family: system-ui, sans-serif;
 }
 .data-modal-subtitle {
     font-size: 11.5px;
@@ -803,17 +1069,17 @@ button.color-choice.selected {
     margin-top: 2px;
 }
 .data-section-box {
-    background: #090a0f;
-    border: 1px solid #161722;
+    background: #111422;
+    border: 1px solid #1b2135;
     border-radius: 10px;
-    padding: 12px 14px;
+    padding: 12px 16px;
     margin-top: 8px;
 }
 .data-section-title {
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 700;
     color: #38bdf8;
-    font-family: ui-monospace, monospace;
+    letter-spacing: 0.02em;
 }
 .data-section-desc {
     font-size: 11px;
@@ -822,8 +1088,8 @@ button.color-choice.selected {
     margin-bottom: 8px;
 }
 .data-info-card {
-    background: #0a0b12;
-    border: 1px solid #1c2030;
+    background: #0d0f19;
+    border: 1px solid #1e263d;
     border-radius: 8px;
     padding: 8px 12px;
     font-family: ui-monospace, monospace;
@@ -831,9 +1097,9 @@ button.color-choice.selected {
     color: #94a3b8;
 }
 .btn-data-action {
-    background: #111422;
-    border: 1px solid #24293d;
-    border-radius: 6px;
+    background: #151a2c;
+    border: 1px solid #273350;
+    border-radius: 7px;
     color: #f1f5f9;
     font-size: 12px;
     font-weight: 600;
@@ -841,14 +1107,14 @@ button.color-choice.selected {
     transition: all 120ms ease;
 }
 .btn-data-action:hover {
-    background: #1a2035;
+    background: #1e2640;
     border-color: #38bdf8;
     color: #38bdf8;
 }
 .btn-data-primary {
     background: #0284c7;
     border: 1px solid #38bdf8;
-    border-radius: 6px;
+    border-radius: 7px;
     color: #ffffff;
     font-size: 12px;
     font-weight: 700;
@@ -867,23 +1133,20 @@ button.color-choice.selected {
 
 /* ---- floating minimap / roadmap (Ctrl+M) ---- */
 .minimap-window {
-    background: #060913;
-    border: 1px solid #1a2336;
-    border-radius: 10px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.95), 0 0 0 1px rgba(56, 189, 248, 0.2);
+    background: #0b0e17;
+    border: 1px solid #1c2438;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(56, 189, 248, 0.15);
     overflow: hidden;
 }
 .minimap-header {
-    background: #090e1a;
-    border-bottom: 1px solid #141c2c;
-    padding: 6px 10px;
+    background: #0e121e;
+    border-bottom: 1px solid #181e2e;
+    padding: 7px 12px;
     cursor: grab;
 }
 .minimap-header:active {
     cursor: grabbing;
-}
-.minimap-header button {
-    cursor: pointer;
 }
 .minimap-header-icon {
     color: #38bdf8;
@@ -891,17 +1154,17 @@ button.color-choice.selected {
 }
 .minimap-header-title {
     font-size: 11px;
-    font-weight: 800;
+    font-weight: 700;
     color: #f8fafc;
-    letter-spacing: 0.04em;
-    font-family: ui-monospace, monospace;
+    letter-spacing: 0.03em;
+    font-family: system-ui, sans-serif;
 }
 .minimap-header-title b {
     color: #38bdf8;
 }
 .minimap-badge {
     font-family: ui-monospace, monospace;
-    font-size: 9.5px;
+    font-size: 9px;
     font-weight: 700;
     color: #38bdf8;
     background: rgba(56, 189, 248, 0.12);
@@ -916,18 +1179,18 @@ button.color-choice.selected {
     font-family: ui-monospace, monospace;
 }
 .minimap-canvas {
-    border-radius: 0 0 9px 9px;
+    border-radius: 0 0 11px 11px;
     cursor: grab;
 }
 .minimap-canvas:active {
     cursor: grabbing;
 }
 .minimap-location-btn {
-    background: #0b1120;
+    background: #111524;
     border: 1px solid #38bdf8;
     border-radius: 20px;
     padding: 3px 10px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.85);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.85);
     transition: all 120ms ease;
 }
 .minimap-location-btn image {
@@ -950,15 +1213,15 @@ button.color-choice.selected {
     color: #ffffff;
 }
 
-/* ---- Rail DevTools Panel (Ctrl+Shift+I) ---- */
+/* ---- Rail DevTools Panel (F12 / Ctrl+Shift+I) ---- */
 .devtools-panel {
-    background: #060913;
-    border-top: 1px solid #141c2c;
-    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.9);
+    background: #0b0e17;
+    border-top: 1px solid #1a2032;
+    box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.85);
 }
 .devtools-header {
-    background: #090e1a;
-    border-bottom: 1px solid #141c2c;
+    background: #0e121e;
+    border-bottom: 1px solid #181e2e;
     padding: 6px 14px;
 }
 .devtools-brand-icon {
@@ -968,7 +1231,7 @@ button.color-choice.selected {
 .devtools-brand-label {
     font-family: ui-monospace, monospace;
     font-size: 11px;
-    font-weight: 800;
+    font-weight: 700;
     color: #f8fafc;
     margin-right: 14px;
 }
@@ -986,7 +1249,7 @@ button.color-choice.selected {
 .devtools-tab-btn {
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: 5px;
     padding: 3px 10px;
     color: #94a3b8;
     font-family: ui-monospace, monospace;
@@ -996,34 +1259,34 @@ button.color-choice.selected {
     transition: all 120ms ease;
 }
 .devtools-tab-btn:hover {
-    background: rgba(56, 189, 248, 0.08);
+    background: rgba(255, 255, 255, 0.05);
     color: #f8fafc;
 }
 .devtools-tab-btn.active {
-    background: rgba(56, 189, 248, 0.16);
+    background: rgba(56, 189, 248, 0.14);
     color: #38bdf8;
-    border-color: rgba(56, 189, 248, 0.35);
+    border-color: rgba(56, 189, 248, 0.3);
 }
 .devtools-log-area {
-    background: #060913;
+    background: #0b0e17;
 }
 .devtools-log-box {
-    padding: 6px 10px;
+    padding: 6px 12px;
 }
 .devtools-log-row {
-    padding: 2px 8px;
-    border-radius: 3px;
+    padding: 3px 10px;
+    border-radius: 4px;
     margin-bottom: 2px;
     font-family: ui-monospace, monospace;
     font-size: 11.5px;
 }
 .devtools-log-row.level-in {
-    background: rgba(255, 255, 255, 0.02);
-    color: #64748b;
+    background: rgba(255, 255, 255, 0.03);
+    color: #94a3b8;
     border-left: 2px solid #64748b;
 }
 .devtools-log-row.level-out {
-    background: rgba(74, 222, 128, 0.05);
+    background: rgba(74, 222, 128, 0.06);
     color: #4ade80;
     border-left: 2px solid #4ade80;
 }
@@ -1038,9 +1301,9 @@ button.color-choice.selected {
     border-left: 2px solid #38bdf8;
 }
 .devtools-input-bar {
-    background: #080c18;
-    border-top: 1px solid #141c2c;
-    padding: 4px 12px;
+    background: #0d111d;
+    border-top: 1px solid #1a2032;
+    padding: 5px 12px;
 }
 .devtools-prompt-char {
     font-family: ui-monospace, monospace;
@@ -1058,17 +1321,17 @@ button.color-choice.selected {
     font-size: 12px;
 }
 .devtools-text-view {
-    background: #060913;
+    background: #0b0e17;
     color: #cbd5e1;
     font-family: ui-monospace, monospace;
     font-size: 11.5px;
-    padding: 10px;
+    padding: 12px;
 }
 .devtools-card {
-    background: #090e1a;
-    border: 1px solid #141c2c;
-    border-radius: 6px;
-    padding: 10px 14px;
+    background: #0f1320;
+    border: 1px solid #1b2236;
+    border-radius: 8px;
+    padding: 12px 16px;
     margin: 8px 12px;
 }
 .devtools-card-title {

@@ -62,6 +62,8 @@ mod imp {
         pub target_grid: RefCell<Vec<Vec<f64>>>,
         /// Current animated progress (0.0 .. 1.0)
         pub current_grid: RefCell<Vec<Vec<f64>>>,
+        /// Custom widths per column in each row
+        pub custom_widths: RefCell<Vec<Vec<Option<f64>>>>,
     }
 
     #[glib::object_subclass]
@@ -91,6 +93,7 @@ mod imp {
             let g = gap(z);
             let grid = self.grid.borrow();
             let cur_prog = self.current_grid.borrow();
+            let c_widths = self.custom_widths.borrow();
             let mut child = widget.first_child();
 
             if grid.is_empty() {
@@ -112,12 +115,16 @@ mod imp {
                 let mut col_x = 0.0;
                 for (c_idx, &is_full) in row.iter().enumerate() {
                     if let Some(c) = child {
-                        let prog = cur_prog
-                            .get(r_idx)
-                            .and_then(|r| r.get(c_idx))
-                            .copied()
-                            .unwrap_or(if is_full { 1.0 } else { 0.0 });
-                        let cw = col_width_animated(prog, vw);
+                        let cw = if let Some(Some(cw_val)) = c_widths.get(r_idx).and_then(|r| r.get(c_idx)) {
+                            cw_val.clamp(280.0, vw)
+                        } else {
+                            let prog = cur_prog
+                                .get(r_idx)
+                                .and_then(|r| r.get(c_idx))
+                                .copied()
+                                .unwrap_or(if is_full { 1.0 } else { 0.0 });
+                            col_width_animated(prog, vw)
+                        };
                         let tx = ((col_x - off_x) * z) as f32;
                         let ty = ((row_y - off_y) * z) as f32;
                         let t = gsk::Transform::new()
@@ -178,6 +185,20 @@ impl StripLayout {
             *current = target;
         }
         *imp.grid.borrow_mut() = grid;
+    }
+    pub fn set_custom_widths(&self, widths: Vec<Vec<Option<f64>>>) {
+        *self.imp().custom_widths.borrow_mut() = widths;
+    }
+    pub fn set_column_width(&self, r_idx: usize, c_idx: usize, width: Option<f64>) {
+        let imp = self.imp();
+        let mut widths = imp.custom_widths.borrow_mut();
+        while widths.len() <= r_idx {
+            widths.push(Vec::new());
+        }
+        while widths[r_idx].len() <= c_idx {
+            widths[r_idx].push(None);
+        }
+        widths[r_idx][c_idx] = width;
     }
     pub fn grid_needs_animation(&self) -> bool {
         let imp = self.imp();
