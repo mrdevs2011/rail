@@ -949,6 +949,144 @@ button.color-choice.selected {
 .minimap-location-btn:hover label {
     color: #ffffff;
 }
+
+/* ---- Rail DevTools Panel (Ctrl+Shift+I) ---- */
+.devtools-panel {
+    background: #060913;
+    border-top: 1px solid #141c2c;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.9);
+}
+.devtools-header {
+    background: #090e1a;
+    border-bottom: 1px solid #141c2c;
+    padding: 6px 14px;
+}
+.devtools-brand-icon {
+    color: #38bdf8;
+    margin-right: 6px;
+}
+.devtools-brand-label {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 800;
+    color: #f8fafc;
+    margin-right: 14px;
+}
+.devtools-badge {
+    font-family: ui-monospace, monospace;
+    font-size: 9px;
+    font-weight: 700;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-right: 12px;
+}
+.devtools-tab-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 3px 10px;
+    color: #94a3b8;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 120ms ease;
+}
+.devtools-tab-btn:hover {
+    background: rgba(56, 189, 248, 0.08);
+    color: #f8fafc;
+}
+.devtools-tab-btn.active {
+    background: rgba(56, 189, 248, 0.16);
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.35);
+}
+.devtools-log-area {
+    background: #060913;
+}
+.devtools-log-box {
+    padding: 6px 10px;
+}
+.devtools-log-row {
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-bottom: 2px;
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+}
+.devtools-log-row.level-in {
+    background: rgba(255, 255, 255, 0.02);
+    color: #64748b;
+    border-left: 2px solid #64748b;
+}
+.devtools-log-row.level-out {
+    background: rgba(74, 222, 128, 0.05);
+    color: #4ade80;
+    border-left: 2px solid #4ade80;
+}
+.devtools-log-row.level-err {
+    background: rgba(248, 113, 113, 0.08);
+    color: #f87171;
+    border-left: 2px solid #f87171;
+}
+.devtools-log-row.level-info {
+    background: rgba(56, 189, 248, 0.08);
+    color: #38bdf8;
+    border-left: 2px solid #38bdf8;
+}
+.devtools-input-bar {
+    background: #080c18;
+    border-top: 1px solid #141c2c;
+    padding: 4px 12px;
+}
+.devtools-prompt-char {
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    font-weight: 800;
+    color: #38bdf8;
+    margin-right: 8px;
+}
+.devtools-entry {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: #f8fafc;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+}
+.devtools-text-view {
+    background: #060913;
+    color: #cbd5e1;
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+    padding: 10px;
+}
+.devtools-card {
+    background: #090e1a;
+    border: 1px solid #141c2c;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 8px 12px;
+}
+.devtools-card-title {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: #38bdf8;
+    margin-bottom: 6px;
+}
+.devtools-card-row {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: #94a3b8;
+    padding: 2px 0;
+}
+.devtools-card-row b {
+    color: #f8fafc;
+}
 ";
 
 /// How far the strip zooms out in overview (niri uses a similar factor).
@@ -1081,7 +1219,18 @@ struct App {
     map_drawing_area: gtk::DrawingArea,
     map_location_btn: gtk::Button,
     map_state: RefCell<MinimapState>,
+    // DevTools Panel (Ctrl+Shift+I)
     devtools_open: Cell<bool>,
+    devtools_panel: gtk::Box,
+    devtools_stack: gtk::Stack,
+    devtools_console_box: gtk::Box,
+    devtools_console_entry: gtk::Entry,
+    devtools_elements_view: gtk::TextView,
+    devtools_network_box: gtk::Box,
+    devtools_storage_box: gtk::Box,
+    devtools_history: RefCell<Vec<String>>,
+    devtools_history_idx: Cell<Option<usize>>,
+    devtools_tab_buttons: RefCell<Vec<gtk::Button>>,
 }
 
 fn to_uri(input: &str) -> String {
@@ -1322,10 +1471,11 @@ impl App {
             return;
         }
         let near = |a: f64, b: f64, eps: f64| (a - b).abs() < eps;
-        if near(self.target_x.get(), self.layout.offset_x(), 0.5)
+        let cam_ready = near(self.target_x.get(), self.layout.offset_x(), 0.5)
             && near(self.target_y.get(), self.layout.offset_y(), 0.5)
-            && near(self.target_zoom.get(), self.layout.zoom(), 0.002)
-        {
+            && near(self.target_zoom.get(), self.layout.zoom(), 0.002);
+
+        if cam_ready && !self.layout.grid_needs_animation() {
             self.layout.set_offset_x(self.target_x.get());
             self.layout.set_offset_y(self.target_y.get());
             self.layout.set_zoom(self.target_zoom.get());
@@ -1352,12 +1502,14 @@ impl App {
             if near(oyt, ny, 0.5) { ny = oyt; }
             if near(zt, nz, 0.002) { nz = zt; }
 
+            let grid_busy = app.layout.step_grid_progress(k);
+
             app.layout.set_offset_x(nx);
             app.layout.set_offset_y(ny);
             app.layout.set_zoom(nz);
             strip.queue_allocate();
 
-            if nx == oxt && ny == oyt && nz == zt {
+            if nx == oxt && ny == oyt && nz == zt && !grid_busy {
                 app.animating.set(false);
                 glib::ControlFlow::Break
             } else {
@@ -1464,18 +1616,266 @@ impl App {
         self.add_view(view, prof_id, true);
     }
 
+    // ---- DevTools (Ctrl+Shift+I) ----
+
+    fn devtools_open(&self) -> bool {
+        self.devtools_open.get()
+    }
+
     fn toggle_devtools(self: &Rc<Self>) {
+        if self.devtools_open() {
+            self.hide_devtools();
+        } else {
+            self.show_devtools();
+        }
+    }
+
+    fn show_devtools(self: &Rc<Self>) {
+        self.devtools_panel.set_visible(true);
+        self.devtools_open.set(true);
+        self.devtools_console_entry.grab_focus();
+        self.refresh_active_devtools_tab();
+    }
+
+    fn hide_devtools(&self) {
+        self.devtools_panel.set_visible(false);
+        self.devtools_open.set(false);
         if let Some(v) = self.focused_view() {
-            if let Some(insp) = v.inspector() {
-                if self.devtools_open.get() {
-                    insp.close();
-                    self.devtools_open.set(false);
-                } else {
-                    insp.show();
-                    self.devtools_open.set(true);
-                }
+            v.grab_focus();
+        }
+    }
+
+    fn devtools_switch_tab(self: &Rc<Self>, idx: usize) {
+        let name = match idx {
+            1 => "elements",
+            2 => "network",
+            3 => "application",
+            _ => "console",
+        };
+        self.devtools_stack.set_visible_child_name(name);
+
+        let btns = self.devtools_tab_buttons.borrow();
+        for (i, btn) in btns.iter().enumerate() {
+            if i == idx {
+                btn.add_css_class("active");
+            } else {
+                btn.remove_css_class("active");
             }
         }
+        drop(btns);
+
+        match idx {
+            0 => { self.devtools_console_entry.grab_focus(); }
+            1 => { self.refresh_devtools_elements(); }
+            2 => { self.refresh_devtools_network(); }
+            3 => { self.refresh_devtools_storage(); }
+            _ => {}
+        }
+    }
+
+    fn refresh_active_devtools_tab(self: &Rc<Self>) {
+        let name = self.devtools_stack.visible_child_name().map(|s| s.to_string()).unwrap_or_default();
+        match name.as_str() {
+            "elements" => self.refresh_devtools_elements(),
+            "network" => self.refresh_devtools_network(),
+            "application" => self.refresh_devtools_storage(),
+            _ => {}
+        }
+    }
+
+    fn devtools_log(&self, level: &str, text: &str) {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        row.add_css_class("devtools-log-row");
+        row.add_css_class(&format!("level-{}", level));
+
+        let lbl = gtk::Label::new(Some(text));
+        lbl.set_xalign(0.0);
+        lbl.set_hexpand(true);
+        lbl.set_wrap(true);
+        lbl.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+        lbl.set_selectable(true);
+
+        row.append(&lbl);
+        self.devtools_console_box.append(&row);
+    }
+
+    fn devtools_clear_console(&self) {
+        while let Some(c) = self.devtools_console_box.first_child() {
+            self.devtools_console_box.remove(&c);
+        }
+        self.devtools_log("info", "Console cleared.");
+    }
+
+    fn devtools_execute_js(self: &Rc<Self>, code: &str) {
+        let clean = code.trim();
+        if clean.is_empty() { return; }
+
+        {
+            let mut hist = self.devtools_history.borrow_mut();
+            if hist.last().map(|s| s.as_str()) != Some(clean) {
+                hist.push(clean.to_string());
+            }
+            self.devtools_history_idx.set(None);
+        }
+
+        self.devtools_log("in", &format!("> {}", clean));
+        self.devtools_console_entry.set_text("");
+
+        let Some(view) = self.focused_view() else {
+            self.devtools_log("err", "< No active view available");
+            return;
+        };
+
+        let app = self.clone();
+        view.evaluate_javascript(
+            clean,
+            None,
+            None,
+            gio::Cancellable::NONE,
+            move |res| {
+                match res {
+                    Ok(val) => {
+                        let out_str = val.to_string();
+                        app.devtools_log("out", &format!("< {}", out_str));
+                    }
+                    Err(err) => {
+                        app.devtools_log("err", &format!("< Error: {}", err));
+                    }
+                }
+            },
+        );
+    }
+
+    fn refresh_devtools_elements(self: &Rc<Self>) {
+        let Some(view) = self.focused_view() else { return };
+        let tv = self.devtools_elements_view.clone();
+        view.evaluate_javascript(
+            "document.documentElement.outerHTML",
+            None,
+            None,
+            gio::Cancellable::NONE,
+            move |res| {
+                if let Ok(val) = res {
+                    let html = val.to_string();
+                    tv.buffer().set_text(&html);
+                }
+            },
+        );
+    }
+
+    fn refresh_devtools_network(self: &Rc<Self>) {
+        while let Some(c) = self.devtools_network_box.first_child() {
+            self.devtools_network_box.remove(&c);
+        }
+
+        let card = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        card.add_css_class("devtools-card");
+
+        let title = gtk::Label::new(Some("ACTIVE SESSION & RESOURCE INSPECTION"));
+        title.add_css_class("devtools-card-title");
+        title.set_xalign(0.0);
+        card.append(&title);
+
+        let cur_uri = self.focused_view().and_then(|v| v.uri()).map(|s| s.to_string()).unwrap_or_else(|| "about:blank".to_string());
+        let uri_lbl = gtk::Label::new(None);
+        uri_lbl.set_markup(&format!("<b>URL:</b> <span foreground='#38bdf8'>{}</span>", glib::markup_escape_text(&cur_uri)));
+        uri_lbl.add_css_class("devtools-card-row");
+        uri_lbl.set_xalign(0.0);
+        card.append(&uri_lbl);
+
+        let host = host_of(&cur_uri).unwrap_or_else(|| "localhost".to_string());
+        let host_lbl = gtk::Label::new(None);
+        host_lbl.set_markup(&format!("<b>Host:</b> {}", glib::markup_escape_text(&host)));
+        host_lbl.add_css_class("devtools-card-row");
+        host_lbl.set_xalign(0.0);
+        card.append(&host_lbl);
+
+        let is_ssl = cur_uri.starts_with("https://");
+        let ssl_lbl = gtk::Label::new(None);
+        ssl_lbl.set_markup(&format!("<b>Security:</b> {}", if is_ssl { "<span foreground='#4ade80'>TLS/HTTPS Secured</span>" } else { "<span foreground='#f87171'>Insecure / Local</span>" }));
+        ssl_lbl.add_css_class("devtools-card-row");
+        ssl_lbl.set_xalign(0.0);
+        card.append(&ssl_lbl);
+
+        let prof_id = self.profiles.borrow().active_id().to_string();
+        let persona = ProfilePersona::for_id(&prof_id);
+        let prof_lbl = gtk::Label::new(None);
+        prof_lbl.set_markup(&format!("<b>Isolated Profile:</b> {} ({})", glib::markup_escape_text(&prof_id), persona.summary()));
+        prof_lbl.add_css_class("devtools-card-row");
+        prof_lbl.set_xalign(0.0);
+        card.append(&prof_lbl);
+
+        self.devtools_network_box.append(&card);
+    }
+
+    fn refresh_devtools_storage(self: &Rc<Self>) {
+        while let Some(c) = self.devtools_storage_box.first_child() {
+            self.devtools_storage_box.remove(&c);
+        }
+
+        let Some(view) = self.focused_view() else { return };
+        let box_storage = self.devtools_storage_box.clone();
+        let app = self.clone();
+
+        view.evaluate_javascript(
+            r#"(function() {
+                try {
+                    return JSON.stringify({
+                        local: Object.entries(localStorage),
+                        session: Object.entries(sessionStorage),
+                        cookie: document.cookie
+                    }, null, 2);
+                } catch(e) {
+                    return JSON.stringify({ local: [], session: [], cookie: "" });
+                }
+            })()"#,
+            None,
+            None,
+            gio::Cancellable::NONE,
+            move |res| {
+                if let Ok(val) = res {
+                    let json_str = val.to_string();
+                    let card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+                    card.add_css_class("devtools-card");
+
+                    let title = gtk::Label::new(Some("CLIENT STORAGE (ISOLATED)"));
+                    title.add_css_class("devtools-card-title");
+                    title.set_xalign(0.0);
+                    card.append(&title);
+
+                    let body = gtk::Label::new(Some(&json_str));
+                    body.add_css_class("devtools-card-row");
+                    body.set_wrap(true);
+                    body.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+                    body.set_selectable(true);
+                    body.set_xalign(0.0);
+                    card.append(&body);
+
+                    let btn_clear = gtk::Button::with_label("Clear Client Storage (localStorage & sessionStorage)");
+                    btn_clear.add_css_class("flat-btn");
+                    let app_clr = app.clone();
+                    btn_clear.connect_clicked(move |_| app_clr.devtools_clear_storage());
+                    card.append(&btn_clear);
+
+                    box_storage.append(&card);
+                }
+            },
+        );
+    }
+
+    fn devtools_clear_storage(self: &Rc<Self>) {
+        let Some(view) = self.focused_view() else { return };
+        let app = self.clone();
+        view.evaluate_javascript(
+            "try { localStorage.clear(); sessionStorage.clear(); } catch(e) {}",
+            None,
+            None,
+            gio::Cancellable::NONE,
+            move |_| {
+                app.devtools_log("info", "Storage cleared (localStorage & sessionStorage).");
+                app.refresh_devtools_storage();
+            },
+        );
     }
 
     fn show_script_dialog(self: &Rc<Self>, view: &WebView, dialog: &ScriptDialog) {
@@ -1790,10 +2190,13 @@ impl App {
             menu.append(&ContextMenuItem::from_gaction(&act_src, "View Page Source  (Ctrl+Shift+I)", None));
         }
 
-        menu.append(&ContextMenuItem::from_stock_action_with_label(
-            ContextMenuAction::InspectElement,
-            "Inspect Element  (Ctrl+Shift+I)",
-        ));
+        let app_insp = self.clone();
+        let act_insp = gio::SimpleAction::new("ctx-inspect-elem", None);
+        act_insp.connect_activate(move |_, _| {
+            app_insp.toggle_devtools();
+        });
+        self.win.add_action(&act_insp);
+        menu.append(&ContextMenuItem::from_gaction(&act_insp, "Inspect Element  (F12 / Ctrl+Shift+I)", None));
     }
 
     fn setup_view_signals(self: &Rc<Self>, view: &WebView) {
@@ -3886,6 +4289,30 @@ impl App {
             }
         }
 
+        if self.devtools_open() {
+            if k == gdk::Key::Escape {
+                self.hide_devtools();
+                return true;
+            }
+            if !ctrl && !shift && !alt && k == gdk::Key::F12 {
+                self.hide_devtools();
+                return true;
+            }
+            if ctrl && shift && !alt && (k == gdk::Key::i || k == gdk::Key::I) {
+                self.hide_devtools();
+                return true;
+            }
+        }
+
+        if !ctrl && !shift && !alt && k == gdk::Key::F12 {
+            self.toggle_devtools();
+            return true;
+        }
+        if ctrl && shift && !alt && (k == gdk::Key::i || k == gdk::Key::I) {
+            self.toggle_devtools();
+            return true;
+        }
+
         if k == gdk::Key::Escape {
             if self.palette_open() {
                 self.cancel_palette();
@@ -4474,6 +4901,131 @@ fn build(gapp: &gtk::Application) {
     map_container.append(&map_header_row);
     map_container.append(&map_overlay);
 
+    // ---- Native Rail Developer Console (Ctrl+Shift+I) ----
+    let devtools_header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    devtools_header.add_css_class("devtools-header");
+
+    let devtools_icon = gtk::Image::from_icon_name("utilities-terminal-symbolic");
+    devtools_icon.add_css_class("devtools-brand-icon");
+
+    let devtools_title = gtk::Label::new(None);
+    devtools_title.set_markup("<span font_family='ui-monospace' font_weight='800'>rail</span><span foreground='#38bdf8'>.dev</span>");
+    devtools_title.add_css_class("devtools-brand-label");
+
+    let devtools_badge = gtk::Label::new(Some("Ctrl+Shift+I"));
+    devtools_badge.add_css_class("devtools-badge");
+
+    let btn_tab_console = gtk::Button::with_label("Console");
+    btn_tab_console.add_css_class("devtools-tab-btn");
+    btn_tab_console.add_css_class("active");
+
+    let btn_tab_elements = gtk::Button::with_label("Elements");
+    btn_tab_elements.add_css_class("devtools-tab-btn");
+
+    let btn_tab_network = gtk::Button::with_label("Network");
+    btn_tab_network.add_css_class("devtools-tab-btn");
+
+    let btn_tab_application = gtk::Button::with_label("Application");
+    btn_tab_application.add_css_class("devtools-tab-btn");
+
+    let dt_spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    dt_spacer.set_hexpand(true);
+
+    let devtools_clear_btn = gtk::Button::from_icon_name("edit-clear-symbolic");
+    devtools_clear_btn.add_css_class("flat-icon");
+    devtools_clear_btn.set_tooltip_text(Some("Clear Console"));
+
+    let devtools_refresh_btn = gtk::Button::from_icon_name("view-refresh-symbolic");
+    devtools_refresh_btn.add_css_class("flat-icon");
+    devtools_refresh_btn.set_tooltip_text(Some("Refresh Active DevTools Tab"));
+
+    let devtools_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
+    devtools_close_btn.add_css_class("flat-icon");
+    devtools_close_btn.set_tooltip_text(Some("Close DevTools (Esc / Ctrl+Shift+I)"));
+
+    devtools_header.append(&devtools_icon);
+    devtools_header.append(&devtools_title);
+    devtools_header.append(&devtools_badge);
+    devtools_header.append(&btn_tab_console);
+    devtools_header.append(&btn_tab_elements);
+    devtools_header.append(&btn_tab_network);
+    devtools_header.append(&btn_tab_application);
+    devtools_header.append(&dt_spacer);
+    devtools_header.append(&devtools_clear_btn);
+    devtools_header.append(&devtools_refresh_btn);
+    devtools_header.append(&devtools_close_btn);
+
+    // Page 0: Console
+    let devtools_console_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    devtools_console_box.add_css_class("devtools-log-box");
+
+    let console_scroll = gtk::ScrolledWindow::new();
+    console_scroll.add_css_class("devtools-log-scroll");
+    console_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    console_scroll.set_vexpand(true);
+    console_scroll.set_child(Some(&devtools_console_box));
+
+    let devtools_console_entry = gtk::Entry::new();
+    devtools_console_entry.add_css_class("devtools-entry");
+    devtools_console_entry.set_hexpand(true);
+    devtools_console_entry.set_placeholder_text(Some("Evaluate JavaScript (e.g. document.title, location.href, 2+2)..."));
+
+    let prompt_sym = gtk::Label::new(Some(">"));
+    prompt_sym.add_css_class("devtools-prompt-char");
+
+    let devtools_input_bar = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    devtools_input_bar.add_css_class("devtools-input-bar");
+    devtools_input_bar.append(&prompt_sym);
+    devtools_input_bar.append(&devtools_console_entry);
+
+    let console_page = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    console_page.append(&console_scroll);
+    console_page.append(&devtools_input_bar);
+
+    // Page 1: Elements
+    let devtools_elements_view = gtk::TextView::new();
+    devtools_elements_view.add_css_class("devtools-text-view");
+    devtools_elements_view.set_editable(false);
+    devtools_elements_view.set_wrap_mode(gtk::WrapMode::Char);
+    devtools_elements_view.set_cursor_visible(false);
+
+    let elements_scroll = gtk::ScrolledWindow::new();
+    elements_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+    elements_scroll.set_vexpand(true);
+    elements_scroll.set_child(Some(&devtools_elements_view));
+
+    // Page 2: Network
+    let devtools_network_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    let network_scroll = gtk::ScrolledWindow::new();
+    network_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    network_scroll.set_vexpand(true);
+    network_scroll.set_child(Some(&devtools_network_box));
+
+    // Page 3: Application
+    let devtools_storage_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    let storage_scroll = gtk::ScrolledWindow::new();
+    storage_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    storage_scroll.set_vexpand(true);
+    storage_scroll.set_child(Some(&devtools_storage_box));
+
+    let devtools_stack = gtk::Stack::new();
+    devtools_stack.add_css_class("devtools-content-area");
+    devtools_stack.set_vexpand(true);
+    devtools_stack.add_named(&console_page, Some("console"));
+    devtools_stack.add_named(&elements_scroll, Some("elements"));
+    devtools_stack.add_named(&network_scroll, Some("network"));
+    devtools_stack.add_named(&storage_scroll, Some("application"));
+
+    let devtools_panel = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    devtools_panel.add_css_class("devtools-panel");
+    devtools_panel.set_halign(gtk::Align::Fill);
+    devtools_panel.set_valign(gtk::Align::End);
+    devtools_panel.set_height_request(300);
+    devtools_panel.set_visible(false);
+
+    devtools_panel.append(&devtools_header);
+    devtools_panel.append(&devtools_stack);
+
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&shell));
     overlay.add_overlay(&load_bar);
@@ -4482,6 +5034,7 @@ fn build(gapp: &gtk::Application) {
     overlay.add_overlay(&profiles_modal);
     overlay.add_overlay(&data_modal);
     overlay.add_overlay(&map_container);
+    overlay.add_overlay(&devtools_panel);
 
     let win = gtk::ApplicationWindow::builder()
         .application(gapp)
@@ -4549,6 +5102,21 @@ fn build(gapp: &gtk::Application) {
         map_location_btn: map_location_btn.clone(),
         map_state: RefCell::new(MinimapState::default()),
         devtools_open: Cell::new(false),
+        devtools_panel: devtools_panel.clone(),
+        devtools_stack: devtools_stack.clone(),
+        devtools_console_box: devtools_console_box.clone(),
+        devtools_console_entry: devtools_console_entry.clone(),
+        devtools_elements_view: devtools_elements_view.clone(),
+        devtools_network_box: devtools_network_box.clone(),
+        devtools_storage_box: devtools_storage_box.clone(),
+        devtools_history: RefCell::new(Vec::new()),
+        devtools_history_idx: Cell::new(None),
+        devtools_tab_buttons: RefCell::new(vec![
+            btn_tab_console.clone(),
+            btn_tab_elements.clone(),
+            btn_tab_network.clone(),
+            btn_tab_application.clone(),
+        ]),
     });
 
     let a_close = app.clone();
@@ -4836,6 +5404,75 @@ fn build(gapp: &gtk::Application) {
             a.update_palette_size();
         }
     });
+
+    // DevTools signal connections
+    let a_dt_close = app.clone();
+    devtools_close_btn.connect_clicked(move |_| a_dt_close.hide_devtools());
+
+    let a_dt_clear = app.clone();
+    devtools_clear_btn.connect_clicked(move |_| a_dt_clear.devtools_clear_console());
+
+    let a_dt_ref = app.clone();
+    devtools_refresh_btn.connect_clicked(move |_| a_dt_ref.refresh_active_devtools_tab());
+
+    let a_dt_c = app.clone();
+    btn_tab_console.connect_clicked(move |_| a_dt_c.devtools_switch_tab(0));
+
+    let a_dt_e = app.clone();
+    btn_tab_elements.connect_clicked(move |_| a_dt_e.devtools_switch_tab(1));
+
+    let a_dt_n = app.clone();
+    btn_tab_network.connect_clicked(move |_| a_dt_n.devtools_switch_tab(2));
+
+    let a_dt_a = app.clone();
+    btn_tab_application.connect_clicked(move |_| a_dt_a.devtools_switch_tab(3));
+
+    let a_dt_exec = app.clone();
+    devtools_console_entry.connect_activate(move |e| a_dt_exec.devtools_execute_js(&e.text()));
+
+    let dt_entry_keys = gtk::EventControllerKey::new();
+    let a_dt_hist = app.clone();
+    dt_entry_keys.connect_key_pressed(move |_, key, _, _| {
+        match key {
+            gdk::Key::Up => {
+                let hist = a_dt_hist.devtools_history.borrow();
+                if hist.is_empty() { return gtk::glib::Propagation::Proceed; }
+                let cur = a_dt_hist.devtools_history_idx.get();
+                let next = match cur {
+                    None => hist.len().saturating_sub(1),
+                    Some(idx) => idx.saturating_sub(1),
+                };
+                a_dt_hist.devtools_history_idx.set(Some(next));
+                if let Some(cmd) = hist.get(next) {
+                    a_dt_hist.devtools_console_entry.set_text(cmd);
+                    a_dt_hist.devtools_console_entry.set_position(-1);
+                }
+                gtk::glib::Propagation::Stop
+            }
+            gdk::Key::Down => {
+                let hist = a_dt_hist.devtools_history.borrow();
+                let cur = a_dt_hist.devtools_history_idx.get();
+                if let Some(idx) = cur {
+                    if idx + 1 < hist.len() {
+                        let next = idx + 1;
+                        a_dt_hist.devtools_history_idx.set(Some(next));
+                        if let Some(cmd) = hist.get(next) {
+                            a_dt_hist.devtools_console_entry.set_text(cmd);
+                            a_dt_hist.devtools_console_entry.set_position(-1);
+                        }
+                    } else {
+                        a_dt_hist.devtools_history_idx.set(None);
+                        a_dt_hist.devtools_console_entry.set_text("");
+                    }
+                    gtk::glib::Propagation::Stop
+                } else {
+                    gtk::glib::Propagation::Proceed
+                }
+            }
+            _ => gtk::glib::Propagation::Proceed,
+        }
+    });
+    devtools_console_entry.add_controller(dt_entry_keys);
 
 
     let a = app.clone();

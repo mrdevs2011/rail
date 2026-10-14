@@ -27,6 +27,18 @@ pub fn col_width(full: bool, viewport: f64) -> f64 {
     }
 }
 
+/// Smooth animated column width calculation (progress 0.0: normal, 1.0: full)
+pub fn col_width_animated(progress: f64, viewport: f64) -> f64 {
+    let p = progress.clamp(0.0, 1.0);
+    if viewport < (MIN_COL_W * 2.0 + GAP) {
+        viewport.max(280.0)
+    } else {
+        let normal_w = ((viewport - GAP) / 2.0).floor();
+        let full_w = viewport.max(280.0);
+        normal_w + (full_w - normal_w) * p
+    }
+}
+
 
 mod imp {
     use super::*;
@@ -46,6 +58,10 @@ mod imp {
         pub on_resize: RefCell<Option<Rc<dyn Fn()>>>,
         /// For each row: list of is_full flags for each column
         pub grid: RefCell<Vec<Vec<bool>>>,
+        /// Target progress (0.0 for normal, 1.0 for full)
+        pub target_grid: RefCell<Vec<Vec<f64>>>,
+        /// Current animated progress (0.0 .. 1.0)
+        pub current_grid: RefCell<Vec<Vec<f64>>>,
     }
 
     #[glib::object_subclass]
@@ -74,6 +90,7 @@ mod imp {
             let (off_x, off_y, z) = (self.offset_x.get(), self.offset_y.get(), self.zoom.get());
             let g = gap(z);
             let grid = self.grid.borrow();
+            let cur_prog = self.current_grid.borrow();
             let mut child = widget.first_child();
 
             if grid.is_empty() {
@@ -93,15 +110,20 @@ mod imp {
             for (r_idx, row) in grid.iter().enumerate() {
                 let row_y = r_idx as f64 * (vh + g);
                 let mut col_x = 0.0;
-                for &is_full in row.iter() {
+                for (c_idx, &is_full) in row.iter().enumerate() {
                     if let Some(c) = child {
-                        let cw = col_width(is_full, vw);
+                        let prog = cur_prog
+                            .get(r_idx)
+                            .and_then(|r| r.get(c_idx))
+                            .copied()
+                            .unwrap_or(if is_full { 1.0 } else { 0.0 });
+                        let cw = col_width_animated(prog, vw);
                         let tx = ((col_x - off_x) * z) as f32;
                         let ty = ((row_y - off_y) * z) as f32;
                         let t = gsk::Transform::new()
                             .translate(&graphene::Point::new(tx, ty))
                             .scale(z as f32, z as f32);
-                        c.allocate(cw as i32, height, -1, Some(t));
+                        c.allocate(cw.round() as i32, height, -1, Some(t));
                         col_x += cw + g;
                         child = c.next_sibling();
                     }
@@ -140,7 +162,63 @@ impl StripLayout {
         self.imp().zoom.set(v);
     }
     pub fn set_grid(&self, grid: Vec<Vec<bool>>) {
-        *self.imp().grid.borrow_mut() = grid;
+        let imp = self.imp();
+        let mut target = Vec::with_capacity(grid.len());
+        for row in grid.iter() {
+            let mut target_row = Vec::with_capacity(row.len());
+            for &is_full in row.iter() {
+                target_row.push(if is_full { 1.0 } else { 0.0 });
+            }
+            target.push(target_row);
+        }
+        *imp.target_grid.borrow_mut() = target.clone();
+
+        let mut current = imp.current_grid.borrow_mut();
+        if current.len() != target.len() || current.iter().zip(target.iter()).any(|(c, t)| c.len() != t.len()) {
+            *current = target;
+        }
+        *imp.grid.borrow_mut() = grid;
+    }
+    pub fn grid_needs_animation(&self) -> bool {
+        let imp = self.imp();
+        let target = imp.target_grid.borrow();
+        let current = imp.current_grid.borrow();
+        for (r_idx, target_row) in target.iter().enumerate() {
+            if let Some(cur_row) = current.get(r_idx) {
+                for (c_idx, &t_val) in target_row.iter().enumerate() {
+                    if let Some(&c_val) = cur_row.get(c_idx) {
+                        if (c_val - t_val).abs() > 0.002 {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+    pub fn step_grid_progress(&self, k: f64) -> bool {
+        let imp = self.imp();
+        let target = imp.target_grid.borrow();
+        let mut current = imp.current_grid.borrow_mut();
+        let mut still_animating = false;
+
+        for (r_idx, target_row) in target.iter().enumerate() {
+            if let Some(cur_row) = current.get_mut(r_idx) {
+                for (c_idx, &t_val) in target_row.iter().enumerate() {
+                    if let Some(c_val) = cur_row.get_mut(c_idx) {
+                        if (*c_val - t_val).abs() > 0.002 {
+                            *c_val += (t_val - *c_val) * k;
+                            if (*c_val - t_val).abs() <= 0.002 {
+                                *c_val = t_val;
+                            } else {
+                                still_animating = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        still_animating
     }
     pub fn connect_resized(&self, f: impl Fn() + 'static) {
         *self.imp().on_resize.borrow_mut() = Some(std::rc::Rc::new(f));

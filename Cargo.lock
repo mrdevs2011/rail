@@ -500,7 +500,7 @@ dependencies = [
 
 [[package]]
 name = "rail"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "gtk4",
  "webkit6",
