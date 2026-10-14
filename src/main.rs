@@ -965,23 +965,49 @@ struct Row {
 }
 
 struct MinimapState {
+    cam_x: f64,
+    cam_y: f64,
+    zoom: f64,
+    target_zoom: f64,
     offset_x: f64,
     offset_y: f64,
-    zoom: f64,
+    target_offset_x: f64,
+    target_offset_y: f64,
     user_panned: bool,
     drag_start_offset_x: f64,
     drag_start_offset_y: f64,
+    vel_x: f64,
+    vel_y: f64,
+    cursor_x: f64,
+    cursor_y: f64,
+    cursor_w: f64,
+    cursor_h: f64,
+    cursor_initialized: bool,
+    animating: bool,
 }
 
 impl Default for MinimapState {
     fn default() -> Self {
         Self {
+            cam_x: 0.0,
+            cam_y: 0.0,
+            zoom: 1.0,
+            target_zoom: 1.0,
             offset_x: 0.0,
             offset_y: 0.0,
-            zoom: 1.0,
+            target_offset_x: 0.0,
+            target_offset_y: 0.0,
             user_panned: false,
             drag_start_offset_x: 0.0,
             drag_start_offset_y: 0.0,
+            vel_x: 0.0,
+            vel_y: 0.0,
+            cursor_x: 0.0,
+            cursor_y: 0.0,
+            cursor_w: MAP_TAB_W,
+            cursor_h: MAP_TAB_H,
+            cursor_initialized: false,
+            animating: false,
         }
     }
 }
@@ -2006,8 +2032,7 @@ impl App {
             self.refresh_sidebar();
             self.schedule_save_session();
             if self.map_open() {
-                self.update_map_location_btn_visibility();
-                self.map_drawing_area.queue_draw();
+                self.trigger_map_animation();
             }
         }
     }
@@ -2048,8 +2073,7 @@ impl App {
         self.schedule_save_session();
 
         if self.map_open() {
-            self.update_map_location_btn_visibility();
-            self.map_drawing_area.queue_draw();
+            self.trigger_map_animation();
         }
 
         if !self.palette_open() && !self.ov.get() {
@@ -3185,11 +3209,30 @@ impl App {
     }
 
     fn show_map(self: &Rc<Self>) {
+        let rows = self.rows.borrow();
+        let (cx, cy) = self.compute_active_tab_center(&rows);
+        let (rx, ry, rw, rh) = self.compute_active_tab_rect(&rows);
+        drop(rows);
+
         {
             let mut st = self.map_state.borrow_mut();
+            st.cam_x = cx;
+            st.cam_y = cy;
             st.offset_x = 0.0;
             st.offset_y = 0.0;
+            st.target_offset_x = 0.0;
+            st.target_offset_y = 0.0;
+            st.zoom = 1.0;
+            st.target_zoom = 1.0;
             st.user_panned = false;
+            st.vel_x = 0.0;
+            st.vel_y = 0.0;
+            st.cursor_x = rx;
+            st.cursor_y = ry;
+            st.cursor_w = rw;
+            st.cursor_h = rh;
+            st.cursor_initialized = true;
+            st.animating = false;
         }
         self.map_location_btn.set_visible(false);
         self.map_container.set_visible(true);
@@ -3204,10 +3247,10 @@ impl App {
         let st = self.map_state.borrow();
         let width = (self.map_drawing_area.width() as f64).max(380.0);
         let height = (self.map_drawing_area.height() as f64).max(260.0);
-        let active_sx = width / 2.0 - st.offset_x * st.zoom;
-        let active_sy = height / 2.0 - st.offset_y * st.zoom;
+        let active_sx = width / 2.0 - st.target_offset_x * st.zoom;
+        let active_sy = height / 2.0 - st.target_offset_y * st.zoom;
         let off_screen = active_sx < 20.0 || active_sx > width - 20.0 || active_sy < 20.0 || active_sy > height - 20.0;
-        let far_from_center = (st.offset_x * st.zoom).hypot(st.offset_y * st.zoom) > 40.0;
+        let far_from_center = (st.target_offset_x * st.zoom).hypot(st.target_offset_y * st.zoom) > 40.0;
         let should_show = st.user_panned && (off_screen || far_from_center);
         self.map_location_btn.set_visible(should_show);
     }
@@ -3232,6 +3275,148 @@ impl App {
         (0.0, 0.0)
     }
 
+    fn compute_active_tab_rect(&self, rows: &[Row]) -> (f64, f64, f64, f64) {
+        let fr = self.focus_row.get();
+        let fc = self.focus_col.get();
+        if fr < rows.len() {
+            let row = &rows[fr];
+            if fc < row.tabs.len() {
+                let y = fr as f64 * (MAP_TAB_H + MAP_GAP_Y);
+                let mut x = 0.0;
+                for (i, tab) in row.tabs.iter().enumerate() {
+                    let w = if tab.container.has_css_class("full") { MAP_TAB_W_FULL } else { MAP_TAB_W };
+                    if i == fc {
+                        return (x, y, w, MAP_TAB_H);
+                    }
+                    x += w + MAP_GAP_X;
+                }
+            }
+        }
+        (0.0, 0.0, MAP_TAB_W, MAP_TAB_H)
+    }
+
+    fn trigger_map_animation(self: &Rc<Self>) {
+        if !self.map_open() {
+            return;
+        }
+        {
+            let mut st = self.map_state.borrow_mut();
+            if st.animating {
+                return;
+            }
+            st.animating = true;
+        }
+
+        let app = self.clone();
+        let last_time = Cell::new(None::<i64>);
+        let drawing_area = app.map_drawing_area.clone();
+
+        drawing_area.add_tick_callback(move |area, clock| {
+            if !app.map_open() {
+                app.map_state.borrow_mut().animating = false;
+                return glib::ControlFlow::Break;
+            }
+
+            let now = clock.frame_time();
+            let dt = last_time.replace(Some(now)).map_or(1.0 / 60.0, |l| {
+                ((now - l) as f64 / 1e6).clamp(0.001, 0.1)
+            });
+
+            let k_pos = 1.0 - (-dt / 0.065).exp();
+            let k_zoom = 1.0 - (-dt / 0.075).exp();
+
+            let rows = app.rows.borrow();
+            let (target_active_cx, target_active_cy) = app.compute_active_tab_center(&rows);
+            let (target_rect_x, target_rect_y, target_rect_w, target_rect_h) = app.compute_active_tab_rect(&rows);
+            drop(rows);
+
+            let mut st = app.map_state.borrow_mut();
+
+            // Inertia decay
+            if st.vel_x.abs() > 0.05 || st.vel_y.abs() > 0.05 {
+                st.target_offset_x += st.vel_x * dt;
+                st.target_offset_y += st.vel_y * dt;
+                let friction = (-dt * 7.5).exp();
+                st.vel_x *= friction;
+                st.vel_y *= friction;
+                if st.vel_x.abs() < 0.05 { st.vel_x = 0.0; }
+                if st.vel_y.abs() < 0.05 { st.vel_y = 0.0; }
+                st.user_panned = true;
+            }
+
+            let target_cam_x = target_active_cx + st.target_offset_x;
+            let target_cam_y = target_active_cy + st.target_offset_y;
+
+            let mut diff_cx = target_cam_x - st.cam_x;
+            let mut diff_cy = target_cam_y - st.cam_y;
+            if diff_cx.abs() < 0.2 {
+                st.cam_x = target_cam_x;
+                diff_cx = 0.0;
+            } else {
+                st.cam_x += diff_cx * k_pos;
+            }
+            if diff_cy.abs() < 0.2 {
+                st.cam_y = target_cam_y;
+                diff_cy = 0.0;
+            } else {
+                st.cam_y += diff_cy * k_pos;
+            }
+
+            let diff_ox = st.target_offset_x - st.offset_x;
+            let diff_oy = st.target_offset_y - st.offset_y;
+            if diff_ox.abs() < 0.2 {
+                st.offset_x = st.target_offset_x;
+            } else {
+                st.offset_x += diff_ox * k_pos;
+            }
+            if diff_oy.abs() < 0.2 {
+                st.offset_y = st.target_offset_y;
+            } else {
+                st.offset_y += diff_oy * k_pos;
+            }
+
+            let mut diff_zoom = st.target_zoom - st.zoom;
+            if diff_zoom.abs() < 0.002 {
+                st.zoom = st.target_zoom;
+                diff_zoom = 0.0;
+            } else {
+                st.zoom += diff_zoom * k_zoom;
+            }
+
+            let mut diff_rx = target_rect_x - st.cursor_x;
+            let mut diff_ry = target_rect_y - st.cursor_y;
+            let mut diff_rw = target_rect_w - st.cursor_w;
+            let mut diff_rh = target_rect_h - st.cursor_h;
+
+            if diff_rx.abs() < 0.2 { st.cursor_x = target_rect_x; diff_rx = 0.0; } else { st.cursor_x += diff_rx * k_pos; }
+            if diff_ry.abs() < 0.2 { st.cursor_y = target_rect_y; diff_ry = 0.0; } else { st.cursor_y += diff_ry * k_pos; }
+            if diff_rw.abs() < 0.2 { st.cursor_w = target_rect_w; diff_rw = 0.0; } else { st.cursor_w += diff_rw * k_pos; }
+            if diff_rh.abs() < 0.2 { st.cursor_h = target_rect_h; diff_rh = 0.0; } else { st.cursor_h += diff_rh * k_pos; }
+
+            let still_animating = diff_cx != 0.0
+                || diff_cy != 0.0
+                || diff_zoom != 0.0
+                || diff_rx != 0.0
+                || diff_ry != 0.0
+                || diff_rw != 0.0
+                || diff_rh != 0.0
+                || st.vel_x != 0.0
+                || st.vel_y != 0.0;
+
+            drop(st);
+
+            app.update_map_location_btn_visibility();
+            area.queue_draw();
+
+            if still_animating {
+                glib::ControlFlow::Continue
+            } else {
+                app.map_state.borrow_mut().animating = false;
+                glib::ControlFlow::Break
+            }
+        });
+    }
+
     fn draw_rounded_rect(cr: &gtk::cairo::Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
         let r = r.min(w / 2.0).min(h / 2.0);
         cr.new_sub_path();
@@ -3252,14 +3437,19 @@ impl App {
             return;
         }
 
-        let (center_x, center_y) = self.compute_active_tab_center(&rows);
-        let (cam_x, cam_y, zoom) = {
+        let (cam_x, cam_y, zoom, cur_rx, cur_ry, cur_rw, cur_rh, cursor_initialized) = {
             let st = self.map_state.borrow();
-            (center_x + st.offset_x, center_y + st.offset_y, st.zoom)
+            (
+                st.cam_x,
+                st.cam_y,
+                st.zoom,
+                st.cursor_x,
+                st.cursor_y,
+                st.cursor_w,
+                st.cursor_h,
+                st.cursor_initialized,
+            )
         };
-
-        let fr = self.focus_row.get();
-        let fc = self.focus_col.get();
 
         for (r, row) in rows.iter().enumerate() {
             let y = r as f64 * (MAP_TAB_H + MAP_GAP_Y);
@@ -3271,7 +3461,7 @@ impl App {
             }
 
             let mut x = 0.0;
-            for (c, tab) in row.tabs.iter().enumerate() {
+            for (_c, tab) in row.tabs.iter().enumerate() {
                 let w = if tab.container.has_css_class("full") { MAP_TAB_W_FULL } else { MAP_TAB_W };
                 let sx = width / 2.0 + (x - cam_x) * zoom;
                 let sw = w * zoom;
@@ -3281,35 +3471,44 @@ impl App {
                     continue;
                 }
 
-                let is_active = r == fr && c == fc;
                 let corner_r = (3.0 * zoom).clamp(1.5, 4.0);
 
                 Self::draw_rounded_rect(cr, sx, sy, sw, sh, corner_r);
 
-                if is_active {
-                    // Electric Rail cyan (#0284c7)
-                    cr.set_source_rgb(0.008, 0.518, 0.780);
-                    let _ = cr.fill_preserve();
-                    // Radiant cyan border (#7dd3fc)
-                    cr.set_source_rgb(0.490, 0.827, 0.988);
-                    cr.set_line_width((2.0 * zoom).clamp(1.4, 2.8));
-                    let _ = cr.stroke();
-
-                    // Bright center core indicator
-                    let dot_r = (2.2 * zoom).clamp(1.5, 3.2);
-                    cr.arc(sx + sw / 2.0, sy + sh / 2.0, dot_r, 0.0, std::f64::consts::PI * 2.0);
-                    cr.set_source_rgb(1.0, 1.0, 1.0);
-                    let _ = cr.fill();
-                } else {
-                    // Sleek dark slate tile (#0f172a)
-                    cr.set_source_rgb(0.059, 0.090, 0.165);
-                    let _ = cr.fill_preserve();
-                    // Subtle border (#1e293b)
-                    cr.set_source_rgb(0.118, 0.161, 0.231);
-                    cr.set_line_width((1.4 * zoom).clamp(0.9, 1.8));
-                    let _ = cr.stroke();
-                }
+                // Sleek dark slate tile (#0f172a)
+                cr.set_source_rgb(0.059, 0.090, 0.165);
+                let _ = cr.fill_preserve();
+                // Subtle border (#1e293b)
+                cr.set_source_rgb(0.118, 0.161, 0.231);
+                cr.set_line_width((1.2 * zoom).clamp(0.8, 1.8));
+                let _ = cr.stroke();
             }
+        }
+
+        // Draw the silky-smooth gliding active tab reticle / cursor
+        if cursor_initialized {
+            let cur_sx = width / 2.0 + (cur_rx - cam_x) * zoom;
+            let cur_sy = height / 2.0 + (cur_ry - cam_y) * zoom;
+            let cur_sw = cur_rw * zoom;
+            let cur_sh = cur_rh * zoom;
+            let corner_r = (3.0 * zoom).clamp(1.5, 4.0);
+
+            Self::draw_rounded_rect(cr, cur_sx, cur_sy, cur_sw, cur_sh, corner_r);
+
+            // Electric Rail cyan fill (#0284c7)
+            cr.set_source_rgba(0.008, 0.518, 0.780, 0.85);
+            let _ = cr.fill_preserve();
+
+            // Radiant cyan border (#7dd3fc)
+            cr.set_source_rgb(0.490, 0.827, 0.988);
+            cr.set_line_width((2.0 * zoom).clamp(1.4, 2.8));
+            let _ = cr.stroke();
+
+            // Bright center core indicator
+            let dot_r = (2.2 * zoom).clamp(1.5, 3.2);
+            cr.arc(cur_sx + cur_sw / 2.0, cur_sy + cur_sh / 2.0, dot_r, 0.0, std::f64::consts::PI * 2.0);
+            cr.set_source_rgb(1.0, 1.0, 1.0);
+            let _ = cr.fill();
         }
     }
 
@@ -3318,10 +3517,9 @@ impl App {
         if rows.is_empty() {
             return;
         }
-        let (center_x, center_y) = self.compute_active_tab_center(&rows);
         let (cam_x, cam_y, zoom) = {
             let st = self.map_state.borrow();
-            (center_x + st.offset_x, center_y + st.offset_y, st.zoom)
+            (st.cam_x, st.cam_y, st.zoom)
         };
 
         let width = (self.map_drawing_area.width() as f64).max(380.0);
@@ -4360,12 +4558,14 @@ fn build(gapp: &gtk::Application) {
     map_location_btn.connect_clicked(move |_| {
         {
             let mut st = a_loc.map_state.borrow_mut();
-            st.offset_x = 0.0;
-            st.offset_y = 0.0;
+            st.target_offset_x = 0.0;
+            st.target_offset_y = 0.0;
+            st.vel_x = 0.0;
+            st.vel_y = 0.0;
             st.user_panned = false;
         }
         a_loc.map_location_btn.set_visible(false);
-        a_loc.map_drawing_area.queue_draw();
+        a_loc.trigger_map_animation();
     });
 
     let a_draw = app.clone();
@@ -4376,16 +4576,24 @@ fn build(gapp: &gtk::Application) {
     let drag_dist = Rc::new(Cell::new(0.0));
     let is_pinching = Rc::new(Cell::new(false));
     let pinch_end_time = Rc::new(Cell::new(0i64));
+    let last_drag_pos = Rc::new(Cell::new((0.0f64, 0.0f64)));
+    let last_drag_t = Rc::new(Cell::new(0i64));
 
     let drag = gtk::GestureDrag::new();
     drag.connect_drag_begin({
         let a = app.clone();
         let drag_dist = drag_dist.clone();
-        move |_gesture, _start_x, _start_y| {
+        let last_pos = last_drag_pos.clone();
+        let last_t = last_drag_t.clone();
+        move |_gesture, start_x, start_y| {
             drag_dist.set(0.0);
+            last_pos.set((start_x, start_y));
+            last_t.set(glib::monotonic_time());
             let mut st = a.map_state.borrow_mut();
-            st.drag_start_offset_x = st.offset_x;
-            st.drag_start_offset_y = st.offset_y;
+            st.drag_start_offset_x = st.target_offset_x;
+            st.drag_start_offset_y = st.target_offset_y;
+            st.vel_x = 0.0;
+            st.vel_y = 0.0;
         }
     });
 
@@ -4394,18 +4602,45 @@ fn build(gapp: &gtk::Application) {
         let drag_dist = drag_dist.clone();
         let is_pinching = is_pinching.clone();
         let pinch_end_time = pinch_end_time.clone();
+        let last_t = last_drag_t.clone();
         move |_gesture, offset_x, offset_y| {
             if is_pinching.get() || (glib::monotonic_time() - pinch_end_time.get()) < 200_000 {
                 return;
             }
             drag_dist.set(offset_x.hypot(offset_y));
+
+            let now = glib::monotonic_time();
+            let dt = ((now - last_t.get()) as f64 / 1e6).max(0.001);
+
             let mut st = a.map_state.borrow_mut();
-            st.offset_x = st.drag_start_offset_x - offset_x / st.zoom;
-            st.offset_y = st.drag_start_offset_y - offset_y / st.zoom;
+            let new_target_ox = st.drag_start_offset_x - offset_x / st.zoom;
+            let new_target_oy = st.drag_start_offset_y - offset_y / st.zoom;
+
+            let instant_vx = (new_target_ox - st.target_offset_x) / dt;
+            let instant_vy = (new_target_oy - st.target_offset_y) / dt;
+            st.vel_x = st.vel_x * 0.3 + instant_vx.clamp(-3000.0, 3000.0) * 0.7;
+            st.vel_y = st.vel_y * 0.3 + instant_vy.clamp(-3000.0, 3000.0) * 0.7;
+
+            st.target_offset_x = new_target_ox;
+            st.target_offset_y = new_target_oy;
+            st.offset_x = new_target_ox;
+            st.offset_y = new_target_oy;
             st.user_panned = true;
+
+            last_t.set(now);
             drop(st);
             a.update_map_location_btn_visibility();
             a.map_drawing_area.queue_draw();
+        }
+    });
+
+    drag.connect_drag_end({
+        let a = app.clone();
+        let drag_dist = drag_dist.clone();
+        move |_gesture, _offset_x, _offset_y| {
+            if drag_dist.get() > 4.0 {
+                a.trigger_map_animation();
+            }
         }
     });
     map_drawing_area.add_controller(drag);
@@ -4433,11 +4668,10 @@ fn build(gapp: &gtk::Application) {
     scroll.connect_scroll(move |_ctrl, _dx, dy| {
         if dy.abs() > 0.001 {
             let mut st = a_scroll.map_state.borrow_mut();
-            let factor = 1.0 - (dy * 0.08).clamp(-0.4, 0.4);
-            st.zoom = (st.zoom * factor).clamp(0.15, 5.0);
+            let factor = 1.0 - (dy * 0.12).clamp(-0.35, 0.35);
+            st.target_zoom = (st.target_zoom * factor).clamp(0.2, 4.0);
             drop(st);
-            a_scroll.update_map_location_btn_visibility();
-            a_scroll.map_drawing_area.queue_draw();
+            a_scroll.trigger_map_animation();
         }
         glib::Propagation::Stop
     });
@@ -4458,9 +4692,11 @@ fn build(gapp: &gtk::Application) {
     {
         let is_pinching = is_pinching.clone();
         let pinch_end_time = pinch_end_time.clone();
+        let a = app.clone();
         zoom_gesture.connect_end(move |_gesture, _seq| {
             is_pinching.set(false);
             pinch_end_time.set(glib::monotonic_time());
+            a.trigger_map_animation();
         });
     }
 
@@ -4472,7 +4708,8 @@ fn build(gapp: &gtk::Application) {
             if p > 0.0 && scale > 0.0 {
                 let factor = scale / p;
                 let mut st = a.map_state.borrow_mut();
-                st.zoom = (st.zoom * factor).clamp(0.15, 5.0);
+                st.target_zoom = (st.target_zoom * factor).clamp(0.2, 4.0);
+                st.zoom = st.target_zoom;
                 drop(st);
                 a.update_map_location_btn_visibility();
                 a.map_drawing_area.queue_draw();
