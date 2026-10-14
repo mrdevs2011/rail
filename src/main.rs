@@ -859,6 +859,24 @@ button.profile-item-btn.selected {
     background: #13192c;
     box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
 }
+.profile-card.dragging {
+    opacity: 0.65;
+    border-color: #38bdf8;
+    background: #182238;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.profile-drag-handle {
+    font-size: 15px;
+    font-weight: bold;
+    color: #475569;
+    padding: 0 4px 0 2px;
+    cursor: grab;
+    transition: color 150ms ease, transform 150ms ease;
+}
+.profile-drag-handle:hover {
+    color: #38bdf8;
+    transform: scale(1.15);
+}
 .profile-avatar-circle {
     min-width: 30px;
     min-height: 30px;
@@ -1661,7 +1679,10 @@ impl App {
 
     fn update_window_title(&self) {
         let focused_title = self.focused_view().and_then(|v| {
-            v.title().map(|s| s.to_string()).filter(|s| !s.trim().is_empty())
+            v.title()
+                .map(|s| s.to_string())
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| v.uri().and_then(|u| host_of(&u)))
         });
         let title = match focused_title {
             Some(t) => {
@@ -2446,6 +2467,7 @@ impl App {
         let app = self.clone();
         view.connect_uri_notify(move |v| {
             app.refresh_sidebar();
+            app.update_window_title();
             app.schedule_save_session();
             if let Some(u) = v.uri() {
                 let title = v.title().unwrap_or_default().to_string();
@@ -2548,8 +2570,9 @@ impl App {
                     if let Some(initial1) = start_w1.get() {
                         let total_pair = initial0 + initial1;
                         if total_pair <= vw + 15.0 {
-                            let new_w1 = (total_pair - new_w0).max(min_w);
-                            app.set_tab_width(r, c, new_w0);
+                            let clamped_w0 = new_w0.clamp(min_w, (total_pair - min_w).min(max_w));
+                            let new_w1 = (total_pair - clamped_w0).max(min_w);
+                            app.set_tab_width(r, c, clamped_w0);
                             app.set_tab_width(r, c + 1, new_w1);
                             return;
                         }
@@ -2570,7 +2593,26 @@ impl App {
             }
         });
 
+        let dbl_click = gtk::GestureClick::new();
+        dbl_click.set_button(gdk::BUTTON_PRIMARY);
+        let app_dbl = self.clone();
+        let v_dbl = view.clone();
+        dbl_click.connect_pressed(move |_, n_press, _, _| {
+            if n_press == 2 {
+                if let Some((r, c)) = app_dbl.find_view_coords(&v_dbl) {
+                    let rows = app_dbl.rows.borrow();
+                    if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) {
+                        tab.custom_width.set(None);
+                    }
+                    drop(rows);
+                    app_dbl.sync_strip();
+                    app_dbl.schedule_save_session();
+                }
+            }
+        });
+
         resize_handle.add_controller(drag);
+        resize_handle.add_controller(dbl_click);
     }
 
     fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_row: bool) {
@@ -3960,6 +4002,17 @@ impl App {
         self.map_location_btn.set_visible(should_show);
     }
 
+    fn minimap_tab_width(&self, tab: &Tab) -> f64 {
+        if let Some(cw) = tab.custom_width.get() {
+            let vw = self.strip.width().max(600) as f64;
+            (cw / vw * MAP_TAB_W_FULL).clamp(MAP_TAB_W * 0.7, MAP_TAB_W_FULL)
+        } else if tab.container.has_css_class("full") {
+            MAP_TAB_W_FULL
+        } else {
+            MAP_TAB_W
+        }
+    }
+
     fn compute_active_tab_center(&self, rows: &[Row]) -> (f64, f64) {
         let fr = self.focus_row.get();
         let fc = self.focus_col.get();
@@ -3969,7 +4022,7 @@ impl App {
                 let y = fr as f64 * (MAP_TAB_H + MAP_GAP_Y);
                 let mut x = 0.0;
                 for (i, tab) in row.tabs.iter().enumerate() {
-                    let w = if tab.container.has_css_class("full") { MAP_TAB_W_FULL } else { MAP_TAB_W };
+                    let w = self.minimap_tab_width(tab);
                     if i == fc {
                         return (x + w / 2.0, y + MAP_TAB_H / 2.0);
                     }
@@ -3989,7 +4042,7 @@ impl App {
                 let y = fr as f64 * (MAP_TAB_H + MAP_GAP_Y);
                 let mut x = 0.0;
                 for (i, tab) in row.tabs.iter().enumerate() {
-                    let w = if tab.container.has_css_class("full") { MAP_TAB_W_FULL } else { MAP_TAB_W };
+                    let w = self.minimap_tab_width(tab);
                     if i == fc {
                         return (x, y, w, MAP_TAB_H);
                     }
@@ -4167,7 +4220,7 @@ impl App {
 
             let mut x = 0.0;
             for (_c, tab) in row.tabs.iter().enumerate() {
-                let w = if tab.container.has_css_class("full") { MAP_TAB_W_FULL } else { MAP_TAB_W };
+                let w = self.minimap_tab_width(tab);
                 let sx = width / 2.0 + (x - cam_x) * zoom;
                 let sw = w * zoom;
                 x += w + MAP_GAP_X;
@@ -4239,7 +4292,7 @@ impl App {
             }
             let mut x = 0.0;
             for (c, tab) in row.tabs.iter().enumerate() {
-                let w = if tab.container.has_css_class("full") { MAP_TAB_W_FULL } else { MAP_TAB_W };
+                let w = self.minimap_tab_width(tab);
                 if world_x >= x && world_x <= x + w {
                     drop(rows);
                     self.focus_coords(r, c);
@@ -4259,12 +4312,57 @@ impl App {
             let mgr = self.profiles.borrow();
             (mgr.profiles().to_vec(), mgr.active_id().to_string(), mgr.profiles().len() > 1)
         };
+        let total_profiles = profiles.len();
 
-        for p in profiles {
-            let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        for (idx, p) in profiles.into_iter().enumerate() {
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
             row.add_css_class("profile-card");
             if p.id == active_id {
                 row.add_css_class("active-profile");
+            }
+
+            let drag_handle = gtk::Label::new(Some("⋮⋮"));
+            drag_handle.add_css_class("profile-drag-handle");
+            drag_handle.set_cursor_from_name(Some("grab"));
+            drag_handle.set_valign(gtk::Align::Center);
+            drag_handle.set_tooltip_text(Some("Drag up or down to reorder profiles"));
+
+            if total_profiles > 1 {
+                let drag = gtk::GestureDrag::new();
+                drag.set_button(gdk::BUTTON_PRIMARY);
+
+                let row_drag = row.clone();
+                let handle_drag = drag_handle.clone();
+                drag.connect_drag_begin(move |_gesture, _start_x, _start_y| {
+                    row_drag.add_css_class("dragging");
+                    handle_drag.set_cursor_from_name(Some("grabbing"));
+                });
+
+                let row_end = row.clone();
+                let handle_end = drag_handle.clone();
+                let app_end = self.clone();
+                let from_idx = idx;
+                drag.connect_drag_end(move |_gesture, _offset_x, offset_y| {
+                    row_end.remove_css_class("dragging");
+                    handle_end.set_cursor_from_name(Some("grab"));
+
+                    let card_height = 54.0f64;
+                    let delta = (offset_y / card_height).round() as isize;
+                    let target_idx = ((from_idx as isize) + delta).clamp(0, (total_profiles - 1) as isize) as usize;
+
+                    if target_idx != from_idx {
+                        if app_end.profiles.borrow_mut().reorder_profile(from_idx, target_idx) {
+                            let a = app_end.clone();
+                            glib::idle_add_local_once(move || {
+                                a.rebuild_profiles_modal_list();
+                                a.rebuild_profile_popover();
+                                a.refresh_sidebar();
+                            });
+                        }
+                    }
+                });
+
+                drag_handle.add_controller(drag);
             }
 
             let avatar = gtk::Label::new(Some(&p.initial_letter()));
@@ -4344,6 +4442,7 @@ impl App {
                 actions_box.append(&del_btn);
             }
 
+            row.append(&drag_handle);
             row.append(&avatar);
             row.append(&info_box);
             row.append(&actions_box);
@@ -5560,30 +5659,49 @@ fn build(gapp: &gtk::Application) {
 
     let header_start_margin_end = Rc::new(Cell::new(24));
     let header_start_margin_bottom = Rc::new(Cell::new(24));
+    let header_start_root_x = Rc::new(Cell::new(0.0f64));
+    let header_start_root_y = Rc::new(Cell::new(0.0f64));
 
     {
         let start_e = header_start_margin_end.clone();
         let start_b = header_start_margin_bottom.clone();
+        let start_rx = header_start_root_x.clone();
+        let start_ry = header_start_root_y.clone();
         let map_container = map_container.clone();
         let map_header_row = map_header_row.clone();
         header_drag.connect_drag_begin(move |gesture, _start_x, _start_y| {
             start_e.set(map_container.margin_end());
             start_b.set(map_container.margin_bottom());
-            map_header_row.set_cursor_from_name(Some("grabbing"));
             if let Some(ev) = gesture.current_event() {
-                let _ = ev.position();
+                if let Some((rx, ry)) = ev.position() {
+                    start_rx.set(rx);
+                    start_ry.set(ry);
+                }
             }
+            map_header_row.set_cursor_from_name(Some("grabbing"));
         });
     }
 
     {
         let start_e = header_start_margin_end.clone();
         let start_b = header_start_margin_bottom.clone();
+        let start_rx = header_start_root_x.clone();
+        let start_ry = header_start_root_y.clone();
         let map_container = map_container.clone();
         let overlay = overlay.clone();
-        header_drag.connect_drag_update(move |_gesture, offset_x, offset_y| {
-            let new_m_end = start_e.get() - (offset_x.round() as i32);
-            let new_m_bottom = start_b.get() - (offset_y.round() as i32);
+        header_drag.connect_drag_update(move |gesture, offset_x, offset_y| {
+            let (dx, dy) = if let Some(ev) = gesture.current_event() {
+                if let Some((rx, ry)) = ev.position() {
+                    (rx - start_rx.get(), ry - start_ry.get())
+                } else {
+                    (offset_x, offset_y)
+                }
+            } else {
+                (offset_x, offset_y)
+            };
+
+            let new_m_end = start_e.get() - (dx.round() as i32);
+            let new_m_bottom = start_b.get() - (dy.round() as i32);
 
             let overlay_w = overlay.width().max(600);
             let overlay_h = overlay.height().max(400);
