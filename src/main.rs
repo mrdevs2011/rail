@@ -1257,6 +1257,36 @@ impl App {
 
     fn setup_view_signals(self: &Rc<Self>, view: &WebView) {
         let app = self.clone();
+        let v = view.clone();
+        let click = gtk::GestureClick::new();
+        click.set_button(0); // Listen to any mouse click
+        click.set_propagation_phase(gtk::PropagationPhase::Capture);
+        click.connect_pressed(move |_, _, _, _| {
+            if !app.ov.get() {
+                if let Some((r, c)) = app.find_view_coords(&v) {
+                    if app.focus_row.get() != r || app.focus_col.get() != c {
+                        app.focus_coords(r, c);
+                    }
+                }
+            }
+        });
+        view.add_controller(click);
+
+        let app = self.clone();
+        let v = view.clone();
+        let focus = gtk::EventControllerFocus::new();
+        focus.connect_enter(move |_| {
+            if !app.ov.get() {
+                if let Some((r, c)) = app.find_view_coords(&v) {
+                    if app.focus_row.get() != r || app.focus_col.get() != c {
+                        app.focus_coords(r, c);
+                    }
+                }
+            }
+        });
+        view.add_controller(focus);
+
+        let app = self.clone();
         view.connect_title_notify(move |_| app.refresh_sidebar());
         let app = self.clone();
         view.connect_uri_notify(move |_| {
@@ -1286,6 +1316,26 @@ impl App {
         });
     }
 
+    fn setup_tab_signals(self: &Rc<Self>, container: &gtk::Box, view: &WebView) {
+        self.setup_view_signals(view);
+
+        let app = self.clone();
+        let v = view.clone();
+        let click = gtk::GestureClick::new();
+        click.set_button(0);
+        click.set_propagation_phase(gtk::PropagationPhase::Capture);
+        click.connect_pressed(move |_, _, _, _| {
+            if !app.ov.get() {
+                if let Some((r, c)) = app.find_view_coords(&v) {
+                    if app.focus_row.get() != r || app.focus_col.get() != c {
+                        app.focus_coords(r, c);
+                    }
+                }
+            }
+        });
+        container.add_controller(click);
+    }
+
     fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_row: bool) {
         view.set_can_target(!self.ov.get());
         let container = Self::create_tab_widget(&view);
@@ -1301,7 +1351,7 @@ impl App {
                 while rows.len() <= next_r {
                     rows.push(Row { tabs: Vec::new() });
                 }
-                rows[next_r].tabs.push(Tab { container, view: view.clone(), profile_id });
+                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), profile_id });
                 let c_idx = rows[next_r].tabs.len() - 1;
                 (next_r, c_idx)
             } else {
@@ -1312,12 +1362,12 @@ impl App {
                 } else {
                     (cur_c + 1).min(rows[cur_r].tabs.len())
                 };
-                rows[cur_r].tabs.insert(col_idx, Tab { container, view: view.clone(), profile_id });
+                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), profile_id });
                 (cur_r, col_idx)
             }
         };
 
-        self.setup_view_signals(&view);
+        self.setup_tab_signals(&container, &view);
         self.sync_strip();
         self.focus_coords(target_r, target_c);
     }
@@ -1525,7 +1575,7 @@ impl App {
             view.load_html(START_PAGE, None);
             view.set_can_target(!self.ov.get());
             let container = Self::create_tab_widget(&view);
-            self.setup_view_signals(&view);
+            self.setup_tab_signals(&container, &view);
 
             let mut rows = self.rows.borrow_mut();
             rows[0].tabs.push(Tab { container, view, profile_id: prof_id });
@@ -1683,7 +1733,7 @@ impl App {
             if !item.full {
                 container.remove_css_class("full");
             }
-            self.setup_view_signals(&view);
+            self.setup_tab_signals(&container, &view);
             loaded_tabs.push((item.row, Tab { container, view, profile_id: item.profile_id }));
         }
 
