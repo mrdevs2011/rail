@@ -3437,6 +3437,8 @@ fn build(gapp: &gtk::Application) {
     });
 
     let drag_dist = Rc::new(Cell::new(0.0));
+    let is_pinching = Rc::new(Cell::new(false));
+    let pinch_end_time = Rc::new(Cell::new(0i64));
 
     let drag = gtk::GestureDrag::new();
     drag.connect_drag_begin({
@@ -3453,7 +3455,12 @@ fn build(gapp: &gtk::Application) {
     drag.connect_drag_update({
         let a = app.clone();
         let drag_dist = drag_dist.clone();
+        let is_pinching = is_pinching.clone();
+        let pinch_end_time = pinch_end_time.clone();
         move |_gesture, offset_x, offset_y| {
+            if is_pinching.get() || (glib::monotonic_time() - pinch_end_time.get()) < 200_000 {
+                return;
+            }
             drag_dist.set(offset_x.hypot(offset_y));
             let mut st = a.map_state.borrow_mut();
             st.offset_x = st.drag_start_offset_x - offset_x / st.zoom;
@@ -3470,7 +3477,12 @@ fn build(gapp: &gtk::Application) {
     click.set_button(gdk::BUTTON_PRIMARY);
     let a_click = app.clone();
     let drag_dist_for_click = drag_dist.clone();
+    let is_pinching_click = is_pinching.clone();
+    let pinch_end_time_click = pinch_end_time.clone();
     click.connect_released(move |_gesture, _n_press, x, y| {
+        if is_pinching_click.get() || (glib::monotonic_time() - pinch_end_time_click.get()) < 250_000 {
+            return;
+        }
         if drag_dist_for_click.get() < 6.0 {
             a_click.handle_minimap_click(x, y);
         }
@@ -3482,18 +3494,56 @@ fn build(gapp: &gtk::Application) {
     );
     let a_scroll = app.clone();
     scroll.connect_scroll(move |_ctrl, _dx, dy| {
-        let mut st = a_scroll.map_state.borrow_mut();
-        if dy < 0.0 {
-            st.zoom = (st.zoom * 1.15).min(5.0);
-        } else if dy > 0.0 {
-            st.zoom = (st.zoom / 1.15).max(0.15);
+        if dy.abs() > 0.001 {
+            let mut st = a_scroll.map_state.borrow_mut();
+            let factor = 1.0 - (dy * 0.08).clamp(-0.4, 0.4);
+            st.zoom = (st.zoom * factor).clamp(0.15, 5.0);
+            drop(st);
+            a_scroll.update_map_location_btn_visibility();
+            a_scroll.map_drawing_area.queue_draw();
         }
-        drop(st);
-        a_scroll.update_map_location_btn_visibility();
-        a_scroll.map_drawing_area.queue_draw();
         glib::Propagation::Stop
     });
     map_drawing_area.add_controller(scroll);
+
+    let zoom_gesture = gtk::GestureZoom::new();
+    let prev_scale = Rc::new(Cell::new(1.0f64));
+
+    {
+        let prev_scale = prev_scale.clone();
+        let is_pinching = is_pinching.clone();
+        zoom_gesture.connect_begin(move |_gesture, _seq| {
+            prev_scale.set(1.0);
+            is_pinching.set(true);
+        });
+    }
+
+    {
+        let is_pinching = is_pinching.clone();
+        let pinch_end_time = pinch_end_time.clone();
+        zoom_gesture.connect_end(move |_gesture, _seq| {
+            is_pinching.set(false);
+            pinch_end_time.set(glib::monotonic_time());
+        });
+    }
+
+    {
+        let a = app.clone();
+        let prev_scale = prev_scale.clone();
+        zoom_gesture.connect_scale_changed(move |_gesture, scale| {
+            let p = prev_scale.get();
+            if p > 0.0 && scale > 0.0 {
+                let factor = scale / p;
+                let mut st = a.map_state.borrow_mut();
+                st.zoom = (st.zoom * factor).clamp(0.15, 5.0);
+                drop(st);
+                a.update_map_location_btn_visibility();
+                a.map_drawing_area.queue_draw();
+            }
+            prev_scale.set(scale);
+        });
+    }
+    map_drawing_area.add_controller(zoom_gesture);
 
     let a = app.clone();
     data_modal_close_btn.connect_clicked(move |_| a.hide_data_modal());
