@@ -874,6 +874,13 @@ button.color-choice.selected {
     background: #090e1a;
     border-bottom: 1px solid #141c2c;
     padding: 6px 10px;
+    cursor: grab;
+}
+.minimap-header:active {
+    cursor: grabbing;
+}
+.minimap-header button {
+    cursor: pointer;
 }
 .minimap-header-icon {
     color: #38bdf8;
@@ -4168,6 +4175,7 @@ fn build(gapp: &gtk::Application) {
     // ---- Minimap / Roadmap (Ctrl+M) ----
     let map_header_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     map_header_row.add_css_class("minimap-header");
+    map_header_row.set_cursor_from_name(Some("grab"));
 
     let map_icon = gtk::Image::from_icon_name("view-grid-symbolic");
     map_icon.add_css_class("minimap-header-icon");
@@ -4181,13 +4189,14 @@ fn build(gapp: &gtk::Application) {
     let map_badge = gtk::Label::new(Some("Ctrl+M"));
     map_badge.add_css_class("minimap-badge");
 
-    let map_hint = gtk::Label::new(Some("Pinch / Drag"));
+    let map_hint = gtk::Label::new(Some("Drag header"));
     map_hint.add_css_class("minimap-header-hint");
     map_hint.set_xalign(0.0);
 
     let map_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
     map_close_btn.add_css_class("flat-icon");
     map_close_btn.set_tooltip_text(Some("Close Map (Ctrl+M / Esc)"));
+    map_close_btn.set_cursor_from_name(Some("pointer"));
 
     map_header_row.append(&map_icon);
     map_header_row.append(&map_title);
@@ -4433,6 +4442,55 @@ fn build(gapp: &gtk::Application) {
         });
     }
     map_drawing_area.add_controller(zoom_gesture);
+
+    // ---- Minimap Header Dragging (reposition floating roadmap window) ----
+    let header_drag = gtk::GestureDrag::new();
+    header_drag.set_button(gdk::BUTTON_PRIMARY);
+
+    let header_start_margin_end = Rc::new(Cell::new(24));
+    let header_start_margin_bottom = Rc::new(Cell::new(24));
+
+    {
+        let start_e = header_start_margin_end.clone();
+        let start_b = header_start_margin_bottom.clone();
+        let map_container = map_container.clone();
+        let map_header_row = map_header_row.clone();
+        header_drag.connect_drag_begin(move |_gesture, _start_x, _start_y| {
+            start_e.set(map_container.margin_end());
+            start_b.set(map_container.margin_bottom());
+            map_header_row.set_cursor_from_name(Some("grabbing"));
+        });
+    }
+
+    {
+        let start_e = header_start_margin_end.clone();
+        let start_b = header_start_margin_bottom.clone();
+        let map_container = map_container.clone();
+        let overlay = overlay.clone();
+        header_drag.connect_drag_update(move |_gesture, offset_x, offset_y| {
+            let new_m_end = start_e.get() - (offset_x.round() as i32);
+            let new_m_bottom = start_b.get() - (offset_y.round() as i32);
+
+            let overlay_w = overlay.width().max(600);
+            let overlay_h = overlay.height().max(400);
+            let map_w = map_container.width().max(380);
+            let map_h = map_container.height().max(260);
+
+            let max_margin_e = (overlay_w - map_w - 8).max(8);
+            let max_margin_b = (overlay_h - map_h - 8).max(8);
+
+            map_container.set_margin_end(new_m_end.clamp(8, max_margin_e));
+            map_container.set_margin_bottom(new_m_bottom.clamp(8, max_margin_b));
+        });
+    }
+
+    {
+        let map_header_row = map_header_row.clone();
+        header_drag.connect_drag_end(move |_gesture, _offset_x, _offset_y| {
+            map_header_row.set_cursor_from_name(Some("grab"));
+        });
+    }
+    map_header_row.add_controller(header_drag);
 
     let a = app.clone();
     data_modal_close_btn.connect_clicked(move |_| a.hide_data_modal());
