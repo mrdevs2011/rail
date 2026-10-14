@@ -1057,6 +1057,7 @@ struct App {
 
 fn to_uri(input: &str) -> String {
     let s = input.trim();
+    let s = s.strip_prefix("view-source:").unwrap_or(s).trim();
     if s.contains("://") || s.starts_with("about:") || s.starts_with("file:") {
         return s.into();
     }
@@ -1338,6 +1339,7 @@ impl App {
 
     // ---- tabs & workspaces -----------------------------------------------
 
+    #[allow(dead_code)]
     fn focused_tab_profile(&self) -> Option<String> {
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
@@ -1364,7 +1366,7 @@ impl App {
 
         let settings = webkit6::Settings::new();
         settings.set_user_agent(Some(persona.user_agent));
-        settings.set_enable_webrtc(false);
+        settings.set_enable_webrtc(true);
         settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_dns_prefetching(false);
         settings.set_enable_smooth_scrolling(true);
@@ -1749,15 +1751,14 @@ impl App {
 
         // 6. Developer Tools (Always present at bottom!)
         let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_default();
-        if !cur_uri.is_empty() && !cur_uri.starts_with("view-source:") && !cur_uri.starts_with("about:") {
+        if !cur_uri.is_empty() && !cur_uri.starts_with("about:") {
             let app_src = self.clone();
-            let src_uri = format!("view-source:{}", cur_uri);
             let act_src = gio::SimpleAction::new("ctx-view-source", None);
             act_src.connect_activate(move |_, _| {
-                app_src.new_tab_with_url(&src_uri);
+                app_src.toggle_devtools();
             });
             self.win.add_action(&act_src);
-            menu.append(&ContextMenuItem::from_gaction(&act_src, "View Page Source", None));
+            menu.append(&ContextMenuItem::from_gaction(&act_src, "View Page Source  (Ctrl+Shift+I)", None));
         }
 
         menu.append(&ContextMenuItem::from_stock_action_with_label(
@@ -2478,7 +2479,7 @@ impl App {
         new_ws_box.add_css_class("btn-new-workspace");
         new_ws_box.set_halign(gtk::Align::Fill);
         let new_ws_icon = gtk::Image::from_icon_name("list-add-symbolic");
-        let new_ws_lbl = gtk::Label::new(Some("+ New Workspace (Ctrl+V)"));
+        let new_ws_lbl = gtk::Label::new(Some("+ New Workspace (Ctrl+Shift+V)"));
         new_ws_lbl.set_xalign(0.0);
         new_ws_lbl.set_hexpand(true);
         new_ws_box.append(&new_ws_icon);
@@ -2674,7 +2675,7 @@ impl App {
         let uri = self.focused_view().and_then(|v| v.uri()).filter(|u| !u.starts_with("about:"));
         self.entry.set_text(uri.as_deref().unwrap_or(""));
 
-        let prof_id = self.focused_tab_profile().unwrap_or_else(|| self.profiles.borrow().active_id().to_string());
+        let prof_id = self.profiles.borrow().active_id().to_string();
         self.select_palette_profile(&prof_id);
         self.rebuild_profile_popover();
 
@@ -3454,9 +3455,7 @@ impl App {
         let color_idx = self.new_profile_color_idx.get();
         let create_res = self.profiles.borrow_mut().create_profile(&clean, color_idx);
         match create_res {
-            Ok(new_p) => {
-                self.profiles.borrow_mut().set_active(&new_p.id);
-                self.select_palette_profile(&new_p.id);
+            Ok(_new_p) => {
                 self.new_profile_entry.set_text("");
                 self.update_create_profile_btn_state();
                 self.rebuild_profiles_modal_list();
@@ -3684,7 +3683,7 @@ impl App {
                 gdk::Key::p | gdk::Key::P => self.toggle_profiles_modal(),
                 gdk::Key::i | gdk::Key::I => self.toggle_data_modal(),
                 gdk::Key::t => self.new_tab(),
-                gdk::Key::v => self.split_vertical(),
+                gdk::Key::n => self.split_vertical(),
                 gdk::Key::f => self.toggle_full(),
                 gdk::Key::h | gdk::Key::Left => self.focus_column_left(),
                 gdk::Key::l | gdk::Key::Right => self.focus_column_right(),
@@ -3762,6 +3761,7 @@ impl App {
                 gdk::Key::p | gdk::Key::P => self.toggle_profiles_modal(),
                 gdk::Key::i | gdk::Key::I => self.toggle_devtools(),
                 gdk::Key::t | gdk::Key::T => self.toggle_touchpad_mode(),
+                gdk::Key::v | gdk::Key::V | gdk::Key::n | gdk::Key::N => self.split_vertical(),
                 gdk::Key::h | gdk::Key::Left => self.move_column(-1),
                 gdk::Key::l | gdk::Key::Right => self.move_column(1),
                 gdk::Key::j | gdk::Key::Down => self.move_tab_to_row(self.focus_row.get() + 1),
@@ -3872,7 +3872,7 @@ fn build(gapp: &gtk::Application) {
     list_scroll.set_vexpand(true);
     list_scroll.set_child(Some(&list));
 
-    let hint = gtk::Label::new(Some("ctrl+h/l tabs  |  ctrl+j/k rows  |  ctrl+v new row"));
+    let hint = gtk::Label::new(Some("ctrl+h/l tabs  |  ctrl+j/k rows  |  ctrl+shift+v new row"));
     hint.add_css_class("side-hint");
     hint.set_xalign(0.0);
     hint.set_margin_start(4);

@@ -289,22 +289,22 @@ impl ProfilePersona {
 
         const PERSONAS: &[(&str, &str, &str, usize, usize, &str, &str)] = &[
             (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                "Win32",
-                "Windows NT 10.0; Win64; x64",
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+                "Linux x86_64",
+                "Linux x86_64",
                 16,
                 16,
                 "Google Inc. (NVIDIA)",
-                "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070, OpenGL 4.6)",
             ),
             (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                "MacIntel",
-                "Intel Mac OS X 10.15",
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Linux x86_64",
+                "Linux x86_64",
                 12,
                 16,
-                "Google Inc. (Apple)",
-                "ANGLE (Apple, Apple M2 Pro, OpenGL 4.1)",
+                "Google Inc. (Intel)",
+                "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)",
             ),
             (
                 "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0",
@@ -316,49 +316,49 @@ impl ProfilePersona {
                 "Mesa Intel(R) UHD Graphics 620 (KBL GT2)",
             ),
             (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
-                "Win32",
-                "Windows NT 10.0; Win64; x64",
-                12,
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Linux x86_64",
+                "Linux x86_64",
+                16,
                 32,
-                "Google Inc. (Intel)",
-                "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x00009A49) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+                "Google Inc. (AMD)",
+                "AMD Radeon RX 6700 XT (RADV NAVI22)",
             ),
             (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
-                "MacIntel",
-                "Intel Mac OS X 10.15",
-                10,
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+                "Linux x86_64",
+                "Linux x86_64",
                 8,
-                "Apple Inc.",
-                "Apple M3",
+                16,
+                "Google Inc. (Intel)",
+                "Mesa Intel(R) Arc(TM) A770 Graphics (DG2)",
             ),
             (
-                "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:130.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0",
+                "Linux x86_64",
+                "Linux x86_64",
+                12,
+                16,
+                "Google Inc. (NVIDIA)",
+                "NVIDIA GeForce RTX 3060/PCIe/SSE2",
+            ),
+            (
+                "Mozilla/5.0 (X11; Fedora; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+                "Linux x86_64",
+                "Linux x86_64",
+                8,
+                8,
+                "Google Inc. (NVIDIA)",
+                "NVIDIA GeForce GTX 1660 SUPER/PCIe/SSE2",
+            ),
+            (
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
                 "Linux x86_64",
                 "Linux x86_64",
                 16,
                 16,
                 "Google Inc. (AMD)",
-                "ANGLE (AMD, AMD Radeon RX 6700 XT, OpenGL 4.6)",
-            ),
-            (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
-                "Win32",
-                "Windows NT 10.0; Win64; x64",
-                6,
-                8,
-                "Google Inc. (NVIDIA)",
-                "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 SUPER Direct3D11 vs_5_0 ps_5_0, D3D11)",
-            ),
-            (
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                "Linux x86_64",
-                "Linux x86_64",
-                12,
-                16,
-                "Google Inc. (NVIDIA)",
-                "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060, OpenGL 4.6)",
+                "AMD Radeon Graphics (RADV RENOIR)",
             ),
         ];
 
@@ -410,6 +410,17 @@ impl ProfilePersona {
     const webglVendor = "{}";
     const webglRenderer = "{}";
 
+    const makeNative = (fn, name) => {{
+        try {{
+            Object.defineProperty(fn, 'name', {{ value: name, configurable: true }});
+            const nativeStr = 'function ' + name + '() {{ [native code] }}';
+            Object.defineProperty(fn, 'toString', {{
+                value: function toString() {{ return nativeStr; }},
+                configurable: true
+            }});
+        }} catch(e) {{}}
+    }};
+
     try {{
         Object.defineProperty(navigator, 'hardwareConcurrency', {{ get: () => hwConcurrency, configurable: true }});
         Object.defineProperty(navigator, 'deviceMemory', {{ get: () => devMemory, configurable: true }});
@@ -427,47 +438,42 @@ impl ProfilePersona {
     try {{
         if (typeof CanvasRenderingContext2D !== 'undefined') {{
             const origGetImageData = CanvasRenderingContext2D.prototype.getImageData;
-            CanvasRenderingContext2D.prototype.getImageData = function(x, y, w, h) {{
+            const patchedGetImageData = function(x, y, w, h) {{
                 const imgData = origGetImageData.apply(this, arguments);
-                const data = imgData.data;
-                if (data.length >= 8) {{
-                    const noise1 = pseudoNoise(0);
-                    const noise2 = pseudoNoise(1);
-                    data[0] = Math.max(0, Math.min(255, data[0] + noise1));
-                    data[4] = Math.max(0, Math.min(255, data[4] + noise2));
+                if (w > 64 && h > 64 && imgData.data && imgData.data.length >= 1024) {{
+                    const d = imgData.data;
+                    const noise = pseudoNoise(0);
+                    d[d.length - 4] = Math.max(0, Math.min(255, d[d.length - 4] + noise));
                 }}
                 return imgData;
             }};
+            makeNative(patchedGetImageData, 'getImageData');
+            CanvasRenderingContext2D.prototype.getImageData = patchedGetImageData;
         }}
 
         if (typeof HTMLCanvasElement !== 'undefined') {{
             const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
-            HTMLCanvasElement.prototype.toDataURL = function() {{
-                const ctx = this.getContext('2d');
-                if (ctx && this.width > 0 && this.height > 0) {{
-                    try {{
-                        const noise = pseudoNoise(2);
-                        const curAlpha = ctx.globalAlpha;
-                        ctx.globalAlpha = Math.max(0.0001, curAlpha - (noise * 0.00002));
-                        ctx.globalAlpha = curAlpha;
-                    }} catch(e) {{}}
-                }}
+            const patchedToDataURL = function() {{
                 return origToDataURL.apply(this, arguments);
             }};
+            makeNative(patchedToDataURL, 'toDataURL');
+            HTMLCanvasElement.prototype.toDataURL = patchedToDataURL;
         }}
     }} catch(e) {{}}
 
     try {{
         if (typeof AudioBuffer !== 'undefined') {{
             const origGetChannelData = AudioBuffer.prototype.getChannelData;
-            AudioBuffer.prototype.getChannelData = function(channel) {{
+            const patchedGetChannelData = function(channel) {{
                 const arr = origGetChannelData.apply(this, arguments);
-                if (arr && arr.length > 10) {{
-                    const noise = (pseudoNoise(channel) * 0.0000001);
+                if (arr && arr.length > 512) {{
+                    const noise = (pseudoNoise(channel) * 0.00000005);
                     arr[arr.length - 1] += noise;
                 }}
                 return arr;
             }};
+            makeNative(patchedGetChannelData, 'getChannelData');
+            AudioBuffer.prototype.getChannelData = patchedGetChannelData;
         }}
     }} catch(e) {{}}
 
@@ -475,13 +481,15 @@ impl ProfilePersona {
         const spoofGL = function(proto) {{
             if (!proto) return;
             const origGetParameter = proto.getParameter;
-            proto.getParameter = function(param) {{
+            const patchedGetParameter = function(param) {{
                 // UNMASKED_VENDOR_WEBGL (0x9245)
                 if (param === 0x9245) return webglVendor;
                 // UNMASKED_RENDERER_WEBGL (0x9246)
                 if (param === 0x9246) return webglRenderer;
                 return origGetParameter.apply(this, arguments);
             }};
+            makeNative(patchedGetParameter, 'getParameter');
+            proto.getParameter = patchedGetParameter;
         }};
         if (typeof WebGLRenderingContext !== 'undefined') spoofGL(WebGLRenderingContext.prototype);
         if (typeof WebGL2RenderingContext !== 'undefined') spoofGL(WebGL2RenderingContext.prototype);
