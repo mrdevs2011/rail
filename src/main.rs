@@ -58,6 +58,7 @@ kbd{font:11px ui-monospace,monospace;background:#090a0f;border:1px solid #1c1d29
 <span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>2</kbd> <kbd>1</kbd></span><span>move tab to workspace 2 / 1</span>
 <span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>T</kbd></span><span>touchpad mode (2-finger slide tabs)</span>
 <span><kbd>Ctrl</kbd><kbd>P</kbd> / <kbd>Shift</kbd><kbd>P</kbd></span><span>manage profiles</span>
+<span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>I</kbd></span><span>import / export all data</span>
 <span><kbd>Ctrl</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>focus left / right tab</span>
 <span><kbd>Ctrl</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>focus workspace down / up</span>
 <span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>H</kbd> <kbd>L</kbd></span><span>move tab left / right</span>
@@ -658,6 +659,93 @@ button.color-choice.selected {
     box-shadow: 0 0 0 2px #06070a;
     transform: scale(1.15);
 }
+
+/* ---- data backup & migration modal (Ctrl+Shift+I) ---- */
+.data-modal {
+    background: #06070a;
+    border: 1px solid #1e202d;
+    border-radius: 16px;
+    padding: 22px 26px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.98);
+    min-width: 520px;
+    max-width: 620px;
+    margin-left: 16px;
+    margin-right: 16px;
+}
+.data-modal-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #f8fafc;
+    letter-spacing: -0.03em;
+    font-family: ui-monospace, monospace, system-ui;
+}
+.data-modal-subtitle {
+    font-size: 11.5px;
+    color: #64748b;
+    margin-top: 2px;
+}
+.data-section-box {
+    background: #090a0f;
+    border: 1px solid #161722;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-top: 8px;
+}
+.data-section-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #38bdf8;
+    font-family: ui-monospace, monospace;
+}
+.data-section-desc {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 2px;
+    margin-bottom: 8px;
+}
+.data-info-card {
+    background: #0a0b12;
+    border: 1px solid #1c2030;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: #94a3b8;
+}
+.btn-data-action {
+    background: #111422;
+    border: 1px solid #24293d;
+    border-radius: 6px;
+    color: #f1f5f9;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    transition: all 120ms ease;
+}
+.btn-data-action:hover {
+    background: #1a2035;
+    border-color: #38bdf8;
+    color: #38bdf8;
+}
+.btn-data-primary {
+    background: #0284c7;
+    border: 1px solid #38bdf8;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 14px;
+    transition: all 120ms ease;
+}
+.btn-data-primary:hover {
+    background: #0369a1;
+    border-color: #7dd3fc;
+}
+.data-status-lbl {
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+    margin-top: 6px;
+}
 ";
 
 /// How far the strip zooms out in overview (niri uses a similar factor).
@@ -720,6 +808,11 @@ struct App {
     touchpad_mode: Cell<bool>,
     last_saved_session: RefCell<String>,
     save_session_gen: Cell<u64>,
+    data_modal: gtk::Box,
+    data_modal_info_lbl: gtk::Label,
+    data_modal_status_lbl: gtk::Label,
+    data_export_entry: gtk::Entry,
+    data_import_entry: gtk::Entry,
 }
 
 fn to_uri(input: &str) -> String {
@@ -1449,6 +1542,17 @@ impl App {
             if t.row > max_row { max_row = t.row; }
         }
 
+        // Clear any existing tabs before loading restored session
+        {
+            let mut rows = self.rows.borrow_mut();
+            for r in rows.iter_mut() {
+                for t in r.tabs.drain(..) {
+                    self.strip.remove(&t.container);
+                }
+            }
+            rows.clear();
+        }
+
         let mut loaded_tabs: Vec<(usize, Tab)> = Vec::new();
         for item in tab_items {
             let session = self.profiles.borrow_mut().get_or_create_session(&item.profile_id);
@@ -1954,6 +2058,122 @@ impl App {
         }
     }
 
+    fn data_modal_open(&self) -> bool {
+        self.data_modal.is_visible()
+    }
+
+    fn toggle_data_modal(self: &Rc<Self>) {
+        if self.data_modal_open() {
+            self.hide_data_modal();
+        } else {
+            self.show_data_modal();
+        }
+    }
+
+    fn show_data_modal(self: &Rc<Self>) {
+        if self.profiles_modal_open() {
+            self.hide_profiles_modal();
+        }
+        if self.palette_open() {
+            self.hide_palette();
+        }
+        self.refresh_data_modal_info();
+        let timestamp = glib::DateTime::now_local()
+            .ok()
+            .and_then(|d| d.format("%Y%m%d_%H%M%S").ok())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "backup".to_string());
+        let default_export = glib::home_dir().join(format!("rail_backup_{}.tar.gz", timestamp));
+        self.data_export_entry.set_text(&default_export.to_string_lossy());
+        self.data_modal_status_lbl.set_text("");
+        self.data_modal.set_visible(true);
+        self.data_export_entry.grab_focus();
+    }
+
+    fn hide_data_modal(&self) {
+        self.data_modal.set_visible(false);
+        if let Some(v) = self.focused_view() {
+            v.grab_focus();
+        }
+    }
+
+    fn refresh_data_modal_info(&self) {
+        let dir = rail_data_dir();
+        let rows = self.rows.borrow();
+        let total_tabs: usize = rows.iter().map(|r| r.tabs.len()).sum();
+        let ws_count = rows.len();
+        drop(rows);
+        let prof_count = self.profiles.borrow().profiles().len();
+
+        let info_text = format!(
+            "Directory: {}\nStatus:    {} open tab(s) in {} workspace(s) | {} profiles (cookies/logins active)",
+            dir.display(), total_tabs, ws_count, prof_count
+        );
+        self.data_modal_info_lbl.set_text(&info_text);
+    }
+
+    fn execute_export_action(self: &Rc<Self>) {
+        self.save_session_immediate();
+        let path_str = self.data_export_entry.text().to_string();
+        let path = PathBuf::from(path_str.trim());
+        if path.as_os_str().is_empty() {
+            self.data_modal_status_lbl.set_markup("<span foreground='#f87171'><b>Error:</b> Please specify an export destination file.</span>");
+            return;
+        }
+
+        match export_data(&path) {
+            Ok(()) => {
+                let size_str = std::fs::metadata(&path)
+                    .map(|m| format!("{:.1} KB", m.len() as f64 / 1024.0))
+                    .unwrap_or_else(|_| "saved".into());
+                self.data_modal_status_lbl.set_markup(&format!(
+                    "<span foreground='#4ade80'><b>Export Successful:</b> {} ({})</span>",
+                    glib::markup_escape_text(&path.to_string_lossy()), size_str
+                ));
+            }
+            Err(e) => {
+                self.data_modal_status_lbl.set_markup(&format!(
+                    "<span foreground='#f87171'><b>Export Failed:</b> {}</span>",
+                    glib::markup_escape_text(&e)
+                ));
+            }
+        }
+    }
+
+    fn execute_import_action(self: &Rc<Self>) {
+        let path_str = self.data_import_entry.text().to_string();
+        let path = PathBuf::from(path_str.trim());
+        if path.as_os_str().is_empty() || !path.exists() {
+            self.data_modal_status_lbl.set_markup("<span foreground='#f87171'><b>Error:</b> Please select a valid .tar.gz backup file.</span>");
+            return;
+        }
+
+        match import_data(&path) {
+            Ok(()) => {
+                // Reload profile manager from imported profiles.txt
+                *self.profiles.borrow_mut() = ProfileManager::new(rail_data_dir());
+                self.rebuild_profiles_modal_list();
+                let active_id = self.profiles.borrow().active_profile().id;
+                self.select_palette_profile(&active_id);
+
+                // Reload session tabs
+                self.restore_session();
+                self.refresh_sidebar();
+                self.refresh_data_modal_info();
+
+                self.data_modal_status_lbl.set_markup(
+                    "<span foreground='#4ade80'><b>Import Successful:</b> All workspaces, tabs, accounts & cookies restored!</span>"
+                );
+            }
+            Err(e) => {
+                self.data_modal_status_lbl.set_markup(&format!(
+                    "<span foreground='#f87171'><b>Import Failed:</b> {}</span>",
+                    glib::markup_escape_text(&e)
+                ));
+            }
+        }
+    }
+
     fn rebuild_profiles_modal_list(self: &Rc<Self>) {
         while let Some(r) = self.profiles_list_box.row_at_index(0) {
             self.profiles_list_box.remove(&r);
@@ -2274,6 +2494,19 @@ impl App {
             return false;
         }
 
+        if self.data_modal_open() {
+            if k == gdk::Key::Escape {
+                self.hide_data_modal();
+                return true;
+            }
+            if ctrl && shift && !alt && (k == gdk::Key::i || k == gdk::Key::I) {
+                self.hide_data_modal();
+                return true;
+            }
+            // All other keystrokes pass directly to data_modal without triggering window shortcuts
+            return false;
+        }
+
         if k == gdk::Key::Escape {
             if self.palette_open() {
                 self.cancel_palette();
@@ -2382,6 +2615,7 @@ impl App {
         if ctrl && shift && !alt {
             match k {
                 gdk::Key::p | gdk::Key::P => self.toggle_profiles_modal(),
+                gdk::Key::i | gdk::Key::I => self.toggle_data_modal(),
                 gdk::Key::t | gdk::Key::T => self.toggle_touchpad_mode(),
                 gdk::Key::h | gdk::Key::Left => self.move_column(-1),
                 gdk::Key::l | gdk::Key::Right => self.move_column(1),
@@ -2681,12 +2915,119 @@ fn build(gapp: &gtk::Application) {
     load_bar.set_can_target(false);
     load_bar.set_visible(false);
 
+    // ---- data backup & migration modal (Ctrl+Shift+I) ----
+    let data_modal_title = gtk::Label::new(Some("📦 Data Backup & Migration"));
+    data_modal_title.add_css_class("data-modal-title");
+    data_modal_title.set_hexpand(true);
+    data_modal_title.set_xalign(0.0);
+
+    let data_modal_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
+    data_modal_close_btn.add_css_class("flat-icon");
+    data_modal_close_btn.set_tooltip_text(Some("Close (Esc)"));
+
+    let data_header_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    data_header_row.append(&data_modal_title);
+    data_header_row.append(&data_modal_close_btn);
+
+    let data_modal_subtitle = gtk::Label::new(Some("Export or import all workspaces, profiles, logins & cookies  (Ctrl+Shift+I)"));
+    data_modal_subtitle.add_css_class("data-modal-subtitle");
+    data_modal_subtitle.set_xalign(0.0);
+
+    let data_info_lbl = gtk::Label::new(None);
+    data_info_lbl.add_css_class("data-info-card");
+    data_info_lbl.set_xalign(0.0);
+    data_info_lbl.set_margin_top(4);
+
+    // --- Export section ---
+    let export_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    export_box.add_css_class("data-section-box");
+
+    let export_title = gtk::Label::new(Some("📤 Export Environment (All Data)"));
+    export_title.add_css_class("data-section-title");
+    export_title.set_xalign(0.0);
+
+    let export_desc = gtk::Label::new(Some("Pack all your open tabs, workspaces, profiles, accounts & cookies into a single portable .tar.gz archive."));
+    export_desc.add_css_class("data-section-desc");
+    export_desc.set_xalign(0.0);
+    export_desc.set_wrap(true);
+
+    let data_export_entry = gtk::Entry::new();
+    data_export_entry.add_css_class("profile-entry-box");
+    data_export_entry.set_hexpand(true);
+
+    let btn_export_browse = gtk::Button::with_label("Browse...");
+    btn_export_browse.add_css_class("btn-data-action");
+
+    let btn_export_do = gtk::Button::with_label("Export Backup");
+    btn_export_do.add_css_class("btn-data-primary");
+
+    let export_actions_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    export_actions_row.append(&data_export_entry);
+    export_actions_row.append(&btn_export_browse);
+    export_actions_row.append(&btn_export_do);
+
+    export_box.append(&export_title);
+    export_box.append(&export_desc);
+    export_box.append(&export_actions_row);
+
+    // --- Import section ---
+    let import_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    import_box.add_css_class("data-section-box");
+
+    let import_title = gtk::Label::new(Some("📥 Import Environment"));
+    import_title.add_css_class("data-section-title");
+    import_title.set_xalign(0.0);
+
+    let import_desc = gtk::Label::new(Some("Restore tabs, workspaces, profiles, and logins from a .tar.gz archive. Replaces current session."));
+    import_desc.add_css_class("data-section-desc");
+    import_desc.set_xalign(0.0);
+    import_desc.set_wrap(true);
+
+    let data_import_entry = gtk::Entry::new();
+    data_import_entry.add_css_class("profile-entry-box");
+    data_import_entry.set_placeholder_text(Some("Select or enter path to .tar.gz backup..."));
+    data_import_entry.set_hexpand(true);
+
+    let btn_import_browse = gtk::Button::with_label("Browse...");
+    btn_import_browse.add_css_class("btn-data-action");
+
+    let btn_import_do = gtk::Button::with_label("Import & Restore");
+    btn_import_do.add_css_class("btn-data-primary");
+
+    let import_actions_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    import_actions_row.append(&data_import_entry);
+    import_actions_row.append(&btn_import_browse);
+    import_actions_row.append(&btn_import_do);
+
+    import_box.append(&import_title);
+    import_box.append(&import_desc);
+    import_box.append(&import_actions_row);
+
+    let data_modal_status_lbl = gtk::Label::new(None);
+    data_modal_status_lbl.add_css_class("data-status-lbl");
+    data_modal_status_lbl.set_xalign(0.0);
+    data_modal_status_lbl.set_wrap(true);
+
+    let data_modal = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    data_modal.add_css_class("data-modal");
+    data_modal.set_halign(gtk::Align::Center);
+    data_modal.set_valign(gtk::Align::Center);
+    data_modal.set_visible(false);
+
+    data_modal.append(&data_header_row);
+    data_modal.append(&data_modal_subtitle);
+    data_modal.append(&data_info_lbl);
+    data_modal.append(&export_box);
+    data_modal.append(&import_box);
+    data_modal.append(&data_modal_status_lbl);
+
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&shell));
     overlay.add_overlay(&load_bar);
     overlay.add_overlay(&palette);
     overlay.add_overlay(&ov_hint);
     overlay.add_overlay(&profiles_modal);
+    overlay.add_overlay(&data_modal);
 
     let win = gtk::ApplicationWindow::builder()
         .application(gapp)
@@ -2738,6 +3079,55 @@ fn build(gapp: &gtk::Application) {
         touchpad_mode: Cell::new(false),
         last_saved_session: RefCell::new(String::new()),
         save_session_gen: Cell::new(0),
+        data_modal: data_modal.clone(),
+        data_modal_info_lbl: data_info_lbl.clone(),
+        data_modal_status_lbl: data_modal_status_lbl.clone(),
+        data_export_entry: data_export_entry.clone(),
+        data_import_entry: data_import_entry.clone(),
+    });
+
+    let a = app.clone();
+    data_modal_close_btn.connect_clicked(move |_| a.hide_data_modal());
+
+    let a = app.clone();
+    btn_export_do.connect_clicked(move |_| a.execute_export_action());
+
+    let a = app.clone();
+    btn_import_do.connect_clicked(move |_| a.execute_import_action());
+
+    let a = app.clone();
+    let win_weak = win.downgrade();
+    btn_export_browse.connect_clicked(move |_| {
+        let Some(win) = win_weak.upgrade() else { return };
+        let dialog = gtk::FileDialog::builder()
+            .title("Save Rail Backup Archive (.tar.gz)")
+            .initial_name("rail_backup.tar.gz")
+            .build();
+        let a = a.clone();
+        dialog.save(Some(&win), gio::Cancellable::NONE, move |res| {
+            if let Ok(file) = res {
+                if let Some(path) = file.path() {
+                    a.data_export_entry.set_text(&path.to_string_lossy());
+                }
+            }
+        });
+    });
+
+    let a = app.clone();
+    let win_weak = win.downgrade();
+    btn_import_browse.connect_clicked(move |_| {
+        let Some(win) = win_weak.upgrade() else { return };
+        let dialog = gtk::FileDialog::builder()
+            .title("Select Rail Backup Archive (.tar.gz)")
+            .build();
+        let a = a.clone();
+        dialog.open(Some(&win), gio::Cancellable::NONE, move |res| {
+            if let Ok(file) = res {
+                if let Some(path) = file.path() {
+                    a.data_import_entry.set_text(&path.to_string_lossy());
+                }
+            }
+        });
     });
 
     for (i, btn) in app.color_buttons.borrow().iter().enumerate() {
@@ -2791,6 +3181,9 @@ fn build(gapp: &gtk::Application) {
         }
         if a.profiles_modal_open() {
             a.hide_profiles_modal();
+        }
+        if a.data_modal_open() {
+            a.hide_data_modal();
         }
     });
     shell.add_controller(click);
