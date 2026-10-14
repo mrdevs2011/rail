@@ -65,6 +65,7 @@ kbd{font:11px ui-monospace,monospace;background:#090a0f;border:1px solid #1c1d29
 <span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>J</kbd> <kbd>K</kbd></span><span>move tab down / up workspace</span>
 <span><kbd>Ctrl</kbd><kbd>F</kbd></span><span>full / half width</span>
 <span><kbd>Ctrl</kbd><kbd>O</kbd></span><span>overview (2D grid zoom out)</span>
+<span><kbd>Ctrl</kbd><kbd>M</kbd></span><span>roadmap map (floating 2D minimap)</span>
 <span><kbd>Ctrl</kbd><kbd>B</kbd></span><span>sidebar</span>
 </div></div>"#;
 
@@ -746,6 +747,61 @@ button.color-choice.selected {
     font-size: 11.5px;
     margin-top: 6px;
 }
+
+/* ---- floating minimap / roadmap (Ctrl+M) ---- */
+.minimap-window {
+    background: #080d1a;
+    border: 1.5px solid #1e293b;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.95), 0 0 0 1px rgba(56, 189, 248, 0.2);
+    overflow: hidden;
+}
+.minimap-header {
+    background: #0a1020;
+    border-bottom: 1px solid #172033;
+    padding: 6px 12px;
+}
+.minimap-header-title {
+    font-size: 11px;
+    font-weight: 800;
+    color: #38bdf8;
+    letter-spacing: 0.06em;
+    font-family: ui-monospace, monospace;
+}
+.minimap-header-hint {
+    font-size: 9.5px;
+    color: #475569;
+    font-family: ui-monospace, monospace;
+    margin-left: 6px;
+}
+.minimap-canvas {
+    border-radius: 0 0 10px 10px;
+    cursor: grab;
+}
+.minimap-canvas:active {
+    cursor: grabbing;
+}
+.minimap-location-btn {
+    background: rgba(15, 23, 42, 0.94);
+    border: 1px solid #38bdf8;
+    border-radius: 20px;
+    padding: 4px 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.85);
+    transition: all 120ms ease;
+}
+.minimap-location-btn label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #38bdf8;
+    font-family: ui-monospace, monospace;
+}
+.minimap-location-btn:hover {
+    background: #0284c7;
+    border-color: #7dd3fc;
+}
+.minimap-location-btn:hover label {
+    color: #ffffff;
+}
 ";
 
 /// How far the strip zooms out in overview (niri uses a similar factor).
@@ -760,6 +816,34 @@ struct Tab {
 struct Row {
     tabs: Vec<Tab>,
 }
+
+struct MinimapState {
+    offset_x: f64,
+    offset_y: f64,
+    zoom: f64,
+    user_panned: bool,
+    drag_start_offset_x: f64,
+    drag_start_offset_y: f64,
+}
+
+impl Default for MinimapState {
+    fn default() -> Self {
+        Self {
+            offset_x: 0.0,
+            offset_y: 0.0,
+            zoom: 1.0,
+            user_panned: false,
+            drag_start_offset_x: 0.0,
+            drag_start_offset_y: 0.0,
+        }
+    }
+}
+
+const MAP_TAB_W: f64 = 28.0;
+const MAP_TAB_W_FULL: f64 = 46.0;
+const MAP_TAB_H: f64 = 18.0;
+const MAP_GAP_X: f64 = 6.0;
+const MAP_GAP_Y: f64 = 6.0;
 
 struct App {
     win: gtk::ApplicationWindow,
@@ -813,6 +897,11 @@ struct App {
     data_modal_status_lbl: gtk::Label,
     data_export_entry: gtk::Entry,
     data_import_entry: gtk::Entry,
+    // Minimap / Roadmap (Ctrl+M)
+    map_container: gtk::Box,
+    map_drawing_area: gtk::DrawingArea,
+    map_location_btn: gtk::Button,
+    map_state: RefCell<MinimapState>,
 }
 
 fn to_uri(input: &str) -> String {
@@ -1303,6 +1392,11 @@ impl App {
         self.reveal_focus();
         self.refresh_sidebar();
         self.schedule_save_session();
+
+        if self.map_open() {
+            self.update_map_location_btn_visibility();
+            self.map_drawing_area.queue_draw();
+        }
 
         if !self.palette_open() && !self.ov.get() {
             if let Some(v) = self.focused_view() {
@@ -2174,6 +2268,177 @@ impl App {
         }
     }
 
+    // ---- Minimap / Roadmap (Ctrl+M) ----
+
+    fn map_open(&self) -> bool {
+        self.map_container.is_visible()
+    }
+
+    fn toggle_map(self: &Rc<Self>) {
+        if self.map_open() {
+            self.hide_map();
+        } else {
+            self.show_map();
+        }
+    }
+
+    fn show_map(self: &Rc<Self>) {
+        {
+            let mut st = self.map_state.borrow_mut();
+            st.offset_x = 0.0;
+            st.offset_y = 0.0;
+            st.user_panned = false;
+        }
+        self.map_location_btn.set_visible(false);
+        self.map_container.set_visible(true);
+        self.map_drawing_area.queue_draw();
+    }
+
+    fn hide_map(&self) {
+        self.map_container.set_visible(false);
+    }
+
+    fn update_map_location_btn_visibility(&self) {
+        let st = self.map_state.borrow();
+        let width = (self.map_drawing_area.width() as f64).max(380.0);
+        let height = (self.map_drawing_area.height() as f64).max(260.0);
+        let active_sx = width / 2.0 - st.offset_x * st.zoom;
+        let active_sy = height / 2.0 - st.offset_y * st.zoom;
+        let off_screen = active_sx < 20.0 || active_sx > width - 20.0 || active_sy < 20.0 || active_sy > height - 20.0;
+        let far_from_center = (st.offset_x * st.zoom).hypot(st.offset_y * st.zoom) > 40.0;
+        let should_show = st.user_panned && (off_screen || far_from_center);
+        self.map_location_btn.set_visible(should_show);
+    }
+
+    fn compute_active_tab_center(&self, rows: &[Row]) -> (f64, f64) {
+        let fr = self.focus_row.get();
+        let fc = self.focus_col.get();
+        if fr < rows.len() {
+            let row = &rows[fr];
+            if fc < row.tabs.len() {
+                let y = fr as f64 * (MAP_TAB_H + MAP_GAP_Y);
+                let mut x = 0.0;
+                for (i, tab) in row.tabs.iter().enumerate() {
+                    let w = if tab.container.has_css_class("full") { MAP_TAB_W_FULL } else { MAP_TAB_W };
+                    if i == fc {
+                        return (x + w / 2.0, y + MAP_TAB_H / 2.0);
+                    }
+                    x += w + MAP_GAP_X;
+                }
+            }
+        }
+        (0.0, 0.0)
+    }
+
+    fn draw_rounded_rect(cr: &gtk::cairo::Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
+        let r = r.min(w / 2.0).min(h / 2.0);
+        cr.new_sub_path();
+        cr.arc(x + w - r, y + r, r, -std::f64::consts::FRAC_PI_2, 0.0);
+        cr.arc(x + w - r, y + h - r, r, 0.0, std::f64::consts::FRAC_PI_2);
+        cr.arc(x + r, y + h - r, r, std::f64::consts::FRAC_PI_2, std::f64::consts::PI);
+        cr.arc(x + r, y + r, r, std::f64::consts::PI, 3.0 * std::f64::consts::FRAC_PI_2);
+        cr.close_path();
+    }
+
+    fn draw_minimap(&self, cr: &gtk::cairo::Context, width: f64, height: f64) {
+        // Sky blue canvas background (#a2d2f8)
+        cr.set_source_rgb(0.635, 0.824, 0.973);
+        let _ = cr.paint();
+
+        let rows = self.rows.borrow();
+        if rows.is_empty() {
+            return;
+        }
+
+        let (center_x, center_y) = self.compute_active_tab_center(&rows);
+        let (cam_x, cam_y, zoom) = {
+            let st = self.map_state.borrow();
+            (center_x + st.offset_x, center_y + st.offset_y, st.zoom)
+        };
+
+        let fr = self.focus_row.get();
+        let fc = self.focus_col.get();
+
+        for (r, row) in rows.iter().enumerate() {
+            let y = r as f64 * (MAP_TAB_H + MAP_GAP_Y);
+            let sy = height / 2.0 + (y - cam_y) * zoom;
+            let sh = MAP_TAB_H * zoom;
+
+            if sy + sh < -10.0 || sy > height + 10.0 {
+                continue;
+            }
+
+            let mut x = 0.0;
+            for (c, tab) in row.tabs.iter().enumerate() {
+                let w = if tab.container.has_css_class("full") { MAP_TAB_W_FULL } else { MAP_TAB_W };
+                let sx = width / 2.0 + (x - cam_x) * zoom;
+                let sw = w * zoom;
+                x += w + MAP_GAP_X;
+
+                if sx + sw < -10.0 || sx > width + 10.0 {
+                    continue;
+                }
+
+                let is_active = r == fr && c == fc;
+                let corner_r = (3.0 * zoom).clamp(1.5, 4.0);
+
+                Self::draw_rounded_rect(cr, sx, sy, sw, sh, corner_r);
+
+                if is_active {
+                    // Vivid red fill (#ef4444)
+                    cr.set_source_rgb(0.937, 0.267, 0.267);
+                    let _ = cr.fill_preserve();
+                    // Dark crisp border (#0f172a)
+                    cr.set_source_rgb(0.06, 0.09, 0.16);
+                    cr.set_line_width((2.0 * zoom).clamp(1.2, 2.5));
+                    let _ = cr.stroke();
+                } else {
+                    // Soft light blue fill (#cbe7ff)
+                    cr.set_source_rgb(0.796, 0.906, 0.996);
+                    let _ = cr.fill_preserve();
+                    // Dark crisp border (#0f172a)
+                    cr.set_source_rgb(0.06, 0.09, 0.16);
+                    cr.set_line_width((1.8 * zoom).clamp(1.0, 2.2));
+                    let _ = cr.stroke();
+                }
+            }
+        }
+    }
+
+    fn handle_minimap_click(self: &Rc<Self>, click_x: f64, click_y: f64) {
+        let rows = self.rows.borrow();
+        if rows.is_empty() {
+            return;
+        }
+        let (center_x, center_y) = self.compute_active_tab_center(&rows);
+        let (cam_x, cam_y, zoom) = {
+            let st = self.map_state.borrow();
+            (center_x + st.offset_x, center_y + st.offset_y, st.zoom)
+        };
+
+        let width = (self.map_drawing_area.width() as f64).max(380.0);
+        let height = (self.map_drawing_area.height() as f64).max(260.0);
+        let world_x = cam_x + (click_x - width / 2.0) / zoom;
+        let world_y = cam_y + (click_y - height / 2.0) / zoom;
+
+        for (r, row) in rows.iter().enumerate() {
+            let y = r as f64 * (MAP_TAB_H + MAP_GAP_Y);
+            if world_y < y || world_y > y + MAP_TAB_H {
+                continue;
+            }
+            let mut x = 0.0;
+            for (c, tab) in row.tabs.iter().enumerate() {
+                let w = if tab.container.has_css_class("full") { MAP_TAB_W_FULL } else { MAP_TAB_W };
+                if world_x >= x && world_x <= x + w {
+                    drop(rows);
+                    self.focus_coords(r, c);
+                    return;
+                }
+                x += w + MAP_GAP_X;
+            }
+        }
+    }
+
     fn rebuild_profiles_modal_list(self: &Rc<Self>) {
         while let Some(r) = self.profiles_list_box.row_at_index(0) {
             self.profiles_list_box.remove(&r);
@@ -2507,6 +2772,17 @@ impl App {
             return false;
         }
 
+        if self.map_open() {
+            if k == gdk::Key::Escape {
+                self.hide_map();
+                return true;
+            }
+            if ctrl && !shift && !alt && (k == gdk::Key::m || k == gdk::Key::M) {
+                self.hide_map();
+                return true;
+            }
+        }
+
         if k == gdk::Key::Escape {
             if self.palette_open() {
                 self.cancel_palette();
@@ -2518,7 +2794,7 @@ impl App {
             }
             return false;
         }
-        let global = ctrl && !shift && !alt && matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::q | gdk::Key::p);
+        let global = ctrl && !shift && !alt && matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::q | gdk::Key::p | gdk::Key::m);
         if self.overview_open() && !global && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
             return true;
         }
@@ -2555,6 +2831,7 @@ impl App {
                 }
                 gdk::Key::b => self.toggle_sidebar(),
                 gdk::Key::o => self.toggle_overview(),
+                gdk::Key::m => self.toggle_map(),
                 gdk::Key::g => self.show_palette(),
                 gdk::Key::Return | gdk::Key::KP_Enter => {
                     if self.palette_open() {
@@ -3021,6 +3298,54 @@ fn build(gapp: &gtk::Application) {
     data_modal.append(&import_box);
     data_modal.append(&data_modal_status_lbl);
 
+    // ---- Minimap / Roadmap (Ctrl+M) ----
+    let map_header_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    map_header_row.add_css_class("minimap-header");
+
+    let map_title = gtk::Label::new(Some("🗺️ ROADMAP"));
+    map_title.add_css_class("minimap-header-title");
+    map_title.set_hexpand(true);
+    map_title.set_xalign(0.0);
+
+    let map_hint = gtk::Label::new(Some("Drag to Pan • Scroll to Zoom"));
+    map_hint.add_css_class("minimap-header-hint");
+    map_hint.set_xalign(0.0);
+
+    let map_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
+    map_close_btn.add_css_class("flat-icon");
+    map_close_btn.set_tooltip_text(Some("Close Map (Ctrl+M / Esc)"));
+
+    map_header_row.append(&map_title);
+    map_header_row.append(&map_hint);
+    map_header_row.append(&map_close_btn);
+
+    let map_drawing_area = gtk::DrawingArea::new();
+    map_drawing_area.add_css_class("minimap-canvas");
+    map_drawing_area.set_content_width(380);
+    map_drawing_area.set_content_height(260);
+
+    let map_location_btn = gtk::Button::with_label("📍 My Location");
+    map_location_btn.add_css_class("minimap-location-btn");
+    map_location_btn.set_halign(gtk::Align::Center);
+    map_location_btn.set_valign(gtk::Align::End);
+    map_location_btn.set_margin_bottom(12);
+    map_location_btn.set_visible(false);
+
+    let map_overlay = gtk::Overlay::new();
+    map_overlay.set_child(Some(&map_drawing_area));
+    map_overlay.add_overlay(&map_location_btn);
+
+    let map_container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    map_container.add_css_class("minimap-window");
+    map_container.set_halign(gtk::Align::End);
+    map_container.set_valign(gtk::Align::End);
+    map_container.set_margin_end(24);
+    map_container.set_margin_bottom(24);
+    map_container.set_visible(false);
+
+    map_container.append(&map_header_row);
+    map_container.append(&map_overlay);
+
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&shell));
     overlay.add_overlay(&load_bar);
@@ -3028,6 +3353,7 @@ fn build(gapp: &gtk::Application) {
     overlay.add_overlay(&ov_hint);
     overlay.add_overlay(&profiles_modal);
     overlay.add_overlay(&data_modal);
+    overlay.add_overlay(&map_container);
 
     let win = gtk::ApplicationWindow::builder()
         .application(gapp)
@@ -3084,7 +3410,90 @@ fn build(gapp: &gtk::Application) {
         data_modal_status_lbl: data_modal_status_lbl.clone(),
         data_export_entry: data_export_entry.clone(),
         data_import_entry: data_import_entry.clone(),
+        map_container: map_container.clone(),
+        map_drawing_area: map_drawing_area.clone(),
+        map_location_btn: map_location_btn.clone(),
+        map_state: RefCell::new(MinimapState::default()),
     });
+
+    let a_close = app.clone();
+    map_close_btn.connect_clicked(move |_| a_close.hide_map());
+
+    let a_loc = app.clone();
+    map_location_btn.connect_clicked(move |_| {
+        {
+            let mut st = a_loc.map_state.borrow_mut();
+            st.offset_x = 0.0;
+            st.offset_y = 0.0;
+            st.user_panned = false;
+        }
+        a_loc.map_location_btn.set_visible(false);
+        a_loc.map_drawing_area.queue_draw();
+    });
+
+    let a_draw = app.clone();
+    map_drawing_area.set_draw_func(move |_area, cr, width, height| {
+        a_draw.draw_minimap(cr, width as f64, height as f64);
+    });
+
+    let drag_dist = Rc::new(Cell::new(0.0));
+
+    let drag = gtk::GestureDrag::new();
+    drag.connect_drag_begin({
+        let a = app.clone();
+        let drag_dist = drag_dist.clone();
+        move |_gesture, _start_x, _start_y| {
+            drag_dist.set(0.0);
+            let mut st = a.map_state.borrow_mut();
+            st.drag_start_offset_x = st.offset_x;
+            st.drag_start_offset_y = st.offset_y;
+        }
+    });
+
+    drag.connect_drag_update({
+        let a = app.clone();
+        let drag_dist = drag_dist.clone();
+        move |_gesture, offset_x, offset_y| {
+            drag_dist.set(offset_x.hypot(offset_y));
+            let mut st = a.map_state.borrow_mut();
+            st.offset_x = st.drag_start_offset_x - offset_x / st.zoom;
+            st.offset_y = st.drag_start_offset_y - offset_y / st.zoom;
+            st.user_panned = true;
+            drop(st);
+            a.update_map_location_btn_visibility();
+            a.map_drawing_area.queue_draw();
+        }
+    });
+    map_drawing_area.add_controller(drag);
+
+    let click = gtk::GestureClick::new();
+    click.set_button(gdk::BUTTON_PRIMARY);
+    let a_click = app.clone();
+    let drag_dist_for_click = drag_dist.clone();
+    click.connect_released(move |_gesture, _n_press, x, y| {
+        if drag_dist_for_click.get() < 6.0 {
+            a_click.handle_minimap_click(x, y);
+        }
+    });
+    map_drawing_area.add_controller(click);
+
+    let scroll = gtk::EventControllerScroll::new(
+        gtk::EventControllerScrollFlags::BOTH_AXES,
+    );
+    let a_scroll = app.clone();
+    scroll.connect_scroll(move |_ctrl, _dx, dy| {
+        let mut st = a_scroll.map_state.borrow_mut();
+        if dy < 0.0 {
+            st.zoom = (st.zoom * 1.15).min(5.0);
+        } else if dy > 0.0 {
+            st.zoom = (st.zoom / 1.15).max(0.15);
+        }
+        drop(st);
+        a_scroll.update_map_location_btn_visibility();
+        a_scroll.map_drawing_area.queue_draw();
+        glib::Propagation::Stop
+    });
+    map_drawing_area.add_controller(scroll);
 
     let a = app.clone();
     data_modal_close_btn.connect_clicked(move |_| a.hide_data_modal());
