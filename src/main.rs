@@ -626,7 +626,7 @@ fn host_of(uri: &str) -> Option<String> {
     Some(h.trim_start_matches("www.").to_string())
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct SessionTabItem {
     row: usize,
     col: usize,
@@ -635,8 +635,20 @@ struct SessionTabItem {
     url: String,
 }
 
-fn parse_session_content(content: &str) -> ((usize, usize), Vec<SessionTabItem>) {
-    let mut target_focus = (0usize, 0usize);
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SessionState {
+    focus: (usize, usize),
+    sidebar_open: Option<bool>,
+    touchpad_mode: Option<bool>,
+    win_size: Option<(i32, i32, bool)>,
+    tabs: Vec<SessionTabItem>,
+}
+
+fn parse_session_content(content: &str) -> SessionState {
+    let mut focus = (0usize, 0usize);
+    let mut sidebar_open = None;
+    let mut touchpad_mode = None;
+    let mut win_size = None;
     let mut tabs: Vec<SessionTabItem> = Vec::new();
 
     for line in content.lines() {
@@ -648,7 +660,19 @@ fn parse_session_content(content: &str) -> ((usize, usize), Vec<SessionTabItem>)
             "focus" if parts.len() >= 3 => {
                 let r = parts[1].parse().unwrap_or(0);
                 let c = parts[2].parse().unwrap_or(0);
-                target_focus = (r, c);
+                focus = (r, c);
+            }
+            "sidebar" if parts.len() >= 2 => {
+                sidebar_open = Some(parts[1] == "1");
+            }
+            "touchpad" if parts.len() >= 2 => {
+                touchpad_mode = Some(parts[1] == "1");
+            }
+            "win" if parts.len() >= 4 => {
+                let w = parts[1].parse().unwrap_or(1400);
+                let h = parts[2].parse().unwrap_or(850);
+                let max = parts[3] == "1";
+                win_size = Some((w, h, max));
             }
             "tab" if parts.len() >= 6 => {
                 let r = parts[1].parse().unwrap_or(0);
@@ -667,7 +691,13 @@ fn parse_session_content(content: &str) -> ((usize, usize), Vec<SessionTabItem>)
             _ => {}
         }
     }
-    (target_focus, tabs)
+    SessionState {
+        focus,
+        sidebar_open,
+        touchpad_mode,
+        win_size,
+        tabs,
+    }
 }
 
 impl App {
@@ -1007,7 +1037,9 @@ impl App {
         self.sync_strip();
 
         if total_tabs == 0 {
-            self.new_tab();
+            self.save_session();
+            self.win.close();
+            return;
         } else {
             let next_r = r_idx.min(total_rows.saturating_sub(1));
             let rows = self.rows.borrow();
@@ -1186,13 +1218,30 @@ impl App {
 
     fn toggle_touchpad_mode(self: &Rc<Self>) {
         self.touchpad_mode.set(!self.touchpad_mode.get());
+        self.save_session();
     }
 
     fn save_session(&self) {
+        let rows = self.rows.borrow();
+        let total_tabs: usize = rows.iter().map(|r| r.tabs.len()).sum();
         let path = glib::user_data_dir().join("rail").join("session.txt");
+        let temp_path = glib::user_data_dir().join("rail").join("session.txt.tmp");
+
+        if total_tabs == 0 {
+            let _ = std::fs::remove_file(&path);
+            let _ = std::fs::remove_file(&temp_path);
+            return;
+        }
+
         let mut out = String::new();
         out.push_str(&format!("focus\t{}\t{}\n", self.focus_row.get(), self.focus_col.get()));
-        let rows = self.rows.borrow();
+        out.push_str(&format!("sidebar\t{}\n", if self.side_open.get() { 1 } else { 0 }));
+        out.push_str(&format!("touchpad\t{}\n", if self.touchpad_mode.get() { 1 } else { 0 }));
+        let win_w = self.win.width();
+        let win_h = self.win.height();
+        let is_max = if self.win.is_maximized() { 1 } else { 0 };
+        out.push_str(&format!("win\t{}\t{}\t{}\n", win_w, win_h, is_max));
+
         for (ri, row) in rows.iter().enumerate() {
             for (ci, tab) in row.tabs.iter().enumerate() {
                 let is_full = if tab.container.has_css_class("full") { 1 } else { 0 };
@@ -1200,17 +1249,47 @@ impl App {
                 out.push_str(&format!("tab\t{}\t{}\t{}\t{}\t{}\n", ri, ci, is_full, tab.profile_id, uri));
             }
         }
-        let _ = std::fs::write(path, out);
+        drop(rows);
+
+        // Atomic write with sync_all (fsync) ensuring data is immediately flushed to physical hard disk
+        if let Ok(mut file) = std::fs::File::create(&temp_path) {
+            use std::io::Write;
+            if file.write_all(out.as_bytes()).is_ok() && file.sync_all().is_ok() {
+                let _ = std::fs::rename(&temp_path, &path);
+                return;
+            }
+        }
+        let _ = std::fs::write(&path, &out);
     }
 
     fn restore_session(self: &Rc<Self>) -> bool {
         let path = glib::user_data_dir().join("rail").join("session.txt");
         let Ok(content) = std::fs::read_to_string(path) else { return false; };
-        let (target_focus, mut tab_items) = parse_session_content(&content);
-        if tab_items.is_empty() {
+        let state = parse_session_content(&content);
+        if state.tabs.is_empty() {
             return false;
         }
 
+        if let Some((w, h, max)) = state.win_size {
+            if w > 400 && h > 300 {
+                self.win.set_default_size(w, h);
+            }
+            if max {
+                self.win.maximize();
+            }
+        }
+
+        if let Some(tp) = state.touchpad_mode {
+            self.touchpad_mode.set(tp);
+        }
+
+        if let Some(open) = state.sidebar_open {
+            self.side_open.set(open);
+            self.side.set_visible(open);
+            self.shell_layout.set_side(if open { SIDE_W as f64 } else { 0.0 });
+        }
+
+        let mut tab_items = state.tabs;
         tab_items.sort_by_key(|t| (t.row, t.col));
 
         let mut max_row = 0;
@@ -1245,7 +1324,7 @@ impl App {
         drop(rows);
 
         self.sync_strip();
-        self.focus_coords(target_focus.0, target_focus.1);
+        self.focus_coords(state.focus.0, state.focus.1);
         true
     }
 
@@ -1388,6 +1467,7 @@ impl App {
 
     fn set_sidebar(self: &Rc<Self>, open: bool) {
         self.side_open.set(open);
+        self.save_session();
         let epoch = self.side_gen.get().wrapping_add(1);
         self.side_gen.set(epoch);
         if open {
@@ -2622,23 +2702,50 @@ mod tests {
 
     #[test]
     fn test_parse_session_content() {
-        let sample = "focus\t1\t0\ntab\t0\t0\t1\tdefault\thttps://google.com\ntab\t1\t0\t1\twork\thttps://github.com\n";
-        let (focus, tabs) = parse_session_content(sample);
-        assert_eq!(focus, (1, 0));
-        assert_eq!(tabs.len(), 2);
-        assert_eq!(tabs[0], SessionTabItem {
+        let sample = "focus\t1\t0\nsidebar\t1\ntouchpad\t0\nwin\t1400\t850\t0\ntab\t0\t0\t1\tdefault\thttps://google.com\ntab\t1\t0\t1\twork\thttps://github.com\n";
+        let state = parse_session_content(sample);
+        assert_eq!(state.focus, (1, 0));
+        assert_eq!(state.sidebar_open, Some(true));
+        assert_eq!(state.touchpad_mode, Some(false));
+        assert_eq!(state.win_size, Some((1400, 850, false)));
+        assert_eq!(state.tabs.len(), 2);
+        assert_eq!(state.tabs[0], SessionTabItem {
             row: 0,
             col: 0,
             full: true,
             profile_id: "default".to_string(),
             url: "https://google.com".to_string()
         });
-        assert_eq!(tabs[1], SessionTabItem {
+        assert_eq!(state.tabs[1], SessionTabItem {
             row: 1,
             col: 0,
             full: true,
             profile_id: "work".to_string(),
             url: "https://github.com".to_string()
+        });
+    }
+
+    #[test]
+    fn test_parse_empty_session() {
+        let state = parse_session_content("");
+        assert_eq!(state.tabs.len(), 0);
+        assert_eq!(state.focus, (0, 0));
+        assert_eq!(state.sidebar_open, None);
+        assert_eq!(state.touchpad_mode, None);
+        assert_eq!(state.win_size, None);
+    }
+
+    #[test]
+    fn test_parse_legacy_session() {
+        let sample = "tab\t0\twork\thttps://news.ycombinator.com\n";
+        let state = parse_session_content(sample);
+        assert_eq!(state.tabs.len(), 1);
+        assert_eq!(state.tabs[0], SessionTabItem {
+            row: 0,
+            col: 0,
+            full: true,
+            profile_id: "work".to_string(),
+            url: "https://news.ycombinator.com".to_string()
         });
     }
 }
