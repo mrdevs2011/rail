@@ -250,16 +250,250 @@ impl ProfileManager {
             Some(p_cache.to_str().unwrap_or("")),
         );
 
+        session.set_itp_enabled(true);
+        session.set_persistent_credential_storage_enabled(false);
+
         if let Some(cookies) = session.cookie_manager() {
             let cookie_path = p_data.join("cookies.sqlite");
             cookies.set_persistent_storage(
                 cookie_path.to_str().unwrap_or("cookies.sqlite"),
                 webkit6::CookiePersistentStorage::Sqlite,
             );
+            cookies.set_accept_policy(webkit6::CookieAcceptPolicy::NoThirdParty);
         }
 
         self.sessions.insert(profile_id.to_string(), session.clone());
         session
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProfilePersona {
+    pub user_agent: &'static str,
+    pub platform: &'static str,
+    pub oscpu: &'static str,
+    pub hardware_concurrency: usize,
+    pub device_memory: usize,
+    pub webgl_vendor: &'static str,
+    pub webgl_renderer: &'static str,
+    pub seed: u64,
+}
+
+impl ProfilePersona {
+    pub fn for_id(profile_id: &str) -> Self {
+        let mut hash: u64 = 0xcbf29ce484222325;
+        for b in profile_id.as_bytes() {
+            hash ^= *b as u64;
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+
+        const PERSONAS: &[(&str, &str, &str, usize, usize, &str, &str)] = &[
+            (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Win32",
+                "Windows NT 10.0; Win64; x64",
+                16,
+                16,
+                "Google Inc. (NVIDIA)",
+                "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            ),
+            (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "MacIntel",
+                "Intel Mac OS X 10.15",
+                12,
+                16,
+                "Google Inc. (Apple)",
+                "ANGLE (Apple, Apple M2 Pro, OpenGL 4.1)",
+            ),
+            (
+                "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0",
+                "Linux x86_64",
+                "Linux x86_64",
+                8,
+                8,
+                "Mesa/X.org",
+                "Mesa Intel(R) UHD Graphics 620 (KBL GT2)",
+            ),
+            (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+                "Win32",
+                "Windows NT 10.0; Win64; x64",
+                12,
+                32,
+                "Google Inc. (Intel)",
+                "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x00009A49) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            ),
+            (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+                "MacIntel",
+                "Intel Mac OS X 10.15",
+                10,
+                8,
+                "Apple Inc.",
+                "Apple M3",
+            ),
+            (
+                "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:130.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+                "Linux x86_64",
+                "Linux x86_64",
+                16,
+                16,
+                "Google Inc. (AMD)",
+                "ANGLE (AMD, AMD Radeon RX 6700 XT, OpenGL 4.6)",
+            ),
+            (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+                "Win32",
+                "Windows NT 10.0; Win64; x64",
+                6,
+                8,
+                "Google Inc. (NVIDIA)",
+                "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 SUPER Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            ),
+            (
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Linux x86_64",
+                "Linux x86_64",
+                12,
+                16,
+                "Google Inc. (NVIDIA)",
+                "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060, OpenGL 4.6)",
+            ),
+        ];
+
+        let idx = (hash as usize) % PERSONAS.len();
+        let (ua, plat, oscpu, hw, mem, vendor, rend) = PERSONAS[idx];
+        Self {
+            user_agent: ua,
+            platform: plat,
+            oscpu,
+            hardware_concurrency: hw,
+            device_memory: mem,
+            webgl_vendor: vendor,
+            webgl_renderer: rend,
+            seed: hash,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        let browser = if self.user_agent.contains("Edg/") {
+            "Edge 131"
+        } else if self.user_agent.contains("Chrome/") {
+            "Chrome 131"
+        } else if self.user_agent.contains("Firefox/") {
+            "Firefox 133"
+        } else if self.user_agent.contains("Version/") {
+            "Safari 18"
+        } else {
+            "Browser"
+        };
+
+        let os = if self.platform == "Win32" {
+            "Windows"
+        } else if self.platform == "MacIntel" {
+            "macOS"
+        } else {
+            "Linux"
+        };
+
+        format!("{} ({})", browser, os)
+    }
+
+    pub fn stealth_script(&self) -> String {
+        format!(
+            r#"(function() {{
+    const seed = {}n;
+    const hwConcurrency = {};
+    const devMemory = {};
+    const spoofPlatform = "{}";
+    const webglVendor = "{}";
+    const webglRenderer = "{}";
+
+    try {{
+        Object.defineProperty(navigator, 'hardwareConcurrency', {{ get: () => hwConcurrency, configurable: true }});
+        Object.defineProperty(navigator, 'deviceMemory', {{ get: () => devMemory, configurable: true }});
+        if (spoofPlatform) {{
+            Object.defineProperty(navigator, 'platform', {{ get: () => spoofPlatform, configurable: true }});
+        }}
+    }} catch(e) {{}}
+
+    function pseudoNoise(offset) {{
+        let x = (seed + BigInt(offset)) % 2147483647n;
+        x = (x * 16807n) % 2147483647n;
+        return Number((x % 3n) - 1n);
+    }}
+
+    try {{
+        if (typeof CanvasRenderingContext2D !== 'undefined') {{
+            const origGetImageData = CanvasRenderingContext2D.prototype.getImageData;
+            CanvasRenderingContext2D.prototype.getImageData = function(x, y, w, h) {{
+                const imgData = origGetImageData.apply(this, arguments);
+                const data = imgData.data;
+                if (data.length >= 8) {{
+                    const noise1 = pseudoNoise(0);
+                    const noise2 = pseudoNoise(1);
+                    data[0] = Math.max(0, Math.min(255, data[0] + noise1));
+                    data[4] = Math.max(0, Math.min(255, data[4] + noise2));
+                }}
+                return imgData;
+            }};
+        }}
+
+        if (typeof HTMLCanvasElement !== 'undefined') {{
+            const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
+            HTMLCanvasElement.prototype.toDataURL = function() {{
+                const ctx = this.getContext('2d');
+                if (ctx && this.width > 0 && this.height > 0) {{
+                    try {{
+                        const noise = pseudoNoise(2);
+                        const curAlpha = ctx.globalAlpha;
+                        ctx.globalAlpha = Math.max(0.0001, curAlpha - (noise * 0.00002));
+                        ctx.globalAlpha = curAlpha;
+                    }} catch(e) {{}}
+                }}
+                return origToDataURL.apply(this, arguments);
+            }};
+        }}
+    }} catch(e) {{}}
+
+    try {{
+        if (typeof AudioBuffer !== 'undefined') {{
+            const origGetChannelData = AudioBuffer.prototype.getChannelData;
+            AudioBuffer.prototype.getChannelData = function(channel) {{
+                const arr = origGetChannelData.apply(this, arguments);
+                if (arr && arr.length > 10) {{
+                    const noise = (pseudoNoise(channel) * 0.0000001);
+                    arr[arr.length - 1] += noise;
+                }}
+                return arr;
+            }};
+        }}
+    }} catch(e) {{}}
+
+    try {{
+        const spoofGL = function(proto) {{
+            if (!proto) return;
+            const origGetParameter = proto.getParameter;
+            proto.getParameter = function(param) {{
+                // UNMASKED_VENDOR_WEBGL (0x9245)
+                if (param === 0x9245) return webglVendor;
+                // UNMASKED_RENDERER_WEBGL (0x9246)
+                if (param === 0x9246) return webglRenderer;
+                return origGetParameter.apply(this, arguments);
+            }};
+        }};
+        if (typeof WebGLRenderingContext !== 'undefined') spoofGL(WebGLRenderingContext.prototype);
+        if (typeof WebGL2RenderingContext !== 'undefined') spoofGL(WebGL2RenderingContext.prototype);
+    }} catch(e) {{}}
+}})();"#,
+            self.seed,
+            self.hardware_concurrency,
+            self.device_memory,
+            self.platform,
+            self.webgl_vendor,
+            self.webgl_renderer
+        )
     }
 }
 
@@ -330,5 +564,24 @@ mod tests {
         }
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_profile_persona_isolation() {
+        let p_default = ProfilePersona::for_id("default");
+        let p_work = ProfilePersona::for_id("work");
+        let p_profile_2 = ProfilePersona::for_id("profile_2");
+
+        // Verify different seeds
+        assert_ne!(p_default.seed, p_work.seed);
+        assert_ne!(p_work.seed, p_profile_2.seed);
+
+        // Verify stealth script generation includes unique seeds
+        let script_default = p_default.stealth_script();
+        let script_work = p_work.stealth_script();
+        assert!(script_default.contains("const seed ="));
+        assert!(script_default.contains("CanvasRenderingContext2D"));
+        assert!(script_default.contains("UNMASKED_RENDERER_WEBGL"));
+        assert_ne!(script_default, script_work);
     }
 }

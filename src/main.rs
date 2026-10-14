@@ -6,7 +6,7 @@ use gtk::glib;
 use gtk::{gdk, gio};
 use gtk4 as gtk;
 use history::{HistoryManager, HistorySuggestion, SuggestionKind};
-use profile::ProfileManager;
+use profile::{ProfileManager, ProfilePersona};
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -514,6 +514,11 @@ button.profile-item-btn.selected {
     font-size: 12.5px;
     font-weight: 600;
     color: #f1f5f9;
+}
+.profile-item-persona {
+    font-size: 9.5px;
+    color: #64748b;
+    font-family: ui-monospace, monospace;
 }
 .profile-item-check {
     font-size: 12px;
@@ -1347,16 +1352,35 @@ impl App {
         None
     }
 
-    fn create_web_view(session: &webkit6::NetworkSession) -> WebView {
+    fn create_web_view(session: &webkit6::NetworkSession, profile_id: &str) -> WebView {
+        let persona = ProfilePersona::for_id(profile_id);
+
         let settings = webkit6::Settings::new();
+        settings.set_user_agent(Some(persona.user_agent));
+        settings.set_enable_webrtc(false);
+        settings.set_enable_hyperlink_auditing(false);
+        settings.set_enable_dns_prefetching(false);
         settings.set_enable_smooth_scrolling(true);
         settings.set_enable_webgl(true);
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
         settings.set_enable_developer_extras(true);
         settings.set_enable_back_forward_navigation_gestures(true);
+
+        let stealth_js = persona.stealth_script();
+        let script = webkit6::UserScript::new(
+            &stealth_js,
+            webkit6::UserContentInjectedFrames::AllFrames,
+            webkit6::UserScriptInjectionTime::Start,
+            &[],
+            &[],
+        );
+        let ucm = webkit6::UserContentManager::new();
+        ucm.add_script(&script);
+
         WebView::builder()
             .network_session(session)
             .settings(&settings)
+            .user_content_manager(&ucm)
             .build()
     }
 
@@ -1364,7 +1388,7 @@ impl App {
         self.exit_overview();
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-        let view = Self::create_web_view(&session);
+        let view = Self::create_web_view(&session, &prof_id);
         view.load_html(START_PAGE, None);
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view, prof_id.clone(), false);
@@ -1376,7 +1400,7 @@ impl App {
         self.exit_overview();
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-        let view = Self::create_web_view(&session);
+        let view = Self::create_web_view(&session, &prof_id);
         view.load_html(START_PAGE, None);
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view, prof_id.clone(), true);
@@ -1388,7 +1412,7 @@ impl App {
         self.exit_overview();
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-        let view = Self::create_web_view(&session);
+        let view = Self::create_web_view(&session, &prof_id);
         view.load_uri(url);
         self.add_view(view, prof_id, false);
     }
@@ -1397,7 +1421,7 @@ impl App {
         self.exit_overview();
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-        let view = Self::create_web_view(&session);
+        let view = Self::create_web_view(&session, &prof_id);
         view.load_uri(url);
         self.add_view(view, prof_id, true);
     }
@@ -2088,7 +2112,7 @@ impl App {
         if need_fresh_in_row_0 {
             let prof_id = self.profiles.borrow().active_profile().id;
             let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-            let view = Self::create_web_view(&session);
+            let view = Self::create_web_view(&session, &prof_id);
             view.load_html(START_PAGE, None);
             view.set_can_target(!self.ov.get());
             let container = Self::create_tab_widget(&view);
@@ -2240,7 +2264,7 @@ impl App {
         let mut loaded_tabs: Vec<(usize, Tab)> = Vec::new();
         for item in tab_items {
             let session = self.profiles.borrow_mut().get_or_create_session(&item.profile_id);
-            let view = Self::create_web_view(&session);
+            let view = Self::create_web_view(&session, &item.profile_id);
             if item.url.is_empty() || item.url.starts_with("about:") {
                 view.load_html(START_PAGE, None);
             } else {
@@ -2542,7 +2566,8 @@ impl App {
                 self.profile_btn.remove_css_class(&format!("prof-bg-{}", i));
             }
             self.profile_btn.add_css_class(&format!("prof-bg-{}", p.color_idx));
-            self.profile_btn.set_tooltip_text(Some(&format!("Profile: {} (Click to switch)", p.name)));
+            let persona = ProfilePersona::for_id(&p.id);
+            self.profile_btn.set_tooltip_text(Some(&format!("Profile: {} [{}] (100% Isolated)", p.name, persona.summary())));
         }
     }
 
@@ -2582,13 +2607,23 @@ impl App {
             dot.set_width_request(24);
             dot.set_height_request(24);
 
+            let persona = ProfilePersona::for_id(&p.id);
+            let name_col = gtk::Box::new(gtk::Orientation::Vertical, 1);
+            name_col.set_hexpand(true);
+
             let name_lbl = gtk::Label::new(Some(&p.name));
             name_lbl.add_css_class("profile-item-name");
-            name_lbl.set_hexpand(true);
             name_lbl.set_xalign(0.0);
 
+            let persona_lbl = gtk::Label::new(Some(&persona.summary()));
+            persona_lbl.add_css_class("profile-item-persona");
+            persona_lbl.set_xalign(0.0);
+
+            name_col.append(&name_lbl);
+            name_col.append(&persona_lbl);
+
             row_box.append(&dot);
-            row_box.append(&name_lbl);
+            row_box.append(&name_col);
 
             if p.id == selected_id {
                 let check = gtk::Image::from_icon_name("object-select-symbolic");
@@ -2875,7 +2910,7 @@ impl App {
         }
 
         let session = self.profiles.borrow_mut().get_or_create_session(target_profile_id);
-        let new_view = Self::create_web_view(&session);
+        let new_view = Self::create_web_view(&session, target_profile_id);
         new_view.set_can_target(!self.ov.get());
         self.setup_view_signals(&new_view);
 
@@ -3298,11 +3333,8 @@ impl App {
             name_lbl.add_css_class("profile-card-name");
             name_lbl.set_xalign(0.0);
 
-            let sub_text = if p.id == "default" {
-                "@default - System Default".to_string()
-            } else {
-                format!("@{}", p.id)
-            };
+            let persona = ProfilePersona::for_id(&p.id);
+            let sub_text = format!("@{} - {} (100% Isolated)", p.id, persona.summary());
             let sub_lbl = gtk::Label::new(Some(&sub_text));
             sub_lbl.add_css_class("profile-card-sub");
             sub_lbl.set_xalign(0.0);
