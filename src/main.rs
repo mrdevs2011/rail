@@ -1,9 +1,11 @@
+mod history;
 mod profile;
 mod strip;
 
 use gtk::glib;
 use gtk::{gdk, gio};
 use gtk4 as gtk;
+use history::{HistoryManager, HistorySuggestion, SuggestionKind};
 use profile::ProfileManager;
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
@@ -368,6 +370,53 @@ entry.palette-entry, entry.palette-entry:focus-within {
     font-size: 10.5px;
     font-family: ui-monospace, monospace;
     margin-top: 6px;
+}
+
+/* ---- palette smart suggestions ---- */
+.palette-suggestions-box {
+    margin-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 6px;
+    margin-bottom: 4px;
+}
+.palette-sug-item {
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: transparent;
+    transition: background 100ms ease;
+    border: none;
+    box-shadow: none;
+}
+.palette-sug-item:hover, .palette-sug-item.selected {
+    background: rgba(56, 189, 248, 0.12);
+}
+.palette-sug-icon {
+    color: #64748b;
+    margin-end: 8px;
+}
+.palette-sug-item:hover .palette-sug-icon, .palette-sug-item.selected .palette-sug-icon {
+    color: #38bdf8;
+}
+.palette-sug-title {
+    color: #f1f5f9;
+    font-size: 13px;
+    font-weight: 500;
+}
+.palette-sug-url {
+    color: #64748b;
+    font-size: 11.5px;
+    margin-start: 8px;
+}
+.palette-sug-badge {
+    color: #475569;
+    font-size: 9.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: #0b0f19;
+    border: 1px solid #1e293b;
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-start: 8px;
 }
 
 /* ---- overview (the live strip, zoomed out in 2D) ---- */
@@ -880,6 +929,12 @@ struct App {
     load_bar: gtk::ProgressBar,
     palette: gtk::Box,
     entry: gtk::Entry,
+    palette_suggestions_box: gtk::Box,
+    history: RefCell<HistoryManager>,
+    current_suggestions: RefCell<Vec<HistorySuggestion>>,
+    selected_suggestion_idx: Cell<Option<usize>>,
+    is_autofilling: Cell<bool>,
+    last_entry_len: Cell<usize>,
     ov_hint: gtk::Label,
     /// Overview is active: the strip is zoomed out and tabs ignore the pointer.
     ov: Cell<bool>,
@@ -1287,11 +1342,21 @@ impl App {
         view.add_controller(focus);
 
         let app = self.clone();
-        view.connect_title_notify(move |_| app.refresh_sidebar());
+        view.connect_title_notify(move |v| {
+            app.refresh_sidebar();
+            if let Some(u) = v.uri() {
+                let title = v.title().unwrap_or_default().to_string();
+                app.history.borrow_mut().record_visit(&u, &title);
+            }
+        });
         let app = self.clone();
-        view.connect_uri_notify(move |_| {
+        view.connect_uri_notify(move |v| {
             app.refresh_sidebar();
             app.schedule_save_session();
+            if let Some(u) = v.uri() {
+                let title = v.title().unwrap_or_default().to_string();
+                app.history.borrow_mut().record_visit(&u, &title);
+            }
         });
         let app = self.clone();
         view.connect_favicon_notify(move |_| app.refresh_sidebar());
@@ -2115,9 +2180,15 @@ impl App {
         let uri = self.focused_view().and_then(|v| v.uri()).filter(|u| !u.starts_with("about:"));
         self.entry.set_text(uri.as_deref().unwrap_or(""));
 
-        let prof_id = self.focused_tab_profile().unwrap_or_else(|| self.profiles.borrow().active_profile().id);
+        let prof_id = self.focused_tab_profile().unwrap_or_else(|| self.profiles.borrow().active_id().to_string());
         self.select_palette_profile(&prof_id);
         self.rebuild_profile_popover();
+
+        self.palette_suggestions_box.set_visible(false);
+        self.clear_suggestions_ui();
+        *self.current_suggestions.borrow_mut() = Vec::new();
+        self.selected_suggestion_idx.set(None);
+        self.last_entry_len.set(self.entry.text().chars().count());
 
         self.update_palette_size();
         self.palette.set_visible(true);
@@ -2126,6 +2197,10 @@ impl App {
     }
 
     fn hide_palette(&self) {
+        self.palette_suggestions_box.set_visible(false);
+        self.clear_suggestions_ui();
+        *self.current_suggestions.borrow_mut() = Vec::new();
+        self.selected_suggestion_idx.set(None);
         self.profile_popover.popdown();
         self.palette.set_visible(false);
         if !self.profiles_modal_open() {
@@ -2133,6 +2208,194 @@ impl App {
                 v.grab_focus();
             }
         }
+    }
+
+    fn clear_suggestions_ui(&self) {
+        while let Some(child) = self.palette_suggestions_box.first_child() {
+            self.palette_suggestions_box.remove(&child);
+        }
+    }
+
+    fn render_suggestions_ui(self: &Rc<Self>, suggestions: &[HistorySuggestion]) {
+        self.clear_suggestions_ui();
+        if suggestions.is_empty() {
+            self.palette_suggestions_box.set_visible(false);
+            return;
+        }
+
+        let sel_idx = self.selected_suggestion_idx.get();
+
+        for (idx, sug) in suggestions.iter().enumerate() {
+            let item_btn = gtk::Button::new();
+            item_btn.add_css_class("palette-sug-item");
+            if Some(idx) == sel_idx {
+                item_btn.add_css_class("selected");
+            }
+
+            let row_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            row_box.set_valign(gtk::Align::Center);
+
+            let icon_name = match sug.kind {
+                SuggestionKind::History => "document-open-recent-symbolic",
+                SuggestionKind::Popular => "starred-symbolic",
+                SuggestionKind::Search => "system-search-symbolic",
+            };
+            let icon = gtk::Image::from_icon_name(icon_name);
+            icon.add_css_class("palette-sug-icon");
+            row_box.append(&icon);
+
+            let title_lbl = gtk::Label::new(Some(&sug.display_title));
+            title_lbl.add_css_class("palette-sug-title");
+            title_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            title_lbl.set_xalign(0.0);
+            row_box.append(&title_lbl);
+
+            if sug.kind != SuggestionKind::Search {
+                let url_lbl = gtk::Label::new(Some(&sug.display_url));
+                url_lbl.add_css_class("palette-sug-url");
+                url_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                url_lbl.set_xalign(0.0);
+                url_lbl.set_hexpand(true);
+                row_box.append(&url_lbl);
+            } else {
+                title_lbl.set_hexpand(true);
+            }
+
+            let badge_text = match sug.kind {
+                SuggestionKind::History => "History",
+                SuggestionKind::Popular => "Top",
+                SuggestionKind::Search => "Search",
+            };
+            let badge = gtk::Label::new(Some(badge_text));
+            badge.add_css_class("palette-sug-badge");
+            badge.set_halign(gtk::Align::End);
+            row_box.append(&badge);
+
+            item_btn.set_child(Some(&row_box));
+
+            let app = self.clone();
+            let target = sug.target_url.clone();
+            item_btn.connect_clicked(move |_| {
+                app.navigate(&target);
+            });
+
+            self.palette_suggestions_box.append(&item_btn);
+        }
+
+        self.palette_suggestions_box.set_visible(true);
+    }
+
+    fn handle_entry_changed(self: &Rc<Self>) {
+        if self.is_autofilling.get() {
+            return;
+        }
+
+        let text = self.entry.text().to_string();
+        let cur_len = text.chars().count();
+        let prev_len = self.last_entry_len.get();
+        self.last_entry_len.set(cur_len);
+
+        let is_typing_forward = cur_len > prev_len;
+        self.selected_suggestion_idx.set(None);
+
+        if text.trim().is_empty() {
+            self.palette_suggestions_box.set_visible(false);
+            self.clear_suggestions_ui();
+            *self.current_suggestions.borrow_mut() = Vec::new();
+            return;
+        }
+
+        let suggestions = self.history.borrow().suggest(&text);
+        if suggestions.is_empty() {
+            self.palette_suggestions_box.set_visible(false);
+            self.clear_suggestions_ui();
+            *self.current_suggestions.borrow_mut() = Vec::new();
+            return;
+        }
+
+        // 1. Inline autofill if typing forward (not on backspace/deletion)
+        if is_typing_forward {
+            if let Some(first) = suggestions.first() {
+                if first.kind != SuggestionKind::Search {
+                    let clean_q = text.trim().to_lowercase();
+                    let autofill = &first.autofill_text;
+                    let autofill_lower = autofill.to_lowercase();
+                    if autofill_lower.starts_with(&clean_q) && autofill.chars().count() > cur_len {
+                        self.is_autofilling.set(true);
+                        self.entry.set_text(autofill);
+                        self.entry.select_region(cur_len as i32, -1);
+                        self.is_autofilling.set(false);
+                        self.last_entry_len.set(autofill.chars().count());
+                    }
+                }
+            }
+        }
+
+        // 2. Render suggestions UI
+        self.render_suggestions_ui(&suggestions);
+        *self.current_suggestions.borrow_mut() = suggestions;
+    }
+
+    fn move_suggestion_selection(self: &Rc<Self>, delta: isize) -> bool {
+        let sugs = self.current_suggestions.borrow();
+        if sugs.is_empty() {
+            return false;
+        }
+        let total = sugs.len() as isize;
+        let cur = self.selected_suggestion_idx.get();
+
+        let new_idx = match cur {
+            None => {
+                if delta > 0 {
+                    0
+                } else {
+                    (total - 1) as usize
+                }
+            }
+            Some(i) => {
+                let next = i as isize + delta;
+                if next < 0 {
+                    (total - 1) as usize
+                } else if next >= total {
+                    0
+                } else {
+                    next as usize
+                }
+            }
+        };
+        drop(sugs);
+
+        self.selected_suggestion_idx.set(Some(new_idx));
+
+        let sugs = self.current_suggestions.borrow();
+        if let Some(s) = sugs.get(new_idx) {
+            self.is_autofilling.set(true);
+            let display_text = if s.kind == SuggestionKind::Search {
+                s.autofill_text.clone()
+            } else {
+                s.display_url.clone()
+            };
+            self.entry.set_text(&display_text);
+            self.entry.set_position(-1);
+            self.last_entry_len.set(display_text.chars().count());
+            self.is_autofilling.set(false);
+        }
+        let sugs_clone = sugs.clone();
+        drop(sugs);
+
+        self.render_suggestions_ui(&sugs_clone);
+        true
+    }
+
+    fn accept_autofill_or_next_suggestion(self: &Rc<Self>) -> bool {
+        if let Some((start, end)) = self.entry.selection_bounds() {
+            if start != end {
+                self.entry.set_position(-1);
+                self.entry.select_region(-1, -1);
+                return true;
+            }
+        }
+        self.move_suggestion_selection(1)
     }
 
     fn cancel_palette(self: &Rc<Self>) {
@@ -2201,6 +2464,7 @@ impl App {
             let cur_r = self.focus_row.get();
             let cur_c = self.focus_col.get();
             let uri = to_uri(text);
+            self.history.borrow_mut().record_visit(&uri, "");
 
             let needs_view_recreation = {
                 let rows = self.rows.borrow();
@@ -3074,6 +3338,7 @@ fn build(gapp: &gtk::Application) {
     );
 
     let profile_mgr = ProfileManager::new(rail_data_dir());
+    let history_mgr = HistoryManager::new(rail_data_dir());
     let initial_prof_id = profile_mgr.active_profile().id;
 
     // ---- sidebar ----
@@ -3178,6 +3443,10 @@ fn build(gapp: &gtk::Application) {
     prow.append(&entry);
     prow.append(&profile_btn);
 
+    let palette_suggestions_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    palette_suggestions_box.add_css_class("palette-suggestions-box");
+    palette_suggestions_box.set_visible(false);
+
     let phint = gtk::Label::new(Some("Enter  go      Esc  cancel      Ctrl+P  profiles"));
     phint.add_css_class("palette-hint");
     phint.set_xalign(0.0);
@@ -3189,6 +3458,7 @@ fn build(gapp: &gtk::Application) {
     palette.set_margin_start(16);
     palette.set_margin_end(16);
     palette.append(&prow);
+    palette.append(&palette_suggestions_box);
     palette.append(&phint);
     palette.set_visible(false);
 
@@ -3502,6 +3772,12 @@ fn build(gapp: &gtk::Application) {
         load_bar,
         palette,
         entry: entry.clone(),
+        palette_suggestions_box: palette_suggestions_box.clone(),
+        history: RefCell::new(history_mgr),
+        current_suggestions: RefCell::new(Vec::new()),
+        selected_suggestion_idx: Cell::new(None),
+        is_autofilling: Cell::new(false),
+        last_entry_len: Cell::new(0),
         ov_hint,
         ov: Cell::new(false),
         ov_return: Cell::new((0, 0)),
@@ -3746,8 +4022,51 @@ fn build(gapp: &gtk::Application) {
     add.connect_clicked(move |_| a.new_tab());
     let a = app.clone();
     pill.connect_clicked(move |_| a.show_palette());
+
     let a = app.clone();
-    entry.connect_activate(move |e| a.navigate(&e.text()));
+    entry.connect_changed(move |_| {
+        a.handle_entry_changed();
+    });
+
+    let entry_keys = gtk::EventControllerKey::new();
+    entry_keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let a = app.clone();
+    entry_keys.connect_key_pressed(move |_, key, _, _| {
+        match key {
+            gdk::Key::Down => {
+                if a.move_suggestion_selection(1) {
+                    return glib::Propagation::Stop;
+                }
+            }
+            gdk::Key::Up => {
+                if a.move_suggestion_selection(-1) {
+                    return glib::Propagation::Stop;
+                }
+            }
+            gdk::Key::Tab => {
+                if a.accept_autofill_or_next_suggestion() {
+                    return glib::Propagation::Stop;
+                }
+            }
+            _ => {}
+        }
+        glib::Propagation::Proceed
+    });
+    entry.add_controller(entry_keys);
+
+    let a = app.clone();
+    entry.connect_activate(move |e| {
+        if let Some(idx) = a.selected_suggestion_idx.get() {
+            let sugs = a.current_suggestions.borrow();
+            if let Some(sug) = sugs.get(idx) {
+                let target = sug.target_url.clone();
+                drop(sugs);
+                a.navigate(&target);
+                return;
+            }
+        }
+        a.navigate(&e.text());
+    });
 
     let pick = gtk::GestureClick::new();
     let a = app.clone();
