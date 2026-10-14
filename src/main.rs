@@ -1286,11 +1286,24 @@ impl App {
         None
     }
 
+    fn create_web_view(session: &webkit6::NetworkSession) -> WebView {
+        let settings = webkit6::Settings::new();
+        settings.set_enable_smooth_scrolling(true);
+        settings.set_enable_webgl(true);
+        settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
+        settings.set_enable_developer_extras(true);
+        settings.set_enable_back_forward_navigation_gestures(true);
+        WebView::builder()
+            .network_session(session)
+            .settings(&settings)
+            .build()
+    }
+
     fn new_tab(self: &Rc<Self>) {
         self.exit_overview();
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-        let view = WebView::builder().network_session(&session).build();
+        let view = Self::create_web_view(&session);
         view.load_html(START_PAGE, None);
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view, prof_id.clone(), false);
@@ -1302,7 +1315,7 @@ impl App {
         self.exit_overview();
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-        let view = WebView::builder().network_session(&session).build();
+        let view = Self::create_web_view(&session);
         view.load_html(START_PAGE, None);
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view, prof_id.clone(), true);
@@ -1636,7 +1649,7 @@ impl App {
         if need_fresh_in_row_0 {
             let prof_id = self.profiles.borrow().active_profile().id;
             let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-            let view = WebView::builder().network_session(&session).build();
+            let view = Self::create_web_view(&session);
             view.load_html(START_PAGE, None);
             view.set_can_target(!self.ov.get());
             let container = Self::create_tab_widget(&view);
@@ -1788,7 +1801,7 @@ impl App {
         let mut loaded_tabs: Vec<(usize, Tab)> = Vec::new();
         for item in tab_items {
             let session = self.profiles.borrow_mut().get_or_create_session(&item.profile_id);
-            let view = WebView::builder().network_session(&session).build();
+            let view = Self::create_web_view(&session);
             if item.url.is_empty() || item.url.starts_with("about:") {
                 view.load_html(START_PAGE, None);
             } else {
@@ -1858,7 +1871,7 @@ impl App {
             return img.upcast();
         }
         let label = Self::tab_label(t);
-        let letter = label.chars().find(|c| c.is_alphanumeric()).unwrap_or('·');
+        let letter = label.chars().find(|c| c.is_alphanumeric()).unwrap_or('R');
         let seed = label.bytes().fold(0u32, |a, b| a.wrapping_mul(31).wrapping_add(b as u32));
         let badge = gtk::Label::new(Some(&letter.to_uppercase().to_string()));
         badge.add_css_class("fav");
@@ -1892,9 +1905,9 @@ impl App {
             ws_box.append(&ws_title);
 
             if ri == cur_r {
-                let active_dot = gtk::Label::new(Some("● Active"));
-                active_dot.add_css_class("workspace-badge");
-                ws_box.append(&active_dot);
+                let active_badge = gtk::Label::new(Some("ACTIVE"));
+                active_badge.add_css_class("workspace-badge");
+                ws_box.append(&active_badge);
             }
 
             let count_text = if row.tabs.len() == 1 {
@@ -2139,7 +2152,7 @@ impl App {
             row_box.append(&name_lbl);
 
             if p.id == selected_id {
-                let check = gtk::Label::new(Some("✓"));
+                let check = gtk::Image::from_icon_name("object-select-symbolic");
                 check.add_css_class("profile-item-check");
                 row_box.append(&check);
             }
@@ -2423,7 +2436,7 @@ impl App {
         }
 
         let session = self.profiles.borrow_mut().get_or_create_session(target_profile_id);
-        let new_view = WebView::builder().network_session(&session).build();
+        let new_view = Self::create_web_view(&session);
         new_view.set_can_target(!self.ov.get());
         self.setup_view_signals(&new_view);
 
@@ -2847,7 +2860,7 @@ impl App {
             name_lbl.set_xalign(0.0);
 
             let sub_text = if p.id == "default" {
-                "@default • System Default".to_string()
+                "@default - System Default".to_string()
             } else {
                 format!("@{}", p.id)
             };
@@ -3380,7 +3393,7 @@ fn build(gapp: &gtk::Application) {
     list_scroll.set_vexpand(true);
     list_scroll.set_child(Some(&list));
 
-    let hint = gtk::Label::new(Some("ctrl+h/l tabs  ·  ctrl+j/k rows  ·  ctrl+v new row"));
+    let hint = gtk::Label::new(Some("ctrl+h/l tabs  |  ctrl+j/k rows  |  ctrl+v new row"));
     hint.add_css_class("side-hint");
     hint.set_xalign(0.0);
     hint.set_margin_start(4);
@@ -4276,7 +4289,7 @@ fn print_data_info() {
                     let name = p.file_name().unwrap_or_default().to_string_lossy();
                     let has_cookies = p.join("data").join("cookies.sqlite").exists();
                     let has_storage = p.join("data").join("storage").exists();
-                    println!("    • Profile '{}': accounts/cookies={}, localStorage/IndexedDB={}", name, has_cookies, has_storage);
+                    println!("    - Profile '{}': accounts/cookies={}, localStorage/IndexedDB={}", name, has_cookies, has_storage);
                 }
             }
         }

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 pub const POPULAR_DOMAINS: &[(&str, &str)] = &[
     ("google.com", "Google Search"),
-    ("github.com", "GitHub · Where software is built"),
+    ("github.com", "GitHub - Where software is built"),
     ("youtube.com", "YouTube"),
     ("chatgpt.com", "ChatGPT"),
     ("wikipedia.org", "Wikipedia"),
