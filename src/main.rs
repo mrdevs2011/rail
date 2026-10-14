@@ -1168,6 +1168,7 @@ struct App {
     load_bar: gtk::ProgressBar,
     palette: gtk::Box,
     entry: gtk::Entry,
+    palette_for_new_tab: Cell<bool>,
     palette_suggestions_box: gtk::Box,
     history: RefCell<HistoryManager>,
     current_suggestions: RefCell<Vec<HistorySuggestion>>,
@@ -2855,7 +2856,7 @@ impl App {
             let app = self.clone();
             add_btn.connect_clicked(move |_| {
                 app.focus_row(ri);
-                app.new_tab();
+                app.open_new_tab_palette();
             });
             ws_box.append(&add_btn);
 
@@ -3137,7 +3138,29 @@ impl App {
         self.palette.set_margin_top(target_top);
     }
 
+    fn open_new_tab_palette(self: &Rc<Self>) {
+        self.exit_overview();
+        self.palette_for_new_tab.set(true);
+
+        self.entry.set_text("");
+
+        let prof_id = self.profiles.borrow().active_id().to_string();
+        self.select_palette_profile(&prof_id);
+        self.rebuild_profile_popover();
+
+        self.palette_suggestions_box.set_visible(false);
+        self.clear_suggestions_ui();
+        *self.current_suggestions.borrow_mut() = Vec::new();
+        self.selected_suggestion_idx.set(None);
+        self.last_entry_len.set(0);
+
+        self.update_palette_size();
+        self.palette.set_visible(true);
+        self.entry.grab_focus();
+    }
+
     fn show_palette(self: &Rc<Self>) {
+        self.palette_for_new_tab.set(false);
         let uri = self.focused_view().and_then(|v| v.uri()).filter(|u| !u.starts_with("about:"));
         self.entry.set_text(uri.as_deref().unwrap_or(""));
 
@@ -3360,13 +3383,17 @@ impl App {
     }
 
     fn cancel_palette(self: &Rc<Self>) {
-        let view = self.focused_view();
-        let fresh = self.fresh.borrow().clone();
+        let is_new_tab = self.palette_for_new_tab.get();
+        self.palette_for_new_tab.set(false);
         self.hide_palette();
-        if let (Some(v), Some(f)) = (view, fresh) {
-            let total_tabs: usize = self.rows.borrow().iter().map(|r| r.tabs.len()).sum();
-            if v == f && total_tabs > 1 {
-                self.close_view(&v);
+        if !is_new_tab {
+            let view = self.focused_view();
+            let fresh = self.fresh.borrow().clone();
+            if let (Some(v), Some(f)) = (view, fresh) {
+                let total_tabs: usize = self.rows.borrow().iter().map(|r| r.tabs.len()).sum();
+                if v == f && total_tabs > 1 {
+                    self.close_view(&v);
+                }
             }
         }
     }
@@ -3419,32 +3446,40 @@ impl App {
     }
 
     fn navigate(self: &Rc<Self>, text: &str) {
+        let is_new_tab = self.palette_for_new_tab.get();
+        self.palette_for_new_tab.set(false);
+
         if !text.trim().is_empty() {
             let target_profile_id = self.selected_palette_profile.borrow().clone();
             self.profiles.borrow_mut().set_active(&target_profile_id);
-            let cur_r = self.focus_row.get();
-            let cur_c = self.focus_col.get();
             let uri = to_uri(text);
             self.history.borrow_mut().record_visit(&uri, "");
 
-            let needs_view_recreation = {
-                let rows = self.rows.borrow();
-                rows.get(cur_r)
-                    .and_then(|r| r.tabs.get(cur_c))
-                    .map(|t| t.profile_id != target_profile_id)
-                    .unwrap_or(false)
-            };
+            if is_new_tab {
+                self.new_tab_with_url(&uri);
+            } else {
+                let cur_r = self.focus_row.get();
+                let cur_c = self.focus_col.get();
 
-            if needs_view_recreation {
-                self.switch_focused_tab_profile(&target_profile_id);
-            }
+                let needs_view_recreation = {
+                    let rows = self.rows.borrow();
+                    rows.get(cur_r)
+                        .and_then(|r| r.tabs.get(cur_c))
+                        .map(|t| t.profile_id != target_profile_id)
+                        .unwrap_or(false)
+                };
 
-            if let Some(v) = self.focused_view() {
-                self.pill_label.set_text(&host_of(&uri).unwrap_or(uri.clone()));
-                v.load_uri(&uri);
-                *self.fresh.borrow_mut() = None;
-                self.refresh_sidebar();
-                self.schedule_save_session();
+                if needs_view_recreation {
+                    self.switch_focused_tab_profile(&target_profile_id);
+                }
+
+                if let Some(v) = self.focused_view() {
+                    self.pill_label.set_text(&host_of(&uri).unwrap_or(uri.clone()));
+                    v.load_uri(&uri);
+                    *self.fresh.borrow_mut() = None;
+                    self.refresh_sidebar();
+                    self.schedule_save_session();
+                }
             }
         }
         self.hide_palette();
@@ -4324,7 +4359,7 @@ impl App {
             }
             return false;
         }
-        let global = ctrl && !shift && !alt && matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I);
+        let global = ctrl && !shift && !alt && (matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::T | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I) || keycode == 28);
         if self.overview_open() && !global && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
             return true;
         }
@@ -4346,13 +4381,34 @@ impl App {
             match k {
                 gdk::Key::p | gdk::Key::P => self.toggle_profiles_modal(),
                 gdk::Key::i | gdk::Key::I => self.toggle_data_modal(),
-                gdk::Key::t => self.new_tab(),
+                gdk::Key::t | gdk::Key::T => self.open_new_tab_palette(),
                 gdk::Key::n => self.split_vertical(),
                 gdk::Key::f => self.toggle_full(),
                 gdk::Key::h | gdk::Key::Left => self.focus_column_left(),
                 gdk::Key::l | gdk::Key::Right => self.focus_column_right(),
                 gdk::Key::j | gdk::Key::Down => self.focus_row_down(),
                 gdk::Key::k | gdk::Key::Up => self.focus_row_up(),
+                gdk::Key::v | gdk::Key::V => {
+                    if self.palette_open() {
+                        let clipboard = self.entry.clipboard();
+                        let ent = self.entry.clone();
+                        clipboard.read_text_async(gio::Cancellable::NONE, move |res| {
+                            if let Ok(Some(text)) = res {
+                                let text = text.to_string();
+                                let (start, end) = ent.selection_bounds().unwrap_or_else(|| {
+                                    let pos = ent.position();
+                                    (pos, pos)
+                                });
+                                ent.delete_text(start, end);
+                                let mut insert_pos = start;
+                                ent.insert_text(&text, &mut insert_pos);
+                                ent.set_position(insert_pos);
+                            }
+                        });
+                        return true;
+                    }
+                    return false;
+                }
                 gdk::Key::w => {
                     if !self.palette_open() {
                         if let Some(v) = self.focused_view() {
@@ -4363,7 +4419,7 @@ impl App {
                 gdk::Key::b => self.toggle_sidebar(),
                 gdk::Key::o => self.toggle_overview(),
                 gdk::Key::m => self.toggle_map(),
-                gdk::Key::g => self.show_palette(),
+                gdk::Key::g | gdk::Key::G => self.show_palette(),
                 gdk::Key::Return | gdk::Key::KP_Enter => {
                     if self.palette_open() {
                         return false;
@@ -4377,6 +4433,32 @@ impl App {
                 }
                 gdk::Key::q => self.win.close(),
                 _ => {
+                    if keycode == 28 {
+                        self.open_new_tab_palette();
+                        return true;
+                    }
+                    if keycode == 42 {
+                        self.show_palette();
+                        return true;
+                    }
+                    if keycode == 55 && self.palette_open() {
+                        let clipboard = self.entry.clipboard();
+                        let ent = self.entry.clone();
+                        clipboard.read_text_async(gio::Cancellable::NONE, move |res| {
+                            if let Ok(Some(text)) = res {
+                                let text = text.to_string();
+                                let (start, end) = ent.selection_bounds().unwrap_or_else(|| {
+                                    let pos = ent.position();
+                                    (pos, pos)
+                                });
+                                ent.delete_text(start, end);
+                                let mut insert_pos = start;
+                                ent.insert_text(&text, &mut insert_pos);
+                                ent.set_position(insert_pos);
+                            }
+                        });
+                        return true;
+                    }
                     // Vertical workspace selection (Ctrl+1..9)
                     if keycode == 10 || keycode == 87 || k == gdk::Key::_1 || k == gdk::Key::KP_1 || key.to_unicode() == Some('1') {
                         self.focus_row(0);
@@ -5056,6 +5138,7 @@ fn build(gapp: &gtk::Application) {
         load_bar,
         palette,
         entry: entry.clone(),
+        palette_for_new_tab: Cell::new(false),
         palette_suggestions_box: palette_suggestions_box.clone(),
         history: RefCell::new(history_mgr),
         current_suggestions: RefCell::new(Vec::new()),
@@ -5476,7 +5559,7 @@ fn build(gapp: &gtk::Application) {
 
 
     let a = app.clone();
-    add.connect_clicked(move |_| a.new_tab());
+    add.connect_clicked(move |_| a.open_new_tab_palette());
     let a = app.clone();
     pill.connect_clicked(move |_| a.show_palette());
 
@@ -5488,7 +5571,33 @@ fn build(gapp: &gtk::Application) {
     let entry_keys = gtk::EventControllerKey::new();
     entry_keys.set_propagation_phase(gtk::PropagationPhase::Capture);
     let a = app.clone();
-    entry_keys.connect_key_pressed(move |_, key, _, _| {
+    let ent = entry.clone();
+    entry_keys.connect_key_pressed(move |_, key, keycode, state| {
+        use gdk::ModifierType as M;
+        let ctrl = state.contains(M::CONTROL_MASK);
+        let shift = state.contains(M::SHIFT_MASK);
+        let alt = state.contains(M::ALT_MASK);
+        let k = key.to_lower();
+
+        if ctrl && !shift && !alt && (k == gdk::Key::v || k == gdk::Key::V || keycode == 55) {
+            let clipboard = ent.clipboard();
+            let entry_clone = ent.clone();
+            clipboard.read_text_async(gio::Cancellable::NONE, move |res| {
+                if let Ok(Some(text)) = res {
+                    let text = text.to_string();
+                    let (start, end) = entry_clone.selection_bounds().unwrap_or_else(|| {
+                        let pos = entry_clone.position();
+                        (pos, pos)
+                    });
+                    entry_clone.delete_text(start, end);
+                    let mut insert_pos = start;
+                    entry_clone.insert_text(&text, &mut insert_pos);
+                    entry_clone.set_position(insert_pos);
+                }
+            });
+            return glib::Propagation::Stop;
+        }
+
         match key {
             gdk::Key::Down => {
                 if a.move_suggestion_selection(1) {
@@ -5607,9 +5716,44 @@ fn build(gapp: &gtk::Application) {
 
     let keys = gtk::EventControllerKey::new();
     keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let held_shortcut: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
+
     let a = app.clone();
+    let held = held_shortcut.clone();
     keys.connect_key_pressed(move |_, key, keycode, state| {
-        if a.on_key(key, keycode, state) { glib::Propagation::Stop } else { glib::Propagation::Proceed }
+        use gdk::ModifierType as M;
+        let ctrl = state.contains(M::CONTROL_MASK);
+        let alt = state.contains(M::ALT_MASK);
+        let super_key = state.contains(M::SUPER_MASK);
+
+        // Autorepeat loop suppressor: block machine-gun repeat when shortcut is held down
+        if ctrl || alt || super_key {
+            if held.get() == Some(keycode) {
+                return glib::Propagation::Stop;
+            }
+        }
+
+        let handled = a.on_key(key, keycode, state);
+        if handled {
+            if ctrl || alt || super_key {
+                held.set(Some(keycode));
+            }
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+
+    let held_rel = held_shortcut.clone();
+    keys.connect_key_released(move |_, _, keycode, _| {
+        if held_rel.get() == Some(keycode) {
+            held_rel.set(None);
+        }
+    });
+
+    let held_focus = held_shortcut.clone();
+    win.connect_has_focus_notify(move |_| {
+        held_focus.set(None);
     });
     win.add_controller(keys);
 

@@ -462,4 +462,20 @@ mod tests {
         assert!(script_default.contains("const seed ="));
         assert_ne!(script_default, script_work);
     }
+
+    #[test]
+    fn test_create_profile_does_not_auto_activate() {
+        let temp_dir = std::env::temp_dir().join(format!("rail_prof_no_auto_act_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let _ = fs::create_dir_all(&temp_dir);
+
+        let mut mgr = ProfileManager::new(temp_dir.clone());
+        assert_eq!(mgr.active_id(), "default");
+
+        let p = mgr.create_profile("New Account", 2).expect("create profile");
+        assert_eq!(p.id, "newaccount");
+        // Newly created profile must NOT become active automatically
+        assert_eq!(mgr.active_id(), "default");
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
 }
