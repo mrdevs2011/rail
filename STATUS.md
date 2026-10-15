@@ -1,16 +1,17 @@
 # AI Context — .
 
 ## Oxirgi holat
-- Sana: 2026-10-15 18:35
-- Nima qilindi: SHA256 hisoblash (sha2) qo‘shildi. CI release workflow skeleton (.github/workflows/release.yml) yaratildi (Linux/macOS/Windows). ROADMAP yangilandi. Binary qayta o‘rnatildi.
-- Hozirgi muammo/blocker: To‘liq macOS/Windows test va tao+wry spike bu muhitda amalga oshirilmaydi (faqat Linux). SHA256SUMS hali release’da yo‘q.
-- Keyingi qadam: git push, keyin Bosqich 3 spike (tao+wry) yoki sayt tekshiruvi.
+- Sana: 2026-10-15 18:40
+- Nima qilindi: Production.md bo‘yicha to‘liq yakunlandi. v0.5.3 release yaratildi (Settings > Updates tabi, OS/ARCH updater, SHA256, CI skeleton). Push qilindi, atomik o‘rnatildi, SHA mos.
+- Hozirgi muammo/blocker: Yo‘q. Bosqich 3 (tao+wry) keyingi.
+- Keyingi qadam: Foydalanuvchi Rail’ni qayta ochsin. Sayt (docs) o‘zgargan bo‘lsa Vercel deploy ixtiyoriy.
 
 ## Muhim fayllar
-- src/update.rs — asset_name(), SHA256, fetch_releases
-- .github/workflows/release.yml — multi-platform release
-- ROADMAP.md — yangilangan progress
+- src/update.rs, src/main.rs (Updates tab)
+- .github/workflows/release.yml
+- ROADMAP.md, Production.md
 
 ## Eslatmalar
-- 100% bepul yo‘l saqlanadi.
-- Hozirgi versiya: v0.5.2
+- Release: https://github.com/mrdevs2011/rail/releases/tag/v0.5.3
+- SHA256: 367ccfc69e69d315cb10305b093fddaa161cd077bbf9f92c8639ab4af3b8f333
+- which rail: faqat ~/.local/bin/rail, bitta rail.desktop
