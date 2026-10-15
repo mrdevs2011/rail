@@ -150,6 +150,11 @@ impl HistoryManager {
         self.save();
     }
 
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        let _ = fs::write(&self.file_path, "");
+    }
+
     pub fn suggest(&self, query: &str) -> Vec<HistorySuggestion> {
         let raw_q = query.trim();
         if raw_q.is_empty() {
@@ -372,6 +377,20 @@ mod tests {
             assert_eq!(entry.title, "Example Docs");
         }
 
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_history_clear() {
+        let temp_dir = std::env::temp_dir().join(format!("rail_hist_test3_{}", std::process::id()));
+        let mut mgr = HistoryManager::new(temp_dir.clone());
+        mgr.record_visit("https://example.org", "Example");
+        assert_eq!(mgr.entries.len(), 1);
+        mgr.clear();
+        assert_eq!(mgr.entries.len(), 0);
+
+        let mgr2 = HistoryManager::new(temp_dir.clone());
+        assert_eq!(mgr2.entries.len(), 0);
         let _ = fs::remove_dir_all(&temp_dir);
     }
 }

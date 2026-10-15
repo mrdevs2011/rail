@@ -250,6 +250,29 @@ kbd {
 </body>
 </html>"##;
 
+const GOOGLE_G_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.27 21.36 7.33 24 12 24z"/>
+  <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.17 0 9.99 0 12s.45 3.83 1.25 5.42l4.03-3.15z"/>
+  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.27 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+</svg>"##;
+
+fn create_google_icon(size: i32) -> gtk::Image {
+    let bytes = glib::Bytes::from_static(GOOGLE_G_SVG.as_bytes());
+    match gdk::Texture::from_bytes(&bytes) {
+        Ok(t) => {
+            let img = gtk::Image::from_paintable(Some(&t));
+            img.set_pixel_size(size);
+            img
+        }
+        Err(_) => {
+            let img = gtk::Image::from_icon_name("system-search-symbolic");
+            img.set_pixel_size(size);
+            img
+        }
+    }
+}
+
 const CSS: &str = "
 window {
     background: #090b10;
@@ -710,26 +733,33 @@ entry.palette-entry, entry.palette-entry:focus-within {
     color: #ffffff !important;
 }
 
-/* ---- profile circle button in URL palette ---- */
+/* ---- profile circle button in URL palette (black text on bright color) ---- */
 button.profile-circle-btn {
     min-width: 28px;
     min-height: 28px;
     padding: 0;
     border-radius: 9999px;
-    border: 2px solid rgba(255, 255, 255, 0.12);
+    border: 2px solid rgba(255, 255, 255, 0.18);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     transition: transform 120ms ease, border-color 120ms ease;
-    color: #ffffff;
 }
 button.profile-circle-btn:hover {
     transform: scale(1.08);
     border-color: #38bdf8;
 }
 button.profile-circle-btn label,
+button.profile-circle-btn.prof-bg-0 label,
+button.profile-circle-btn.prof-bg-1 label,
+button.profile-circle-btn.prof-bg-2 label,
+button.profile-circle-btn.prof-bg-3 label,
+button.profile-circle-btn.prof-bg-4 label,
+button.profile-circle-btn.prof-bg-5 label,
+button.profile-circle-btn.prof-bg-6 label,
+button.profile-circle-btn.prof-bg-7 label,
 .profile-circle-label {
-    color: #ffffff !important;
-    font-weight: 800;
-    font-size: 11.5px;
+    color: #000000 !important;
+    font-weight: 900;
+    font-size: 12px;
     font-family: system-ui, sans-serif;
 }
 
@@ -1167,6 +1197,153 @@ button.color-choice.selected {
     margin-top: 6px;
 }
 
+/* ---- floating settings modal (Ctrl+Shift+S) ---- */
+.settings-modal {
+    background: #0b0e18;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 32px 84px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    min-width: 820px;
+    max-width: 880px;
+    min-height: 540px;
+    max-height: 620px;
+    margin-left: 20px;
+    margin-right: 20px;
+    overflow: hidden;
+}
+.settings-header {
+    background: #0e1220;
+    padding: 12px 18px;
+    border-bottom: 1px solid #1a2238;
+}
+.settings-header-icon {
+    color: #38bdf8;
+    margin-right: 8px;
+}
+.settings-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #f8fafc;
+    letter-spacing: -0.02em;
+}
+.settings-badge {
+    background: rgba(56, 189, 248, 0.12);
+    color: #38bdf8;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 5px;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    margin-left: 8px;
+}
+.settings-body {
+    background: #0b0e18;
+}
+.settings-sidebar {
+    background: #090c14;
+    border-right: 1px solid #161c2e;
+    padding: 12px 8px;
+    min-width: 195px;
+}
+.settings-tab-btn {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: #94a3b8;
+    padding: 9px 12px;
+    margin-bottom: 4px;
+    font-size: 12.5px;
+    font-weight: 500;
+    transition: all 120ms ease;
+}
+.settings-tab-btn:hover {
+    background: #131726;
+    color: #f1f5f9;
+}
+.settings-tab-btn.active {
+    background: #171f34;
+    color: #38bdf8;
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 0 #38bdf8;
+}
+.settings-content-page {
+    padding: 18px 24px;
+}
+.settings-page-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #f8fafc;
+    letter-spacing: -0.01em;
+}
+.settings-page-subtitle {
+    font-size: 11.5px;
+    color: #64748b;
+    margin-top: 2px;
+    margin-bottom: 12px;
+}
+.settings-card {
+    background: #101423;
+    border: 1px solid #1a2238;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+}
+.settings-card-title {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+.settings-card-desc {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 2px;
+    margin-bottom: 6px;
+}
+.settings-option-item {
+    background: #0d101c;
+    border: 1px solid #1a2238;
+    border-radius: 7px;
+    padding: 6px 12px;
+    margin-right: 6px;
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 120ms ease;
+}
+.settings-option-item:hover {
+    background: #14192b;
+    border-color: #2b3858;
+    color: #f8fafc;
+}
+.settings-option-item.active {
+    background: #0e273f;
+    border-color: #38bdf8;
+    color: #38bdf8;
+    font-weight: 600;
+}
+.shortcut-row {
+    padding: 6px 10px;
+    border-bottom: 1px solid #141928;
+}
+.shortcut-row:last-child {
+    border-bottom: none;
+}
+.shortcut-desc {
+    font-size: 12px;
+    color: #cbd5e1;
+}
+.shortcut-kbd {
+    background: #171d2e;
+    border: 1px solid #28334e;
+    border-radius: 4px;
+    color: #38bdf8;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+}
+
 /* ---- floating minimap / roadmap (Ctrl+M) ---- */
 .minimap-window {
     background: #0b0e17;
@@ -1249,11 +1426,47 @@ button.color-choice.selected {
     color: #ffffff;
 }
 
-/* ---- Rail DevTools Panel (F12 / Ctrl+Shift+I) ---- */
+/* ---- Rail DevTools Panel (F12 / Ctrl+Shift+I / Ctrl+Shift+D) ---- */
 .devtools-panel {
     background: #0b0e17;
+    box-shadow: 0 0 48px rgba(0, 0, 0, 0.85);
+}
+.devtools-panel.dock-bottom {
     border-top: 1px solid #1a2032;
     box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.85);
+}
+.devtools-panel.dock-left {
+    border-right: 1px solid #1a2032;
+    box-shadow: 16px 0 48px rgba(0, 0, 0, 0.85);
+}
+.devtools-panel.dock-right {
+    border-left: 1px solid #1a2032;
+    box-shadow: -16px 0 48px rgba(0, 0, 0, 0.85);
+}
+.devtools-resize-handle {
+    background: transparent;
+    transition: background 0.15s ease;
+}
+.devtools-panel.dock-bottom .devtools-resize-handle {
+    min-height: 4px;
+    height: 4px;
+    cursor: ns-resize;
+}
+.devtools-panel.dock-bottom .devtools-resize-handle:hover {
+    background: rgba(56, 189, 248, 0.45);
+}
+.devtools-panel.dock-left .devtools-resize-handle,
+.devtools-panel.dock-right .devtools-resize-handle {
+    min-width: 4px;
+    width: 4px;
+    cursor: ew-resize;
+}
+.devtools-panel.dock-left .devtools-resize-handle:hover,
+.devtools-panel.dock-right .devtools-resize-handle:hover {
+    background: rgba(56, 189, 248, 0.45);
+}
+.devtools-window-box {
+    background: #0b0e17;
 }
 .devtools-header {
     background: #0e121e;
@@ -1500,7 +1713,6 @@ struct App {
     profile_btn: gtk::Button,
     profile_btn_lbl: gtk::Label,
     profile_popover: gtk::Popover,
-    profiles_modal: gtk::Box,
     profiles_modal_scroll: gtk::ScrolledWindow,
     profiles_list_box: gtk::ListBox,
     new_profile_entry: gtk::Entry,
@@ -1511,7 +1723,6 @@ struct App {
     touchpad_mode: Cell<bool>,
     last_saved_session: RefCell<String>,
     save_session_gen: Cell<u64>,
-    data_modal: gtk::Box,
     data_modal_info_lbl: gtk::Label,
     data_modal_status_lbl: gtk::Label,
     data_export_entry: gtk::Entry,
@@ -1521,15 +1732,41 @@ struct App {
     map_drawing_area: gtk::DrawingArea,
     map_location_btn: gtk::Button,
     map_state: RefCell<MinimapState>,
-    // DevTools Panel (F12 / Ctrl+Shift+I)
+    // DevTools Panel (F12 / Ctrl+Shift+I / Ctrl+Shift+D)
     devtools_open: Cell<bool>,
+    devtools_dock_side: Cell<DevToolsDockSide>,
     devtools_panel: gtk::Box,
     devtools_content_box: gtk::Box,
+    devtools_resize_handle: gtk::Box,
     devtools_url_lbl: gtk::Label,
     devtools_window: RefCell<Option<gtk::Window>>,
+    // Floating Settings Panel (Ctrl+Shift+S / Ctrl+P / Ctrl+I)
+    settings_modal: gtk::Box,
+    settings_stack: gtk::Stack,
+    settings_tab_buttons: RefCell<Vec<(SettingsTab, gtk::Button)>>,
+    current_settings_tab: Cell<SettingsTab>,
+    search_engine: RefCell<String>,
 }
 
-fn to_uri(input: &str) -> String {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum DevToolsDockSide {
+    Bottom,
+    Left,
+    Right,
+    Undocked,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum SettingsTab {
+    General,
+    Profiles,
+    Data,
+    Privacy,
+    Shortcuts,
+    About,
+}
+
+fn to_uri(input: &str, search_engine: &str) -> String {
     let s = input.trim();
     let s = s.strip_prefix("view-source:").unwrap_or(s).trim();
     if s.contains("://") || s.starts_with("about:") || s.starts_with("file:") {
@@ -1541,7 +1778,14 @@ fn to_uri(input: &str) -> String {
     if !s.contains(' ') && s.contains('.') {
         return format!("https://{s}");
     }
-    format!("https://www.google.com/search?q={}", glib::Uri::escape_string(s, None, false))
+    let encoded = glib::Uri::escape_string(s, None, false);
+    match search_engine.to_lowercase().as_str() {
+        "duckduckgo" | "ddg" => format!("https://duckduckgo.com/?q={}", encoded),
+        "brave" => format!("https://search.brave.com/search?q={}", encoded),
+        "bing" => format!("https://www.bing.com/search?q={}", encoded),
+        "ecosia" => format!("https://www.ecosia.org/search?q={}", encoded),
+        _ => format!("https://www.google.com/search?q={}", encoded),
+    }
 }
 
 fn host_of(uri: &str) -> Option<String> {
@@ -1565,6 +1809,7 @@ struct SessionState {
     focus: (usize, usize),
     sidebar_open: Option<bool>,
     touchpad_mode: Option<bool>,
+    search_engine: Option<String>,
     win_size: Option<(i32, i32, bool)>,
     tabs: Vec<SessionTabItem>,
 }
@@ -1573,6 +1818,7 @@ fn parse_session_content(content: &str) -> SessionState {
     let mut focus = (0usize, 0usize);
     let mut sidebar_open = None;
     let mut touchpad_mode = None;
+    let mut search_engine = None;
     let mut win_size = None;
     let mut tabs: Vec<SessionTabItem> = Vec::new();
 
@@ -1592,6 +1838,9 @@ fn parse_session_content(content: &str) -> SessionState {
             }
             "touchpad" if parts.len() >= 2 => {
                 touchpad_mode = Some(parts[1] == "1");
+            }
+            "engine" | "search_engine" if parts.len() >= 2 => {
+                search_engine = Some(parts[1].trim().to_string());
             }
             "win" if parts.len() >= 4 => {
                 let w = parts[1].parse().unwrap_or(1400);
@@ -1621,6 +1870,7 @@ fn parse_session_content(content: &str) -> SessionState {
         focus,
         sidebar_open,
         touchpad_mode,
+        search_engine,
         win_size,
         tabs,
     }
@@ -1965,7 +2215,7 @@ impl App {
         self.add_view(view, prof_id, true);
     }
 
-    // ---- DevTools (Ctrl+Shift+I) ----
+    // ---- DevTools (Ctrl+Shift+I / F12 / Ctrl+Shift+D) ----
 
     fn devtools_open(&self) -> bool {
         self.devtools_open.get()
@@ -1979,42 +2229,205 @@ impl App {
         }
     }
 
-    fn show_devtools(self: &Rc<Self>) {
+    fn cycle_devtools_dock(self: &Rc<Self>) {
+        if !self.devtools_open() {
+            self.show_devtools();
+            return;
+        }
+        let next = match self.devtools_dock_side.get() {
+            DevToolsDockSide::Bottom => DevToolsDockSide::Right,
+            DevToolsDockSide::Right => DevToolsDockSide::Left,
+            DevToolsDockSide::Left => DevToolsDockSide::Undocked,
+            DevToolsDockSide::Undocked => DevToolsDockSide::Bottom,
+        };
+        self.set_devtools_dock_side(next);
+    }
+
+    fn set_devtools_dock_side(self: &Rc<Self>, side: DevToolsDockSide) {
+        self.devtools_dock_side.set(side);
         let Some(view) = self.focused_view() else { return };
         let Some(insp) = view.inspector() else { return };
+        let Some(w) = insp.web_view() else { return };
+        let widget: gtk::Widget = w.upcast();
 
-        // If inspector is inside detached window and that window is open, present it
-        if let Some(win) = self.devtools_window.borrow().as_ref() {
-            if win.is_visible() {
-                insp.show();
-                win.present();
-                self.devtools_open.set(true);
-                return;
-            }
-        }
-
-        insp.show();
-
-        // Update URL and host badge in devtools header
-        let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_else(|| "about:blank".to_string());
-        let host = host_of(&cur_uri).unwrap_or_else(|| "localhost".to_string());
-        self.devtools_url_lbl.set_markup(&format!("<span foreground='#38bdf8'>{}</span> <span color='#64748b'>•</span> <span color='#94a3b8'>{}</span>", glib::markup_escape_text(&host), glib::markup_escape_text(&cur_uri)));
-
-        // Attach WebKit's full WebInspector widget to content_box
-        if let Some(w) = insp.web_view() {
-            let widget: gtk::Widget = w.upcast();
-            if widget.parent().as_ref() != Some(self.devtools_content_box.upcast_ref()) {
+        match side {
+            DevToolsDockSide::Bottom => {
+                if let Some(win) = self.devtools_window.borrow_mut().take() {
+                    win.set_child(None::<&gtk::Widget>);
+                    win.close();
+                }
                 while let Some(c) = self.devtools_content_box.first_child() {
                     self.devtools_content_box.remove(&c);
                 }
                 widget.set_vexpand(true);
                 widget.set_hexpand(true);
                 self.devtools_content_box.append(&widget);
+
+                self.devtools_panel.remove_css_class("dock-left");
+                self.devtools_panel.remove_css_class("dock-right");
+                self.devtools_panel.add_css_class("dock-bottom");
+
+                self.devtools_panel.set_orientation(gtk::Orientation::Vertical);
+                while let Some(c) = self.devtools_panel.first_child() {
+                    self.devtools_panel.remove(&c);
+                }
+                self.devtools_panel.append(&self.devtools_resize_handle);
+                self.devtools_panel.append(&self.devtools_content_box);
+
+                self.devtools_panel.set_halign(gtk::Align::Fill);
+                self.devtools_panel.set_valign(gtk::Align::End);
+                self.devtools_panel.set_width_request(-1);
+                self.devtools_panel.set_height_request(400);
+                self.devtools_panel.set_visible(true);
+                self.devtools_open.set(true);
+            }
+            DevToolsDockSide::Left => {
+                if let Some(win) = self.devtools_window.borrow_mut().take() {
+                    win.set_child(None::<&gtk::Widget>);
+                    win.close();
+                }
+                while let Some(c) = self.devtools_content_box.first_child() {
+                    self.devtools_content_box.remove(&c);
+                }
+                widget.set_vexpand(true);
+                widget.set_hexpand(true);
+                self.devtools_content_box.append(&widget);
+
+                self.devtools_panel.remove_css_class("dock-bottom");
+                self.devtools_panel.remove_css_class("dock-right");
+                self.devtools_panel.add_css_class("dock-left");
+
+                self.devtools_panel.set_orientation(gtk::Orientation::Horizontal);
+                while let Some(c) = self.devtools_panel.first_child() {
+                    self.devtools_panel.remove(&c);
+                }
+                self.devtools_panel.append(&self.devtools_content_box);
+                self.devtools_panel.append(&self.devtools_resize_handle);
+
+                self.devtools_panel.set_halign(gtk::Align::Start);
+                self.devtools_panel.set_valign(gtk::Align::Fill);
+                self.devtools_panel.set_height_request(-1);
+                self.devtools_panel.set_width_request(560);
+                self.devtools_panel.set_visible(true);
+                self.devtools_open.set(true);
+            }
+            DevToolsDockSide::Right => {
+                if let Some(win) = self.devtools_window.borrow_mut().take() {
+                    win.set_child(None::<&gtk::Widget>);
+                    win.close();
+                }
+                while let Some(c) = self.devtools_content_box.first_child() {
+                    self.devtools_content_box.remove(&c);
+                }
+                widget.set_vexpand(true);
+                widget.set_hexpand(true);
+                self.devtools_content_box.append(&widget);
+
+                self.devtools_panel.remove_css_class("dock-bottom");
+                self.devtools_panel.remove_css_class("dock-left");
+                self.devtools_panel.add_css_class("dock-right");
+
+                self.devtools_panel.set_orientation(gtk::Orientation::Horizontal);
+                while let Some(c) = self.devtools_panel.first_child() {
+                    self.devtools_panel.remove(&c);
+                }
+                self.devtools_panel.append(&self.devtools_resize_handle);
+                self.devtools_panel.append(&self.devtools_content_box);
+
+                self.devtools_panel.set_halign(gtk::Align::End);
+                self.devtools_panel.set_valign(gtk::Align::Fill);
+                self.devtools_panel.set_height_request(-1);
+                self.devtools_panel.set_width_request(560);
+                self.devtools_panel.set_visible(true);
+                self.devtools_open.set(true);
+            }
+            DevToolsDockSide::Undocked => {
+                self.devtools_panel.set_visible(false);
+                while let Some(c) = self.devtools_content_box.first_child() {
+                    self.devtools_content_box.remove(&c);
+                }
+
+                let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_default();
+                let host = host_of(&cur_uri).unwrap_or_else(|| "DevTools".to_string());
+                let mut win_opt = self.devtools_window.borrow_mut();
+                if let Some(win) = win_opt.as_ref() {
+                    if let Some(child) = win.child() {
+                        if let Some(box_container) = child.downcast_ref::<gtk::Box>() {
+                            if widget.parent().as_ref() != Some(box_container.upcast_ref()) {
+                                while let Some(c) = box_container.first_child() {
+                                    box_container.remove(&c);
+                                }
+                                widget.set_vexpand(true);
+                                widget.set_hexpand(true);
+                                box_container.append(&widget);
+                            }
+                        }
+                    }
+                    win.set_title(Some(&format!("Rail DevTools - {}", host)));
+                    win.present();
+                } else {
+                    let win_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                    win_box.add_css_class("devtools-window-box");
+                    widget.set_vexpand(true);
+                    widget.set_hexpand(true);
+                    win_box.append(&widget);
+
+                    let dt_win_click = gtk::GestureClick::new();
+                    dt_win_click.set_propagation_phase(gtk::PropagationPhase::Capture);
+                    let app_win_click = self.clone();
+                    let win_child_ref = win_box.clone();
+                    dt_win_click.connect_pressed(move |_, _, x, y| {
+                        let w = win_child_ref.width() as f64;
+                        if y >= 0.0 && y <= 36.0 && w > 200.0 && x >= (w - 180.0) {
+                            let dist = w - x;
+                            if dist <= 36.0 {
+                                app_win_click.hide_devtools();
+                            } else if dist > 72.0 && dist <= 108.0 {
+                                app_win_click.set_devtools_dock_side(DevToolsDockSide::Right);
+                            } else if dist > 108.0 && dist <= 144.0 {
+                                app_win_click.set_devtools_dock_side(DevToolsDockSide::Bottom);
+                            } else if dist > 144.0 && dist <= 180.0 {
+                                app_win_click.set_devtools_dock_side(DevToolsDockSide::Left);
+                            }
+                        }
+                    });
+                    win_box.add_controller(dt_win_click);
+
+                    let win = gtk::Window::builder()
+                        .title(&format!("Rail DevTools - {}", host))
+                        .default_width(1050)
+                        .default_height(720)
+                        .child(&win_box)
+                        .build();
+                    win.add_css_class("devtools-window");
+
+                    let app_win = self.clone();
+                    win.connect_close_request(move |_| {
+                        app_win.hide_devtools();
+                        glib::Propagation::Proceed
+                    });
+
+                    win.present();
+                    *win_opt = Some(win);
+                }
+                self.devtools_open.set(true);
             }
         }
+    }
 
-        self.devtools_panel.set_visible(true);
-        self.devtools_open.set(true);
+    fn show_devtools(self: &Rc<Self>) {
+        let Some(view) = self.focused_view() else { return };
+        let Some(insp) = view.inspector() else { return };
+
+        insp.show();
+
+        // Update URL and host badge in devtools header if ever needed
+        let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_else(|| "about:blank".to_string());
+        let host = host_of(&cur_uri).unwrap_or_else(|| "localhost".to_string());
+        self.devtools_url_lbl.set_markup(&format!("<span foreground='#38bdf8'>{}</span> <span color='#64748b'>•</span> <span color='#94a3b8'>{}</span>", glib::markup_escape_text(&host), glib::markup_escape_text(&cur_uri)));
+
+        let side = self.devtools_dock_side.get();
+        self.set_devtools_dock_side(side);
     }
 
     fn hide_devtools(&self) {
@@ -2034,48 +2447,10 @@ impl App {
     }
 
     fn toggle_devtools_undocked(self: &Rc<Self>) {
-        let Some(view) = self.focused_view() else { return };
-        let Some(insp) = view.inspector() else { return };
-        let Some(w) = insp.web_view() else { return };
-        let widget: gtk::Widget = w.upcast();
-
-        let mut win_opt = self.devtools_window.borrow_mut();
-        if let Some(win) = win_opt.take() {
-            // Re-dock into bottom drawer
-            win.set_child(None::<&gtk::Widget>);
-            win.close();
-            while let Some(c) = self.devtools_content_box.first_child() {
-                self.devtools_content_box.remove(&c);
-            }
-            widget.set_vexpand(true);
-            widget.set_hexpand(true);
-            self.devtools_content_box.append(&widget);
-            self.devtools_panel.set_visible(true);
+        if self.devtools_dock_side.get() == DevToolsDockSide::Undocked {
+            self.set_devtools_dock_side(DevToolsDockSide::Bottom);
         } else {
-            // Detach into dedicated window
-            self.devtools_panel.set_visible(false);
-            while let Some(c) = self.devtools_content_box.first_child() {
-                self.devtools_content_box.remove(&c);
-            }
-
-            let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_default();
-            let host = host_of(&cur_uri).unwrap_or_else(|| "DevTools".to_string());
-            let win = gtk::Window::builder()
-                .title(&format!("Rail DevTools - {}", host))
-                .default_width(1050)
-                .default_height(720)
-                .child(&widget)
-                .build();
-            win.add_css_class("devtools-window");
-
-            let app_re_dock = self.clone();
-            win.connect_close_request(move |_| {
-                app_re_dock.hide_devtools();
-                glib::Propagation::Proceed
-            });
-
-            win.present();
-            *win_opt = Some(win);
+            self.set_devtools_dock_side(DevToolsDockSide::Undocked);
         }
     }
 
@@ -2418,7 +2793,23 @@ impl App {
         if let Some(insp) = view.inspector() {
             let app_insp = self.clone();
             insp.connect_open_window(move |_| {
-                app_insp.show_devtools();
+                app_insp.set_devtools_dock_side(DevToolsDockSide::Undocked);
+                true
+            });
+            let app_detach = self.clone();
+            insp.connect_detach(move |_| {
+                app_detach.set_devtools_dock_side(DevToolsDockSide::Undocked);
+                true
+            });
+            let app_attach = self.clone();
+            insp.connect_attach(move |_| {
+                let cur = app_attach.devtools_dock_side.get();
+                let target = if cur == DevToolsDockSide::Undocked {
+                    DevToolsDockSide::Bottom
+                } else {
+                    cur
+                };
+                app_attach.set_devtools_dock_side(target);
                 true
             });
             let a_closed = self.clone();
@@ -2998,6 +3389,7 @@ impl App {
         out.push_str(&format!("focus\t{}\t{}\n", self.focus_row.get(), self.focus_col.get()));
         out.push_str(&format!("sidebar\t{}\n", if self.side_open.get() { 1 } else { 0 }));
         out.push_str(&format!("touchpad\t{}\n", if self.touchpad_mode.get() { 1 } else { 0 }));
+        out.push_str(&format!("engine\t{}\n", self.search_engine.borrow()));
         let win_w = self.win.width();
         let win_h = self.win.height();
         let is_max = if self.win.is_maximized() { 1 } else { 0 };
@@ -3079,6 +3471,10 @@ impl App {
 
         if let Some(tp) = state.touchpad_mode {
             self.touchpad_mode.set(tp);
+        }
+
+        if let Some(engine) = state.search_engine {
+            *self.search_engine.borrow_mut() = engine;
         }
 
         if let Some(open) = state.sidebar_open {
@@ -3627,6 +4023,29 @@ impl App {
             box_menu.append(&row_btn);
         }
 
+        let sep = gtk::Separator::new(gtk::Orientation::Horizontal);
+        sep.set_margin_top(6);
+        sep.set_margin_bottom(6);
+        box_menu.append(&sep);
+
+        let manage_btn = gtk::Button::new();
+        manage_btn.add_css_class("profile-item-btn");
+        let manage_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let manage_icon = gtk::Image::from_icon_name("preferences-system-symbolic");
+        let manage_lbl = gtk::Label::new(Some("Manage Profiles in Settings (Ctrl+P)"));
+        manage_lbl.add_css_class("profile-item-name");
+        manage_lbl.set_xalign(0.0);
+        manage_box.append(&manage_icon);
+        manage_box.append(&manage_lbl);
+        manage_btn.set_child(Some(&manage_box));
+
+        let app_c = self.clone();
+        manage_btn.connect_clicked(move |_| {
+            app_c.profile_popover.popdown();
+            app_c.open_settings_tab(SettingsTab::Profiles);
+        });
+        box_menu.append(&manage_btn);
+
         self.profile_popover.set_child(Some(&box_menu));
     }
 
@@ -3957,7 +4376,7 @@ impl App {
         if !text.trim().is_empty() {
             let target_profile_id = self.selected_palette_profile.borrow().clone();
             self.profiles.borrow_mut().set_active(&target_profile_id);
-            let uri = to_uri(text);
+            let uri = to_uri(text, &self.search_engine.borrow());
             self.history.borrow_mut().record_visit(&uri, "");
 
             if is_new_tab {
@@ -3990,74 +4409,117 @@ impl App {
         self.hide_palette();
     }
 
-    // ---- profiles manager modal (Ctrl+P / Ctrl+Shift+P) ------------------
+    // ---- floating settings modal (Ctrl+Shift+S / Ctrl+P / Ctrl+I) --------
 
-    fn profiles_modal_open(&self) -> bool {
-        self.profiles_modal.is_visible()
+    fn settings_modal_open(&self) -> bool {
+        self.settings_modal.is_visible()
     }
 
-    fn toggle_profiles_modal(self: &Rc<Self>) {
-        if self.profiles_modal_open() {
-            self.hide_profiles_modal();
-        } else {
-            self.show_profiles_modal();
-        }
-    }
-
-    fn show_profiles_modal(self: &Rc<Self>) {
-        self.hide_palette();
-        self.rebuild_profiles_modal_list();
-        self.new_profile_entry.set_text("");
-        self.select_new_profile_color(0);
-        self.update_create_profile_btn_state();
-        self.profiles_modal.set_visible(true);
-        self.new_profile_entry.grab_focus();
-    }
-
-    fn hide_profiles_modal(&self) {
-        self.profiles_modal.set_visible(false);
-        if let Some(v) = self.focused_view() {
-            v.grab_focus();
-        }
-    }
-
-    fn data_modal_open(&self) -> bool {
-        self.data_modal.is_visible()
-    }
-
-    fn toggle_data_modal(self: &Rc<Self>) {
-        if self.data_modal_open() {
-            self.hide_data_modal();
-        } else {
-            self.show_data_modal();
-        }
-    }
-
-    fn show_data_modal(self: &Rc<Self>) {
-        if self.profiles_modal_open() {
-            self.hide_profiles_modal();
-        }
+    fn open_settings_tab(self: &Rc<Self>, tab: SettingsTab) {
         if self.palette_open() {
             self.hide_palette();
         }
-        self.refresh_data_modal_info();
-        let timestamp = glib::DateTime::now_local()
-            .ok()
-            .and_then(|d| d.format("%Y%m%d_%H%M%S").ok())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "backup".to_string());
-        let default_export = glib::home_dir().join(format!("rail_backup_{}.tar.gz", timestamp));
-        self.data_export_entry.set_text(&default_export.to_string_lossy());
-        self.data_modal_status_lbl.set_text("");
-        self.data_modal.set_visible(true);
-        self.data_export_entry.grab_focus();
+        self.current_settings_tab.set(tab);
+        let tab_name = match tab {
+            SettingsTab::General => "general",
+            SettingsTab::Profiles => "profiles",
+            SettingsTab::Data => "data",
+            SettingsTab::Privacy => "privacy",
+            SettingsTab::Shortcuts => "shortcuts",
+            SettingsTab::About => "about",
+        };
+        self.settings_stack.set_visible_child_name(tab_name);
+
+        for (btn_tab, btn) in self.settings_tab_buttons.borrow().iter() {
+            if *btn_tab == tab {
+                btn.add_css_class("active");
+            } else {
+                btn.remove_css_class("active");
+            }
+        }
+
+        match tab {
+            SettingsTab::Profiles => {
+                self.rebuild_profiles_modal_list();
+                self.new_profile_entry.set_text("");
+                self.select_new_profile_color(0);
+                self.update_create_profile_btn_state();
+                self.new_profile_entry.grab_focus();
+            }
+            SettingsTab::Data => {
+                self.refresh_data_modal_info();
+                let timestamp = glib::DateTime::now_local()
+                    .ok()
+                    .and_then(|d| d.format("%Y%m%d_%H%M%S").ok())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "backup".to_string());
+                let default_export = glib::home_dir().join(format!("rail_backup_{}.tar.gz", timestamp));
+                self.data_export_entry.set_text(&default_export.to_string_lossy());
+                self.data_modal_status_lbl.set_text("");
+                self.data_export_entry.grab_focus();
+            }
+            _ => {}
+        }
+
+        self.settings_modal.set_visible(true);
     }
 
-    fn hide_data_modal(&self) {
-        self.data_modal.set_visible(false);
+    fn toggle_settings_modal(self: &Rc<Self>) {
+        if self.settings_modal_open() {
+            self.hide_settings_modal();
+        } else {
+            self.open_settings_tab(self.current_settings_tab.get());
+        }
+    }
+
+    fn hide_settings_modal(&self) {
+        self.settings_modal.set_visible(false);
         if let Some(v) = self.focused_view() {
             v.grab_focus();
         }
+    }
+
+    fn profiles_modal_open(&self) -> bool {
+        self.settings_modal.is_visible() && self.current_settings_tab.get() == SettingsTab::Profiles
+    }
+
+    fn toggle_profiles_modal(self: &Rc<Self>) {
+        if self.settings_modal_open() && self.current_settings_tab.get() == SettingsTab::Profiles {
+            self.hide_settings_modal();
+        } else {
+            self.open_settings_tab(SettingsTab::Profiles);
+        }
+    }
+
+    fn toggle_data_modal(self: &Rc<Self>) {
+        if self.settings_modal_open() && self.current_settings_tab.get() == SettingsTab::Data {
+            self.hide_settings_modal();
+        } else {
+            self.open_settings_tab(SettingsTab::Data);
+        }
+    }
+
+    fn clear_history_action(self: &Rc<Self>) {
+        self.history.borrow_mut().clear();
+        self.data_modal_status_lbl.set_markup(
+            "<span foreground='#4ade80'><b>History Cleared:</b> All Omnibar history and suggestions have been purged.</span>"
+        );
+    }
+
+    fn clear_cache_action(self: &Rc<Self>) {
+        let dir = rail_data_dir();
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() && p.file_name().and_then(|n| n.to_str()).map(|n| n.starts_with("profile_")).unwrap_or(false) {
+                    let cache_dir = p.join("cache");
+                    let _ = std::fs::remove_dir_all(&cache_dir);
+                }
+            }
+        }
+        self.data_modal_status_lbl.set_markup(
+            "<span foreground='#4ade80'><b>Cache Cleared:</b> Profile network disk caches purged successfully.</span>"
+        );
     }
 
     fn refresh_data_modal_info(&self) {
@@ -4923,29 +5385,32 @@ impl App {
         let alt = state.contains(M::ALT_MASK);
         let k = key.to_lower();
 
-        if self.profiles_modal_open() {
+        if self.settings_modal_open() {
             if k == gdk::Key::Escape {
-                self.hide_profiles_modal();
+                self.hide_settings_modal();
+                return true;
+            }
+            if ctrl && shift && !alt && (k == gdk::Key::s || k == gdk::Key::S || keycode == 39) {
+                self.hide_settings_modal();
                 return true;
             }
             if ctrl && !shift && !alt && (k == gdk::Key::p || k == gdk::Key::P) {
-                self.hide_profiles_modal();
+                if self.current_settings_tab.get() == SettingsTab::Profiles {
+                    self.hide_settings_modal();
+                } else {
+                    self.open_settings_tab(SettingsTab::Profiles);
+                }
                 return true;
             }
-            // All other keystrokes pass directly to profiles_modal without triggering window shortcuts
-            return false;
-        }
-
-        if self.data_modal_open() {
-            if k == gdk::Key::Escape {
-                self.hide_data_modal();
+            if ctrl && !shift && !alt && (k == gdk::Key::i || k == gdk::Key::I) {
+                if self.current_settings_tab.get() == SettingsTab::Data {
+                    self.hide_settings_modal();
+                } else {
+                    self.open_settings_tab(SettingsTab::Data);
+                }
                 return true;
             }
-            if ctrl && !alt && (k == gdk::Key::i || k == gdk::Key::I) {
-                self.hide_data_modal();
-                return true;
-            }
-            // All other keystrokes pass directly to data_modal without triggering window shortcuts
+            // All other keystrokes pass directly to settings_modal without triggering window shortcuts
             return false;
         }
 
@@ -4975,6 +5440,11 @@ impl App {
             }
         }
 
+        if ctrl && shift && !alt && (k == gdk::Key::d || k == gdk::Key::D) {
+            self.cycle_devtools_dock();
+            return true;
+        }
+
         if !ctrl && !shift && !alt && k == gdk::Key::F12 {
             self.toggle_devtools();
             return true;
@@ -4995,7 +5465,7 @@ impl App {
             }
             return false;
         }
-        let global = ctrl && !shift && !alt && (matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::T | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I) || keycode == 28);
+        let global = ctrl && !alt && (matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::T | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I | gdk::Key::s | gdk::Key::S | gdk::Key::d | gdk::Key::D) || keycode == 28 || keycode == 39);
         if self.overview_open() && !global && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
             return true;
         }
@@ -5140,7 +5610,14 @@ impl App {
 
         if ctrl && shift && !alt {
             match k {
-                gdk::Key::p | gdk::Key::P => self.toggle_profiles_modal(),
+                gdk::Key::s | gdk::Key::S => {
+                    self.toggle_settings_modal();
+                    return true;
+                }
+                gdk::Key::p | gdk::Key::P => {
+                    self.open_settings_tab(SettingsTab::Profiles);
+                    return true;
+                }
                 gdk::Key::i | gdk::Key::I => self.toggle_devtools(),
                 gdk::Key::t | gdk::Key::T => self.toggle_touchpad_mode(),
                 gdk::Key::v | gdk::Key::V | gdk::Key::n | gdk::Key::N => self.split_vertical(),
@@ -5153,6 +5630,10 @@ impl App {
                     }
                 }
                 _ => {
+                    if keycode == 39 {
+                        self.toggle_settings_modal();
+                        return true;
+                    }
                     // Ctrl+Shift+1 -> move to workspace/row 1
                     if keycode == 10 || keycode == 87
                         || k == gdk::Key::_1 || k == gdk::Key::exclam || k == gdk::Key::KP_1
@@ -5234,7 +5715,7 @@ fn build(gapp: &gtk::Application) {
     pill_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
     pill_label.set_width_chars(1);
     let pill_inner = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    let s_icon = gtk::Image::from_icon_name("system-search-symbolic");
+    let s_icon = create_google_icon(18);
     s_icon.add_css_class("pill-icon");
     pill_inner.append(&s_icon);
     pill_inner.append(&pill_label);
@@ -5290,8 +5771,7 @@ fn build(gapp: &gtk::Application) {
     entry.set_hexpand(true);
     entry.set_placeholder_text(Some("Search Google or enter web address..."));
 
-    let sicon = gtk::Image::from_icon_name("system-search-symbolic");
-    sicon.set_pixel_size(20);
+    let sicon = create_google_icon(20);
 
     let profile_btn = gtk::Button::new();
     profile_btn.add_css_class("profile-circle-btn");
@@ -5335,24 +5815,194 @@ fn build(gapp: &gtk::Application) {
         pop_c.popup();
     });
 
-    // ---- profiles modal (Ctrl+P / Ctrl+Shift+P) ----
-    let modal_title = gtk::Label::new(Some("Profiles"));
-    modal_title.add_css_class("profiles-modal-title");
-    modal_title.set_xalign(0.0);
-    modal_title.set_hexpand(true);
+    // ---- floating settings panel (Ctrl+Shift+S / Ctrl+P / Ctrl+I) ----
+    let settings_modal = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    settings_modal.add_css_class("settings-modal");
+    settings_modal.set_halign(gtk::Align::Center);
+    settings_modal.set_valign(gtk::Align::Center);
+    settings_modal.set_visible(false);
+    settings_modal.set_size_request(820, 560);
 
-    let modal_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
-    modal_close_btn.add_css_class("flat-icon");
-    modal_close_btn.set_tooltip_text(Some("Close (Esc)"));
+    // Settings Header
+    let settings_header = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    settings_header.add_css_class("settings-header");
 
-    let modal_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    modal_header.append(&modal_title);
-    modal_header.append(&modal_close_btn);
+    let settings_icon = gtk::Image::from_icon_name("preferences-system-symbolic");
+    settings_icon.add_css_class("settings-header-icon");
 
-    let modal_subtitle = gtk::Label::new(Some("Isolated workspaces, sessions & cookie storage  (Ctrl+P)"));
-    modal_subtitle.add_css_class("profiles-modal-subtitle");
-    modal_subtitle.set_xalign(0.0);
+    let settings_title = gtk::Label::new(Some("Settings"));
+    settings_title.add_css_class("settings-title");
 
+    let settings_badge = gtk::Label::new(Some("rail.preferences"));
+    settings_badge.add_css_class("settings-badge");
+
+    let header_spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    header_spacer.set_hexpand(true);
+
+    let settings_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
+    settings_close_btn.add_css_class("flat-icon");
+    settings_close_btn.set_tooltip_text(Some("Close Settings (Esc)"));
+
+    settings_header.append(&settings_icon);
+    settings_header.append(&settings_title);
+    settings_header.append(&settings_badge);
+    settings_header.append(&header_spacer);
+    settings_header.append(&settings_close_btn);
+    settings_modal.append(&settings_header);
+
+    // Settings Body (Left sidebar + Right stack)
+    let settings_body = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    settings_body.add_css_class("settings-body");
+    settings_body.set_vexpand(true);
+
+    let settings_sidebar = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    settings_sidebar.add_css_class("settings-sidebar");
+
+    let settings_stack = gtk::Stack::new();
+    settings_stack.set_transition_type(gtk::StackTransitionType::Crossfade);
+    settings_stack.set_transition_duration(150);
+    settings_stack.set_hexpand(true);
+    settings_stack.set_vexpand(true);
+
+    let sidebar_items = [
+        (SettingsTab::General, "preferences-system-symbolic", "General"),
+        (SettingsTab::Profiles, "system-users-symbolic", "Profiles"),
+        (SettingsTab::Data, "drive-harddisk-symbolic", "Data & Backup"),
+        (SettingsTab::Privacy, "security-high-symbolic", "Privacy & Shield"),
+        (SettingsTab::Shortcuts, "input-keyboard-symbolic", "Shortcuts"),
+        (SettingsTab::About, "help-about-symbolic", "About Rail"),
+    ];
+
+    let mut tab_buttons_vec: Vec<(SettingsTab, gtk::Button)> = Vec::new();
+    for (tab_type, icon_name, label_text) in sidebar_items {
+        let btn = gtk::Button::new();
+        btn.add_css_class("settings-tab-btn");
+        let btn_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let btn_icon = gtk::Image::from_icon_name(icon_name);
+        let btn_lbl = gtk::Label::new(Some(label_text));
+        btn_lbl.set_xalign(0.0);
+        btn_lbl.set_hexpand(true);
+        btn_box.append(&btn_icon);
+        btn_box.append(&btn_lbl);
+        btn.set_child(Some(&btn_box));
+        if tab_type == SettingsTab::General {
+            btn.add_css_class("active");
+        }
+        settings_sidebar.append(&btn);
+        tab_buttons_vec.push((tab_type, btn));
+    }
+
+    let sidebar_spacer = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    sidebar_spacer.set_vexpand(true);
+    settings_sidebar.append(&sidebar_spacer);
+
+    let esc_hint = gtk::Label::new(Some("Esc to close"));
+    esc_hint.add_css_class("data-section-desc");
+    esc_hint.set_xalign(0.5);
+    esc_hint.set_margin_bottom(8);
+    settings_sidebar.append(&esc_hint);
+
+    settings_body.append(&settings_sidebar);
+    settings_body.append(&settings_stack);
+    settings_modal.append(&settings_body);
+
+    // --- Page 1: General ---
+    let page_general = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    page_general.add_css_class("settings-content-page");
+
+    let gen_title = gtk::Label::new(Some("General Preferences"));
+    gen_title.add_css_class("settings-page-title");
+    gen_title.set_xalign(0.0);
+    let gen_subtitle = gtk::Label::new(Some("Configure default search engine, new tab behavior, and browsing controls"));
+    gen_subtitle.add_css_class("settings-page-subtitle");
+    gen_subtitle.set_xalign(0.0);
+    page_general.append(&gen_title);
+    page_general.append(&gen_subtitle);
+
+    // Search Engine Card
+    let engine_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    engine_card.add_css_class("settings-card");
+    let engine_title = gtk::Label::new(Some("Default Search Engine"));
+    engine_title.add_css_class("settings-card-title");
+    engine_title.set_xalign(0.0);
+    let engine_desc = gtk::Label::new(Some("Applied when searching via the Omnibar (Ctrl+T / Ctrl+G)"));
+    engine_desc.add_css_class("settings-card-desc");
+    engine_desc.set_xalign(0.0);
+    engine_card.append(&engine_title);
+    engine_card.append(&engine_desc);
+
+    let engines_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let engine_choices = [
+        ("google", "🔍 Google"),
+        ("duckduckgo", "🦆 DuckDuckGo"),
+        ("brave", "🦁 Brave"),
+        ("bing", "🟦 Bing"),
+        ("ecosia", "🌳 Ecosia"),
+    ];
+    let mut engine_buttons: Vec<(String, gtk::Button)> = Vec::new();
+    for (id, label) in engine_choices {
+        let btn = gtk::Button::with_label(label);
+        btn.add_css_class("settings-option-item");
+        if id == "google" {
+            btn.add_css_class("active");
+        }
+        engines_row.append(&btn);
+        engine_buttons.push((id.to_string(), btn));
+    }
+    engine_card.append(&engines_row);
+    page_general.append(&engine_card);
+
+    // Browsing Controls Card
+    let browse_card = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    browse_card.add_css_class("settings-card");
+    let browse_title = gtk::Label::new(Some("Browsing Ergonomics & Gestures"));
+    browse_title.add_css_class("settings-card-title");
+    browse_title.set_xalign(0.0);
+    browse_card.append(&browse_title);
+
+    let tp_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    let tp_lbl = gtk::Label::new(Some("Touchpad Canvas Navigation (Two-finger swipe navigates 2D canvas)"));
+    tp_lbl.add_css_class("shortcut-desc");
+    tp_lbl.set_hexpand(true);
+    tp_lbl.set_xalign(0.0);
+    let tp_switch = gtk::Switch::new();
+    tp_switch.set_active(false);
+    tp_switch.set_valign(gtk::Align::Center);
+    tp_row.append(&tp_lbl);
+    tp_row.append(&tp_switch);
+    browse_card.append(&tp_row);
+
+    let scroll_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    let scroll_lbl = gtk::Label::new(Some("WebKit Smooth Kinetic Scrolling"));
+    scroll_lbl.add_css_class("shortcut-desc");
+    scroll_lbl.set_hexpand(true);
+    scroll_lbl.set_xalign(0.0);
+    let scroll_switch = gtk::Switch::new();
+    scroll_switch.set_active(true);
+    scroll_switch.set_valign(gtk::Align::Center);
+    scroll_row.append(&scroll_lbl);
+    scroll_row.append(&scroll_switch);
+    browse_card.append(&scroll_row);
+
+    let hw_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    let hw_lbl = gtk::Label::new(Some("Hardware Acceleration Policy"));
+    hw_lbl.add_css_class("shortcut-desc");
+    hw_lbl.set_hexpand(true);
+    hw_lbl.set_xalign(0.0);
+    let hw_badge = gtk::Label::new(Some("Always (GSK GPU)"));
+    hw_badge.add_css_class("shortcut-kbd");
+    hw_row.append(&hw_lbl);
+    hw_row.append(&hw_badge);
+    browse_card.append(&hw_row);
+
+    page_general.append(&browse_card);
+
+    let page_gen_scroll = gtk::ScrolledWindow::new();
+    page_gen_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_gen_scroll.set_child(Some(&page_general));
+    settings_stack.add_named(&page_gen_scroll, Some("general"));
+
+    // --- Page 2: Profiles ---
     let profiles_list_box = gtk::ListBox::new();
     profiles_list_box.add_css_class("tablist");
     profiles_list_box.set_selection_mode(gtk::SelectionMode::None);
@@ -5412,60 +6062,36 @@ fn build(gapp: &gtk::Application) {
     create_bottom_row.append(&spacer);
     create_bottom_row.append(&add_prof_btn);
 
-    let profiles_modal = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    profiles_modal.add_css_class("profiles-modal");
-    profiles_modal.set_halign(gtk::Align::Center);
-    profiles_modal.set_valign(gtk::Align::Center);
-    profiles_modal.set_visible(false);
+    let page_profiles = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    page_profiles.add_css_class("settings-content-page");
 
-    profiles_modal.append(&modal_header);
-    profiles_modal.append(&modal_subtitle);
-    profiles_modal.append(&modal_list_scroll);
-    profiles_modal.append(&sep);
-    profiles_modal.append(&new_lbl);
-    profiles_modal.append(&new_profile_entry);
-    profiles_modal.append(&new_profile_error_lbl);
-    profiles_modal.append(&create_bottom_row);
+    let prof_page_title = gtk::Label::new(Some("Profiles & Workspaces"));
+    prof_page_title.add_css_class("settings-page-title");
+    prof_page_title.set_xalign(0.0);
+    let prof_page_subtitle = gtk::Label::new(Some("Isolated workspaces, sessions & cookie storage  (Ctrl+P)"));
+    prof_page_subtitle.add_css_class("settings-page-subtitle");
+    prof_page_subtitle.set_xalign(0.0);
 
-    // ---- overview hint ----
-    let ov_hint = gtk::Label::new(Some("h/l/j/k  move      Enter  open      x  close      Esc  cancel"));
-    ov_hint.add_css_class("ov-hint");
-    ov_hint.set_halign(gtk::Align::Center);
-    ov_hint.set_valign(gtk::Align::End);
-    ov_hint.set_margin_bottom(28);
-    ov_hint.set_can_target(false);
-    ov_hint.set_visible(false);
+    page_profiles.append(&prof_page_title);
+    page_profiles.append(&prof_page_subtitle);
+    page_profiles.append(&modal_list_scroll);
+    page_profiles.append(&sep);
+    page_profiles.append(&new_lbl);
+    page_profiles.append(&new_profile_entry);
+    page_profiles.append(&new_profile_error_lbl);
+    page_profiles.append(&create_bottom_row);
 
-    let load_bar = gtk::ProgressBar::new();
-    load_bar.add_css_class("load-bar");
-    load_bar.set_valign(gtk::Align::Start);
-    load_bar.set_can_target(false);
-    load_bar.set_visible(false);
+    let page_prof_scroll = gtk::ScrolledWindow::new();
+    page_prof_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_prof_scroll.set_child(Some(&page_profiles));
+    settings_stack.add_named(&page_prof_scroll, Some("profiles"));
 
-    // ---- data backup & migration modal (Ctrl+I) ----
-    let data_modal_title = gtk::Label::new(Some("Data Backup & Migration"));
-    data_modal_title.add_css_class("data-modal-title");
-    data_modal_title.set_hexpand(true);
-    data_modal_title.set_xalign(0.0);
-
-    let data_modal_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
-    data_modal_close_btn.add_css_class("flat-icon");
-    data_modal_close_btn.set_tooltip_text(Some("Close (Esc)"));
-
-    let data_header_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    data_header_row.append(&data_modal_title);
-    data_header_row.append(&data_modal_close_btn);
-
-    let data_modal_subtitle = gtk::Label::new(Some("Export or import all workspaces, profiles, logins & cookies  (Ctrl+I)"));
-    data_modal_subtitle.add_css_class("data-modal-subtitle");
-    data_modal_subtitle.set_xalign(0.0);
-
+    // --- Page 3: Data & Backup ---
     let data_info_lbl = gtk::Label::new(None);
     data_info_lbl.add_css_class("data-info-card");
     data_info_lbl.set_xalign(0.0);
     data_info_lbl.set_margin_top(4);
 
-    // --- Export section ---
     let export_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
     export_box.add_css_class("data-section-box");
 
@@ -5497,7 +6123,6 @@ fn build(gapp: &gtk::Application) {
     export_box.append(&export_desc);
     export_box.append(&export_actions_row);
 
-    // --- Import section ---
     let import_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
     import_box.add_css_class("data-section-box");
 
@@ -5530,23 +6155,291 @@ fn build(gapp: &gtk::Application) {
     import_box.append(&import_desc);
     import_box.append(&import_actions_row);
 
+    let maint_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    maint_box.add_css_class("data-section-box");
+    let maint_title = gtk::Label::new(Some("Data Maintenance & Cache"));
+    maint_title.add_css_class("data-section-title");
+    maint_title.set_xalign(0.0);
+    let maint_desc = gtk::Label::new(Some("Clear local Omnibar suggestions history or purge temporary network disk caches."));
+    maint_desc.add_css_class("data-section-desc");
+    maint_desc.set_xalign(0.0);
+    let maint_btns_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let btn_clear_hist = gtk::Button::with_label("Clear Omnibar History");
+    btn_clear_hist.add_css_class("btn-data-action");
+    let btn_clear_cache = gtk::Button::with_label("Clear Disk Cache");
+    btn_clear_cache.add_css_class("btn-data-action");
+    maint_btns_row.append(&btn_clear_hist);
+    maint_btns_row.append(&btn_clear_cache);
+    maint_box.append(&maint_title);
+    maint_box.append(&maint_desc);
+    maint_box.append(&maint_btns_row);
+
     let data_modal_status_lbl = gtk::Label::new(None);
     data_modal_status_lbl.add_css_class("data-status-lbl");
     data_modal_status_lbl.set_xalign(0.0);
     data_modal_status_lbl.set_wrap(true);
 
-    let data_modal = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    data_modal.add_css_class("data-modal");
-    data_modal.set_halign(gtk::Align::Center);
-    data_modal.set_valign(gtk::Align::Center);
-    data_modal.set_visible(false);
+    let page_data = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    page_data.add_css_class("settings-content-page");
 
-    data_modal.append(&data_header_row);
-    data_modal.append(&data_modal_subtitle);
-    data_modal.append(&data_info_lbl);
-    data_modal.append(&export_box);
-    data_modal.append(&import_box);
-    data_modal.append(&data_modal_status_lbl);
+    let data_page_title = gtk::Label::new(Some("Data Backup & Migration"));
+    data_page_title.add_css_class("settings-page-title");
+    data_page_title.set_xalign(0.0);
+    let data_page_subtitle = gtk::Label::new(Some("Export or import all workspaces, profiles, logins & cookies  (Ctrl+I)"));
+    data_page_subtitle.add_css_class("settings-page-subtitle");
+    data_page_subtitle.set_xalign(0.0);
+
+    page_data.append(&data_page_title);
+    page_data.append(&data_page_subtitle);
+    page_data.append(&data_info_lbl);
+    page_data.append(&export_box);
+    page_data.append(&import_box);
+    page_data.append(&maint_box);
+    page_data.append(&data_modal_status_lbl);
+
+    let page_data_scroll = gtk::ScrolledWindow::new();
+    page_data_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_data_scroll.set_child(Some(&page_data));
+    settings_stack.add_named(&page_data_scroll, Some("data"));
+
+    // --- Page 4: Privacy & Shield ---
+    let page_privacy = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    page_privacy.add_css_class("settings-content-page");
+
+    let priv_title = gtk::Label::new(Some("Privacy & Security Shield"));
+    priv_title.add_css_class("settings-page-title");
+    priv_title.set_xalign(0.0);
+    let priv_subtitle = gtk::Label::new(Some("Container isolation, fingerprint shielding, and network leak prevention"));
+    priv_subtitle.add_css_class("settings-page-subtitle");
+    priv_subtitle.set_xalign(0.0);
+    page_privacy.append(&priv_title);
+    page_privacy.append(&priv_subtitle);
+
+    let iso_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    iso_card.add_css_class("settings-card");
+    let iso_title = gtk::Label::new(Some("🛡️ Multi-Container Storage Isolation"));
+    iso_title.add_css_class("settings-card-title");
+    iso_title.set_xalign(0.0);
+    let iso_desc = gtk::Label::new(Some("Each profile runs in its own isolated WebKit WebsiteDataManager directory with completely independent cookie jars, IndexedDB databases, and localStorage partitions. Websites cannot cross-track you between personas."));
+    iso_desc.add_css_class("settings-card-desc");
+    iso_desc.set_xalign(0.0);
+    iso_desc.set_wrap(true);
+    iso_card.append(&iso_title);
+    iso_card.append(&iso_desc);
+    page_privacy.append(&iso_card);
+
+    let leak_card = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    leak_card.add_css_class("settings-card");
+    let leak_title = gtk::Label::new(Some("Network Leak Protections"));
+    leak_title.add_css_class("settings-card-title");
+    leak_title.set_xalign(0.0);
+    leak_card.append(&leak_title);
+
+    let webrtc_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    let webrtc_lbl = gtk::Label::new(Some("WebRTC Peer Connections (Enabled for video calls & audio)"));
+    webrtc_lbl.add_css_class("shortcut-desc");
+    webrtc_lbl.set_hexpand(true);
+    webrtc_lbl.set_xalign(0.0);
+    let webrtc_switch = gtk::Switch::new();
+    webrtc_switch.set_active(true);
+    webrtc_switch.set_valign(gtk::Align::Center);
+    webrtc_row.append(&webrtc_lbl);
+    webrtc_row.append(&webrtc_switch);
+    leak_card.append(&webrtc_row);
+
+    let dns_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    let dns_lbl = gtk::Label::new(Some("DNS Prefetching Shield (Blocks unrequested domain lookup leaks)"));
+    dns_lbl.add_css_class("shortcut-desc");
+    dns_lbl.set_hexpand(true);
+    dns_lbl.set_xalign(0.0);
+    let dns_badge = gtk::Label::new(Some("Shielded"));
+    dns_badge.add_css_class("shortcut-kbd");
+    dns_row.append(&dns_lbl);
+    dns_row.append(&dns_badge);
+    leak_card.append(&dns_row);
+
+    let ping_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    let ping_lbl = gtk::Label::new(Some("Hyperlink Auditing (Blocks <a ping> click beacons)"));
+    ping_lbl.add_css_class("shortcut-desc");
+    ping_lbl.set_hexpand(true);
+    ping_lbl.set_xalign(0.0);
+    let ping_badge = gtk::Label::new(Some("Blocked"));
+    ping_badge.add_css_class("shortcut-kbd");
+    ping_row.append(&ping_lbl);
+    ping_row.append(&ping_badge);
+    leak_card.append(&ping_row);
+
+    let dnt_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    let dnt_lbl = gtk::Label::new(Some("Do Not Track & Global Privacy Control"));
+    dnt_lbl.add_css_class("shortcut-desc");
+    dnt_lbl.set_hexpand(true);
+    dnt_lbl.set_xalign(0.0);
+    let dnt_badge = gtk::Label::new(Some("Active"));
+    dnt_badge.add_css_class("shortcut-kbd");
+    dnt_row.append(&dnt_lbl);
+    dnt_row.append(&dnt_badge);
+    leak_card.append(&dnt_row);
+
+    page_privacy.append(&leak_card);
+
+    let page_priv_scroll = gtk::ScrolledWindow::new();
+    page_priv_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_priv_scroll.set_child(Some(&page_privacy));
+    settings_stack.add_named(&page_priv_scroll, Some("privacy"));
+
+    // --- Page 5: Shortcuts ---
+    let page_shortcuts = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    page_shortcuts.add_css_class("settings-content-page");
+
+    let sc_title = gtk::Label::new(Some("Keyboard Shortcuts Reference"));
+    sc_title.add_css_class("settings-page-title");
+    sc_title.set_xalign(0.0);
+    let sc_subtitle = gtk::Label::new(Some("Speed up your workflow with full keyboard navigation"));
+    sc_subtitle.add_css_class("settings-page-subtitle");
+    sc_subtitle.set_xalign(0.0);
+    page_shortcuts.append(&sc_title);
+    page_shortcuts.append(&sc_subtitle);
+
+    let sc_card1 = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    sc_card1.add_css_class("settings-card");
+    let sc_sec1 = gtk::Label::new(Some("Tabs & Workspaces"));
+    sc_sec1.add_css_class("settings-card-title");
+    sc_sec1.set_xalign(0.0);
+    sc_card1.append(&sc_sec1);
+
+    let sc_list1 = [
+        ("Open Omnibar / New tab", "Ctrl + T"),
+        ("Focus URL / Address bar in tab", "Ctrl + G"),
+        ("Close focused tab", "Ctrl + W  or  x"),
+        ("Switch to workspace 1..9", "Ctrl + 1..9"),
+        ("Move tab to workspace 1..9", "Ctrl + Shift + 1..9"),
+        ("Split column vertically", "Ctrl + N  or  Ctrl + Shift + V"),
+        ("Focus column Left / Right", "Ctrl + H  /  Ctrl + L"),
+        ("Focus row Down / Up", "Ctrl + J  /  Ctrl + K"),
+        ("Move tab column Left / Right", "Ctrl + Shift + H  /  L"),
+        ("Move tab row Down / Up", "Ctrl + Shift + J  /  K"),
+    ];
+    for (desc, kbd) in sc_list1 {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        row.add_css_class("shortcut-row");
+        let d = gtk::Label::new(Some(desc));
+        d.add_css_class("shortcut-desc");
+        d.set_xalign(0.0);
+        d.set_hexpand(true);
+        let k = gtk::Label::new(Some(kbd));
+        k.add_css_class("shortcut-kbd");
+        row.append(&d);
+        row.append(&k);
+        sc_card1.append(&row);
+    }
+    page_shortcuts.append(&sc_card1);
+
+    let sc_card2 = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    sc_card2.add_css_class("settings-card");
+    let sc_sec2 = gtk::Label::new(Some("Panels, Settings & Tools"));
+    sc_sec2.add_css_class("settings-card-title");
+    sc_sec2.set_xalign(0.0);
+    sc_card2.append(&sc_sec2);
+
+    let sc_list2 = [
+        ("Toggle Floating Settings Panel", "Ctrl + Shift + S"),
+        ("Open Settings → Profiles Tab", "Ctrl + P"),
+        ("Open Settings → Data Backup Tab", "Ctrl + I"),
+        ("Toggle WebKit DevTools Console", "F12  or  Ctrl + Shift + I"),
+        ("Toggle Roadmap / Minimap", "Ctrl + M"),
+        ("Toggle Fullscreen", "F11"),
+        ("Toggle Touchpad Canvas Navigation", "Ctrl + Shift + T"),
+        ("Browser Back / Forward", "Alt + Left  /  Alt + Right"),
+        ("Close modal / Dismiss overlay", "Esc"),
+    ];
+    for (desc, kbd) in sc_list2 {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        row.add_css_class("shortcut-row");
+        let d = gtk::Label::new(Some(desc));
+        d.add_css_class("shortcut-desc");
+        d.set_xalign(0.0);
+        d.set_hexpand(true);
+        let k = gtk::Label::new(Some(kbd));
+        k.add_css_class("shortcut-kbd");
+        row.append(&d);
+        row.append(&k);
+        sc_card2.append(&row);
+    }
+    page_shortcuts.append(&sc_card2);
+
+    let page_sc_scroll = gtk::ScrolledWindow::new();
+    page_sc_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_sc_scroll.set_child(Some(&page_shortcuts));
+    settings_stack.add_named(&page_sc_scroll, Some("shortcuts"));
+
+    // --- Page 6: About Rail ---
+    let page_about = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    page_about.add_css_class("settings-content-page");
+
+    let about_title = gtk::Label::new(Some("About Rail Browser"));
+    about_title.add_css_class("settings-page-title");
+    about_title.set_xalign(0.0);
+    let about_subtitle = gtk::Label::new(Some("High-performance native browser engineered in Rust"));
+    about_subtitle.add_css_class("settings-page-subtitle");
+    about_subtitle.set_xalign(0.0);
+    page_about.append(&about_title);
+    page_about.append(&about_subtitle);
+
+    let about_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    about_card.add_css_class("settings-card");
+
+    let brand_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let brand_logo = gtk::Label::new(None);
+    brand_logo.set_markup("<span weight='bold' font_family='monospace' size='xx-large' foreground='#f8fafc'>rail</span><span weight='bold' size='xx-large' foreground='#38bdf8'>.</span>");
+    let version_badge = gtk::Label::new(Some("v0.4.5 Liquid Edition"));
+    version_badge.add_css_class("settings-badge");
+    version_badge.set_valign(gtk::Align::Center);
+    brand_row.append(&brand_logo);
+    brand_row.append(&version_badge);
+    about_card.append(&brand_row);
+
+    let specs = [
+        ("Core Engine", "WebKitGTK 4.1 / WebKit 6.0"),
+        ("GUI Framework", "GTK 4.0 + GSK GPU Compositor"),
+        ("Language", "100% Pure Native Rust"),
+        ("Architecture", "Zero-Electron / Multi-Persona Sandboxed Profiles"),
+        ("Data Directory", "~/.local/share/rail/"),
+        ("License", "MIT License"),
+    ];
+    for (k_txt, v_txt) in specs {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        row.add_css_class("shortcut-row");
+        let k = gtk::Label::new(Some(k_txt));
+        k.add_css_class("shortcut-desc");
+        k.set_xalign(0.0);
+        k.set_hexpand(true);
+        let v = gtk::Label::new(Some(v_txt));
+        v.add_css_class("shortcut-kbd");
+        row.append(&k);
+        row.append(&v);
+        about_card.append(&row);
+    }
+    page_about.append(&about_card);
+
+    let page_about_scroll = gtk::ScrolledWindow::new();
+    page_about_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_about_scroll.set_child(Some(&page_about));
+    settings_stack.add_named(&page_about_scroll, Some("about"));
+
+    // ---- overview hint ----
+    let ov_hint = gtk::Label::new(Some("h/l/j/k  move      Enter  open      x  close      Esc  cancel"));
+    ov_hint.add_css_class("ov-hint");
+    ov_hint.set_halign(gtk::Align::Center);
+    ov_hint.set_valign(gtk::Align::End);
+    ov_hint.set_margin_bottom(28);
+    ov_hint.set_can_target(false);
+    ov_hint.set_visible(false);
+
+    let load_bar = gtk::ProgressBar::new();
+    load_bar.add_css_class("load-bar");
+    load_bar.set_valign(gtk::Align::Start);
+    load_bar.set_can_target(false);
+    load_bar.set_visible(false);
 
     // ---- Minimap / Roadmap (Ctrl+M) ----
     let map_header_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -5651,6 +6544,9 @@ fn build(gapp: &gtk::Application) {
     devtools_header.append(&devtools_detach_btn);
     devtools_header.append(&devtools_close_btn);
 
+    let devtools_resize_handle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    devtools_resize_handle.add_css_class("devtools-resize-handle");
+
     let devtools_content_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
     devtools_content_box.add_css_class("devtools-content-area");
     devtools_content_box.set_vexpand(true);
@@ -5658,11 +6554,13 @@ fn build(gapp: &gtk::Application) {
 
     let devtools_panel = gtk::Box::new(gtk::Orientation::Vertical, 0);
     devtools_panel.add_css_class("devtools-panel");
+    devtools_panel.add_css_class("dock-bottom");
     devtools_panel.set_halign(gtk::Align::Fill);
     devtools_panel.set_valign(gtk::Align::End);
     devtools_panel.set_height_request(400);
     devtools_panel.set_visible(false);
 
+    devtools_panel.append(&devtools_resize_handle);
     devtools_panel.append(&devtools_content_box);
 
     let overlay = gtk::Overlay::new();
@@ -5670,8 +6568,7 @@ fn build(gapp: &gtk::Application) {
     overlay.add_overlay(&load_bar);
     overlay.add_overlay(&palette);
     overlay.add_overlay(&ov_hint);
-    overlay.add_overlay(&profiles_modal);
-    overlay.add_overlay(&data_modal);
+    overlay.add_overlay(&settings_modal);
     overlay.add_overlay(&map_container);
     overlay.add_overlay(&devtools_panel);
 
@@ -5722,7 +6619,6 @@ fn build(gapp: &gtk::Application) {
         profile_btn: profile_btn.clone(),
         profile_btn_lbl: profile_btn_lbl.clone(),
         profile_popover: profile_popover.clone(),
-        profiles_modal: profiles_modal.clone(),
         profiles_modal_scroll: modal_list_scroll.clone(),
         profiles_list_box: profiles_list_box.clone(),
         new_profile_entry: new_profile_entry.clone(),
@@ -5733,7 +6629,6 @@ fn build(gapp: &gtk::Application) {
         touchpad_mode: Cell::new(false),
         last_saved_session: RefCell::new(String::new()),
         save_session_gen: Cell::new(0),
-        data_modal: data_modal.clone(),
         data_modal_info_lbl: data_info_lbl.clone(),
         data_modal_status_lbl: data_modal_status_lbl.clone(),
         data_export_entry: data_export_entry.clone(),
@@ -5743,10 +6638,17 @@ fn build(gapp: &gtk::Application) {
         map_location_btn: map_location_btn.clone(),
         map_state: RefCell::new(MinimapState::default()),
         devtools_open: Cell::new(false),
+        devtools_dock_side: Cell::new(DevToolsDockSide::Bottom),
         devtools_panel: devtools_panel.clone(),
         devtools_content_box: devtools_content_box.clone(),
+        devtools_resize_handle: devtools_resize_handle.clone(),
         devtools_url_lbl: devtools_url_lbl.clone(),
         devtools_window: RefCell::new(None),
+        settings_modal: settings_modal.clone(),
+        settings_stack: settings_stack.clone(),
+        settings_tab_buttons: RefCell::new(tab_buttons_vec.clone()),
+        current_settings_tab: Cell::new(SettingsTab::General),
+        search_engine: RefCell::new("google".to_string()),
     });
 
     let a_close = app.clone();
@@ -5989,7 +6891,43 @@ fn build(gapp: &gtk::Application) {
     map_header_row.add_controller(header_drag);
 
     let a = app.clone();
-    data_modal_close_btn.connect_clicked(move |_| a.hide_data_modal());
+    settings_close_btn.connect_clicked(move |_| a.hide_settings_modal());
+
+    for (tab_type, btn) in tab_buttons_vec.iter() {
+        let a = app.clone();
+        let t = *tab_type;
+        btn.connect_clicked(move |_| a.open_settings_tab(t));
+    }
+
+    for (engine_id, btn) in engine_buttons.iter() {
+        let a = app.clone();
+        let id_str = engine_id.clone();
+        let engine_btns_clone = engine_buttons.clone();
+        btn.connect_clicked(move |_| {
+            *a.search_engine.borrow_mut() = id_str.clone();
+            for (eid, b) in engine_btns_clone.iter() {
+                if eid == &id_str {
+                    b.add_css_class("active");
+                } else {
+                    b.remove_css_class("active");
+                }
+            }
+            a.save_session_immediate();
+        });
+    }
+
+    let a = app.clone();
+    btn_clear_hist.connect_clicked(move |_| a.clear_history_action());
+
+    let a = app.clone();
+    btn_clear_cache.connect_clicked(move |_| a.clear_cache_action());
+
+    let a = app.clone();
+    tp_switch.connect_state_set(move |_, state| {
+        a.touchpad_mode.set(state);
+        a.schedule_save_session();
+        glib::Propagation::Proceed
+    });
 
     let a = app.clone();
     btn_export_do.connect_clicked(move |_| a.execute_export_action());
@@ -6038,8 +6976,6 @@ fn build(gapp: &gtk::Application) {
     }
 
     let a = app.clone();
-    modal_close_btn.connect_clicked(move |_| a.hide_profiles_modal());
-    let a = app.clone();
     add_prof_btn.connect_clicked(move |_| a.create_new_profile_action());
     let a = app.clone();
     new_profile_entry.connect_activate(move |_| a.create_new_profile_action());
@@ -6057,7 +6993,70 @@ fn build(gapp: &gtk::Application) {
         }
     });
 
-    // DevTools signal connections
+    // DevTools toolbar click interceptor for docking & close buttons
+    let dt_click = gtk::GestureClick::new();
+    dt_click.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let app_dt_click = app.clone();
+    let box_ref = devtools_content_box.clone();
+    dt_click.connect_pressed(move |_, _, x, y| {
+        let w = box_ref.width() as f64;
+        if y >= 0.0 && y <= 36.0 && w > 200.0 && x >= (w - 180.0) {
+            let dist = w - x;
+            if dist <= 36.0 {
+                app_dt_click.hide_devtools();
+            } else if dist <= 72.0 {
+                app_dt_click.set_devtools_dock_side(DevToolsDockSide::Undocked);
+            } else if dist <= 108.0 {
+                app_dt_click.set_devtools_dock_side(DevToolsDockSide::Right);
+            } else if dist <= 144.0 {
+                app_dt_click.set_devtools_dock_side(DevToolsDockSide::Bottom);
+            } else if dist <= 180.0 {
+                app_dt_click.set_devtools_dock_side(DevToolsDockSide::Left);
+            }
+        }
+    });
+    devtools_content_box.add_controller(dt_click);
+
+    // DevTools resize drag handle
+    let dt_drag = gtk::GestureDrag::new();
+    let app_drag = app.clone();
+    let start_size = Rc::new(Cell::new(0i32));
+    let st_sz_begin = start_size.clone();
+    dt_drag.connect_drag_begin(move |_, _, _| {
+        let side = app_drag.devtools_dock_side.get();
+        let cur = match side {
+            DevToolsDockSide::Bottom => app_drag.devtools_panel.height(),
+            DevToolsDockSide::Left | DevToolsDockSide::Right => app_drag.devtools_panel.width(),
+            _ => 0,
+        };
+        st_sz_begin.set(cur);
+    });
+
+    let app_drag_up = app.clone();
+    let st_sz_update = start_size.clone();
+    dt_drag.connect_drag_update(move |_, offset_x, offset_y| {
+        let side = app_drag_up.devtools_dock_side.get();
+        let base = st_sz_update.get() as f64;
+        let win_w = app_drag_up.win.width() as f64;
+        let win_h = app_drag_up.win.height() as f64;
+        match side {
+            DevToolsDockSide::Bottom => {
+                let nh = (base - offset_y).clamp(180.0, (win_h - 100.0).max(200.0)) as i32;
+                app_drag_up.devtools_panel.set_height_request(nh);
+            }
+            DevToolsDockSide::Left => {
+                let nw = (base + offset_x).clamp(280.0, (win_w - 200.0).max(300.0)) as i32;
+                app_drag_up.devtools_panel.set_width_request(nw);
+            }
+            DevToolsDockSide::Right => {
+                let nw = (base - offset_x).clamp(280.0, (win_w - 200.0).max(300.0)) as i32;
+                app_drag_up.devtools_panel.set_width_request(nw);
+            }
+            _ => {}
+        }
+    });
+    devtools_resize_handle.add_controller(dt_drag);
+
     let a_dt_close = app.clone();
     devtools_close_btn.connect_clicked(move |_| a_dt_close.hide_devtools());
 
@@ -6157,11 +7156,8 @@ fn build(gapp: &gtk::Application) {
         if a.palette_open() {
             a.hide_palette();
         }
-        if a.profiles_modal_open() {
-            a.hide_profiles_modal();
-        }
-        if a.data_modal_open() {
-            a.hide_data_modal();
+        if a.settings_modal_open() {
+            a.hide_settings_modal();
         }
     });
     shell.add_controller(click);
@@ -6557,5 +7553,45 @@ mod tests {
         let state = parse_session_content(sample);
         assert_eq!(state.tabs.len(), 1);
         assert_eq!(state.tabs[0].custom_width, Some(850.5));
+    }
+
+    #[test]
+    fn test_parse_session_with_search_engine() {
+        let sample = "focus\t0\t0\nengine\tduckduckgo\ntab\t0\t0\t1\tdefault\thttps://duckduckgo.com\n";
+        let state = parse_session_content(sample);
+        assert_eq!(state.search_engine, Some("duckduckgo".to_string()));
+        assert_eq!(state.tabs.len(), 1);
+    }
+
+    #[test]
+    fn test_to_uri_search_engines() {
+        assert_eq!(to_uri("rust lang", "google"), "https://www.google.com/search?q=rust%20lang");
+        assert_eq!(to_uri("rust lang", "duckduckgo"), "https://duckduckgo.com/?q=rust%20lang");
+        assert_eq!(to_uri("rust lang", "brave"), "https://search.brave.com/search?q=rust%20lang");
+        assert_eq!(to_uri("rust lang", "bing"), "https://www.bing.com/search?q=rust%20lang");
+        assert_eq!(to_uri("rust lang", "ecosia"), "https://www.ecosia.org/search?q=rust%20lang");
+        assert_eq!(to_uri("https://github.com", "google"), "https://github.com");
+        assert_eq!(to_uri("github.com", "duckduckgo"), "https://github.com");
+    }
+
+    #[test]
+    fn test_settings_tab_enum() {
+        assert_ne!(SettingsTab::General, SettingsTab::Profiles);
+        assert_ne!(SettingsTab::Data, SettingsTab::Shortcuts);
+        assert_eq!(SettingsTab::General, SettingsTab::General);
+    }
+
+    #[test]
+    fn test_devtools_dock_side_cycling() {
+        let cycle = |side: DevToolsDockSide| match side {
+            DevToolsDockSide::Bottom => DevToolsDockSide::Right,
+            DevToolsDockSide::Right => DevToolsDockSide::Left,
+            DevToolsDockSide::Left => DevToolsDockSide::Undocked,
+            DevToolsDockSide::Undocked => DevToolsDockSide::Bottom,
+        };
+        assert_eq!(cycle(DevToolsDockSide::Bottom), DevToolsDockSide::Right);
+        assert_eq!(cycle(DevToolsDockSide::Right), DevToolsDockSide::Left);
+        assert_eq!(cycle(DevToolsDockSide::Left), DevToolsDockSide::Undocked);
+        assert_eq!(cycle(DevToolsDockSide::Undocked), DevToolsDockSide::Bottom);
     }
 }
