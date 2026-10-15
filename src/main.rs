@@ -719,19 +719,14 @@ entry.palette-entry, entry.palette-entry:focus-within {
 }
 
 /* ---- profile colors (True Dark Multi-Persona) ---- */
-.prof-bg-0 { background-color: #38bdf8; color: #050811; }
-.prof-bg-1 { background-color: #c084fc; color: #050811; }
-.prof-bg-2 { background-color: #4ade80; color: #050811; }
-.prof-bg-3 { background-color: #facc15; color: #050811; }
-.prof-bg-4 { background-color: #f87171; color: #050811; }
-.prof-bg-5 { background-color: #22d3ee; color: #050811; }
-.prof-bg-6 { background-color: #fb923c; color: #050811; }
-.prof-bg-7 { background-color: #2dd4bf; color: #050811; }
-
-.prof-bg-0 label, .prof-bg-1 label, .prof-bg-2 label, .prof-bg-3 label,
-.prof-bg-4 label, .prof-bg-5 label, .prof-bg-6 label, .prof-bg-7 label {
-    color: #050811;
-}
+.prof-bg-0 { background-color: #38bdf8; }
+.prof-bg-1 { background-color: #c084fc; }
+.prof-bg-2 { background-color: #4ade80; }
+.prof-bg-3 { background-color: #facc15; }
+.prof-bg-4 { background-color: #f87171; }
+.prof-bg-5 { background-color: #22d3ee; }
+.prof-bg-6 { background-color: #fb923c; }
+.prof-bg-7 { background-color: #2dd4bf; }
 
 /* ---- profile circle button in URL palette ---- */
 button.profile-circle-btn {
@@ -760,8 +755,9 @@ button.profile-circle-btn label,
 .profile-circle-label {
     opacity: 1 !important;
     font-weight: 800;
-    font-size: 12px;
-    font-family: system-ui, sans-serif;
+    font-size: 11px;
+    letter-spacing: -0.04em;
+    font-family: system-ui, -apple-system, sans-serif;
 }
 
 /* ---- profile popover dropdown ---- */
@@ -787,12 +783,13 @@ popover.profile-popover > arrow {
     background-color: #0d101a !important;
     border-color: rgba(255, 255, 255, 0.14) !important;
 }
-.profile-popover-title {
+.profile-popover-title,
+popover.profile-popover .profile-popover-title {
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #ffffff !important;
+    color: #94a3b8 !important;
     font-family: ui-monospace, monospace;
     padding: 4px 8px 2px;
 }
@@ -814,26 +811,41 @@ button.profile-item-btn.selected {
     border-left: 2px solid #38bdf8;
     color: #ffffff !important;
 }
-.profile-item-dot {
-    min-width: 20px;
-    min-height: 20px;
+button.profile-item-btn label,
+popover.profile-popover label {
+    color: #ffffff !important;
+}
+.profile-item-dot,
+button.profile-item-btn .profile-item-dot {
+    min-width: 24px;
+    min-height: 24px;
     border-radius: 9999px;
-    font-size: 10.5px;
+    font-size: 10px;
+    letter-spacing: -0.03em;
     font-weight: 800;
-    padding: 0;
+    color: #ffffff !important;
+    padding: 0 2px;
     opacity: 1 !important;
 }
 .profile-item-name,
-button.profile-item-btn .profile-item-name {
+button.profile-item-btn .profile-item-name,
+button.profile-item-btn label.profile-item-name {
     font-size: 12.5px;
     font-weight: 600;
-    color: #ffffff !important;
+    color: #f1f5f9 !important;
 }
 .profile-item-persona,
-button.profile-item-btn .profile-item-persona {
+button.profile-item-btn .profile-item-persona,
+button.profile-item-btn label.profile-item-persona {
     font-size: 9.5px;
-    color: #cbd5e1 !important;
+    color: #94a3b8 !important;
     font-family: ui-monospace, monospace;
+}
+button.profile-item-btn image {
+    color: #94a3b8 !important;
+}
+button.profile-item-btn:hover image {
+    color: #38bdf8 !important;
 }
 .profile-item-check {
     font-size: 12px;
@@ -1038,14 +1050,15 @@ button.btn-create-profile.active-ready:hover {
 }
 
 .profile-badge-mini {
-    font-size: 9px;
+    font-size: 8.5px;
     font-weight: 800;
-    min-width: 16px;
+    letter-spacing: -0.03em;
+    min-width: 18px;
     min-height: 16px;
     border-radius: 9999px;
     margin-left: 2px;
     margin-right: 4px;
-    padding: 0;
+    padding: 0 3px;
     font-family: ui-monospace, monospace;
     opacity: 1 !important;
 }
@@ -3704,7 +3717,7 @@ impl App {
                         p_dot.add_css_class(&format!("prof-bg-{}", p.color_idx));
                         p_dot.set_valign(gtk::Align::Center);
                         p_dot.set_halign(gtk::Align::Center);
-                        p_dot.set_width_request(16);
+                        p_dot.set_width_request(18);
                         p_dot.set_height_request(16);
                         p_dot.set_tooltip_text(Some(&format!("Profile: {}", p.name)));
                         content_box.append(&p_dot);
@@ -4019,10 +4032,8 @@ impl App {
             let row_box = gtk::Box::new(gtk::Orientation::Horizontal, 10);
 
             let dot = gtk::Label::new(None);
-            let fg = p.text_color();
             dot.set_markup(&format!(
-                "<span foreground='{}' font_weight='800'>{}</span>",
-                fg,
+                "<span foreground='#ffffff' font_weight='800'>{}</span>",
                 glib::markup_escape_text(&p.initial_letter())
             ));
             dot.add_css_class("profile-item-dot");
@@ -7219,38 +7230,79 @@ fn build(gapp: &gtk::Application) {
     let ay = accum_y.clone();
     let ls = last_scroll.clone();
     scroll.connect_scroll(move |_, dx, dy| {
+        // 1. Modals, dialogs, and popovers must ALWAYS receive raw scroll events without interference
+        if a.settings_modal_open() || a.palette_open() || a.map_open() {
+            return glib::Propagation::Proceed;
+        }
+
+        // 2. Overview mode: 2D canvas pan navigation on zoomed-out workspace grid
+        if a.ov.get() {
+            let now = glib::monotonic_time();
+            if now - ls.get() > 300_000 {
+                ax.set(0.0);
+                ay.set(0.0);
+            }
+            ls.set(now);
+
+            let nx = ax.get() + dx;
+            let ny = ay.get() + dy;
+            ax.set(nx);
+            ay.set(ny);
+
+            const OV_THRESHOLD: f64 = 2.0;
+            if nx > OV_THRESHOLD {
+                ax.set(0.0);
+                a.focus_column_right();
+                return glib::Propagation::Stop;
+            } else if nx < -OV_THRESHOLD {
+                ax.set(0.0);
+                a.focus_column_left();
+                return glib::Propagation::Stop;
+            }
+
+            if ny > OV_THRESHOLD {
+                ay.set(0.0);
+                a.focus_row_down();
+                return glib::Propagation::Stop;
+            } else if ny < -OV_THRESHOLD {
+                ay.set(0.0);
+                a.focus_row_up();
+                return glib::Propagation::Stop;
+            }
+            return glib::Propagation::Proceed;
+        }
+
+        // 3. Normal browsing mode:
+        // NEVER hijack vertical scrolling (dy) on web pages! Reading documents must be 100% smooth.
         if !a.touchpad_mode.get() {
             return glib::Propagation::Proceed;
         }
-        let now = glib::monotonic_time();
-        if now - ls.get() > 400_000 {
-            ax.set(0.0);
-            ay.set(0.0);
-        }
-        ls.set(now);
 
-        let nx = ax.get() + dx;
-        let ny = ay.get() + dy;
-        ax.set(nx);
-        ay.set(ny);
+        // Only handle intentional horizontal two-finger canvas navigation (dx)
+        if dx.abs() > 1.8 && dx.abs() > 2.0 * dy.abs() {
+            let now = glib::monotonic_time();
+            if now - ls.get() > 300_000 {
+                ax.set(0.0);
+            }
+            ls.set(now);
 
-        const THRESHOLD: f64 = 2.5;
-        if nx > THRESHOLD {
-            ax.set(0.0);
-            a.focus_column_right();
-        } else if nx < -THRESHOLD {
-            ax.set(0.0);
-            a.focus_column_left();
+            let nx = ax.get() + dx;
+            ax.set(nx);
+
+            const SWIPE_THRESHOLD: f64 = 2.5;
+            if nx > SWIPE_THRESHOLD {
+                ax.set(0.0);
+                a.focus_column_right();
+                return glib::Propagation::Stop;
+            } else if nx < -SWIPE_THRESHOLD {
+                ax.set(0.0);
+                a.focus_column_left();
+                return glib::Propagation::Stop;
+            }
         }
 
-        if ny > THRESHOLD {
-            ay.set(0.0);
-            a.focus_row_down();
-        } else if ny < -THRESHOLD {
-            ay.set(0.0);
-            a.focus_row_up();
-        }
-        glib::Propagation::Stop
+        // All other scrolling (especially vertical web reading) proceeds smoothly!
+        glib::Propagation::Proceed
     });
     let ax2 = accum_x.clone();
     let ay2 = accum_y.clone();

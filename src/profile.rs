@@ -32,9 +32,53 @@ impl Profile {
     }
 
     pub fn initial_letter(&self) -> String {
-        self.name
+        let trimmed = self.name.trim();
+        if trimmed.is_empty() {
+            return "P".into();
+        }
+
+        // 1. If trimmed string consists entirely of digits (e.g. "10", "100", "7"):
+        // take up to 3 digits directly!
+        let digits: String = trimmed.chars().filter(|c| c.is_ascii_digit()).collect();
+        let non_digits: String = trimmed.chars().filter(|c| c.is_alphabetic()).collect();
+
+        if !digits.is_empty() && non_digits.is_empty() {
+            return digits.chars().take(3).collect();
+        }
+
+        // 2. If multi-word name:
+        let words: Vec<&str> = trimmed.split_whitespace().collect();
+        if words.len() > 1 {
+            if let Some(last) = words.last() {
+                if last.chars().all(|c| c.is_ascii_digit()) && last.len() <= 3 {
+                    // e.g. "Profile 10" -> "10"
+                    if words.len() == 2 && words[0].eq_ignore_ascii_case("profile") {
+                        return (*last).to_string();
+                    }
+                }
+            }
+            // Multi-word initials up to 3: "John Doe" -> "JD", "My Work Space" -> "MWS"
+            let initials: String = words
+                .iter()
+                .filter_map(|w| w.chars().find(|c| c.is_alphanumeric()))
+                .take(3)
+                .map(|c| c.to_uppercase().to_string())
+                .collect();
+            if !initials.is_empty() {
+                return initials;
+            }
+        }
+
+        // 3. Short alphanumeric names <= 3 chars (e.g. "QA", "DEV", "10", "PRO"):
+        let clean: String = trimmed.chars().filter(|c| c.is_alphanumeric()).collect();
+        if clean.len() <= 3 && !clean.is_empty() {
+            return clean.to_uppercase();
+        }
+
+        // 4. Long single-word names (e.g. "Default", "Personal", "Work"):
+        clean
             .chars()
-            .find(|c| c.is_alphanumeric())
+            .next()
             .map(|c| c.to_uppercase().to_string())
             .unwrap_or_else(|| "P".into())
     }
@@ -558,5 +602,29 @@ mod tests {
             color_idx: 0, // #38bdf8
         };
         assert_eq!(prof.text_color(), "#050811");
+    }
+
+    #[test]
+    fn test_profile_initial_letter_multi_char() {
+        let p1 = Profile { id: "1".into(), name: "1".into(), color_idx: 0 };
+        assert_eq!(p1.initial_letter(), "1");
+
+        let p10 = Profile { id: "10".into(), name: "10".into(), color_idx: 0 };
+        assert_eq!(p10.initial_letter(), "10");
+
+        let p100 = Profile { id: "100".into(), name: "100".into(), color_idx: 0 };
+        assert_eq!(p100.initial_letter(), "100");
+
+        let p_prof10 = Profile { id: "prof10".into(), name: "Profile 10".into(), color_idx: 0 };
+        assert_eq!(p_prof10.initial_letter(), "10");
+
+        let p_qa = Profile { id: "qa".into(), name: "QA".into(), color_idx: 0 };
+        assert_eq!(p_qa.initial_letter(), "QA");
+
+        let p_dev = Profile { id: "dev".into(), name: "Dev".into(), color_idx: 0 };
+        assert_eq!(p_dev.initial_letter(), "DEV");
+
+        let p_default = Profile { id: "default".into(), name: "Default".into(), color_idx: 0 };
+        assert_eq!(p_default.initial_letter(), "D");
     }
 }
