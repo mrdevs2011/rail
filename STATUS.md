@@ -1,16 +1,16 @@
 # AI Context — .
 
 ## Oxirgi holat
-- Sana: 2026-10-15 18:30
-- Nima qilindi: Settings > Updates tabi qo‘shildi (joriy versiya, status, GitHub releases dropdown, one-tap Update). Updater endi OS/ARCH bo‘yicha asset tanlaydi (asset_name()). ROADMAP Bosqich 2 progress belgilandi. Commit: bfd2cc0
-- Hozirgi muammo/blocker: SHA256SUMS hali release’da yo‘q (hozir --version tekshiruvi yetarli). Bosqich 3 (tao+wry spike) keyin.
-- Keyingi qadam: Saytni qo‘lda tekshirish yoki Bosqich 3 spike boshlash.
+- Sana: 2026-10-15 18:35
+- Nima qilindi: SHA256 hisoblash (sha2) qo‘shildi. CI release workflow skeleton (.github/workflows/release.yml) yaratildi (Linux/macOS/Windows). ROADMAP yangilandi. Binary qayta o‘rnatildi.
+- Hozirgi muammo/blocker: To‘liq macOS/Windows test va tao+wry spike bu muhitda amalga oshirilmaydi (faqat Linux). SHA256SUMS hali release’da yo‘q.
+- Keyingi qadam: git push, keyin Bosqich 3 spike (tao+wry) yoki sayt tekshiruvi.
 
 ## Muhim fayllar
-- src/update.rs — asset_name(), fetch_releases(), download_and_install
-- src/main.rs — SettingsTab::Update, updates page
-- ROADMAP.md — Bosqich 2 yangilandi
+- src/update.rs — asset_name(), SHA256, fetch_releases
+- .github/workflows/release.yml — multi-platform release
+- ROADMAP.md — yangilangan progress
 
 ## Eslatmalar
-- 100% bepul yo‘l saqlanadi. Domen yo‘q, Vercel + GitHub Releases.
-- Hozirgi versiya v0.5.2 (eng so‘nggi).
+- 100% bepul yo‘l saqlanadi.
+- Hozirgi versiya: v0.5.2
