@@ -719,46 +719,47 @@ entry.palette-entry, entry.palette-entry:focus-within {
 }
 
 /* ---- profile colors (True Dark Multi-Persona) ---- */
-.prof-bg-0 { background-color: #38bdf8; color: #ffffff; }
-.prof-bg-1 { background-color: #c084fc; color: #ffffff; }
-.prof-bg-2 { background-color: #4ade80; color: #ffffff; }
-.prof-bg-3 { background-color: #facc15; color: #ffffff; }
-.prof-bg-4 { background-color: #f87171; color: #ffffff; }
-.prof-bg-5 { background-color: #22d3ee; color: #ffffff; }
-.prof-bg-6 { background-color: #fb923c; color: #ffffff; }
-.prof-bg-7 { background-color: #2dd4bf; color: #ffffff; }
+.prof-bg-0 { background-color: #38bdf8; color: #050811; }
+.prof-bg-1 { background-color: #c084fc; color: #050811; }
+.prof-bg-2 { background-color: #4ade80; color: #050811; }
+.prof-bg-3 { background-color: #facc15; color: #050811; }
+.prof-bg-4 { background-color: #f87171; color: #050811; }
+.prof-bg-5 { background-color: #22d3ee; color: #050811; }
+.prof-bg-6 { background-color: #fb923c; color: #050811; }
+.prof-bg-7 { background-color: #2dd4bf; color: #050811; }
 
 .prof-bg-0 label, .prof-bg-1 label, .prof-bg-2 label, .prof-bg-3 label,
 .prof-bg-4 label, .prof-bg-5 label, .prof-bg-6 label, .prof-bg-7 label {
-    color: #ffffff !important;
+    color: #050811;
 }
 
-/* ---- profile circle button in URL palette (black text on bright color) ---- */
+/* ---- profile circle button in URL palette ---- */
 button.profile-circle-btn {
     min-width: 28px;
     min-height: 28px;
     padding: 0;
     border-radius: 9999px;
-    border: 2px solid rgba(255, 255, 255, 0.18);
+    border: 2px solid rgba(255, 255, 255, 0.25);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    background-image: none !important;
+    opacity: 1 !important;
     transition: transform 120ms ease, border-color 120ms ease;
 }
 button.profile-circle-btn:hover {
     transform: scale(1.08);
     border-color: #38bdf8;
 }
+button.profile-circle-btn:backdrop,
+button.profile-circle-btn:active,
+button.profile-circle-btn:focus,
+button.profile-circle-btn:disabled {
+    opacity: 1 !important;
+    background-image: none !important;
+}
 button.profile-circle-btn label,
-button.profile-circle-btn.prof-bg-0 label,
-button.profile-circle-btn.prof-bg-1 label,
-button.profile-circle-btn.prof-bg-2 label,
-button.profile-circle-btn.prof-bg-3 label,
-button.profile-circle-btn.prof-bg-4 label,
-button.profile-circle-btn.prof-bg-5 label,
-button.profile-circle-btn.prof-bg-6 label,
-button.profile-circle-btn.prof-bg-7 label,
 .profile-circle-label {
-    color: #000000 !important;
-    font-weight: 900;
+    opacity: 1 !important;
+    font-weight: 800;
     font-size: 12px;
     font-family: system-ui, sans-serif;
 }
@@ -813,17 +814,14 @@ button.profile-item-btn.selected {
     border-left: 2px solid #38bdf8;
     color: #ffffff !important;
 }
-button.profile-item-btn label {
-    color: #ffffff !important;
-}
 .profile-item-dot {
     min-width: 20px;
     min-height: 20px;
     border-radius: 9999px;
     font-size: 10.5px;
     font-weight: 800;
-    color: #ffffff !important;
     padding: 0;
+    opacity: 1 !important;
 }
 .profile-item-name,
 button.profile-item-btn .profile-item-name {
@@ -865,6 +863,19 @@ button.profile-item-btn .profile-item-persona {
     font-size: 11.5px;
     color: #64748b;
     margin-top: 2px;
+}
+/* ---- profiles list in settings modal ---- */
+.settings-profiles-list, .settings-profiles-list row {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    border: none;
+    box-shadow: none;
+}
+.settings-profiles-list row:hover,
+.settings-profiles-list row:selected {
+    background: transparent;
+    border-color: transparent;
 }
 .profile-card {
     background: #111422;
@@ -915,9 +926,9 @@ button.profile-item-btn .profile-item-persona {
     border-radius: 9999px;
     font-size: 12px;
     font-weight: 800;
-    color: #ffffff;
     margin: 0;
     padding: 0;
+    opacity: 1 !important;
 }
 .profile-card-name {
     font-size: 13.5px;
@@ -1036,7 +1047,7 @@ button.btn-create-profile.active-ready:hover {
     margin-right: 4px;
     padding: 0;
     font-family: ui-monospace, monospace;
-    color: #ffffff;
+    opacity: 1 !important;
 }
 button.color-choice {
     min-width: 22px;
@@ -3682,7 +3693,13 @@ impl App {
                 let mgr = self.profiles.borrow();
                 if mgr.profiles().len() > 1 {
                     if let Some(p) = mgr.get_profile(&t.profile_id) {
-                        let p_dot = gtk::Label::new(Some(&p.initial_letter()));
+                        let p_dot = gtk::Label::new(None);
+                        let fg = p.text_color();
+                        p_dot.set_markup(&format!(
+                            "<span foreground='{}' font_weight='800'>{}</span>",
+                            fg,
+                            glib::markup_escape_text(&p.initial_letter())
+                        ));
                         p_dot.add_css_class("profile-badge-mini");
                         p_dot.add_css_class(&format!("prof-bg-{}", p.color_idx));
                         p_dot.set_valign(gtk::Align::Center);
@@ -3958,7 +3975,12 @@ impl App {
     fn select_palette_profile(&self, id: &str) {
         *self.selected_palette_profile.borrow_mut() = id.to_string();
         if let Some(p) = self.profiles.borrow().get_profile(id) {
-            self.profile_btn_lbl.set_text(&p.initial_letter());
+            let fg = p.text_color();
+            self.profile_btn_lbl.set_markup(&format!(
+                "<span foreground='{}' font_weight='800'>{}</span>",
+                fg,
+                glib::markup_escape_text(&p.initial_letter())
+            ));
             for i in 0..8 {
                 self.profile_btn.remove_css_class(&format!("prof-bg-{}", i));
             }
@@ -3996,7 +4018,13 @@ impl App {
 
             let row_box = gtk::Box::new(gtk::Orientation::Horizontal, 10);
 
-            let dot = gtk::Label::new(Some(&p.initial_letter()));
+            let dot = gtk::Label::new(None);
+            let fg = p.text_color();
+            dot.set_markup(&format!(
+                "<span foreground='{}' font_weight='800'>{}</span>",
+                fg,
+                glib::markup_escape_text(&p.initial_letter())
+            ));
             dot.add_css_class("profile-item-dot");
             dot.add_css_class(&format!("prof-bg-{}", p.color_idx));
             dot.set_valign(gtk::Align::Center);
@@ -5020,8 +5048,6 @@ impl App {
             drag_handle.set_valign(gtk::Align::Center);
             drag_handle.set_tooltip_text(Some("Drag up or down to reorder profiles"));
 
-            row.set_cursor_from_name(Some("grab"));
-
             if total_profiles > 1 {
                 let drag = gtk::GestureDrag::new();
                 drag.set_button(gdk::BUTTON_PRIMARY);
@@ -5040,7 +5066,6 @@ impl App {
                 let drag_provider_update = drag_provider.clone();
                 let from_idx = idx;
                 drag.connect_drag_update(move |_gesture, _offset_x, offset_y| {
-                    // Physical translation of dragged card under cursor
                     drag_provider_update.load_from_string(&format!(
                         ".profile-card.dragging {{ transform: translateY({:.1}px) !important; z-index: 1000 !important; }}",
                         offset_y
@@ -5087,7 +5112,7 @@ impl App {
                 drag.connect_drag_end(move |_gesture, _offset_x, offset_y| {
                     drag_provider_end.load_from_string("");
                     row_end.remove_css_class("dragging");
-                    row_end.set_cursor_from_name(Some("grab"));
+                    row_end.set_cursor_from_name(Some("default"));
                     handle_end.set_cursor_from_name(Some("grab"));
 
                     let rows_ref = rows_vec_end.borrow();
@@ -5113,10 +5138,16 @@ impl App {
                     }
                 });
 
-                row.add_controller(drag);
+                drag_handle.add_controller(drag);
             }
 
-            let avatar = gtk::Label::new(Some(&p.initial_letter()));
+            let avatar = gtk::Label::new(None);
+            let fg = p.text_color();
+            avatar.set_markup(&format!(
+                "<span foreground='{}' font_weight='800'>{}</span>",
+                fg,
+                glib::markup_escape_text(&p.initial_letter())
+            ));
             avatar.add_css_class("profile-avatar-circle");
             avatar.add_css_class(&format!("prof-bg-{}", p.color_idx));
             avatar.set_valign(gtk::Align::Center);
@@ -6029,14 +6060,8 @@ fn build(gapp: &gtk::Application) {
 
     // --- Page 2: Profiles ---
     let profiles_list_box = gtk::ListBox::new();
-    profiles_list_box.add_css_class("tablist");
+    profiles_list_box.add_css_class("settings-profiles-list");
     profiles_list_box.set_selection_mode(gtk::SelectionMode::None);
-
-    let modal_list_scroll = gtk::ScrolledWindow::new();
-    modal_list_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-    modal_list_scroll.set_max_content_height(240);
-    modal_list_scroll.set_propagate_natural_height(true);
-    modal_list_scroll.set_child(Some(&profiles_list_box));
 
     let sep = gtk::Separator::new(gtk::Orientation::Horizontal);
     sep.set_margin_top(8);
@@ -6099,7 +6124,7 @@ fn build(gapp: &gtk::Application) {
 
     page_profiles.append(&prof_page_title);
     page_profiles.append(&prof_page_subtitle);
-    page_profiles.append(&modal_list_scroll);
+    page_profiles.append(&profiles_list_box);
     page_profiles.append(&sep);
     page_profiles.append(&new_lbl);
     page_profiles.append(&new_profile_entry);
@@ -6108,6 +6133,8 @@ fn build(gapp: &gtk::Application) {
 
     let page_prof_scroll = gtk::ScrolledWindow::new();
     page_prof_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_prof_scroll.set_vexpand(true);
+    page_prof_scroll.set_hexpand(true);
     page_prof_scroll.set_child(Some(&page_profiles));
     settings_stack.add_named(&page_prof_scroll, Some("profiles"));
 
@@ -6644,7 +6671,7 @@ fn build(gapp: &gtk::Application) {
         profile_btn: profile_btn.clone(),
         profile_btn_lbl: profile_btn_lbl.clone(),
         profile_popover: profile_popover.clone(),
-        profiles_modal_scroll: modal_list_scroll.clone(),
+        profiles_modal_scroll: page_prof_scroll.clone(),
         profiles_list_box: profiles_list_box.clone(),
         new_profile_entry: new_profile_entry.clone(),
         new_profile_error_lbl: new_profile_error_lbl.clone(),
