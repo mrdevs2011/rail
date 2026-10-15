@@ -7582,6 +7582,40 @@ fn build(gapp: &gtk::Application) {
         });
     }
 
+    {
+        let dropdown = dropdown.clone();
+        let update_btn = update_btn.clone();
+        let update_info = update_info.clone();
+        let err_lbl = err_lbl.clone();
+        dropdown.connect_selected_notify(move |dd| {
+            let Some(item) = dd.selected_item() else { return; };
+            let Some(str_obj) = item.downcast_ref::<gtk::StringObject>() else { return; };
+            let tag = str_obj.string().to_string();
+            let current = update::current_version();
+            let current_parsed = update::parse_ver(&current);
+            let sel_parsed = update::parse_ver(&tag);
+            err_lbl.set_visible(false);
+
+            match (sel_parsed, current_parsed) {
+                (Some(s), Some(c)) if s == c => {
+                    update_btn.set_sensitive(false);
+                    update_btn.set_label(tr("Up to date"));
+                    *update_info.borrow_mut() = None;
+                }
+                _ => {
+                    update_btn.set_sensitive(true);
+                    update_btn.set_label(tr("Update now"));
+                    *update_info.borrow_mut() = Some(update::UpdateInfo {
+                        latest_tag: tag.clone(),
+                        newer_count: 1,
+                        more: false,
+                        url: update::asset_url_for_tag(&tag),
+                    });
+                }
+            }
+        });
+    }
+
     // --- Page 6: About Rail ---
     let page_about = gtk::Box::new(gtk::Orientation::Vertical, 10);
     page_about.add_css_class("settings-content-page");

@@ -25,6 +25,10 @@ fn asset_name() -> String {
     }
 }
 
+pub fn asset_url_for_tag(tag: &str) -> String {
+    format!("https://github.com/{}/releases/download/{}/{}", REPO, tag, asset_name())
+}
+
 /// The running version. `RAIL_FAKE_VERSION` lets you test the card without a real old build.
 pub fn current_version() -> String {
     std::env::var("RAIL_FAKE_VERSION")
@@ -33,7 +37,7 @@ pub fn current_version() -> String {
         .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string())
 }
 
-fn parse_ver(s: &str) -> Option<[u32; 3]> {
+pub fn parse_ver(s: &str) -> Option<[u32; 3]> {
     let t = s.trim().trim_start_matches(['v', 'V']);
     let core = t.split(['-', '+']).next()?;
     let mut out = [0u32; 3];
@@ -54,33 +58,54 @@ pub struct UpdateInfo {
     pub url: String,
 }
 
-/// Fetches all tags from the atom feed (last ~10) and latest update info if any newer.
+/// Fetches all tags from the atom feed across all pages and latest update info if any newer.
 pub fn fetch_releases() -> Option<(Vec<String>, Option<UpdateInfo>)> {
-    let feed_url = format!("https://github.com/{}/releases.atom", REPO);
-    let out = Command::new("curl")
-        .args(["-fsSL", "-m", "8", "-A", "rail-browser", &feed_url])
-        .stdin(Stdio::null())
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let text = String::from_utf8_lossy(&out.stdout).to_string();
     let current = parse_ver(&current_version())?;
     let marker = "/releases/tag/";
     let mut seen: Vec<String> = Vec::new();
-    let mut rest = text.as_str();
-    while let Some(i) = rest.find(marker) {
-        rest = &rest[i + marker.len()..];
-        let end = rest.find(['"', '<', '\'', ' ']).unwrap_or(rest.len());
-        let tag = rest[..end].to_string();
-        if !seen.contains(&tag) {
-            seen.push(tag);
+    let mut after: Option<String> = None;
+
+    // GitHub's Atom feed lists 10 releases per page. Paginate with ?after=<tag>
+    // to collect all historical releases (up to 10 pages / 100 releases).
+    for _ in 0..10 {
+        let feed_url = match &after {
+            Some(a) => format!("https://github.com/{}/releases.atom?after={}", REPO, a),
+            None => format!("https://github.com/{}/releases.atom", REPO),
+        };
+        let out = Command::new("curl")
+            .args(["-fsSL", "-m", "8", "-A", "rail-browser", &feed_url])
+            .stdin(Stdio::null())
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            break;
         }
+        let text = String::from_utf8_lossy(&out.stdout).to_string();
+        let mut rest = text.as_str();
+        let mut page_count = 0;
+        let mut last_tag = None;
+        while let Some(i) = rest.find(marker) {
+            rest = &rest[i + marker.len()..];
+            let end = rest.find(['"', '<', '\'', ' ']).unwrap_or(rest.len());
+            let tag = rest[..end].to_string();
+            if !tag.is_empty() {
+                if !seen.contains(&tag) {
+                    seen.push(tag.clone());
+                    page_count += 1;
+                }
+                last_tag = Some(tag);
+            }
+        }
+        if page_count == 0 {
+            break;
+        }
+        after = last_tag;
     }
+
     if seen.is_empty() {
         return None;
     }
+
     let mut count = 0usize;
     let mut best: Option<([u32; 3], String)> = None;
     for tag in &seen {
@@ -94,7 +119,7 @@ pub fn fetch_releases() -> Option<(Vec<String>, Option<UpdateInfo>)> {
     }
     let more = !seen.is_empty() && count >= seen.len();
     let info = best.map(|(_, tag)| UpdateInfo {
-        url: format!("https://github.com/{}/releases/download/{}/{}", REPO, tag, asset_name()),
+        url: asset_url_for_tag(&tag),
         latest_tag: tag,
         newer_count: count,
         more,
@@ -143,7 +168,7 @@ fn fetch_update() -> Option<UpdateInfo> {
     // The feed lists only the last 10 releases: if all of them are newer, the real gap is bigger.
     let more = !seen.is_empty() && count >= seen.len();
     Some(UpdateInfo {
-        url: format!("https://github.com/{}/releases/download/{}/{}", REPO, tag, asset_name()),
+        url: asset_url_for_tag(&tag),
         latest_tag: tag,
         newer_count: count,
         more,
@@ -393,6 +418,27 @@ pub fn cli_update() -> glib::ExitCode {
                     glib::ExitCode::FAILURE
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_ver() {
+        assert_eq!(parse_ver("v0.5.4"), Some([0, 5, 4]));
+        assert_eq!(parse_ver("0.1.0"), Some([0, 1, 0]));
+        assert_eq!(parse_ver("v1.2.3-beta"), Some([1, 2, 3]));
+    }
+
+    #[test]
+    fn test_fetch_releases_gets_more_than_ten() {
+        if let Some((tags, _)) = fetch_releases() {
+            assert!(tags.len() > 10, "Should fetch all historical releases beyond 10, got {}", tags.len());
+            assert!(tags.contains(&"v0.1.0".to_string()));
+            assert!(tags.contains(&"v0.5.4".to_string()));
         }
     }
 }
