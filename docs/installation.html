@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>O'rnatish & CLI — Rail Dokumentatsiyasi</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='8' y='23' font-size='22' font-family='monospace' fill='%23fff'%3Er%3C/text%3E%3Ccircle cx='25' cy='25' r='3' fill='%232f6bff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<div id="cur"></div>
+
+<!-- Top Fixed Header -->
+<header class="docs-header">
+  <button class="hamburger" aria-label="Toggle Navigation">
+    <span>☰</span> <span data-t="menu_open">Menyu</span>
+  </button>
+  <a href="index.html" class="brand-link">
+    <div class="logo">r</div>
+    <b>rail</b>
+    <span class="pill" data-t="brand_sub">hujjatlar</span>
+  </a>
+  <span class="pill" style="border-color:#333;font-size:11px">v0.5.2</span>
+  <div class="sp"></div>
+  <div class="search-box">
+    <input type="text" data-ph="search_placeholder" placeholder="Qidirish... (/)">
+  </div>
+  <a href="../index.html" class="back-root" data-t="back_to_root">← Asosiy sahifa</a>
+  <div class="lang" role="group" aria-label="Language / Til / Язык">
+    <button data-l="uz">UZ</button>
+    <button data-l="en">EN</button>
+    <button data-l="ru">RU</button>
+  </div>
+</header>
+
+<div class="sidebar-overlay"></div>
+
+<div class="docs-layout">
+  <!-- Desktop Leftbar / Mobile Off-canvas Drawer -->
+  <aside class="docs-sidebar">
+    <div class="sidebar-group">
+      <div class="sidebar-title" data-t="sb_nav_guide">Qo'llanma</div>
+      <a href="index.html" class="nav-item">
+        <span class="nav-idx">01</span>
+        <span data-t="nav_intro">Kirish & Konsepsiya</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="architecture.html" class="nav-item">
+        <span class="nav-idx">02</span>
+        <span data-t="nav_arch">Arxitektura & Rust</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="shortcuts.html" class="nav-item">
+        <span class="nav-idx">03</span>
+        <span data-t="nav_shortcuts">Qisqa klavishlar</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="profiles.html" class="nav-item">
+        <span class="nav-idx">04</span>
+        <span data-t="nav_profiles">Izolyatsiyalangan profillar</span>
+        <span class="nav-dot"></span>
+      </a>
+    </div>
+    <div class="sidebar-group">
+      <div class="sidebar-title" data-t="sb_nav_reference">Ma'lumotnoma</div>
+      <a href="installation.html" class="nav-item active">
+        <span class="nav-idx">05</span>
+        <span data-t="nav_install">O'rnatish & CLI</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="configuration.html" class="nav-item">
+        <span class="nav-idx">06</span>
+        <span data-t="nav_config">Konfiguratsiya & Sozlamalar</span>
+        <span class="nav-dot"></span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="docs-content">
+    <div class="breadcrumbs">
+      <a href="../index.html">rail</a>
+      <span class="sep">/</span>
+      <a href="index.html" data-t="brand_sub">docs</a>
+      <span class="sep">/</span>
+      <span data-t="nav_install">O'rnatish & CLI</span>
+    </div>
+
+    <h1 class="doc-title" data-t="inst_title">O'rnatish va CLI Qo'llanmasi</h1>
+    <p class="doc-lead" data-t="inst_lead">Rail Linux tizimlarida o'ta yengil va birgina buyruq bilan o'rnatiladi. Windows va macOS uchun esa tez orada chiqariladi.</p>
+
+    <!-- Method 1 -->
+    <h2 class="doc-h2" data-t="inst_m1_title">1-usul: Bir qatorli avtomatik o'rnatish (Tavsiya etiladi)</h2>
+    <p data-t="inst_m1_p">Ushbu buyruq kerakli kutubxonalarni tekshiradi, binarni <code>~/.local/bin/rail</code> ga joylaydi va tizim menyusiga ilova yorlig'ini qo'shadi:</p>
+
+    <div class="code-header">
+      <span>Terminal buyrug'i</span>
+      <button class="btn-copy" data-target="cmdInstall" data-t="lbl_copy">Nusxa olish</button>
+    </div>
+    <pre><code id="cmdInstall">curl -fsSL https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh | bash</code></pre>
+
+    <!-- Method 2 -->
+    <h2 class="doc-h2" data-t="inst_m2_title">2-usul: Tayyor binar faylni yuklab olish (~500 KB)</h2>
+    <p data-t="inst_m2_p">Agar tizimda <code>libwebkitgtk-6.0</code> mavjud bo'lsa, to'g'ridan-to'g'ri yuklab olib ishlatishingiz mumkin:</p>
+
+    <div class="code-header">
+      <span>Binar o'rnatish</span>
+      <button class="btn-copy" data-target="cmdBinary" data-t="lbl_copy">Nusxa olish</button>
+    </div>
+    <pre><code id="cmdBinary">mkdir -p ~/.local/bin
+curl -fL -o ~/.local/bin/rail https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64
+chmod +x ~/.local/bin/rail</code></pre>
+
+    <!-- CLI Reference -->
+    <h2 class="doc-h2" data-t="inst_cli_h2">CLI Buyruqlari va Parametrlari</h2>
+    <div class="table-wrap">
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th style="width:260px">Buyruq</th>
+            <th>Vazifasi</th>
+            <th>Misol</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>rail</code></td>
+            <td>Brauzerni boshlang'ich yangi tab bilan ochish</td>
+            <td><code>rail</code></td>
+          </tr>
+          <tr>
+            <td><code>rail &lt;url&gt;</code></td>
+            <td>Berilgan veb-manzilni yangi oynada ochish</td>
+            <td><code>rail https://github.com</code></td>
+          </tr>
+          <tr>
+            <td><code>rail --update</code></td>
+            <td>Eng so'nggi relizni tekshirib, yangilash</td>
+            <td><code>rail --update</code></td>
+          </tr>
+          <tr>
+            <td><code>rail --profile &lt;nom&gt;</code></td>
+            <td>Maxsus izolyatsiyalangan profil bilan ochish</td>
+            <td><code>rail --profile work https://linear.app</code></td>
+          </tr>
+          <tr>
+            <td><code>rail --version</code></td>
+            <td>Joriy o'rnatilgan versiyani chiqarish</td>
+            <td><code>rail --version</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Auto-updater engine -->
+    <h2 class="doc-h2" data-t="inst_update_h2">Avtomatik Yangilanish Tizimi (`update.rs`)</h2>
+    <p data-t="inst_update_p">Rail har ishga tushganda yangi relizni avtomatik tekshiradi. SHA256 nazorat summasini tekshirib, joriy ochiq tablarni saqlagan holda dasturni yangilaydi.</p>
+
+    <div class="callout tip">
+      <div class="callout-title"><span class="dot"></span> <span data-t="tip_title">Maslahat</span>: Yangilanish xabari</div>
+      <p style="margin-bottom:0">Yangi versiya chiqqanda pastki o'ng burchakda yangilanish kartasi chiqadi. "Update" tugmasi bir bosishda yuklaydi va barcha ochiq tablarni saqlab brauzerni qayta ochadi.</p>
+    </div>
+
+    <!-- Footer Nav -->
+    <div class="docs-nav-footer">
+      <a href="profiles.html" class="docs-nav-btn">
+        <span class="label" data-t="lbl_prev">Oldingi</span>
+        <span class="name" data-t="nav_profiles">← Izolyatsiyalangan profillar</span>
+      </a>
+      <a href="configuration.html" class="docs-nav-btn">
+        <span class="label" data-t="lbl_next">Keyingi</span>
+        <span class="name" data-t="nav_config">Konfiguratsiya & Sozlamalar →</span>
+      </a>
+    </div>
+  </main>
+</div>
+
+<script src="i18n.js"></script>
+<script src="docs.js"></script>
+</body>
+</html>

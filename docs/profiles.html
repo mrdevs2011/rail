@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Izolyatsiyalangan Profillar — Rail Dokumentatsiyasi</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='8' y='23' font-size='22' font-family='monospace' fill='%23fff'%3Er%3C/text%3E%3Ccircle cx='25' cy='25' r='3' fill='%232f6bff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<div id="cur"></div>
+
+<!-- Top Fixed Header -->
+<header class="docs-header">
+  <button class="hamburger" aria-label="Toggle Navigation">
+    <span>☰</span> <span data-t="menu_open">Menyu</span>
+  </button>
+  <a href="index.html" class="brand-link">
+    <div class="logo">r</div>
+    <b>rail</b>
+    <span class="pill" data-t="brand_sub">hujjatlar</span>
+  </a>
+  <span class="pill" style="border-color:#333;font-size:11px">v0.5.2</span>
+  <div class="sp"></div>
+  <div class="search-box">
+    <input type="text" data-ph="search_placeholder" placeholder="Qidirish... (/)">
+  </div>
+  <a href="../index.html" class="back-root" data-t="back_to_root">← Asosiy sahifa</a>
+  <div class="lang" role="group" aria-label="Language / Til / Язык">
+    <button data-l="uz">UZ</button>
+    <button data-l="en">EN</button>
+    <button data-l="ru">RU</button>
+  </div>
+</header>
+
+<div class="sidebar-overlay"></div>
+
+<div class="docs-layout">
+  <!-- Desktop Leftbar / Mobile Off-canvas Drawer -->
+  <aside class="docs-sidebar">
+    <div class="sidebar-group">
+      <div class="sidebar-title" data-t="sb_nav_guide">Qo'llanma</div>
+      <a href="index.html" class="nav-item">
+        <span class="nav-idx">01</span>
+        <span data-t="nav_intro">Kirish & Konsepsiya</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="architecture.html" class="nav-item">
+        <span class="nav-idx">02</span>
+        <span data-t="nav_arch">Arxitektura & Rust</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="shortcuts.html" class="nav-item">
+        <span class="nav-idx">03</span>
+        <span data-t="nav_shortcuts">Qisqa klavishlar</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="profiles.html" class="nav-item active">
+        <span class="nav-idx">04</span>
+        <span data-t="nav_profiles">Izolyatsiyalangan profillar</span>
+        <span class="nav-dot"></span>
+      </a>
+    </div>
+    <div class="sidebar-group">
+      <div class="sidebar-title" data-t="sb_nav_reference">Ma'lumotnoma</div>
+      <a href="installation.html" class="nav-item">
+        <span class="nav-idx">05</span>
+        <span data-t="nav_install">O'rnatish & CLI</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="configuration.html" class="nav-item">
+        <span class="nav-idx">06</span>
+        <span data-t="nav_config">Konfiguratsiya & Sozlamalar</span>
+        <span class="nav-dot"></span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="docs-content">
+    <div class="breadcrumbs">
+      <a href="../index.html">rail</a>
+      <span class="sep">/</span>
+      <a href="index.html" data-t="brand_sub">docs</a>
+      <span class="sep">/</span>
+      <span data-t="nav_profiles">Izolyatsiyalangan profillar</span>
+    </div>
+
+    <h1 class="doc-title" data-t="prof_title">100% Izolyatsiyalangan Multi-Profile Tizimi</h1>
+    <p class="doc-lead" data-t="prof_lead">Bitta brauzer ichida bir nechta akkauntdan (shaxsiy, ishchi, mijoz) aralashmasdan va hech narsa sizib chiqmasdan foydalaning.</p>
+
+    <!-- Interactive Profile Lab Widget -->
+    <div class="profile-lab-widget">
+      <h3 class="doc-h3" style="margin-top:0"><span class="dot"></span> <span data-t="prof_lab_title">Virtual Profil Laboratoriyasi</span></h3>
+      <p data-t="prof_lab_desc">Quyidagi profillardan birini tanlab, sinov tizimiga kiring. Kuki va saqlangan ma'lumotlar ikkinchi profilga umuman o'tmasligini ko'rasiz:</p>
+      
+      <div class="row" style="margin-bottom:12px">
+        <button class="v-btn primary" id="labP1" data-t="prof_lab_p1">Profil 1 (Shaxsiy)</button>
+        <button class="v-btn" id="labP2" data-t="prof_lab_p2">Profil 2 (Ishchi)</button>
+        <button class="v-btn" id="labLogin" data-t="prof_lab_login">site.com tizimiga kirish</button>
+        <button class="v-btn" id="labWipe" data-t="prof_lab_wipe">Kukilarni tozalash</button>
+      </div>
+
+      <div class="lab-profiles">
+        <div class="lab-card active">
+          <div class="lab-badge"><span class="dot" style="background:#38bdf8"></span> Profil 1: Shaxsiy</div>
+          <div class="cookie-jar-list" id="labJar0">Yuklanmoqda...</div>
+        </div>
+        <div class="lab-card">
+          <div class="lab-badge"><span class="dot" style="background:#c084fc"></span> Profil 2: Ishchi</div>
+          <div class="cookie-jar-list" id="labJar1">Yuklanmoqda...</div>
+        </div>
+      </div>
+      <p id="labMsg" style="font-size:12px;color:var(--dim);margin-top:10px"></p>
+    </div>
+
+    <h2 class="doc-h2">Xavfsizlik Kafolatlari va Afzalliklari</h2>
+    <ul>
+      <li data-t="prof_feat_1"><b>Nolinchi Ma'lumot Sizishi:</b> Har bir profil alohida disk papkasi va kuki-jar ga ega.</li>
+      <li data-t="prof_feat_2"><b>Tezkor almashtirish:</b> URL maydonidagi rangli indikator yoki Ctrl+P orqali 1 soniyada almashtirish.</li>
+      <li data-t="prof_feat_3"><b>Rangli identifikatorlar:</b> Har bir profil o'zining rangli doirachasi va bosh harflari bilan belgilanadi.</li>
+    </ul>
+
+    <h2 class="doc-h2">Diskdagi Tuzilma</h2>
+    <p>Rail har bir profil uchun alohida katalog ajratadi:</p>
+    <pre><code>~/.local/share/rail/
+├── profiles.json           # Profillar ro'yxati va rang sozlamalari
+└── profiles/
+    ├── default/            # Asosiy profil (kuki, kesh, WebStorage)
+    ├── work/               # Ishchi profil (to'liq ajratilgan)
+    └── client_xyz/         # Mijoz profili</code></pre>
+
+    <div class="callout tip">
+      <div class="callout-title"><span class="dot"></span> <span data-t="tip_title">Maslahat</span>: Buyruqlar qatoridan ochish</div>
+      <p style="margin-bottom:0">Ma'lum bir profil bilan to'g'ridan-to'g'ri terminaldan ochish uchun: <code>rail --profile work https://linear.app</code> buyrug'idan foydalanishingiz mumkin.</p>
+    </div>
+
+    <!-- Footer Nav -->
+    <div class="docs-nav-footer">
+      <a href="shortcuts.html" class="docs-nav-btn">
+        <span class="label" data-t="lbl_prev">Oldingi</span>
+        <span class="name" data-t="nav_shortcuts">← Qisqa klavishlar</span>
+      </a>
+      <a href="installation.html" class="docs-nav-btn">
+        <span class="label" data-t="lbl_next">Keyingi</span>
+        <span class="name" data-t="nav_install">O'rnatish & CLI →</span>
+      </a>
+    </div>
+  </main>
+</div>
+
+<script src="i18n.js"></script>
+<script src="docs.js"></script>
+</body>
+</html>

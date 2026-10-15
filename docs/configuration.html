@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Konfiguratsiya & Sozlamalar — Rail Dokumentatsiyasi</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='8' y='23' font-size='22' font-family='monospace' fill='%23fff'%3Er%3C/text%3E%3Ccircle cx='25' cy='25' r='3' fill='%232f6bff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<div id="cur"></div>
+
+<!-- Top Fixed Header -->
+<header class="docs-header">
+  <button class="hamburger" aria-label="Toggle Navigation">
+    <span>☰</span> <span data-t="menu_open">Menyu</span>
+  </button>
+  <a href="index.html" class="brand-link">
+    <div class="logo">r</div>
+    <b>rail</b>
+    <span class="pill" data-t="brand_sub">hujjatlar</span>
+  </a>
+  <span class="pill" style="border-color:#333;font-size:11px">v0.5.2</span>
+  <div class="sp"></div>
+  <div class="search-box">
+    <input type="text" data-ph="search_placeholder" placeholder="Qidirish... (/)">
+  </div>
+  <a href="../index.html" class="back-root" data-t="back_to_root">← Asosiy sahifa</a>
+  <div class="lang" role="group" aria-label="Language / Til / Язык">
+    <button data-l="uz">UZ</button>
+    <button data-l="en">EN</button>
+    <button data-l="ru">RU</button>
+  </div>
+</header>
+
+<div class="sidebar-overlay"></div>
+
+<div class="docs-layout">
+  <!-- Desktop Leftbar / Mobile Off-canvas Drawer -->
+  <aside class="docs-sidebar">
+    <div class="sidebar-group">
+      <div class="sidebar-title" data-t="sb_nav_guide">Qo'llanma</div>
+      <a href="index.html" class="nav-item">
+        <span class="nav-idx">01</span>
+        <span data-t="nav_intro">Kirish & Konsepsiya</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="architecture.html" class="nav-item">
+        <span class="nav-idx">02</span>
+        <span data-t="nav_arch">Arxitektura & Rust</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="shortcuts.html" class="nav-item">
+        <span class="nav-idx">03</span>
+        <span data-t="nav_shortcuts">Qisqa klavishlar</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="profiles.html" class="nav-item">
+        <span class="nav-idx">04</span>
+        <span data-t="nav_profiles">Izolyatsiyalangan profillar</span>
+        <span class="nav-dot"></span>
+      </a>
+    </div>
+    <div class="sidebar-group">
+      <div class="sidebar-title" data-t="sb_nav_reference">Ma'lumotnoma</div>
+      <a href="installation.html" class="nav-item">
+        <span class="nav-idx">05</span>
+        <span data-t="nav_install">O'rnatish & CLI</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="configuration.html" class="nav-item active">
+        <span class="nav-idx">06</span>
+        <span data-t="nav_config">Konfiguratsiya & Sozlamalar</span>
+        <span class="nav-dot"></span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="docs-content">
+    <div class="breadcrumbs">
+      <a href="../index.html">rail</a>
+      <span class="sep">/</span>
+      <a href="index.html" data-t="brand_sub">docs</a>
+      <span class="sep">/</span>
+      <span data-t="nav_config">Konfiguratsiya & Sozlamalar</span>
+    </div>
+
+    <h1 class="doc-title" data-t="conf_title">Konfiguratsiya va Sozlamalar</h1>
+    <p class="doc-lead" data-t="conf_lead">Rail soddalik va moslashuvchanlik tamoyiliga tayanadi. Barcha sozlamalar JSON formatida saqlanadi.</p>
+
+    <!-- Configuration file -->
+    <h2 class="doc-h2" data-t="conf_file_h2">Sozlamalar Fayli Joylashuvi</h2>
+    <p data-t="conf_file_p">Konfiguratsiya <code>~/.config/rail/config.json</code> manzilida saqlanadi. Uni istalgan matn muharririda ochib o'zgartirishingiz mumkin:</p>
+
+    <div class="code-header">
+      <span>~/.config/rail/config.json</span>
+      <button class="btn-copy" data-target="cfgJson" data-t="lbl_copy">Nusxa olish</button>
+    </div>
+    <pre><code id="cfgJson">{
+  "language": "uz",
+  "search_engine": "https://duckduckgo.com/?q=%s",
+  "default_profile": "default",
+  "ui": {
+    "theme": "black_white_blue",
+    "column_min_width": 480,
+    "overview_zoom": 0.65,
+    "animations": true
+  },
+  "privacy": {
+    "do_not_track": true,
+    "clear_cache_on_exit": false
+  }
+}</code></pre>
+
+    <!-- Language / i18n -->
+    <h2 class="doc-h2" data-t="conf_i18n_h2">Interfeys Tili (i18n)</h2>
+    <p data-t="conf_i18n_p">Rail to'liq 3 ta tilni qo'llab-quvvatlaydi: O'zbekcha (sukut bo'yicha), Inglizcha va Ruscha. Tilni Settings menyusidan yoki <code>rail --lang &lt;uz|en|ru&gt;</code> orqali o'zgartirish mumkin.</p>
+
+    <!-- Custom CSS -->
+    <h2 class="doc-h2" data-t="conf_css_h2">Maxsus CSS Usullar</h2>
+    <p data-t="conf_css_p">Saytlarning ko'rinishini o'zingizga moslashtirish uchun foydalanuvchi CSS qoidalari <code>~/.config/rail/custom.css</code> faylida kiritilishi mumkin.</p>
+
+    <div class="code-header">
+      <span>~/.config/rail/custom.css</span>
+      <button class="btn-copy" data-target="cssSample" data-t="lbl_copy">Nusxa olish</button>
+    </div>
+    <pre><code id="cssSample">/* Tungi rejimni majburiy qilish */
+html {
+  filter: contrast(102%) brightness(98%);
+}
+
+/* Scrollbar dizaynini ixchamlashtirish */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2f6bff;
+}</code></pre>
+
+    <!-- Footer Nav -->
+    <div class="docs-nav-footer">
+      <a href="installation.html" class="docs-nav-btn">
+        <span class="label" data-t="lbl_prev">Oldingi</span>
+        <span class="name" data-t="nav_install">← O'rnatish & CLI</span>
+      </a>
+      <a href="index.html" class="docs-nav-btn">
+        <span class="label" data-t="lbl_next">Boshiga</span>
+        <span class="name" data-t="nav_intro">Kirish & Konsepsiya →</span>
+      </a>
+    </div>
+  </main>
+</div>
+
+<script src="i18n.js"></script>
+<script src="docs.js"></script>
+</body>
+</html>

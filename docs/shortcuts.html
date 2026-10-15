@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Qisqa Klavishlar & Boshqaruv — Rail Dokumentatsiyasi</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='8' y='23' font-size='22' font-family='monospace' fill='%23fff'%3Er%3C/text%3E%3Ccircle cx='25' cy='25' r='3' fill='%232f6bff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<div id="cur"></div>
+
+<!-- Top Fixed Header -->
+<header class="docs-header">
+  <button class="hamburger" aria-label="Toggle Navigation">
+    <span>☰</span> <span data-t="menu_open">Menyu</span>
+  </button>
+  <a href="index.html" class="brand-link">
+    <div class="logo">r</div>
+    <b>rail</b>
+    <span class="pill" data-t="brand_sub">hujjatlar</span>
+  </a>
+  <span class="pill" style="border-color:#333;font-size:11px">v0.5.2</span>
+  <div class="sp"></div>
+  <div class="search-box">
+    <input type="text" data-ph="search_placeholder" placeholder="Qidirish... (/)">
+  </div>
+  <a href="../index.html" class="back-root" data-t="back_to_root">← Asosiy sahifa</a>
+  <div class="lang" role="group" aria-label="Language / Til / Язык">
+    <button data-l="uz">UZ</button>
+    <button data-l="en">EN</button>
+    <button data-l="ru">RU</button>
+  </div>
+</header>
+
+<div class="sidebar-overlay"></div>
+
+<div class="docs-layout">
+  <!-- Desktop Leftbar / Mobile Off-canvas Drawer -->
+  <aside class="docs-sidebar">
+    <div class="sidebar-group">
+      <div class="sidebar-title" data-t="sb_nav_guide">Qo'llanma</div>
+      <a href="index.html" class="nav-item">
+        <span class="nav-idx">01</span>
+        <span data-t="nav_intro">Kirish & Konsepsiya</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="architecture.html" class="nav-item">
+        <span class="nav-idx">02</span>
+        <span data-t="nav_arch">Arxitektura & Rust</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="shortcuts.html" class="nav-item active">
+        <span class="nav-idx">03</span>
+        <span data-t="nav_shortcuts">Qisqa klavishlar</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="profiles.html" class="nav-item">
+        <span class="nav-idx">04</span>
+        <span data-t="nav_profiles">Izolyatsiyalangan profillar</span>
+        <span class="nav-dot"></span>
+      </a>
+    </div>
+    <div class="sidebar-group">
+      <div class="sidebar-title" data-t="sb_nav_reference">Ma'lumotnoma</div>
+      <a href="installation.html" class="nav-item">
+        <span class="nav-idx">05</span>
+        <span data-t="nav_install">O'rnatish & CLI</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="configuration.html" class="nav-item">
+        <span class="nav-idx">06</span>
+        <span data-t="nav_config">Konfiguratsiya & Sozlamalar</span>
+        <span class="nav-dot"></span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="docs-content">
+    <div class="breadcrumbs">
+      <a href="../index.html">rail</a>
+      <span class="sep">/</span>
+      <a href="index.html" data-t="brand_sub">docs</a>
+      <span class="sep">/</span>
+      <span data-t="nav_shortcuts">Qisqa klavishlar</span>
+    </div>
+
+    <h1 class="doc-title" data-t="short_title">Klaviatura va Boshqaruv (Keybindings)</h1>
+    <p class="doc-lead" data-t="short_lead">Rail klaviatura orqali boshqarish uchun maxsus loyihalashtirilgan. Sichqonchasiz ishlash tezlikni 3-5 barobarga oshiradi.</p>
+
+    <!-- Interactive Tester -->
+    <div class="kb-interactive">
+      <h3 class="doc-h3" style="margin-top:0"><span class="dot"></span> <span data-t="short_tester_title">Interaktiv Klaviatura Trenajyori</span></h3>
+      <p data-t="short_tester_p">Quyidagi maydonga bosing va ixtiyoriy klavishlarni (masalan Ctrl+T, Ctrl+H, Ctrl+O) bosing:</p>
+      <input type="text" id="kbTesterInput" class="kb-search" placeholder="Shu yerga bosing va klavishlarni bosing..." readonly>
+      <div id="kbTesterOutput" style="font-size:13px;color:#aaa">Kutilyapti...</div>
+    </div>
+
+    <!-- Navigation & Focus -->
+    <h2 class="doc-h2" data-t="short_tbl_nav">Navigatsiya va Fokus</h2>
+    <div class="table-wrap">
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th style="width:220px">Klavish</th>
+            <th>Vazifasi</th>
+            <th>Tavsif</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-combo="ctrl+h">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">H</span></td>
+            <td>Chap ustunga o'tish</td>
+            <td>Gorizontal lentada chap tomondagi ustunga fokusni o'tkazadi</td>
+          </tr>
+          <tr data-combo="ctrl+l">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">L</span></td>
+            <td>O'ng ustunga o'tish</td>
+            <td>Gorizontal lentada o'ng tomondagi ustunga fokusni o'tkazadi</td>
+          </tr>
+          <tr data-combo="ctrl+j">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">J</span></td>
+            <td>Pastki oynaga o'tish</td>
+            <td>Joriy ustun ichidagi stakda pastdagi oynaga o'tadi</td>
+          </tr>
+          <tr data-combo="ctrl+k">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">K</span></td>
+            <td>Yuqori oynaga o'tish</td>
+            <td>Joriy ustun ichidagi stakda yuqoridagi oynaga o'tadi</td>
+          </tr>
+          <tr data-combo="ctrl+shift+h">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">Shift</span> + <span class="key-badge">H</span></td>
+            <td>Ustunni chapga ko'chirish</td>
+            <td>Joriy ustunni qo'shni chap ustun bilan o'rnini almashtiradi</td>
+          </tr>
+          <tr data-combo="ctrl+shift+l">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">Shift</span> + <span class="key-badge">L</span></td>
+            <td>Ustunni o'ngga ko'chirish</td>
+            <td>Joriy ustunni qo'shni o'ng ustun bilan o'rnini almashtiradi</td>
+          </tr>
+          <tr data-combo="ctrl+shift+j">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">Shift</span> + <span class="key-badge">J</span></td>
+            <td>Oynani pastga siljitish</td>
+            <td>Stak ichida oynani pastga ko'chiradi</td>
+          </tr>
+          <tr data-combo="ctrl+shift+k">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">Shift</span> + <span class="key-badge">K</span></td>
+            <td>Oynani yuqoriga siljitish</td>
+            <td>Stak ichida oynani yuqoriga ko'chiradi</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Window & Ribbon Management -->
+    <h2 class="doc-h2" data-t="short_tbl_win">Oynalar va Lenta Boshqaruvi</h2>
+    <div class="table-wrap">
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th style="width:220px">Klavish</th>
+            <th>Vazifasi</th>
+            <th>Tavsif</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-combo="ctrl+t">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">T</span></td>
+            <td>Yangi ustun qo'shish</td>
+            <td>Lentaning o'ng tomoniga yangi to'liq ustun (tab) yaratadi</td>
+          </tr>
+          <tr data-combo="ctrl+v">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">V</span> / <span class="key-badge">Ctrl</span>+<span class="key-badge">Shift</span>+<span class="key-badge">T</span></td>
+            <td>Vertikal stakka bo'lish</td>
+            <td>Joriy ustun ichida pastga yangi veb-oyna stakini qo'shadi</td>
+          </tr>
+          <tr data-combo="ctrl+w">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">W</span></td>
+            <td>Oynani yopish</td>
+            <td>Fokusdagi veb-oynani yopadi (oxirgi oyna yopilsa ustun o'chadi)</td>
+          </tr>
+          <tr data-combo="ctrl+g">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">G</span></td>
+            <td>URL qatori (Omnibar)</td>
+            <td>Qidiruv va manzil kiritish dialogini ochadi</td>
+          </tr>
+          <tr data-combo="ctrl+enter">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">Enter</span></td>
+            <td>URL'ni tahrirlash</td>
+            <td>Joriy fokusdagi sahifaning manzilini tezkor tahrirlash</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Views & Modes -->
+    <h2 class="doc-h2" data-t="short_tbl_view">Ko'rinish va Rejimlar</h2>
+    <div class="table-wrap">
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th style="width:220px">Klavish</th>
+            <th>Vazifasi</th>
+            <th>Tavsif</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-combo="ctrl+o">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">O</span></td>
+            <td>Overview rejimi</td>
+            <td>Lentani masshtabini kichraytirib (zoom 0.65), barcha oynalarni bir ekranda ko'rsatadi</td>
+          </tr>
+          <tr data-combo="ctrl+f">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">F</span></td>
+            <td>To'liq kenglik / Split</td>
+            <td>Ustunni to'liq ekran kengligiga yoyish yoki 50% split rejimiga qaytarish</td>
+          </tr>
+          <tr data-combo="ctrl+b">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">B</span></td>
+            <td>Yon panel (Sidebar)</td>
+            <td>Xatcho'plar va profillar yon panelini ochish yoki yashirish</td>
+          </tr>
+          <tr data-combo="ctrl+p">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">P</span> / <span class="key-badge">Ctrl</span>+<span class="key-badge">Shift</span>+<span class="key-badge">P</span></td>
+            <td>Profillar dialogi</td>
+            <td>100% izolyatsiyalangan profillar ro'yxatini ochish va tezkor almashtirish</td>
+          </tr>
+          <tr>
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">←</span> / <span class="key-badge">→</span></td>
+            <td>Orqaga / Oldinga</td>
+            <td>Joriy oynaning ko'rishlar tarixi bo'yicha orqaga yoki oldinga o'tish</td>
+          </tr>
+          <tr data-combo="ctrl+r">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">R</span></td>
+            <td>Qayta yuklash</td>
+            <td>Fokusdagi veb sahifani to'liq qayta yuklash</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Footer Nav -->
+    <div class="docs-nav-footer">
+      <a href="architecture.html" class="docs-nav-btn">
+        <span class="label" data-t="lbl_prev">Oldingi</span>
+        <span class="name" data-t="nav_arch">← Arxitektura & Rust</span>
+      </a>
+      <a href="profiles.html" class="docs-nav-btn">
+        <span class="label" data-t="lbl_next">Keyingi</span>
+        <span class="name" data-t="nav_profiles">Izolyatsiyalangan profillar →</span>
+      </a>
+    </div>
+  </main>
+</div>
+
+<script src="i18n.js"></script>
+<script src="docs.js"></script>
+</body>
+</html>

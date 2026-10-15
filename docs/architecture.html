@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arxitektura & Rust — Rail Dokumentatsiyasi</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='8' y='23' font-size='22' font-family='monospace' fill='%23fff'%3Er%3C/text%3E%3Ccircle cx='25' cy='25' r='3' fill='%232f6bff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<div id="cur"></div>
+
+<!-- Top Fixed Header -->
+<header class="docs-header">
+  <button class="hamburger" aria-label="Toggle Navigation">
+    <span>☰</span> <span data-t="menu_open">Menyu</span>
+  </button>
+  <a href="index.html" class="brand-link">
+    <div class="logo">r</div>
+    <b>rail</b>
+    <span class="pill" data-t="brand_sub">hujjatlar</span>
+  </a>
+  <span class="pill" style="border-color:#333;font-size:11px">v0.5.2</span>
+  <div class="sp"></div>
+  <div class="search-box">
+    <input type="text" data-ph="search_placeholder" placeholder="Qidirish... (/)">
+  </div>
+  <a href="../index.html" class="back-root" data-t="back_to_root">← Asosiy sahifa</a>
+  <div class="lang" role="group" aria-label="Language / Til / Язык">
+    <button data-l="uz">UZ</button>
+    <button data-l="en">EN</button>
+    <button data-l="ru">RU</button>
+  </div>
+</header>
+
+<div class="sidebar-overlay"></div>
+
+<div class="docs-layout">
+  <!-- Desktop Leftbar / Mobile Off-canvas Drawer -->
+  <aside class="docs-sidebar">
+    <div class="sidebar-group">
+      <div class="sidebar-title" data-t="sb_nav_guide">Qo'llanma</div>
+      <a href="index.html" class="nav-item">
+        <span class="nav-idx">01</span>
+        <span data-t="nav_intro">Kirish & Konsepsiya</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="architecture.html" class="nav-item active">
+        <span class="nav-idx">02</span>
+        <span data-t="nav_arch">Arxitektura & Rust</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="shortcuts.html" class="nav-item">
+        <span class="nav-idx">03</span>
+        <span data-t="nav_shortcuts">Qisqa klavishlar</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="profiles.html" class="nav-item">
+        <span class="nav-idx">04</span>
+        <span data-t="nav_profiles">Izolyatsiyalangan profillar</span>
+        <span class="nav-dot"></span>
+      </a>
+    </div>
+    <div class="sidebar-group">
+      <div class="sidebar-title" data-t="sb_nav_reference">Ma'lumotnoma</div>
+      <a href="installation.html" class="nav-item">
+        <span class="nav-idx">05</span>
+        <span data-t="nav_install">O'rnatish & CLI</span>
+        <span class="nav-dot"></span>
+      </a>
+      <a href="configuration.html" class="nav-item">
+        <span class="nav-idx">06</span>
+        <span data-t="nav_config">Konfiguratsiya & Sozlamalar</span>
+        <span class="nav-dot"></span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="docs-content">
+    <div class="breadcrumbs">
+      <a href="../index.html">rail</a>
+      <span class="sep">/</span>
+      <a href="index.html" data-t="brand_sub">docs</a>
+      <span class="sep">/</span>
+      <span data-t="nav_arch">Arxitektura & Rust</span>
+    </div>
+
+    <h1 class="doc-title" data-t="arch_title">Arxitektura va Ichki Tuzilish</h1>
+    <p class="doc-lead" data-t="arch_lead">Rail noldan GTK4, WebKitGTK 6.0 va Rust dasturlash tilida qurilgan bo'lib, uning binar hajmi atigi ~500 KB ni tashkil qiladi.</p>
+
+    <h2 class="doc-h2" data-t="arch_tech_h2">Texnologik Stek</h2>
+    <p data-t="arch_tech_p">Boshqa ko'plab zamonaviy brauzerlardan (masalan Electron asosidagi) farqli ravishda, Rail xotira va protsessordan minimal foydalanadi:</p>
+
+    <div class="table-wrap">
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th>Qatlam</th>
+            <th>Kutubxona / Crate</th>
+            <th>Vazifasi & Xususiyatlari</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Asosiy til</b></td>
+            <td><code>Rust 2021 / 2024</code></td>
+            <td>Xotira xavfsizligi (memory-safety), nol abstraksiya narxi, yuqori tezlik</td>
+          </tr>
+          <tr>
+            <td><b>Grafik interfeys</b></td>
+            <td><code>GTK4 (gtk4 crate)</code></td>
+            <td>GSK (GTK Scene Graph), apparatli tezlashtirish (GPU rendering), Wayland va X11 native integratsiyasi</td>
+          </tr>
+          <tr>
+            <td><b>Veb dvigatel</b></td>
+            <td><code>WebKitGTK 6.0</code></td>
+            <td>Zamonaviy HTML5, CSS3, ECMAScript, izolyatsiyalangan WebKitNetworkSession instansiyalari</td>
+          </tr>
+          <tr>
+            <td><b>2D Lenta tizimi</b></td>
+            <td><code>strip.rs (StripLayout)</code></td>
+            <td>Niri kompozitori koordinata modeli, dinamik masshtablash, 2D staklar</td>
+          </tr>
+          <tr>
+            <td><b>Serializatsiya</b></td>
+            <td><code>minijson.rs</code></td>
+            <td>Hech qanday tashqi bog'liqliksiz (zero-dependency) tezkor JSON saqlagich</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="doc-h2" data-t="arch_strip_h2">2D StripLayout mexanizmi (`strip.rs`)</h2>
+    <p data-t="arch_strip_p">Rail brauzerida oynalarning joylashishi maxsus GTK Layout Manager — <code>StripLayout</code> orqali boshqariladi. Bu niri Wayland kompozitorining koordinata hisoblash algoritmidan ilhomlangan:</p>
+
+    <div class="code-header">
+      <span>src/strip.rs — StripLayout koordinata hisoblash yadrosi</span>
+      <button class="btn-copy" data-target="codeStrip" data-t="lbl_copy">Nusxa olish</button>
+    </div>
+    <pre><code id="codeStrip">pub const GAP: f64 = 6.0;
+pub const MIN_COL_W: f64 = 480.0;
+
+/// Oraliq masofa (gap) zoom pasayganda kattalashadi, 
+/// bu orqali Overview rejimida ustunlar bir-biriga yopishib ketmaydi:
+pub fn gap(zoom: f64) -> f64 {
+    GAP + (1.0 - zoom) * 40.0
+}
+
+/// Ustun kengligini hisoblash: to'liq ekran yoki yarim viewport
+pub fn col_width(full: bool, viewport: f64) -> f64 {
+    if full || viewport < (MIN_COL_W * 2.0 + GAP) {
+        viewport.max(280.0)
+    } else {
+        ((viewport - GAP) / 2.0).floor()
+    }
+}</code></pre>
+
+    <div class="callout note">
+      <div class="callout-title"><span class="dot"></span> <span data-t="note_title">Eslatma</span>: 2D Grid Matritsasi</div>
+      <p style="margin-bottom:0">Har bir oynaning holati xotirada <code>Vec&lt;Vec&lt;bool&gt;&gt;</code> ko'rinishidagi 2D matritsada saqlanadi. Gorizontal indeks ustunni (Column), vertikal indeks esa ustun ichidagi stak oynasini (Row) bildiradi.</p>
+    </div>
+
+    <h2 class="doc-h2" data-t="arch_profile_h2">Profillar izolyatsiyasi (`profile.rs`)</h2>
+    <p data-t="arch_profile_p">Har bir profil o'zining mustaqil <code>WebKitNetworkSession</code> instansiyasiga ega bo'lib, uning fayllari <code>~/.local/share/rail/profiles/{id}</code> papkasida saqlanadi. Kesh, kuki va WebStorage xotiralari tizim darajasida to'liq ajratilgan.</p>
+
+    <div class="code-header">
+      <span>src/profile.rs — WebKitNetworkSession yaratish</span>
+      <button class="btn-copy" data-target="codeProfile" data-t="lbl_copy">Nusxa olish</button>
+    </div>
+    <pre><code id="codeProfile">pub fn create_session(data_dir: &PathBuf) -> NetworkSession {
+    let cache_dir = data_dir.join("cache");
+    let data_dir_str = data_dir.to_string_lossy();
+    let cache_dir_str = cache_dir.to_string_lossy();
+
+    // Har bir profil uchun alohida kuki va kesh saqlash joyi:
+    NetworkSession::new(Some(&data_dir_str), Some(&cache_dir_str))
+}</code></pre>
+
+    <!-- Footer Nav -->
+    <div class="docs-nav-footer">
+      <a href="index.html" class="docs-nav-btn">
+        <span class="label" data-t="lbl_prev">Oldingi</span>
+        <span class="name" data-t="nav_intro">← Kirish & Konsepsiya</span>
+      </a>
+      <a href="shortcuts.html" class="docs-nav-btn">
+        <span class="label" data-t="lbl_next">Keyingi</span>
+        <span class="name" data-t="nav_shortcuts">Qisqa klavishlar →</span>
+      </a>
+    </div>
+  </main>
+</div>
+
+<script src="i18n.js"></script>
+<script src="docs.js"></script>
+</body>
+</html>
