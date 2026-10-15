@@ -2217,6 +2217,12 @@ impl App {
         settings.set_enable_webgl(true);
         settings.set_enable_developer_extras(true);
         settings.set_enable_back_forward_navigation_gestures(true);
+        settings.set_enable_webaudio(true);
+        settings.set_enable_html5_local_storage(true);
+        settings.set_enable_html5_database(true);
+        settings.set_enable_site_specific_quirks(true);
+        settings.set_javascript_can_access_clipboard(true);
+        settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
 
         let stealth_js = persona.stealth_script();
         let script = webkit6::UserScript::new(
