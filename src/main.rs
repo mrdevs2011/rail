@@ -734,14 +734,19 @@ entry.palette-entry, entry.palette-entry:focus-within {
 }
 
 /* ---- profile colors (True Dark Multi-Persona) ---- */
-.prof-bg-0 { background-color: #38bdf8; color: #021220; }
-.prof-bg-1 { background-color: #c084fc; color: #180529; }
-.prof-bg-2 { background-color: #4ade80; color: #04200c; }
-.prof-bg-3 { background-color: #facc15; color: #231b02; }
-.prof-bg-4 { background-color: #f87171; color: #290808; }
-.prof-bg-5 { background-color: #22d3ee; color: #031b20; }
-.prof-bg-6 { background-color: #fb923c; color: #261102; }
-.prof-bg-7 { background-color: #2dd4bf; color: #021e1a; }
+.prof-bg-0 { background-color: #38bdf8; color: #000000; }
+.prof-bg-1 { background-color: #c084fc; color: #000000; }
+.prof-bg-2 { background-color: #4ade80; color: #000000; }
+.prof-bg-3 { background-color: #facc15; color: #000000; }
+.prof-bg-4 { background-color: #f87171; color: #000000; }
+.prof-bg-5 { background-color: #22d3ee; color: #000000; }
+.prof-bg-6 { background-color: #fb923c; color: #000000; }
+.prof-bg-7 { background-color: #2dd4bf; color: #000000; }
+
+.prof-bg-0 label, .prof-bg-1 label, .prof-bg-2 label, .prof-bg-3 label,
+.prof-bg-4 label, .prof-bg-5 label, .prof-bg-6 label, .prof-bg-7 label {
+    color: #000000;
+}
 
 /* ---- profile circle button in URL palette ---- */
 button.profile-circle-btn {
@@ -752,13 +757,16 @@ button.profile-circle-btn {
     border: 2px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     transition: transform 120ms ease, border-color 120ms ease;
+    color: #000000;
 }
 button.profile-circle-btn:hover {
     transform: scale(1.08);
     border-color: #38bdf8;
 }
+button.profile-circle-btn label,
 .profile-circle-label {
-    font-weight: 700;
+    color: #000000;
+    font-weight: 800;
     font-size: 11.5px;
     font-family: system-ui, sans-serif;
 }
@@ -800,7 +808,8 @@ button.profile-item-btn.selected {
     min-height: 20px;
     border-radius: 9999px;
     font-size: 10.5px;
-    font-weight: 700;
+    font-weight: 800;
+    color: #000000;
     padding: 0;
 }
 .profile-item-name {
@@ -882,7 +891,8 @@ button.profile-item-btn.selected {
     min-height: 30px;
     border-radius: 9999px;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 800;
+    color: #000000;
     margin: 0;
     padding: 0;
 }
@@ -1003,6 +1013,7 @@ button.btn-create-profile.active-ready:hover {
     margin-right: 4px;
     padding: 0;
     font-family: ui-monospace, monospace;
+    color: #000000;
 }
 button.color-choice {
     min-width: 22px;
