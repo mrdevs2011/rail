@@ -1012,11 +1012,21 @@ button.btn-del-profile {
     border-radius: 6px;
     padding: 4px;
     color: #64748b;
-    transition: all 120ms ease;
+    opacity: 0;
+    cursor: pointer;
+    transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+}
+button.btn-del-profile image {
+    color: inherit;
+}
+.profile-card:hover button.btn-del-profile,
+.settings-profiles-list row:hover button.btn-del-profile {
+    opacity: 0.75;
 }
 button.btn-del-profile:hover {
     background: rgba(244, 63, 94, 0.18);
     color: #fb7185;
+    opacity: 1 !important;
 }
 .profile-section-label {
     font-size: 10.5px;
