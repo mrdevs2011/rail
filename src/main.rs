@@ -40,6 +40,65 @@ pub fn rail_data_dir() -> PathBuf {
     glib::user_data_dir().join("rail")
 }
 
+pub fn settings_json_path() -> PathBuf {
+    rail_data_dir().join("settings.json")
+}
+
+#[derive(Clone, Debug)]
+pub struct AppSettings {
+    pub search_engine: String,
+    pub touchpad_mode: bool,
+    pub smooth_scrolling: bool,
+    pub webrtc_enabled: bool,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            search_engine: "google".to_string(),
+            touchpad_mode: false,
+            smooth_scrolling: true,
+            webrtc_enabled: true,
+        }
+    }
+}
+
+pub fn load_app_settings() -> AppSettings {
+    let mut s = AppSettings::default();
+    let Ok(text) = std::fs::read_to_string(settings_json_path()) else {
+        return s;
+    };
+    if let Some(root) = minijson::parse(&text) {
+        if let Some(se) = root.get("search_engine").and_then(|v| v.as_str()) {
+            s.search_engine = se.to_string();
+        }
+        if let Some(tp) = root.get("touchpad_navigation").and_then(|v| v.as_bool()) {
+            s.touchpad_mode = tp;
+        }
+        if let Some(ss) = root.get("smooth_scrolling").and_then(|v| v.as_bool()) {
+            s.smooth_scrolling = ss;
+        }
+        if let Some(wr) = root.get("webrtc_enabled").and_then(|v| v.as_bool()) {
+            s.webrtc_enabled = wr;
+        }
+    }
+    s
+}
+
+pub fn save_app_settings(s: &AppSettings) -> bool {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("  \"search_engine\": \"{}\",\n", minijson::escape(&s.search_engine)));
+    out.push_str(&format!("  \"touchpad_navigation\": {},\n", s.touchpad_mode));
+    out.push_str(&format!("  \"smooth_scrolling\": {},\n", s.smooth_scrolling));
+    out.push_str(&format!("  \"webrtc_enabled\": {}\n", s.webrtc_enabled));
+    out.push_str("}\n");
+    let path = settings_json_path();
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    std::fs::write(path, out).is_ok()
+}
+
 const DEFAULT_HTML_CSS: &str = include_str!("html_default.css");
 
 thread_local! {
@@ -1925,10 +1984,10 @@ const G_TABS: &str = "Tabs & Workspaces";
 const G_PANELS: &str = "Panels, Settings & Tools";
 
 const SHORTCUT_DEFS: &[ShortcutDef] = &[
-    sc!("new_tab", G_TABS, "Open Omnibar / New tab", ["Alt+T", "Ctrl+T"]),
-    sc!("focus_url", G_TABS, "Focus URL / Address bar", ["Alt+G", "Ctrl+L"]),
-    sc!("close_tab", G_TABS, "Close focused tab", ["Alt+W", "Ctrl+W"]),
-    sc!("reload", G_TABS, "Reload active tab", ["Alt+R", "Ctrl+R", "F5"]),
+    sc!("new_tab", G_TABS, "Open Omnibar / New tab", ["Alt+T"]),
+    sc!("focus_url", G_TABS, "Focus URL / Address bar", ["Alt+G"]),
+    sc!("close_tab", G_TABS, "Close focused tab", ["Alt+W"]),
+    sc!("reload", G_TABS, "Reload active tab", ["Alt+R"]),
     sc!("full_tab", G_TABS, "Toggle Full Tab View", ["Alt+F"]),
     sc!("split_v", G_TABS, "Split column vertically", ["Alt+N"]),
     sc!("focus_left", G_TABS, "Focus column Left", ["Alt+H"]),
@@ -1953,11 +2012,14 @@ const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("mv_3", G_TABS, "Move tab to workspace 3", ["Alt+Shift+3"]),
     sc!("mv_4", G_TABS, "Move tab to workspace 4", ["Alt+Shift+4"]),
     sc!("mv_5", G_TABS, "Move tab to workspace 5", ["Alt+Shift+5"]),
-    sc!("settings", G_PANELS, "Toggle Settings panel", ["Alt+Shift+S"]),
-    sc!("settings_profiles", G_PANELS, "Open Settings > Profiles", ["Alt+Shift+P"]),
+    sc!("mv_6", G_TABS, "Move tab to workspace 6", ["Alt+Shift+6"]),
+    sc!("mv_7", G_TABS, "Move tab to workspace 7", ["Alt+Shift+7"]),
+    sc!("mv_8", G_TABS, "Move tab to workspace 8", ["Alt+Shift+8"]),
+    sc!("mv_9", G_TABS, "Move tab to workspace 9", ["Alt+Shift+9"]),
+    sc!("settings", G_PANELS, "Toggle Settings panel", ["Alt+S"]),
     sc!("profiles", G_PANELS, "Profiles / profile switcher", ["Alt+P"]),
     sc!("data", G_PANELS, "Data & Backup", ["Alt+I"]),
-    sc!("devtools", G_PANELS, "Toggle DevTools", ["F12", "Ctrl+Shift+I"]),
+    sc!("devtools", G_PANELS, "Toggle DevTools", ["F12"]),
     sc!("devtools_dock", G_PANELS, "Cycle DevTools dock position", ["Alt+Shift+D"]),
     sc!("map", G_PANELS, "Toggle Roadmap / Minimap", ["Alt+M"]),
     sc!("overview", G_PANELS, "Toggle Spatial Overview", ["Alt+O"]),
@@ -2255,10 +2317,10 @@ fn sc_resolve(combo: &str) -> ScResolve {
     SHORTCUTS.with(|c| {
         let cfg = c.borrow();
         for def in SHORTCUT_DEFS {
-            if !sc_enabled(&cfg, def.id) {
-                continue;
-            }
             if sc_effective(def, &cfg).iter().any(|x| x == combo) {
+                if !sc_enabled(&cfg, def.id) {
+                    return ScResolve::Disabled;
+                }
                 return ScResolve::Action(def.defaults[0].to_string());
             }
         }
@@ -2271,16 +2333,11 @@ fn sc_resolve(combo: &str) -> ScResolve {
     })
 }
 
-/// Rail first (capture phase) or the page first (bubble phase).
+/// Rail intercepts keys in capture phase, respecting each shortcut's priority (Rail vs Website).
 fn apply_shortcut_priority() {
-    let site_wins = SHORTCUTS.with(|c| c.borrow().site_wins);
     KEY_CTL.with(|k| {
         if let Some(ctl) = k.borrow().as_ref() {
-            ctl.set_propagation_phase(if site_wins {
-                gtk::PropagationPhase::Bubble
-            } else {
-                gtk::PropagationPhase::Capture
-            });
+            ctl.set_propagation_phase(gtk::PropagationPhase::Capture);
         }
     });
 }
@@ -2290,6 +2347,8 @@ struct ScUi {
     rows: gtk::Box,
     pending: Rc<RefCell<ShortcutConfig>>,
     status: gtk::Label,
+    prio: gtk::CheckButton,
+    is_syncing: Rc<Cell<bool>>,
 }
 
 const SC_MODS: &[&str] = &["Alt", "Ctrl", "Alt+Shift", "Ctrl+Shift", "None"];
@@ -2489,90 +2548,80 @@ fn sc_build(ui: &ScUi) {
             let sw = gtk::Switch::new();
             sw.set_active(enabled);
             sw.set_valign(gtk::Align::Center);
-            sw.set_tooltip_text(Some(tr("Turn this shortcut on or off")));
+            sw.set_tooltip_text(Some(tr("Rail shortcuts win over website shortcuts")));
             let ui2 = ui.clone();
             sw.connect_active_notify(move |s| {
+                if ui2.is_syncing.get() {
+                    return;
+                }
+                let is_on = s.is_active();
                 {
                     let mut c = ui2.pending.borrow_mut();
-                    if s.is_active() {
+                    if is_on {
                         c.disabled.remove(def.id);
                     } else {
                         c.disabled.insert(def.id.to_string());
                     }
                 }
+                let all_on = {
+                    let c = ui2.pending.borrow();
+                    SHORTCUT_DEFS.iter().all(|d| sc_enabled(&c, d.id))
+                };
+                ui2.pending.borrow_mut().site_wins = !all_on;
+
+                ui2.is_syncing.set(true);
+                ui2.prio.set_active(all_on);
+                ui2.is_syncing.set(false);
+
                 sc_commit(&ui2);
                 sc_refresh(&ui2);
             });
             row.append(&sw);
         }
 
-        let slots = gtk::Box::new(gtk::Orientation::Vertical, 4);
-        slots.set_sensitive(enabled);
+        let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        line.set_sensitive(enabled);
+        line.set_valign(gtk::Align::Center);
         let eff = sc_effective(def, &cfg);
-        let count = eff.len().max(1);
-        for slot in 0..count {
-            let combo = eff.get(slot).cloned().unwrap_or_default();
-            let (mod_idx, key) = if combo.is_empty() {
-                (0u32, String::new())
-            } else {
-                sc_split(&combo)
-            };
-            let sel = Rc::new(Cell::new(mod_idx));
-            let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let combo = eff.first().cloned().unwrap_or_default();
+        let (mod_idx, key) = if combo.is_empty() {
+            (0u32, String::new())
+        } else {
+            sc_split(&combo)
+        };
+        let sel = Rc::new(Cell::new(mod_idx));
 
-            let dd = gtk::DropDown::from_strings(SC_MODS);
-            dd.set_selected(mod_idx);
-            {
-                let ui3 = ui.clone();
-                let sel = sel.clone();
-                let key = key.clone();
-                dd.connect_selected_notify(move |d| {
-                    sel.set(d.selected());
-                    let is_f = key.len() >= 2 && key.starts_with('F') && key[1..].chars().all(|c| c.is_ascii_digit());
-                    if sel.get() == 4 && !is_f {
-                        ui3.status.set_text(tr("No modifier: tap the key button and pick F1-F12"));
-                    } else if !key.is_empty() {
-                        sc_apply_slot(&ui3, def, slot, sc_join(sel.get(), &key));
-                    }
-                });
-            }
-            line.append(&dd);
-
-            let kb = gtk::MenuButton::new();
-            kb.set_label(&sc_key_label(&key));
-            kb.set_size_request(80, -1);
-            {
-                let ui4 = ui.clone();
-                let sel = sel.clone();
-                let pop = sc_build_picker(sel.clone(), Rc::new(move |v: String| {
-                    sc_apply_slot(&ui4, def, slot, sc_join(sel.get(), &v));
-                }));
-                kb.set_popover(Some(&pop));
-            }
-            line.append(&kb);
-
-            if eff.len() > 1 {
-                let rm = gtk::Button::from_icon_name("window-close-symbolic");
-                rm.add_css_class("flat");
-                rm.set_tooltip_text(Some(tr("Remove this key")));
-                let ui5 = ui.clone();
-                rm.connect_clicked(move |_| {
-                    {
-                        let mut c = ui5.pending.borrow_mut();
-                        let mut list = sc_effective(def, &c);
-                        if slot < list.len() && list.len() > 1 {
-                            list.remove(slot);
-                            c.overrides.insert(def.id.to_string(), list);
-                        }
-                    }
-                    sc_commit(&ui5);
-                    sc_refresh(&ui5);
-                });
-                line.append(&rm);
-            }
-            slots.append(&line);
+        let dd = gtk::DropDown::from_strings(SC_MODS);
+        dd.set_selected(mod_idx);
+        {
+            let ui3 = ui.clone();
+            let sel = sel.clone();
+            let key = key.clone();
+            dd.connect_selected_notify(move |d| {
+                sel.set(d.selected());
+                let is_f = key.len() >= 2 && key.starts_with('F') && key[1..].chars().all(|c| c.is_ascii_digit());
+                if sel.get() == 4 && !is_f {
+                    ui3.status.set_text(tr("No modifier: tap the key button and pick F1-F12"));
+                } else if !key.is_empty() {
+                    sc_apply_slot(&ui3, def, 0, sc_join(sel.get(), &key));
+                }
+            });
         }
-        row.append(&slots);
+        line.append(&dd);
+
+        let kb = gtk::MenuButton::new();
+        kb.set_label(&sc_key_label(&key));
+        kb.set_size_request(80, -1);
+        {
+            let ui4 = ui.clone();
+            let sel = sel.clone();
+            let pop = sc_build_picker(sel.clone(), Rc::new(move |v: String| {
+                sc_apply_slot(&ui4, def, 0, sc_join(sel.get(), &v));
+            }));
+            kb.set_popover(Some(&pop));
+        }
+        line.append(&kb);
+        row.append(&line);
 
         if cfg.overrides.contains_key(def.id) || cfg.disabled.contains(def.id) {
             let reset = gtk::Button::from_icon_name("edit-undo-symbolic");
@@ -5455,6 +5504,10 @@ impl App {
 
     fn execute_export_action(self: &Rc<Self>) {
         self.save_session_immediate();
+        let mut s = load_app_settings();
+        s.search_engine = self.search_engine.borrow().clone();
+        s.touchpad_mode = self.touchpad_mode.get();
+        save_app_settings(&s);
         let path_str = self.data_export_entry.text().to_string();
         let path = PathBuf::from(path_str.trim());
         if path.as_os_str().is_empty() {
@@ -5491,6 +5544,12 @@ impl App {
 
         match import_data(&path) {
             Ok(()) => {
+                // Reload settings from imported settings.json
+                let imported_settings = load_app_settings();
+                *self.search_engine.borrow_mut() = imported_settings.search_engine.clone();
+                self.touchpad_mode.set(imported_settings.touchpad_mode);
+                self.tp_switch.set_active(imported_settings.touchpad_mode);
+
                 // Reload profile manager from imported profiles.txt
                 reload_customize_from_disk();
                 self.reload_css_editor();
@@ -6312,7 +6371,7 @@ impl App {
                 self.hide_settings_modal();
                 return true;
             }
-            if alt && shift && !ctrl && (k == gdk::Key::s || k == gdk::Key::S || keycode == 39) {
+            if alt && !ctrl && (k == gdk::Key::s || k == gdk::Key::S || keycode == 39) {
                 self.hide_settings_modal();
                 return true;
             }
@@ -6393,6 +6452,41 @@ impl App {
             return true;
         }
 
+        // Standard universal browser shortcuts (Ctrl+R, Ctrl+T, Ctrl+W, Ctrl+L, F5)
+        if ctrl && !shift && !alt {
+            match k {
+                gdk::Key::r | gdk::Key::R => {
+                    if let Some(v) = self.focused_view() {
+                        v.reload();
+                    }
+                    return true;
+                }
+                gdk::Key::t | gdk::Key::T => {
+                    self.open_new_tab_palette();
+                    return true;
+                }
+                gdk::Key::w | gdk::Key::W => {
+                    if !self.palette_open() {
+                        if let Some(v) = self.focused_view() {
+                            self.close_view(&v);
+                        }
+                    }
+                    return true;
+                }
+                gdk::Key::l | gdk::Key::L => {
+                    self.show_palette();
+                    return true;
+                }
+                _ => {}
+            }
+        }
+        if !ctrl && !shift && !alt && (k == gdk::Key::F5 || keycode == 71) {
+            if let Some(v) = self.focused_view() {
+                v.reload();
+            }
+            return true;
+        }
+
         if ctrl && shift && !alt {
             match k {
                 gdk::Key::t | gdk::Key::T => {
@@ -6461,8 +6555,16 @@ impl App {
                         v.reload();
                     }
                 }
+                gdk::Key::s | gdk::Key::S => {
+                    self.toggle_settings_modal();
+                    return true;
+                }
                 gdk::Key::q => self.win.close(),
                 _ => {
+                    if keycode == 39 {
+                        self.toggle_settings_modal();
+                        return true;
+                    }
                     if keycode == 28 {
                         self.open_new_tab_palette();
                         return true;
@@ -6520,10 +6622,6 @@ impl App {
                     self.toggle_settings_modal();
                     return true;
                 }
-                gdk::Key::p | gdk::Key::P => {
-                    self.open_settings_tab(SettingsTab::Profiles);
-                    return true;
-                }
                 gdk::Key::i | gdk::Key::I => self.toggle_devtools(),
                 gdk::Key::d | gdk::Key::D => {
                     self.cycle_devtools_dock();
@@ -6579,6 +6677,26 @@ impl App {
                     // Alt+Shift+5 -> move to workspace/row 5
                     if keycode == 14 || keycode == 91 || k == gdk::Key::_5 || k == gdk::Key::KP_5 || key.to_unicode() == Some('5') {
                         self.move_tab_to_row(4);
+                        return true;
+                    }
+                    // Alt+Shift+6 -> move to workspace/row 6
+                    if keycode == 15 || keycode == 92 || k == gdk::Key::_6 || k == gdk::Key::asciicircum || k == gdk::Key::KP_6 || key.to_unicode() == Some('6') || key.to_unicode() == Some('^') {
+                        self.move_tab_to_row(5);
+                        return true;
+                    }
+                    // Alt+Shift+7 -> move to workspace/row 7
+                    if keycode == 16 || keycode == 93 || k == gdk::Key::_7 || k == gdk::Key::ampersand || k == gdk::Key::KP_7 || key.to_unicode() == Some('7') || key.to_unicode() == Some('&') {
+                        self.move_tab_to_row(6);
+                        return true;
+                    }
+                    // Alt+Shift+8 -> move to workspace/row 8
+                    if keycode == 17 || keycode == 94 || k == gdk::Key::_8 || k == gdk::Key::asterisk || k == gdk::Key::KP_8 || key.to_unicode() == Some('8') || key.to_unicode() == Some('*') {
+                        self.move_tab_to_row(7);
+                        return true;
+                    }
+                    // Alt+Shift+9 -> move to workspace/row 9
+                    if keycode == 18 || keycode == 95 || k == gdk::Key::_9 || k == gdk::Key::parenleft || k == gdk::Key::KP_9 || key.to_unicode() == Some('9') || key.to_unicode() == Some('(') {
+                        self.move_tab_to_row(8);
                         return true;
                     }
                     return false;
@@ -6849,6 +6967,9 @@ fn build(gapp: &gtk::Application) {
     engine_card.append(&engine_title);
     engine_card.append(&engine_desc);
 
+    let initial_settings = load_app_settings();
+    let initial_engine = initial_settings.search_engine.clone();
+
     let engines_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     let engine_choices = [
         ("google", "Google"),
@@ -6861,7 +6982,7 @@ fn build(gapp: &gtk::Application) {
     for (id, label) in engine_choices {
         let btn = gtk::Button::with_label(label);
         btn.add_css_class("settings-option-item");
-        if id == "google" {
+        if id == initial_engine {
             btn.add_css_class("active");
         }
         engines_row.append(&btn);
@@ -7063,19 +7184,36 @@ fn build(gapp: &gtk::Application) {
     sc_reset_all.set_halign(gtk::Align::Start);
     sc_page.append(&sc_reset_all);
 
+    let is_syncing = Rc::new(Cell::new(false));
     let sc_ui = ScUi {
         rows: sc_rows.clone(),
         pending: sc_pending.clone(),
         status: sc_status.clone(),
+        prio: sc_prio.clone(),
+        is_syncing: is_syncing.clone(),
     };
     {
         let ui = sc_ui.clone();
         sc_prio.connect_toggled(move |c| {
-            let want_site = !c.is_active();
-            if ui.pending.borrow().site_wins != want_site {
-                ui.pending.borrow_mut().site_wins = want_site;
-                sc_commit(&ui);
+            if ui.is_syncing.get() {
+                return;
             }
+            let rail_wins = c.is_active();
+            {
+                let mut p = ui.pending.borrow_mut();
+                p.site_wins = !rail_wins;
+                if rail_wins {
+                    p.disabled.clear();
+                } else {
+                    for def in SHORTCUT_DEFS {
+                        if def.id != SC_LOCKED {
+                            p.disabled.insert(def.id.to_string());
+                        }
+                    }
+                }
+            }
+            sc_commit(&ui);
+            sc_refresh(&ui);
         });
     }
     {
@@ -7083,8 +7221,13 @@ fn build(gapp: &gtk::Application) {
         let prio = sc_prio.clone();
         sc_page.connect_map(move |_| {
             *ui.pending.borrow_mut() = SHORTCUTS.with(|c| c.borrow().clone());
-            let site_wins = ui.pending.borrow().site_wins;
-            prio.set_active(!site_wins);
+            let all_on = {
+                let c = ui.pending.borrow();
+                !c.site_wins && SHORTCUT_DEFS.iter().all(|d| sc_enabled(&c, d.id))
+            };
+            ui.is_syncing.set(true);
+            prio.set_active(all_on);
+            ui.is_syncing.set(false);
             ui.status.set_text("");
             sc_build(&ui);
         });
@@ -7096,7 +7239,11 @@ fn build(gapp: &gtk::Application) {
                 let mut c = ui.pending.borrow_mut();
                 c.overrides.clear();
                 c.disabled.clear();
+                c.site_wins = false;
             }
+            ui.is_syncing.set(true);
+            ui.prio.set_active(true);
+            ui.is_syncing.set(false);
             sc_commit(&ui);
             ui.status.set_text(tr("All shortcuts are back to their defaults."));
             sc_build(&ui);
@@ -7907,9 +8054,11 @@ fn build(gapp: &gtk::Application) {
         settings_tab_buttons: RefCell::new(tab_buttons_vec.clone()),
         current_settings_tab: Cell::new(SettingsTab::General),
         css_buffer: css_buffer.clone(),
-        search_engine: RefCell::new("google".to_string()),
+        search_engine: RefCell::new(initial_settings.search_engine.clone()),
     });
 
+    app.touchpad_mode.set(initial_settings.touchpad_mode);
+    tp_switch.set_active(initial_settings.touchpad_mode);
     app.select_palette_profile(&initial_prof_id);
 
     let a_close = app.clone();
