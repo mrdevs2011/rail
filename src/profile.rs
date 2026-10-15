@@ -200,12 +200,8 @@ impl ProfileManager {
             name: clean_name.to_string(),
             color_idx: color_idx % PROFILE_COLORS.len(),
         };
-        // Insert right after active profile if found, otherwise at the end
-        if let Some(pos) = self.profiles.iter().position(|pr| pr.id == self.active_id) {
-            self.profiles.insert(pos + 1, p.clone());
-        } else {
-            self.profiles.push(p.clone());
-        }
+        // Always append newly created profile to the very bottom
+        self.profiles.push(p.clone());
         self.save();
         Ok(p)
     }
@@ -494,26 +490,25 @@ mod tests {
     }
 
     #[test]
-    fn test_create_profile_inserted_after_active() {
-        let temp_dir = std::env::temp_dir().join(format!("rail_prof_ins_after_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+    fn test_create_profile_appends_to_bottom() {
+        let temp_dir = std::env::temp_dir().join(format!("rail_prof_appends_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
         let _ = fs::create_dir_all(&temp_dir);
 
         let mut mgr = ProfileManager::new(temp_dir.clone());
         let _ = mgr.create_profile("Profile A", 1).expect("create");
-        mgr.set_active("profilea");
         let _ = mgr.create_profile("Profile B", 2).expect("create");
         mgr.set_active("profilea");
 
-        let p_new = mgr.create_profile("Profile After A", 3).expect("create");
-        assert_eq!(p_new.id, "profileaftera");
+        let p_new = mgr.create_profile("Profile C", 3).expect("create");
+        assert_eq!(p_new.id, "profilec");
 
         let ids: Vec<&str> = mgr.profiles().iter().map(|p| p.id.as_str()).collect();
-        assert_eq!(ids, vec!["default", "profilea", "profileaftera", "profileb"]);
+        assert_eq!(ids, vec!["default", "profilea", "profileb", "profilec"]);
 
         // Test reorder
-        mgr.reorder_profile(2, 0);
+        mgr.reorder_profile(3, 1);
         let ids_reordered: Vec<&str> = mgr.profiles().iter().map(|p| p.id.as_str()).collect();
-        assert_eq!(ids_reordered, vec!["profileaftera", "default", "profilea", "profileb"]);
+        assert_eq!(ids_reordered, vec!["default", "profilec", "profilea", "profileb"]);
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
