@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 gtk4 = { version = "0.11.5", features = ["v4_12"] }
+sha2 = { version = "0.11.1", default-features = false }
 webkit6 = "0.6.1"
 
 [profile.release]

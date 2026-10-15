@@ -9,6 +9,7 @@ use std::cell::Cell;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::rc::Rc;
+use sha2::{Sha256, Digest};
 
 const REPO: &str = "mrdevs2011/rail";
 /// Asset name for the current OS and architecture.
@@ -182,9 +183,22 @@ pub fn download_and_install(url: &str) -> Result<(), String> {
         let _ = std::fs::remove_file(&tmp);
         return Err(tr("Downloaded file looks wrong.").to_string());
     }
-    // SHA256 verification: currently relies on running the binary with --version
-    // (see below). Full SHA256SUMS check can be added when the release includes it.
-    // Temporary file is renamed only after successful verification.
+    // Compute SHA256 of the downloaded file
+    let sha256_hex = {
+        use std::io::Read;
+        let mut file = std::fs::File::open(&tmp).map_err(|e| e.to_string())?;
+        let mut hasher = Sha256::new();
+        let mut buf = [0u8; 8192];
+        loop {
+            let n = file.read(&mut buf).map_err(|e| e.to_string())?;
+            if n == 0 { break; }
+            hasher.update(&buf[..n]);
+        }
+        hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect::<String>()
+    };
+    // TODO: compare against SHA256SUMS from the release when available.
+    // For now we continue with the binary --version check below.
+    let _ = sha256_hex; // used in future verification
     let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755));
     let ok = Command::new(&tmp)
         .arg("--version")

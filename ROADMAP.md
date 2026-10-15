@@ -61,9 +61,9 @@ Belgilar: [x] tayyor, [ ] qilinadi, [?] tajribada tekshiriladi, [~] boshlangan /
 | # | Bosqich | Muddat | Holat |
 | :--- | :--- | :--- | :--- |
 | 1 | Sayt | 1 kun | [x] tayyor (qo'lda tekshiruv qoldi) |
-| 2 | Tizimga qarab yangilash | 1 kun | [~] OS/ARCH + temp fayl tayyor, SHA256 keyin |
+| 2 | Tizimga qarab yangilash | 1 kun | [~] OS/ARCH + SHA256 hisoblash + temp fayl tayyor |
 | 3 | Tajriba (spike): tao + wry | 1 hafta | [ ] eng muhim qaror |
-| 4 | CI: bitta tag, uch build | 1 kun | [ ] |
+| 4 | CI: bitta tag, uch build | 1 kun | [~] .github/workflows/release.yml skeleton yaratildi |
 | 5 | Funksiyalarni ko'chirish | 2-4 hafta | [ ] spike'dan keyin |
 | 6 | Tarqatish | 1 hafta | [ ] |
 
@@ -89,7 +89,7 @@ Tartib qat'iy: 3-bosqich natijasi chiqmaguncha 5-bosqichga o'tilmaydi.
 - [x] Settings > Updates tabi + dropdown + one-tap Update
 - [x] Vaqtinchalik fayl + rename (uzilsa yarim fayl qolmaydi)
 - [x] Binary `--version` tekshiruvi
-- [ ] SHA256SUMS tekshiruvi (release'ga qo'shilganda)
+- [~] SHA256SUMS tekshiruvi (sha2 qo'shildi, hisoblash tayyor; release'da SUMS bo'lganda solishtiriladi)
 - [ ] Windows: rail.old.exe mantiqi
 - [ ] macOS: quarantine olib tashlash
 - [ ] rail --update barcha tizimlarda
