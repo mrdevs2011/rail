@@ -38,6 +38,32 @@ impl Profile {
             .map(|c| c.to_uppercase().to_string())
             .unwrap_or_else(|| "P".into())
     }
+
+    pub fn text_color(&self) -> &'static str {
+        profile_text_color_for_bg(self.hex_color())
+    }
+}
+
+pub fn profile_text_color_for_bg(hex: &str) -> &'static str {
+    let clean = hex.trim_start_matches('#');
+    if clean.len() == 6 {
+        if let (Ok(r), Ok(g), Ok(b)) = (
+            u8::from_str_radix(&clean[0..2], 16),
+            u8::from_str_radix(&clean[2..4], 16),
+            u8::from_str_radix(&clean[4..6], 16),
+        ) {
+            let lum = 0.299 * (r as f64) + 0.587 * (g as f64) + 0.114 * (b as f64);
+            if lum > 140.0 {
+                "#050811" // Light background -> solid pure deep black
+            } else {
+                "#ffffff" // Dark background -> solid crisp white
+            }
+        } else {
+            "#050811"
+        }
+    } else {
+        "#050811"
+    }
 }
 
 pub struct ProfileManager {

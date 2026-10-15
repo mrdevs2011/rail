@@ -2151,7 +2151,6 @@ impl App {
         settings.set_enable_dns_prefetching(false);
         settings.set_enable_smooth_scrolling(true);
         settings.set_enable_webgl(true);
-        settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
         settings.set_enable_developer_extras(true);
         settings.set_enable_back_forward_navigation_gestures(true);
 
@@ -2178,7 +2177,7 @@ impl App {
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
-        view.load_html(START_PAGE, None);
+        view.load_html(START_PAGE, Some("rail://start/"));
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view, prof_id.clone(), false);
         self.select_palette_profile(&prof_id);
@@ -2190,20 +2189,24 @@ impl App {
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
-        view.load_html(START_PAGE, None);
+        view.load_html(START_PAGE, Some("rail://start/"));
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view, prof_id.clone(), true);
         self.select_palette_profile(&prof_id);
         self.show_palette();
     }
 
-    fn new_tab_with_url(self: &Rc<Self>, url: &str) {
+    fn new_tab_with_url_and_profile(self: &Rc<Self>, url: &str, profile_id: &str) {
         self.exit_overview();
-        let prof_id = self.profiles.borrow().active_id().to_string();
-        let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-        let view = Self::create_web_view(&session, &prof_id);
+        let session = self.profiles.borrow_mut().get_or_create_session(profile_id);
+        let view = Self::create_web_view(&session, profile_id);
         view.load_uri(url);
-        self.add_view(view, prof_id, false);
+        self.add_view(view, profile_id.to_string(), false);
+    }
+
+    fn new_tab_with_url(self: &Rc<Self>, url: &str) {
+        let prof_id = self.profiles.borrow().active_id().to_string();
+        self.new_tab_with_url_and_profile(url, &prof_id);
     }
 
     fn split_with_url(self: &Rc<Self>, url: &str) {
@@ -2919,6 +2922,7 @@ impl App {
         let h = resize_handle.clone();
         let start_w0 = Rc::new(Cell::new(0.0f64));
         let start_w1 = Rc::new(Cell::new(Option::<f64>::None));
+        let start_root_x = Rc::new(Cell::new(0.0f64));
 
         drag.connect_drag_begin({
             let app = app.clone();
@@ -2926,8 +2930,14 @@ impl App {
             let h = h.clone();
             let start_w0 = start_w0.clone();
             let start_w1 = start_w1.clone();
-            move |_gesture, _start_x, _start_y| {
+            let start_root_x = start_root_x.clone();
+            move |gesture, _start_x, _start_y| {
                 h.add_css_class("active");
+                if let Some(ev) = gesture.current_event() {
+                    if let Some((rx, _)) = ev.position() {
+                        start_root_x.set(rx);
+                    }
+                }
                 if let Some((r, c)) = app.find_view_coords(&v) {
                     let vw = app.strip.width() as f64;
                     let rows = app.rows.borrow();
@@ -2955,13 +2965,24 @@ impl App {
             let v = v.clone();
             let start_w0 = start_w0.clone();
             let start_w1 = start_w1.clone();
-            move |_gesture, offset_x, _offset_y| {
+            let start_root_x = start_root_x.clone();
+            move |gesture, offset_x, _offset_y| {
+                let dx = if let Some(ev) = gesture.current_event() {
+                    if let Some((rx, _)) = ev.position() {
+                        rx - start_root_x.get()
+                    } else {
+                        offset_x
+                    }
+                } else {
+                    offset_x
+                };
+
                 if let Some((r, c)) = app.find_view_coords(&v) {
                     let vw = app.strip.width() as f64;
                     let min_w = 280.0;
                     let max_w = vw; // Fullscreen max: left edge to right edge
                     let initial0 = start_w0.get();
-                    let new_w0 = (initial0 + offset_x).clamp(min_w, max_w);
+                    let new_w0 = (initial0 + dx).clamp(min_w, max_w);
 
                     if let Some(initial1) = start_w1.get() {
                         let total_pair = initial0 + initial1;
@@ -3297,7 +3318,7 @@ impl App {
             let prof_id = self.profiles.borrow().active_profile().id;
             let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
             let view = Self::create_web_view(&session, &prof_id);
-            view.load_html(START_PAGE, None);
+            view.load_html(START_PAGE, Some("rail://start/"));
             view.set_can_target(!self.ov.get());
             let (container, resize_handle) = Self::create_tab_widget(&view);
             self.setup_tab_signals(&container, &view, &resize_handle);
@@ -3344,7 +3365,7 @@ impl App {
             let prof_id = self.profiles.borrow().active_profile().id;
             let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
             let view = Self::create_web_view(&session, &prof_id);
-            view.load_html(START_PAGE, None);
+            view.load_html(START_PAGE, Some("rail://start/"));
             view.set_can_target(!self.ov.get());
             let (container, resize_handle) = Self::create_tab_widget(&view);
             self.setup_tab_signals(&container, &view, &resize_handle);
@@ -3507,7 +3528,7 @@ impl App {
             let session = self.profiles.borrow_mut().get_or_create_session(&item.profile_id);
             let view = Self::create_web_view(&session, &item.profile_id);
             if item.url.is_empty() || item.url.starts_with("about:") {
-                view.load_html(START_PAGE, None);
+                view.load_html(START_PAGE, Some("rail://start/"));
             } else {
                 view.load_uri(&item.url);
             }
@@ -4012,9 +4033,12 @@ impl App {
             let app = self.clone();
             let pid = p.id.clone();
             row_btn.connect_clicked(move |_| {
-                app.profiles.borrow_mut().set_active(&pid);
+                let is_new = app.palette_for_new_tab.get();
                 app.select_palette_profile(&pid);
-                app.switch_focused_tab_profile(&pid);
+                if !is_new {
+                    app.profiles.borrow_mut().set_active(&pid);
+                    app.switch_focused_tab_profile(&pid);
+                }
                 app.rebuild_profile_popover();
                 app.profile_popover.popdown();
                 app.entry.grab_focus();
@@ -4356,12 +4380,12 @@ impl App {
 
         if let Some(uri) = current_uri {
             if uri.starts_with("about:") || uri.is_empty() {
-                new_view.load_html(START_PAGE, None);
+                new_view.load_html(START_PAGE, Some("rail://start/"));
             } else {
                 new_view.load_uri(&uri);
             }
         } else {
-            new_view.load_html(START_PAGE, None);
+            new_view.load_html(START_PAGE, Some("rail://start/"));
         }
 
         self.refresh_sidebar();
@@ -4375,12 +4399,12 @@ impl App {
 
         if !text.trim().is_empty() {
             let target_profile_id = self.selected_palette_profile.borrow().clone();
-            self.profiles.borrow_mut().set_active(&target_profile_id);
             let uri = to_uri(text, &self.search_engine.borrow());
             self.history.borrow_mut().record_visit(&uri, "");
 
             if is_new_tab {
-                self.new_tab_with_url(&uri);
+                self.profiles.borrow_mut().set_active(&target_profile_id);
+                self.new_tab_with_url_and_profile(&uri, &target_profile_id);
             } else {
                 let cur_r = self.focus_row.get();
                 let cur_c = self.focus_col.get();
@@ -4394,6 +4418,7 @@ impl App {
                 };
 
                 if needs_view_recreation {
+                    self.profiles.borrow_mut().set_active(&target_profile_id);
                     self.switch_focused_tab_profile(&target_profile_id);
                 }
 
@@ -7593,5 +7618,38 @@ mod tests {
         assert_eq!(cycle(DevToolsDockSide::Right), DevToolsDockSide::Left);
         assert_eq!(cycle(DevToolsDockSide::Left), DevToolsDockSide::Undocked);
         assert_eq!(cycle(DevToolsDockSide::Undocked), DevToolsDockSide::Bottom);
+    }
+
+    #[test]
+    fn test_tab_width_pair_clamping() {
+        let min_w = 280.0;
+        let max_w = 1200.0;
+        let initial0 = 500.0;
+        let initial1 = 500.0;
+        let total_pair = initial0 + initial1;
+
+        let clamp_pair = |req_w0: f64| {
+            let clamped_w0 = req_w0.clamp(min_w, (total_pair - min_w).min(max_w));
+            let new_w1 = (total_pair - clamped_w0).max(min_w);
+            (clamped_w0, new_w1)
+        };
+
+        // Test normal resize
+        let (w0, w1) = clamp_pair(600.0);
+        assert_eq!(w0, 600.0);
+        assert_eq!(w1, 400.0);
+        assert_eq!(w0 + w1, 1000.0);
+
+        // Test below min_w constraint
+        let (w0, w1) = clamp_pair(100.0);
+        assert_eq!(w0, 280.0);
+        assert_eq!(w1, 720.0);
+        assert_eq!(w0 + w1, 1000.0);
+
+        // Test above maximum allowed by neighbour's min_w
+        let (w0, w1) = clamp_pair(950.0);
+        assert_eq!(w0, 720.0);
+        assert_eq!(w1, 280.0);
+        assert_eq!(w0 + w1, 1000.0);
     }
 }
