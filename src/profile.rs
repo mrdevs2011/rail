@@ -538,4 +538,25 @@ mod tests {
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
+
+    #[test]
+    fn test_profile_contrast_color() {
+        // Bright colors (cyan, yellow, green, teal, etc.) must yield high contrast dark text (#050811)
+        assert_eq!(profile_text_color_for_bg("#38bdf8"), "#050811");
+        assert_eq!(profile_text_color_for_bg("#facc15"), "#050811");
+        assert_eq!(profile_text_color_for_bg("#4ade80"), "#050811");
+        assert_eq!(profile_text_color_for_bg("#ffffff"), "#050811");
+
+        // Dark backgrounds (black, deep navy, etc.) must yield crisp white text (#ffffff)
+        assert_eq!(profile_text_color_for_bg("#000000"), "#ffffff");
+        assert_eq!(profile_text_color_for_bg("#090b10"), "#ffffff");
+        assert_eq!(profile_text_color_for_bg("#1e293b"), "#ffffff");
+
+        let prof = Profile {
+            id: "work".into(),
+            name: "Work".into(),
+            color_idx: 0, // #38bdf8
+        };
+        assert_eq!(prof.text_color(), "#050811");
+    }
 }

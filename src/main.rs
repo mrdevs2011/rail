@@ -5833,8 +5833,15 @@ fn build(gapp: &gtk::Application) {
     profile_btn.add_css_class("profile-circle-btn");
     profile_btn.set_valign(gtk::Align::Center);
     profile_btn.set_halign(gtk::Align::End);
-    let profile_btn_lbl = gtk::Label::new(Some("D"));
+    let active_p = profile_mgr.active_profile();
+    let profile_btn_lbl = gtk::Label::new(None);
+    profile_btn_lbl.set_markup(&format!(
+        "<span foreground='{}' font_weight='800'>{}</span>",
+        active_p.text_color(),
+        glib::markup_escape_text(&active_p.initial_letter())
+    ));
     profile_btn_lbl.add_css_class("profile-circle-label");
+    profile_btn.add_css_class(&format!("prof-bg-{}", active_p.color_idx));
     profile_btn.set_child(Some(&profile_btn_lbl));
 
     let profile_popover = gtk::Popover::new();
@@ -6667,7 +6674,7 @@ fn build(gapp: &gtk::Application) {
         side_gen: Cell::new(0),
         fresh: RefCell::new(None),
         profiles: RefCell::new(profile_mgr),
-        selected_palette_profile: RefCell::new(initial_prof_id),
+        selected_palette_profile: RefCell::new(initial_prof_id.clone()),
         profile_btn: profile_btn.clone(),
         profile_btn_lbl: profile_btn_lbl.clone(),
         profile_popover: profile_popover.clone(),
@@ -6702,6 +6709,8 @@ fn build(gapp: &gtk::Application) {
         current_settings_tab: Cell::new(SettingsTab::General),
         search_engine: RefCell::new("google".to_string()),
     });
+
+    app.select_palette_profile(&initial_prof_id);
 
     let a_close = app.clone();
     map_close_btn.connect_clicked(move |_| a_close.hide_map());
