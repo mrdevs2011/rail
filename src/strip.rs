@@ -252,7 +252,7 @@ impl StripLayout {
 // fully closed, or mid-animation -- never a stuck half width.
 // ---------------------------------------------------------------------------
 
-pub const SIDE_W: i32 = 248;
+pub const SIDE_W: i32 = 260;
 
 mod shell_imp {
     use super::*;

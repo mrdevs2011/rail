@@ -346,33 +346,51 @@ label {
     color: #a1a1a1;
 }
 
-/* ---- modern sleek scrollbars ---- */
+/* ---- dev-style ultra-thin minimalist scrollbars ---- */
 scrollbar {
     background: transparent;
-    transition: all 200ms ease;
-}
-scrollbar.horizontal {
-    min-height: 8px;
+    border: none;
+    padding: 0;
+    margin: 0;
+    -GtkScrollbar-has-backward-stepper: 0;
+    -GtkScrollbar-has-forward-stepper: 0;
 }
 scrollbar.vertical {
-    min-width: 8px;
+    min-width: 3px;
+    width: 3px;
+    margin: 0;
+    padding: 0;
+}
+scrollbar.horizontal {
+    min-height: 3px;
+    height: 3px;
+    margin: 0;
+    padding: 0;
+}
+scrollbar trough {
+    background: transparent;
+    border: none;
+    margin: 0;
+    padding: 0;
 }
 scrollbar slider {
-    min-width: 6px;
+    min-width: 3px;
     min-height: 24px;
-    border-radius: 2px;
-    background: rgba(161, 161, 161, 0.25);
-    transition: background 150ms ease, min-width 150ms ease, min-height 150ms ease;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    margin: 0;
+    padding: 0;
+    transition: background 120ms ease, min-width 120ms ease, min-height 120ms ease;
 }
 scrollbar:hover slider,
 scrollbar.dragging slider {
-    background: rgba(255, 255, 255, 0.36);
+    background: rgba(255, 255, 255, 0.45);
+    min-width: 5px;
 }
-scrollbar.vertical:hover slider {
-    min-width: 8px;
-}
-scrollbar.horizontal:hover slider {
-    min-height: 8px;
+scrollbar.horizontal:hover slider,
+scrollbar.horizontal.dragging slider {
+    min-height: 5px;
 }
 
 /* ---- columns & tabs (Spatial 2D Strip) ---- */
@@ -432,7 +450,7 @@ scrollbar.horizontal:hover slider {
 .side-bar {
     background: #0a0a0a;
     border-right: 1px solid #121212;
-    padding-right: 4px;
+    padding-right: 2px;
 }
 .brand {
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
@@ -537,8 +555,8 @@ button.pill:hover .pill-chip {
     border-color: transparent;
 }
 .workspace-header {
-    padding: 6px 10px;
-    margin: 10px 4px 3px 4px;
+    padding: 6px 8px;
+    margin: 8px 2px 3px 2px;
     border-radius: 3px;
     background: #0c0c0c;
     border: 1px solid #141414;
@@ -593,8 +611,8 @@ button.pill:hover .pill-chip {
 }
 
 .tabrow {
-    padding: 6px 10px 6px 14px;
-    margin: 2px 4px;
+    padding: 6px 6px 6px 10px;
+    margin: 2px 2px;
     border-radius: 3px;
     border: 1px solid transparent;
     transition: all 120ms ease;
@@ -682,8 +700,8 @@ button.pill:hover .pill-chip {
     opacity: 0.7;
 }
 .btn-new-workspace {
-    margin: 12px 6px 6px 6px;
-    padding: 7px 12px;
+    margin: 10px 2px 6px 2px;
+    padding: 7px 8px;
     background: #0c0c0c;
     border: 1px dashed #1d1d1d;
     border-radius: 3px;
@@ -4530,8 +4548,9 @@ impl App {
 
         for (ri, row) in rows.iter().enumerate() {
             // Workspace Header
-            let ws_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            let ws_box = gtk::Box::new(gtk::Orientation::Horizontal, 4);
             ws_box.add_css_class("workspace-header");
+            ws_box.set_overflow(gtk::Overflow::Hidden);
             if ri == cur_r {
                 ws_box.add_css_class("active-workspace");
             }
@@ -4540,6 +4559,8 @@ impl App {
             ws_title.add_css_class("workspace-title");
             ws_title.set_xalign(0.0);
             ws_title.set_hexpand(true);
+            ws_title.set_width_chars(1);
+            ws_title.set_ellipsize(gtk::pango::EllipsizeMode::End);
             ws_box.append(&ws_title);
 
             if ri == cur_r {
@@ -4555,6 +4576,8 @@ impl App {
             };
             let count_lbl = gtk::Label::new(Some(&count_text));
             count_lbl.add_css_class("workspace-tab-count");
+            count_lbl.set_width_chars(1);
+            count_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
             ws_box.append(&count_lbl);
 
             let add_btn = gtk::Button::from_icon_name("list-add-symbolic");
@@ -4580,13 +4603,15 @@ impl App {
             for (ci, t) in row.tabs.iter().enumerate() {
                 let item = gtk::Box::new(gtk::Orientation::Horizontal, 4);
                 item.add_css_class("tabrow");
+                item.set_overflow(gtk::Overflow::Hidden);
                 if ri == cur_r && ci == cur_c {
                     item.add_css_class("active-tab");
                 }
                 tab_items_registry.borrow_mut().push((ri, ci, item.clone()));
 
-                let content_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+                let content_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
                 content_box.set_hexpand(true);
+                content_box.set_overflow(gtk::Overflow::Hidden);
                 content_box.append(&Self::tab_icon(t, 16));
 
                 let mgr = self.profiles.borrow();
@@ -4766,6 +4791,8 @@ impl App {
                 close.add_css_class("tab-close");
                 close.set_valign(gtk::Align::Center);
                 close.set_cursor_from_name(Some("pointer"));
+                close.set_hexpand(false);
+                close.set_halign(gtk::Align::End);
                 let (app, v) = (self.clone(), t.view.clone());
                 close.connect_clicked(move |_| {
                     app.close_view(&v);
@@ -4780,14 +4807,15 @@ impl App {
         drop(rows);
 
         // Bottom "+ New Workspace" button
-        let new_ws_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let new_ws_box = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         new_ws_box.add_css_class("btn-new-workspace");
         new_ws_box.set_halign(gtk::Align::Fill);
-        let new_ws_icon = gtk::Image::from_icon_name("list-add-symbolic");
+        new_ws_box.set_overflow(gtk::Overflow::Hidden);
         let new_ws_lbl = gtk::Label::new(Some(tr("+ New Workspace (Alt+Shift+V)")));
         new_ws_lbl.set_xalign(0.0);
         new_ws_lbl.set_hexpand(true);
-        new_ws_box.append(&new_ws_icon);
+        new_ws_lbl.set_width_chars(1);
+        new_ws_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
         new_ws_box.append(&new_ws_lbl);
         let app = self.clone();
         let new_ws_click = gtk::GestureClick::new();
@@ -6758,16 +6786,20 @@ fn build(gapp: &gtk::Application) {
     let list = gtk::ListBox::new();
     list.add_css_class("tablist");
     list.set_selection_mode(gtk::SelectionMode::None);
+    list.set_overflow(gtk::Overflow::Hidden);
     let list_scroll = gtk::ScrolledWindow::new();
     list_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
     list_scroll.set_vexpand(true);
+    list_scroll.set_overflow(gtk::Overflow::Hidden);
     list_scroll.set_child(Some(&list));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("side-bar");
+    side.set_size_request(SIDE_W, -1);
+    side.set_overflow(gtk::Overflow::Hidden);
     side.set_margin_top(10);
     side.set_margin_bottom(10);
-    side.set_margin_start(10);
+    side.set_margin_start(8);
     side.set_margin_end(2);
     side.append(&head);
     side.append(&pill);
@@ -9183,6 +9215,25 @@ mod tests {
         assert!(!sc_enabled(&cfg, "data"));
         assert!(!sc_enabled(&cfg, "ws_1"));
         assert!(sc_enabled(&cfg, SC_LOCKED)); // Settings remains accessible
+    }
+
+    #[test]
+    fn test_color_chooser() {
+        let _ = |r: webkit6::ColorChooserRequest, parent: &gtk::Window| {
+            let dialog = gtk::ColorDialog::new();
+            dialog.set_modal(true);
+            dialog.set_title("Select Color");
+            let initial = r.rgba();
+            let req = r.clone();
+            dialog.choose_rgba(Some(parent), Some(&initial), gio::Cancellable::NONE, move |res| {
+                if let Ok(rgba) = res {
+                    req.set_rgba(&rgba);
+                    req.finish();
+                } else {
+                    req.cancel();
+                }
+            });
+        };
     }
 }
 

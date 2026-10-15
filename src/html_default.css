@@ -180,3 +180,27 @@ optgroup { display: block; font-weight: bolder; }
 /* ===== progress and meter ===== */
 progress { display: inline-block; box-sizing: border-box; vertical-align: -0.2em; width: 10em; height: 1em; }
 meter { display: inline-block; box-sizing: border-box; vertical-align: -0.2em; width: 5em; height: 1em; }
+
+/* ===== dev-style ultra-thin scrollbars ===== */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(160, 160, 160, 0.25);
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.45);
+}
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(160, 160, 160, 0.25) transparent;
+}
+
