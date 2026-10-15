@@ -528,7 +528,7 @@ button.btn-add-tab {
     min-height: 28px;
     color: #a1a1a1;
     padding: 0;
-    transition: all 120ms ease;
+    transition: all 40ms ease;
 }
 button.btn-add-tab:hover {
     background: #161616;
@@ -1190,7 +1190,7 @@ button.btn-create-profile {
     border: 1px solid #1d1d1d;
     border-radius: 3px;
     padding: 7px 18px;
-    transition: all 120ms ease;
+    transition: all 30ms ease;
 }
 button.btn-create-profile label {
     color: #727272;
@@ -2068,6 +2068,7 @@ const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("reload", G_TABS, "Reload active tab", ["Alt+R"]),
     sc!("full_tab", G_TABS, "Toggle Full Tab View", ["Alt+F"]),
     sc!("split_v", G_TABS, "Split column vertically", ["Alt+N"]),
+    sc!("new_workspace", G_TABS, "New Workspace", ["Alt+Shift+V"]),
     sc!("focus_left", G_TABS, "Focus column Left", ["Alt+H"]),
     sc!("focus_right", G_TABS, "Focus column Right", ["Alt+L"]),
     sc!("focus_down", G_TABS, "Focus row Down", ["Alt+J"]),
@@ -3115,19 +3116,21 @@ impl App {
 
         let settings = webkit6::Settings::new();
         settings.set_user_agent(Some(persona.user_agent));
-        settings.set_enable_webrtc(true);
+        settings.set_enable_webrtc(false); // RAM: disable until site needs it
         settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_dns_prefetching(false);
         settings.set_enable_smooth_scrolling(true);
         settings.set_enable_webgl(true);
         settings.set_enable_developer_extras(true);
         settings.set_enable_back_forward_navigation_gestures(true);
-        settings.set_enable_webaudio(true);
+        settings.set_enable_webaudio(false); // RAM: enable on demand via sites
         settings.set_enable_html5_local_storage(true);
         settings.set_enable_html5_database(true);
         settings.set_enable_site_specific_quirks(true);
         settings.set_javascript_can_access_clipboard(true);
+        // OnDemand reduces GPU/RAM when tabs are backgrounded
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
+        settings.set_enable_page_cache(false); // RAM: avoid bfcache keeping full page in memory
 
         let stealth_js = persona.stealth_script();
         let script = webkit6::UserScript::new(
@@ -5694,7 +5697,8 @@ impl App {
         &self,
         title: &'static str,
         prompt_text: &'static str,
-        is_confirm_needed: bool,
+        btn_label: &'static str,
+        need_confirm: bool,
         on_confirm: F,
     ) where
         F: Fn(String) + 'static,
@@ -5728,16 +5732,14 @@ impl App {
         let entry_pass = gtk::PasswordEntry::new();
         entry_pass.add_css_class("profile-entry-box");
         entry_pass.set_show_peek_icon(true);
+        entry_pass.set_placeholder_text(Some(tr("Password")));
         vbox.append(&entry_pass);
 
-        let entry_confirm = if is_confirm_needed {
-            let lbl_c = gtk::Label::new(Some(tr("Confirm password...")));
-            lbl_c.add_css_class("data-section-desc");
-            lbl_c.set_xalign(0.0);
-            vbox.append(&lbl_c);
+        let entry_confirm = if need_confirm {
             let e = gtk::PasswordEntry::new();
             e.add_css_class("profile-entry-box");
             e.set_show_peek_icon(true);
+            e.set_placeholder_text(Some(tr("Confirm password (optional)")));
             vbox.append(&e);
             Some(e)
         } else {
@@ -5757,8 +5759,7 @@ impl App {
         let btn_cancel = gtk::Button::with_label(tr("Cancel"));
         btn_cancel.add_css_class("btn-data-action");
 
-        let confirm_label = if is_confirm_needed { tr("Encrypt & Sync") } else { tr("Decrypt & Restore") };
-        let btn_ok = gtk::Button::with_label(confirm_label);
+        let btn_ok = gtk::Button::with_label(tr(btn_label));
         btn_ok.add_css_class("btn-data-primary");
 
         btns_row.append(&btn_cancel);
@@ -5777,14 +5778,15 @@ impl App {
         let el = err_lbl.clone();
         let do_submit = move || {
             let p1 = ep.text().to_string();
-            if p1.trim().len() < 4 {
-                el.set_markup(&format!("<span foreground='#f87171'>{}</span>", tr("Password must be at least 4 characters.")));
+            // Spec: 1-inputda kamida 1 belgi bo'lsa shifrlash ishlasin; 2-input bo'sh bo'lishi mumkin
+            if p1.is_empty() {
+                el.set_markup(&format!("<span foreground='#f87171'>{}</span>", tr("Password cannot be empty.")));
                 el.set_visible(true);
                 return;
             }
             if let Some(ref c) = ec {
                 let p2 = c.text().to_string();
-                if p1 != p2 {
+                if !p2.is_empty() && p1 != p2 {
                     el.set_markup(&format!("<span foreground='#f87171'>{}</span>", tr("Passwords do not match.")));
                     el.set_visible(true);
                     return;
@@ -5797,12 +5799,17 @@ impl App {
         let ds1 = do_submit.clone();
         btn_ok.connect_clicked(move |_| ds1());
 
-        let ds2 = do_submit.clone();
-        entry_pass.connect_activate(move |_| ds2());
-
-        if let Some(c) = entry_confirm {
+        // Enter on 1st field -> focus 2nd if present, else submit
+        if let Some(ref conf) = entry_confirm {
+            let conf2 = conf.clone();
+            entry_pass.connect_activate(move |_| {
+                conf2.grab_focus();
+            });
             let ds3 = do_submit.clone();
-            c.connect_activate(move |_| ds3());
+            conf.connect_activate(move |_| ds3());
+        } else {
+            let ds2 = do_submit.clone();
+            entry_pass.connect_activate(move |_| ds2());
         }
 
         dialog.present();
@@ -5814,6 +5821,7 @@ impl App {
         self.show_password_dialog(
             "Encryption Password",
             "Set a password to encrypt your data. Without this password, no one can restore or access your data.",
+            "Encrypt & Sync",
             true,
             move |password| {
                 app.data_modal_status_lbl.set_markup(&format!(
@@ -5885,6 +5893,7 @@ impl App {
         self.show_password_dialog(
             "Enter Decryption Password",
             "Enter the password used to encrypt this backup:",
+            "Decrypt & Restore",
             false,
             move |password| {
                 app.data_modal_status_lbl.set_markup(&format!(
@@ -7410,7 +7419,7 @@ fn build(gapp: &gtk::Application) {
     let sidebar_items = [
         (SettingsTab::General, "preferences-system-symbolic", tr("General")),
         (SettingsTab::Profiles, "system-users-symbolic", tr("Profiles")),
-        (SettingsTab::Data, "drive-harddisk-symbolic", tr("Cloud Sync & Data")),
+        (SettingsTab::Data, "drive-harddisk-symbolic", tr("Data")),
         (SettingsTab::Privacy, "security-high-symbolic", tr("Privacy & Shield")),
         (SettingsTab::Customize, "document-edit-symbolic", tr("Customize")),
         (SettingsTab::Update, "software-update-available-symbolic", tr("Updates")),
@@ -7879,17 +7888,21 @@ fn build(gapp: &gtk::Application) {
     page_prof_scroll.set_child(Some(&page_profiles));
     settings_stack.add_named(&page_prof_scroll, Some("profiles"));
 
-    // --- Page 3: Cloud Sync & Data ---
+    // --- Page 3: Data ---
     let data_info_lbl = gtk::Label::new(None);
     data_info_lbl.add_css_class("data-info-card");
     data_info_lbl.set_xalign(0.0);
     data_info_lbl.set_margin_top(4);
 
-    // Section 1: Cloud Sync (Encrypted)
+    // Subtab 1: Export
+    let sub_page_export = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    sub_page_export.set_vexpand(true);
+
+    // Section 1.1: Cloud Sync (Encrypted)
     let sync_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
     sync_card.add_css_class("data-section-box");
 
-    let sync_title = gtk::Label::new(Some(tr("☁️ Cloud Sync (Encrypted)")));
+    let sync_title = gtk::Label::new(Some(tr("Cloud Sync (Encrypted)")));
     sync_title.add_css_class("data-section-title");
     sync_title.set_xalign(0.0);
 
@@ -7920,11 +7933,40 @@ fn build(gapp: &gtk::Application) {
     sync_card.append(&btn_sync_now);
     sync_card.append(&sync_result_box);
 
-    // Section 2: Restore from Sync URL
+    // Section 1.2: Local Archive Export
+    let local_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    local_card.add_css_class("data-section-box");
+
+    let local_title = gtk::Label::new(Some(tr("Local Archive (.tar.gz)")));
+    local_title.add_css_class("data-section-title");
+    local_title.set_xalign(0.0);
+
+    let local_desc = gtk::Label::new(Some(tr("Offline backup file on your local disk.")));
+    local_desc.add_css_class("data-section-desc");
+    local_desc.set_xalign(0.0);
+
+    let local_btns_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let btn_export_local = gtk::Button::with_label(tr("Export to File..."));
+    btn_export_local.add_css_class("btn-data-action");
+
+    local_btns_row.append(&btn_export_local);
+
+    local_card.append(&local_title);
+    local_card.append(&local_desc);
+    local_card.append(&local_btns_row);
+
+    sub_page_export.append(&sync_card);
+    sub_page_export.append(&local_card);
+
+    // Subtab 2: Import
+    let sub_page_import = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    sub_page_import.set_vexpand(true);
+
+    // Section 2.1: Restore from Sync URL
     let restore_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
     restore_card.add_css_class("data-section-box");
 
-    let restore_title = gtk::Label::new(Some(tr("📥 Restore from Sync URL")));
+    let restore_title = gtk::Label::new(Some(tr("Restore from Sync URL")));
     restore_title.add_css_class("data-section-title");
     restore_title.set_xalign(0.0);
 
@@ -7949,32 +7991,35 @@ fn build(gapp: &gtk::Application) {
     restore_card.append(&restore_desc);
     restore_card.append(&restore_row);
 
-    // Section 3: Local Offline Backup (.tar.gz)
-    let local_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
-    local_card.add_css_class("data-section-box");
+    // Section 2.2: Local Archive Import
+    let local_import_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    local_import_card.add_css_class("data-section-box");
 
-    let local_title = gtk::Label::new(Some(tr("💾 Local Archive (.tar.gz)")));
-    local_title.add_css_class("data-section-title");
-    local_title.set_xalign(0.0);
+    let local_import_title = gtk::Label::new(Some(tr("Local Archive Import")));
+    local_import_title.add_css_class("data-section-title");
+    local_import_title.set_xalign(0.0);
 
-    let local_desc = gtk::Label::new(Some(tr("Offline backup file on your local disk.")));
-    local_desc.add_css_class("data-section-desc");
-    local_desc.set_xalign(0.0);
+    let local_import_desc = gtk::Label::new(Some(tr("Restore workspaces and data from an offline .tar.gz archive.")));
+    local_import_desc.add_css_class("data-section-desc");
+    local_import_desc.set_xalign(0.0);
 
-    let local_btns_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    let btn_export_local = gtk::Button::with_label(tr("Export to File..."));
-    btn_export_local.add_css_class("btn-data-action");
+    let local_import_btns_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     let btn_import_local = gtk::Button::with_label(tr("Import from File..."));
     btn_import_local.add_css_class("btn-data-action");
 
-    local_btns_row.append(&btn_export_local);
-    local_btns_row.append(&btn_import_local);
+    local_import_btns_row.append(&btn_import_local);
 
-    local_card.append(&local_title);
-    local_card.append(&local_desc);
-    local_card.append(&local_btns_row);
+    local_import_card.append(&local_import_title);
+    local_import_card.append(&local_import_desc);
+    local_import_card.append(&local_import_btns_row);
 
-    // Section 4: Data Maintenance & Cache
+    sub_page_import.append(&restore_card);
+    sub_page_import.append(&local_import_card);
+
+    // Subtab 3: Cache
+    let sub_page_cache = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    sub_page_cache.set_vexpand(true);
+
     let maint_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
     maint_card.add_css_class("data-section-box");
 
@@ -7999,6 +8044,64 @@ fn build(gapp: &gtk::Application) {
     maint_card.append(&maint_desc);
     maint_card.append(&maint_btns_row);
 
+    sub_page_cache.append(&maint_card);
+
+    // Data Stack & Subtabs bar
+    let data_stack = gtk::Stack::new();
+    data_stack.set_vexpand(true);
+    data_stack.add_named(&sub_page_export, Some("export"));
+    data_stack.add_named(&sub_page_import, Some("import"));
+    data_stack.add_named(&sub_page_cache, Some("cache"));
+
+    let data_sub_bar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let sub_export_btn = gtk::Button::with_label(tr("Export"));
+    sub_export_btn.add_css_class("settings-option-item");
+    sub_export_btn.add_css_class("active");
+    let sub_import_btn = gtk::Button::with_label(tr("Import"));
+    sub_import_btn.add_css_class("settings-option-item");
+    let sub_cache_btn = gtk::Button::with_label(tr("Cache"));
+    sub_cache_btn.add_css_class("settings-option-item");
+    data_sub_bar.append(&sub_export_btn);
+    data_sub_bar.append(&sub_import_btn);
+    data_sub_bar.append(&sub_cache_btn);
+
+    {
+        let stack = data_stack.clone();
+        let b_exp = sub_export_btn.clone();
+        let b_imp = sub_import_btn.clone();
+        let b_cch = sub_cache_btn.clone();
+        sub_export_btn.connect_clicked(move |_| {
+            stack.set_visible_child_name("export");
+            b_exp.add_css_class("active");
+            b_imp.remove_css_class("active");
+            b_cch.remove_css_class("active");
+        });
+    }
+    {
+        let stack = data_stack.clone();
+        let b_exp = sub_export_btn.clone();
+        let b_imp = sub_import_btn.clone();
+        let b_cch = sub_cache_btn.clone();
+        sub_import_btn.connect_clicked(move |_| {
+            stack.set_visible_child_name("import");
+            b_imp.add_css_class("active");
+            b_exp.remove_css_class("active");
+            b_cch.remove_css_class("active");
+        });
+    }
+    {
+        let stack = data_stack.clone();
+        let b_exp = sub_export_btn.clone();
+        let b_imp = sub_import_btn.clone();
+        let b_cch = sub_cache_btn.clone();
+        sub_cache_btn.connect_clicked(move |_| {
+            stack.set_visible_child_name("cache");
+            b_cch.add_css_class("active");
+            b_exp.remove_css_class("active");
+            b_imp.remove_css_class("active");
+        });
+    }
+
     // Keep hidden entries for legacy CLI or local paths if needed
     let data_export_entry = gtk::Entry::new();
     let data_import_entry = gtk::Entry::new();
@@ -8011,7 +8114,7 @@ fn build(gapp: &gtk::Application) {
     let page_data = gtk::Box::new(gtk::Orientation::Vertical, 8);
     page_data.add_css_class("settings-content-page");
 
-    let data_page_title = gtk::Label::new(Some(tr("Cloud Sync & Data")));
+    let data_page_title = gtk::Label::new(Some(tr("Data")));
     data_page_title.add_css_class("settings-page-title");
     data_page_title.set_xalign(0.0);
     let data_page_subtitle = gtk::Label::new(Some(tr("End-to-end encrypted backup and instant cloud synchronization across devices  (Alt+I)")));
@@ -8021,10 +8124,8 @@ fn build(gapp: &gtk::Application) {
     page_data.append(&data_page_title);
     page_data.append(&data_page_subtitle);
     page_data.append(&data_info_lbl);
-    page_data.append(&sync_card);
-    page_data.append(&restore_card);
-    page_data.append(&local_card);
-    page_data.append(&maint_card);
+    page_data.append(&data_sub_bar);
+    page_data.append(&data_stack);
     page_data.append(&data_modal_status_lbl);
 
     let page_data_scroll = gtk::ScrolledWindow::new();
@@ -8047,7 +8148,7 @@ fn build(gapp: &gtk::Application) {
 
     let iso_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
     iso_card.add_css_class("settings-card");
-    let iso_title = gtk::Label::new(Some(tr("🛡️ Multi-Container Storage Isolation")));
+    let iso_title = gtk::Label::new(Some(tr("Multi-Container Storage Isolation")));
     iso_title.add_css_class("settings-card-title");
     iso_title.set_xalign(0.0);
     let iso_desc = gtk::Label::new(Some(tr("Each profile runs in its own isolated WebKit WebsiteDataManager directory with completely independent cookie jars, IndexedDB databases, and localStorage partitions. Websites cannot cross-track you between personas.")));
@@ -8898,6 +8999,9 @@ fn build(gapp: &gtk::Application) {
 
     let a = app.clone();
     btn_sync_restore.connect_clicked(move |_| a.prompt_and_execute_restore());
+
+    let a = app.clone();
+    sync_restore_entry.connect_activate(move |_| a.prompt_and_execute_restore());
 
     let a = app.clone();
     let entry_res = sync_url_result_entry.clone();
