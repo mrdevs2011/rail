@@ -1,6 +1,8 @@
 mod history;
+mod minijson;
 mod profile;
 mod strip;
+mod update;
 
 use gtk::glib;
 use gtk::{gdk, gio};
@@ -44,7 +46,12 @@ thread_local! {
 
 /// Editable Chrome-like default stylesheet, stored next to the rest of Rail's data.
 pub fn html_css_path() -> PathBuf {
-    rail_data_dir().join("html.css")
+    customize_dir().join("html.css")
+}
+
+/// Everything Customize writes lives here, so a Data & Backup export/import carries it along.
+pub fn customize_dir() -> PathBuf {
+    rail_data_dir().join(".railassets").join("customize")
 }
 
 /// Reads html.css; creates it from the built-in default the first time.
@@ -56,8 +63,15 @@ pub fn load_html_css() -> String {
             if let Some(dir) = path.parent() {
                 let _ = std::fs::create_dir_all(dir);
             }
-            let _ = std::fs::write(&path, DEFAULT_HTML_CSS);
-            DEFAULT_HTML_CSS.to_string()
+            // First run after the move: carry over the old html.css from the data root.
+            let legacy = rail_data_dir().join("html.css");
+            let initial =
+                std::fs::read_to_string(&legacy).unwrap_or_else(|_| DEFAULT_HTML_CSS.to_string());
+            let _ = std::fs::write(&path, &initial);
+            if legacy.exists() {
+                let _ = std::fs::remove_file(&legacy);
+            }
+            initial
         }
     }
 }
@@ -91,49 +105,7 @@ pub fn apply_html_css(css: &str) -> usize {
     applied
 }
 
-fn css_jump_to_line(buffer: &gtk::TextBuffer, view: &gtk::TextView, line: i32) {
-    if let Some(iter) = buffer.iter_at_line(line) {
-        buffer.place_cursor(&iter);
-        let mark = match buffer.mark("rail-jump") {
-            Some(m) => {
-                buffer.move_mark(&m, &iter);
-                m
-            }
-            None => buffer.create_mark(Some("rail-jump"), &iter, true),
-        };
-        view.scroll_to_mark(&mark, 0.0, true, 0.0, 0.02);
-        view.grab_focus();
-    }
-}
-
-fn rebuild_css_chips(chips: &gtk::FlowBox, buffer: &gtk::TextBuffer, view: &gtk::TextView) {
-    while let Some(child) = chips.child_at_index(0) {
-        chips.remove(&child);
-    }
-    let (start, end) = buffer.bounds();
-    let text = buffer.text(&start, &end, false).to_string();
-    for (idx, line) in text.lines().enumerate() {
-        let t = line.trim();
-        if t.starts_with("/* =====") && t.ends_with("===== */") {
-            let name = t
-                .trim_start_matches("/* =====")
-                .trim_end_matches("===== */")
-                .trim();
-            if name.is_empty() {
-                continue;
-            }
-            let btn = gtk::Button::with_label(name);
-            btn.add_css_class("settings-option-item");
-            let b = buffer.clone();
-            let v = view.clone();
-            let line_no = idx as i32;
-            btn.connect_clicked(move |_| css_jump_to_line(&b, &v, line_no));
-            chips.append(&btn);
-        }
-    }
-}
-
-fn save_css_editor(buffer: &gtk::TextBuffer, status: &gtk::Label) {
+fn save_css_editor(buffer: &gtk::TextBuffer, btn: &gtk::Button) {
     let (start, end) = buffer.bounds();
     let text = buffer.text(&start, &end, false).to_string();
     let path = html_css_path();
@@ -142,15 +114,13 @@ fn save_css_editor(buffer: &gtk::TextBuffer, status: &gtk::Label) {
     }
     match std::fs::write(&path, &text) {
         Ok(_) => {
-            let n = apply_html_css(&text);
-            status.set_text(&format!(
-                "Saved to {} and applied to {} open view(s). New page loads use it immediately; reload a tab if it did not refresh.",
-                path.display(),
-                n
-            ));
+            apply_html_css(&text);
+            btn.set_label("Saved");
         }
-        Err(e) => status.set_text(&format!("Save failed: {}", e)),
+        Err(_) => btn.set_label("Save failed"),
     }
+    let b = btn.clone();
+    glib::timeout_add_local_once(Duration::from_millis(1500), move || b.set_label("Save"));
 }
 
 const START_PAGE: &str = r##"<!doctype html>
@@ -162,181 +132,89 @@ const START_PAGE: &str = r##"<!doctype html>
 <title>Rail Browser</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #050505;
+  --panel: #0b0b0b;
+  --line: #242424;
+  --line-hi: #3a3a3a;
+  --fg: #ededed;
+  --mut: #8a8a8a;
+  --dim: #525252;
+  --acc: #38bdf8;
+}
 body {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at 50% 15%, #13192b 0%, #080a10 70%, #05060a 100%);
-  color: #94a3b8;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "SF Pro Display", Inter, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--mut);
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', ui-monospace, monospace;
+  font-size: 13px;
   padding: 32px 20px;
   overflow-y: auto;
   user-select: none;
 }
 .container {
   width: 100%;
-  max-width: 780px;
+  max-width: 680px;
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 26px;
-  animation: fadeIn 250ms ease-out;
+  animation: fadeIn 160ms ease-out;
 }
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.brand-area {
-  text-align: center;
-}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .brand-title {
-  font-size: clamp(42px, 7vw, 60px);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: #f8fafc;
-  line-height: 1.1;
-  display: inline-flex;
-  align-items: baseline;
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  color: var(--fg);
+  line-height: 1;
 }
-.brand-title .dot {
-  color: #38bdf8;
-  text-shadow: 0 0 24px rgba(56, 189, 248, 0.6);
-}
+.brand-title .dot { color: var(--acc); }
 .brand-subtitle {
-  margin-top: 6px;
-  font-size: 13.5px;
-  color: #64748b;
-  font-weight: 400;
-  letter-spacing: 0.01em;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--dim);
 }
-.search-wrapper {
-  width: 100%;
-  max-width: 600px;
-  position: relative;
+.brand-subtitle::before { content: '// '; color: var(--line-hi); }
+.search-wrapper { position: relative; width: 100%; }
+.prompt {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fg);
+  font-weight: 700;
+  pointer-events: none;
 }
 .search-bar {
   width: 100%;
-  background: rgba(18, 22, 36, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  padding: 13px 18px 13px 44px;
-  font-size: 14.5px;
-  color: #f1f5f9;
+  background: var(--panel);
+  border: 1px solid var(--line-hi);
+  border-radius: 3px;
+  padding: 13px 92px 13px 34px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg);
+  caret-color: var(--acc);
   outline: none;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  transition: all 180ms ease;
-  backdrop-filter: blur(12px);
+  transition: border-color 120ms ease;
 }
-.search-bar:focus {
-  background: rgba(22, 28, 46, 0.95);
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2), 0 16px 44px rgba(0, 0, 0, 0.6);
-}
-.search-bar::placeholder {
-  color: #55657e;
-  font-weight: 400;
-}
-.search-icon {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
-  color: #64748b;
-  pointer-events: none;
-}
+.search-bar:focus { border-color: var(--fg); }
+.search-bar::placeholder { color: var(--dim); }
 .search-hint {
   position: absolute;
-  right: 12px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 10px;
-  font-weight: 600;
-  color: #64748b;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 5px;
-  padding: 2px 7px;
-  pointer-events: none;
-}
-.cards-grid {
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-}
-@media (max-width: 640px) {
-  .cards-grid { grid-template-columns: 1fr; }
-}
-.card {
-  background: rgba(15, 18, 30, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 12px;
-  padding: 16px 18px;
-  backdrop-filter: blur(8px);
-  transition: all 150ms ease;
-}
-.card:hover {
-  background: rgba(20, 25, 42, 0.85);
-  border-color: rgba(56, 189, 248, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.card-icon {
-  width: 16px;
-  height: 16px;
-  color: #38bdf8;
-}
-.card-title {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #f1f5f9;
-}
-.shortcuts-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.shortcut-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-}
-.shortcut-desc {
-  color: #8896ab;
-}
-.keys {
-  display: flex;
-  gap: 4px;
-}
-kbd {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 10.5px;
-  font-weight: 600;
-  color: #e2e8f0;
-  background: #111422;
-  border: 1px solid #22293e;
-  border-bottom: 2px solid #1a2032;
-  border-radius: 4px;
-  padding: 2px 6px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-.footer {
-  margin-top: 6px;
-  font-size: 11px;
-  color: #475569;
+  color: var(--mut);
+  border: 1px solid var(--line-hi);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 1px 7px;
+  pointer-events: none;
 }
 </style>
 </head>
@@ -344,25 +222,20 @@ kbd {
 <div class="container">
   <div class="brand-area">
     <div class="brand-title">rail<span class="dot">.</span></div>
-    <div class="brand-subtitle">Spatial 2D Tiled Web Browser • Clean & Isolated</div>
+    <div class="brand-subtitle">keyboard-first browser for developers</div>
   </div>
 
   <div class="search-wrapper">
-    <svg class="search-icon google-icon" viewBox="0 0 24 24" width="20" height="20">
-      <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.27 21.36 7.33 24 12 24z"/>
-      <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.17 0 9.99 0 12s.45 3.83 1.25 5.42l4.03-3.15z"/>
-      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.27 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-    </svg>
+    <span class="prompt">&gt;</span>
     <input
       type="text"
       class="search-bar"
-      placeholder="Search Google or enter web address..."
+      placeholder="search or enter url"
       autocomplete="off"
       spellcheck="false"
       onkeydown="if(event.key==='Enter'){var q=this.value.trim();if(q){if(q.indexOf('://')!==-1||(q.indexOf('.')!==-1&&q.indexOf(' ')===-1)){location.href=q.indexOf('://')===-1?'https://'+q:q;}else{location.href='https://www.google.com/search?q='+encodeURIComponent(q);}}}"
     />
-    <span class="search-hint">Alt + G</span>
+    <span class="search-hint">Alt+G</span>
   </div>
 </div>
 </body>
@@ -393,14 +266,14 @@ fn create_google_icon(size: i32) -> gtk::Image {
 
 const CSS: &str = "
 window {
-    background: #090b10;
+    background: #080808;
     border-radius: 0;
     box-shadow: none;
-    color: #f1f5f9;
-    font-family: system-ui, -apple-system, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif;
+    color: #f4f4f4;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
 }
 label {
-    color: #94a3b8;
+    color: #a1a1a1;
 }
 
 /* ---- modern sleek scrollbars ---- */
@@ -417,13 +290,13 @@ scrollbar.vertical {
 scrollbar slider {
     min-width: 6px;
     min-height: 24px;
-    border-radius: 4px;
-    background: rgba(148, 163, 184, 0.25);
+    border-radius: 2px;
+    background: rgba(161, 161, 161, 0.25);
     transition: background 150ms ease, min-width 150ms ease, min-height 150ms ease;
 }
 scrollbar:hover slider,
 scrollbar.dragging slider {
-    background: rgba(56, 189, 248, 0.6);
+    background: rgba(255, 255, 255, 0.36);
 }
 scrollbar.vertical:hover slider {
     min-width: 8px;
@@ -437,86 +310,84 @@ scrollbar.horizontal:hover slider {
     background: transparent;
 }
 .tab {
-    border-radius: 12px;
-    border: 1px solid #1a2030;
-    background: #0d1017;
+    border-radius: 5px;
+    border: 1px solid #181818;
+    background: #0c0c0c;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 .tab.focused {
-    border-color: #38bdf8;
-    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35), 0 12px 36px rgba(0, 0, 0, 0.7);
+    border-color: #ededed;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 12px 36px rgba(0, 0, 0, 0.7);
 }
 
 /* ---- interactive tab resize splitter handle ---- */
 .tab-resize-handle {
     min-width: 6px;
-    width: 6px;
     background: transparent;
-    cursor: col-resize;
     transition: background-color 150ms ease, box-shadow 150ms ease;
 }
 .tab-resize-handle:hover,
 .tab-resize-handle.active {
-    background: #38bdf8;
-    box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+    background: #ededed;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
 }
 
 /* ---- overview (the live strip, zoomed out in 2D) ---- */
 .zoomed .tab {
     opacity: 0.88;
-    border-radius: 14px;
-    border: 1px solid #23283c;
+    border-radius: 6px;
+    border: 1px solid #282828;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
 }
 .zoomed .tab.focused {
     opacity: 1;
-    border-color: #38bdf8;
-    outline: 2px solid #38bdf8;
+    border-color: #ededed;
+    outline: 2px solid #ededed;
     outline-offset: 1px;
-    box-shadow: 0 0 24px rgba(56, 189, 248, 0.4);
+    box-shadow: 0 0 24px rgba(255, 255, 255, 0.05);
 }
 .ov-hint {
-    background: #0e121d;
-    color: #cbd5e1;
-    border: 1px solid #232c44;
-    border-radius: 8px;
+    background: #0d0d0d;
+    color: #d4d4d4;
+    border: 1px solid #2c2c2c;
+    border-radius: 3px;
     padding: 7px 16px;
     font-size: 11.5px;
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8);
 }
 
 /* ---- sidebar (Modern Obsidian Acrylic) ---- */
 .side-bar {
-    background: #0a0d15;
-    border-right: 1px solid #141824;
+    background: #0a0a0a;
+    border-right: 1px solid #121212;
     padding-right: 4px;
 }
 .brand {
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-weight: 700;
     font-size: 15px;
     letter-spacing: -0.02em;
-    color: #f8fafc;
+    color: #fafafa;
 }
 .brand-dot {
-    color: #38bdf8;
+    color: #ededed;
 }
 button.btn-add-tab {
-    background: #111422;
-    border: 1px solid #1c2234;
-    border-radius: 7px;
+    background: #0f0f0f;
+    border: 1px solid #1a1a1a;
+    border-radius: 3px;
     min-width: 28px;
     min-height: 28px;
-    color: #94a3b8;
+    color: #a1a1a1;
     padding: 0;
     transition: all 120ms ease;
 }
 button.btn-add-tab:hover {
-    background: #181d2e;
-    border-color: #38bdf8;
-    color: #38bdf8;
+    background: #161616;
+    border-color: #ededed;
+    color: #ededed;
 }
 button.flat-icon {
     background: transparent;
@@ -525,55 +396,55 @@ button.flat-icon {
     min-width: 28px;
     min-height: 28px;
     padding: 0;
-    border-radius: 6px;
-    color: #64748b;
+    border-radius: 2px;
+    color: #727272;
     transition: all 100ms ease;
 }
 button.flat-icon:hover {
     background: rgba(255, 255, 255, 0.06);
-    color: #f1f5f9;
+    color: #f4f4f4;
 }
 button.pill {
-    background: #101422;
-    border: 1px solid #1c2336;
-    border-radius: 9px;
+    background: #0f0f0f;
+    border: 1px solid #1a1a1a;
+    border-radius: 4px;
     padding: 7px 11px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-    color: #94a3b8;
+    color: #a1a1a1;
     transition: all 120ms ease;
 }
 button.pill:hover {
-    background: #151a2b;
-    border-color: #28334d;
-    color: #f1f5f9;
+    background: #141414;
+    border-color: #333333;
+    color: #f4f4f4;
 }
 button.pill label {
-    color: #94a3b8;
+    color: #a1a1a1;
     font-size: 12px;
     font-weight: 500;
 }
 button.pill:hover label {
-    color: #f1f5f9;
+    color: #f4f4f4;
 }
 .pill-icon {
-    color: #64748b;
+    color: #727272;
 }
 button.pill:hover .pill-icon {
-    color: #38bdf8;
+    color: #ededed;
 }
 .pill-chip {
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 9.5px;
     font-weight: 600;
-    color: #64748b;
-    background: #090c14;
-    border: 1px solid #1e2438;
-    border-radius: 4px;
+    color: #727272;
+    background: #090909;
+    border: 1px solid #1b1b1b;
+    border-radius: 2px;
     padding: 1px 5px;
 }
 button.pill:hover .pill-chip {
-    color: #38bdf8;
-    border-color: rgba(56, 189, 248, 0.3);
+    color: #ededed;
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
 /* ---- tab list & workspaces ---- */
@@ -583,13 +454,13 @@ button.pill:hover .pill-chip {
 .tablist row {
     padding: 0;
     margin: 2px 0;
-    border-radius: 7px;
+    border-radius: 3px;
     border: 1px solid transparent;
     transition: all 100ms ease;
 }
 .tablist row:hover {
-    background: #101422;
-    border-color: #1a2034;
+    background: #0f0f0f;
+    border-color: #181818;
 }
 .tablist row:selected {
     background: transparent;
@@ -598,147 +469,144 @@ button.pill:hover .pill-chip {
 .workspace-header {
     padding: 6px 10px;
     margin: 10px 4px 3px 4px;
-    border-radius: 8px;
-    background: #0d101a;
-    border: 1px solid #161b2b;
-    cursor: pointer;
+    border-radius: 3px;
+    background: #0c0c0c;
+    border: 1px solid #141414;
     transition: all 120ms ease;
 }
 .workspace-header:hover {
-    background: #121726;
-    border-color: #222a42;
+    background: #111111;
+    border-color: #2a2a2a;
 }
 .workspace-header.active-workspace {
-    background: #14192a;
-    border-color: #273454;
-    border-left: 3px solid #38bdf8;
+    background: #131313;
+    border-color: #343434;
+    border-left: 3px solid #ededed;
 }
 .workspace-title {
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.05em;
-    color: #94a3b8;
+    color: #a1a1a1;
     text-transform: uppercase;
 }
 .workspace-header.active-workspace .workspace-title {
-    color: #38bdf8;
+    color: #ededed;
 }
 .workspace-badge {
     font-size: 8.5px;
     font-weight: 700;
-    color: #38bdf8;
-    background: rgba(56, 189, 248, 0.12);
-    border-radius: 3px;
+    color: #ededed;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 1px;
     padding: 1px 4px;
     margin-right: 2px;
 }
 .workspace-tab-count {
     font-size: 10px;
-    color: #475569;
+    color: #535353;
     margin-right: 4px;
 }
 .btn-ws-add {
     min-width: 22px;
     min-height: 22px;
     padding: 0;
-    border-radius: 5px;
+    border-radius: 2px;
     background: transparent;
     border: none;
-    color: #64748b;
+    color: #727272;
     transition: all 100ms ease;
 }
 .btn-ws-add:hover {
-    background: rgba(56, 189, 248, 0.12);
-    color: #38bdf8;
+    background: rgba(255, 255, 255, 0.07);
+    color: #ededed;
 }
 
 .tabrow {
     padding: 6px 10px 6px 14px;
     margin: 2px 4px;
-    border-radius: 8px;
+    border-radius: 3px;
     border: 1px solid transparent;
-    cursor: pointer;
     transition: all 120ms ease;
 }
 .tabrow:hover {
-    background: #111420;
-    border-color: #1a2032;
+    background: #0f0f0f;
+    border-color: #181818;
 }
 .tabrow.active-tab {
-    background: #151a2b;
-    border-color: #232d48;
-    border-left: 3px solid #38bdf8;
+    background: #141414;
+    border-color: #2d2d2d;
+    border-left: 3px solid #ededed;
 }
 .tabrow.active-tab .tab-title {
-    color: #f8fafc;
+    color: #fafafa;
     font-weight: 600;
 }
 .tabrow.active-tab .tab-index {
-    color: #38bdf8;
-    background: rgba(56, 189, 248, 0.12);
-    border-color: rgba(56, 189, 248, 0.3);
+    color: #ededed;
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.18);
 }
 .tabrow.dragging {
     opacity: 0.88;
-    background: #18223c !important;
-    border: 1px solid #38bdf8 !important;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65), 0 0 14px rgba(56, 189, 248, 0.35) !important;
+    background: #191919;
+    border: 1px solid #ededed;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65), 0 0 14px rgba(255, 255, 255, 0.05);
 }
 .tabrow.drop-target-above {
-    border-top: 3px solid #38bdf8 !important;
-    background: rgba(56, 189, 248, 0.14) !important;
-    box-shadow: 0 -3px 10px rgba(56, 189, 248, 0.3) !important;
+    border-top: 3px solid #ededed;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -3px 10px rgba(255, 255, 255, 0.05);
 }
 .tabrow.drop-target-below {
-    border-bottom: 3px solid #38bdf8 !important;
-    background: rgba(56, 189, 248, 0.14) !important;
-    box-shadow: 0 3px 10px rgba(56, 189, 248, 0.3) !important;
+    border-bottom: 3px solid #ededed;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 3px 10px rgba(255, 255, 255, 0.05);
 }
 .tab-index {
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 10px;
     font-weight: 600;
-    color: #475569;
-    background: #090c14;
-    border: 1px solid #181d2e;
-    border-radius: 4px;
+    color: #535353;
+    background: #090909;
+    border: 1px solid #161616;
+    border-radius: 2px;
     padding: 1px 5px;
     min-width: 14px;
 }
 .tab-title {
     font-size: 12.5px;
     font-weight: 500;
-    color: #94a3b8;
+    color: #a1a1a1;
 }
 .tab-full-badge {
     font-size: 8.5px;
     font-weight: 700;
-    color: #a78bfa;
-    background: rgba(167, 139, 250, 0.12);
-    border: 1px solid rgba(167, 139, 250, 0.3);
-    border-radius: 3px;
+    color: #999999;
+    background: rgba(153, 153, 153, 0.12);
+    border: 1px solid rgba(153, 153, 153, 0.3);
+    border-radius: 1px;
     padding: 0 4px;
 }
 .tabrow image {
-    color: #64748b;
+    color: #727272;
 }
 .tab-close {
     opacity: 0;
     min-width: 20px;
     min-height: 20px;
     padding: 0;
-    border-radius: 5px;
+    border-radius: 2px;
     background: transparent;
     border: none;
     box-shadow: none;
-    color: #64748b;
-    cursor: pointer;
+    color: #727272;
     transition: all 120ms ease;
 }
 .tab-close:hover {
     background: rgba(244, 63, 94, 0.18);
     color: #fb7185;
-    opacity: 1 !important;
+    opacity: 1;
 }
 .tabrow:hover .tab-close, .tabrow.active-tab .tab-close {
     opacity: 0.7;
@@ -746,35 +614,34 @@ button.pill:hover .pill-chip {
 .btn-new-workspace {
     margin: 12px 6px 6px 6px;
     padding: 7px 12px;
-    background: #0d101a;
-    border: 1px dashed #20273d;
-    border-radius: 7px;
-    color: #64748b;
+    background: #0c0c0c;
+    border: 1px dashed #1d1d1d;
+    border-radius: 3px;
+    color: #727272;
     font-size: 11px;
     font-weight: 600;
-    cursor: pointer;
     transition: all 120ms ease;
 }
 .btn-new-workspace:hover {
-    background: #14192b;
-    border-color: #38bdf8;
-    color: #38bdf8;
+    background: #131313;
+    border-color: #ededed;
+    color: #ededed;
 }
 .side-hint {
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 9.5px;
-    color: #475569;
+    color: #535353;
     letter-spacing: -0.01em;
 }
 
 .fav, .tabrow label.fav, row:selected .tabrow label.fav {
-    border-radius: 4px;
+    border-radius: 2px;
     font-size: 10px;
     font-weight: 800;
     color: #000000;
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
 }
-.fav-0 { background: #38bdf8; } .fav-1 { background: #c084fc; } .fav-2 { background: #4ade80; }
+.fav-0 { background: #ededed; } .fav-1 { background: #c084fc; } .fav-2 { background: #4ade80; }
 .fav-3 { background: #facc15; } .fav-4 { background: #f87171; } .fav-5 { background: #22d3ee; }
 .fav-6 { background: #fb923c; } .fav-7 { background: #2dd4bf; }
 
@@ -783,21 +650,21 @@ progressbar.load-bar { min-height: 2px; margin: 0; }
 progressbar.load-bar trough { min-height: 2px; background: transparent; border: none; }
 progressbar.load-bar progress {
     min-height: 2px;
-    background: #38bdf8;
-    border-radius: 1px;
-    box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+    background: #ededed;
+    border-radius: 0px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
 }
 
 /* ---- address & command palette (Spotlight / Raycast style) ---- */
 .palette {
-    background: #0d101a;
-    border-radius: 14px;
+    background: #0c0c0c;
+    border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     padding: 14px 18px 12px;
     box-shadow: 0 24px 72px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 .palette image {
-    color: #64748b;
+    color: #727272;
 }
 entry.palette-entry, entry.palette-entry:focus-within {
     background: none;
@@ -808,13 +675,13 @@ entry.palette-entry, entry.palette-entry:focus-within {
     min-height: 0;
     font-size: 15px;
     font-weight: 500;
-    color: #f8fafc;
-    font-family: system-ui, -apple-system, sans-serif;
+    color: #fafafa;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
 }
 .palette-hint {
-    color: #64748b;
+    color: #727272;
     font-size: 10.5px;
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     margin-top: 6px;
 }
 
@@ -827,46 +694,46 @@ entry.palette-entry, entry.palette-entry:focus-within {
 }
 .palette-sug-item {
     padding: 7px 11px;
-    border-radius: 8px;
+    border-radius: 3px;
     background: transparent;
     transition: background 100ms ease;
     border: none;
     box-shadow: none;
 }
 .palette-sug-item:hover, .palette-sug-item.selected {
-    background: rgba(56, 189, 248, 0.12);
+    background: rgba(255, 255, 255, 0.07);
 }
 .palette-sug-icon {
-    color: #64748b;
-    margin-end: 8px;
+    color: #727272;
+    margin-right: 8px;
 }
 .palette-sug-item:hover .palette-sug-icon, .palette-sug-item.selected .palette-sug-icon {
-    color: #38bdf8;
+    color: #ededed;
 }
 .palette-sug-title {
-    color: #f1f5f9;
+    color: #f4f4f4;
     font-size: 13px;
     font-weight: 500;
 }
 .palette-sug-url {
-    color: #64748b;
+    color: #727272;
     font-size: 11.5px;
-    margin-start: 8px;
+    margin-left: 8px;
 }
 .palette-sug-badge {
-    color: #38bdf8;
+    color: #ededed;
     font-size: 9.5px;
     font-weight: 600;
     text-transform: uppercase;
-    background: rgba(56, 189, 248, 0.1);
-    border: 1px solid rgba(56, 189, 248, 0.25);
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
     padding: 1px 5px;
-    margin-start: 8px;
+    margin-left: 8px;
 }
 
 /* ---- profile colors (True Dark Multi-Persona) ---- */
-.prof-bg-0 { background-color: #38bdf8; }
+.prof-bg-0 { background-color: #ededed; }
 .prof-bg-1 { background-color: #c084fc; }
 .prof-bg-2 { background-color: #4ade80; }
 .prof-bg-3 { background-color: #facc15; }
@@ -883,52 +750,52 @@ button.profile-circle-btn {
     border-radius: 9999px;
     border: 2px solid rgba(255, 255, 255, 0.25);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    background-image: none !important;
-    opacity: 1 !important;
+    background-image: none;
+    opacity: 1;
     transition: transform 120ms ease, border-color 120ms ease;
 }
 button.profile-circle-btn:hover {
     transform: scale(1.08);
-    border-color: #38bdf8;
+    border-color: #ededed;
 }
 button.profile-circle-btn:backdrop,
 button.profile-circle-btn:active,
 button.profile-circle-btn:focus,
 button.profile-circle-btn:disabled {
-    opacity: 1 !important;
-    background-image: none !important;
+    opacity: 1;
+    background-image: none;
 }
 button.profile-circle-btn label,
 .profile-circle-label {
-    opacity: 1 !important;
+    opacity: 1;
     font-weight: 800;
     font-size: 11px;
     letter-spacing: -0.04em;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
 }
 
 /* ---- profile popover dropdown ---- */
 popover.profile-popover,
 popover.profile-popover.background {
-    background: none !important;
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
+    background: none;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
 }
 popover.profile-popover > contents {
-    background: #0d101a !important;
-    background-color: #0d101a !important;
-    border: 1px solid rgba(255, 255, 255, 0.14) !important;
-    border-radius: 12px !important;
-    padding: 6px 8px !important;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.95) !important;
-    color: #ffffff !important;
+    background: #0c0c0c;
+    background-color: #0c0c0c;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 5px;
+    padding: 6px 8px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.95);
+    color: #ffffff;
 }
 popover.profile-popover > arrow {
-    background: #0d101a !important;
-    background-color: #0d101a !important;
-    border-color: rgba(255, 255, 255, 0.14) !important;
+    background: #0c0c0c;
+    background-color: #0c0c0c;
+    border-color: rgba(255, 255, 255, 0.14);
 }
 .profile-popover-title,
 popover.profile-popover .profile-popover-title {
@@ -936,31 +803,31 @@ popover.profile-popover .profile-popover-title {
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #94a3b8 !important;
-    font-family: ui-monospace, monospace;
+    color: #a1a1a1;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     padding: 4px 8px 2px;
 }
 button.profile-item-btn {
     background: transparent;
     border: none;
     box-shadow: none;
-    border-radius: 7px;
+    border-radius: 3px;
     padding: 6px 9px;
-    color: #ffffff !important;
+    color: #ffffff;
     transition: background 100ms;
 }
 button.profile-item-btn:hover {
-    background: #14192b;
-    color: #ffffff !important;
+    background: #131313;
+    color: #ffffff;
 }
 button.profile-item-btn.selected {
-    background: #182036;
-    border-left: 2px solid #38bdf8;
-    color: #ffffff !important;
+    background: #181818;
+    border-left: 2px solid #ededed;
+    color: #ffffff;
 }
 button.profile-item-btn label,
 popover.profile-popover label {
-    color: #ffffff !important;
+    color: #ffffff;
 }
 .profile-item-dot,
 button.profile-item-btn .profile-item-dot {
@@ -970,41 +837,41 @@ button.profile-item-btn .profile-item-dot {
     font-size: 10px;
     letter-spacing: -0.03em;
     font-weight: 800;
-    color: #ffffff !important;
+    color: #ffffff;
     padding: 0 2px;
-    opacity: 1 !important;
+    opacity: 1;
 }
 .profile-item-name,
 button.profile-item-btn .profile-item-name,
 button.profile-item-btn label.profile-item-name {
     font-size: 12.5px;
     font-weight: 600;
-    color: #f1f5f9 !important;
+    color: #f4f4f4;
 }
 .profile-item-persona,
 button.profile-item-btn .profile-item-persona,
 button.profile-item-btn label.profile-item-persona {
     font-size: 9.5px;
-    color: #94a3b8 !important;
-    font-family: ui-monospace, monospace;
+    color: #a1a1a1;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
 }
 button.profile-item-btn image {
-    color: #94a3b8 !important;
+    color: #a1a1a1;
 }
 button.profile-item-btn:hover image {
-    color: #38bdf8 !important;
+    color: #ededed;
 }
 .profile-item-check {
     font-size: 12px;
     font-weight: 700;
-    color: #38bdf8 !important;
+    color: #ededed;
 }
 
 /* ---- profiles manager modal (Alt+P) ---- */
 .profiles-modal {
-    background: #0d101a;
+    background: #0c0c0c;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
+    border-radius: 6px;
     padding: 24px 28px;
     box-shadow: 0 32px 84px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.06);
     min-width: 440px;
@@ -1014,13 +881,13 @@ button.profile-item-btn:hover image {
 .profiles-modal-title {
     font-size: 17px;
     font-weight: 700;
-    color: #f8fafc;
+    color: #fafafa;
     letter-spacing: -0.02em;
-    font-family: system-ui, sans-serif;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
 }
 .profiles-modal-subtitle {
     font-size: 11.5px;
-    color: #64748b;
+    color: #727272;
     margin-top: 2px;
 }
 /* ---- profiles list in settings modal ---- */
@@ -1037,21 +904,21 @@ button.profile-item-btn:hover image {
     border-color: transparent;
 }
 .profile-card {
-    background: #111422;
-    border: 1px solid #1b2135;
-    border-radius: 10px;
+    background: #0f0f0f;
+    border: 1px solid #191919;
+    border-radius: 4px;
     padding: 10px 14px;
     margin-bottom: 6px;
     transition: transform 180ms cubic-bezier(0.2, 0, 0, 1), background-color 120ms ease, border-color 120ms ease;
 }
 .profile-card:hover {
-    border-color: #283350;
-    background: #141829;
+    border-color: #333333;
+    background: #121212;
 }
 .profile-card.active-profile {
-    border-color: #38bdf8;
-    background: #13192c;
-    box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+    border-color: #ededed;
+    background: #131313;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
 }
 .profile-card.shift-up {
     transform: translateY(-60px);
@@ -1060,23 +927,21 @@ button.profile-item-btn:hover image {
     transform: translateY(60px);
 }
 .profile-card.dragging {
-    z-index: 1000 !important;
-    opacity: 0.98 !important;
-    border-color: #38bdf8 !important;
-    background: #172136 !important;
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 24px rgba(56, 189, 248, 0.4) !important;
-    transition: none !important;
+    opacity: 0.98;
+    border-color: #ededed;
+    background: #181818;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 24px rgba(255, 255, 255, 0.05);
+    transition: none;
 }
 .profile-drag-handle {
     font-size: 15px;
     font-weight: bold;
-    color: #475569;
+    color: #535353;
     padding: 0 4px 0 2px;
-    cursor: grab;
     transition: color 150ms ease, transform 150ms ease;
 }
 .profile-drag-handle:hover {
-    color: #38bdf8;
+    color: #ededed;
     transform: scale(1.15);
 }
 .profile-avatar-circle {
@@ -1087,51 +952,50 @@ button.profile-item-btn:hover image {
     font-weight: 800;
     margin: 0;
     padding: 0;
-    opacity: 1 !important;
+    opacity: 1;
 }
 .profile-card-name {
     font-size: 13.5px;
     font-weight: 600;
-    color: #f1f5f9;
+    color: #f4f4f4;
 }
 .profile-card-sub {
     font-size: 10.5px;
-    color: #64748b;
-    font-family: ui-monospace, monospace;
+    color: #727272;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
 }
 .profile-badge-active {
     font-size: 9.5px;
     font-weight: 700;
     border-radius: 9999px;
     padding: 2px 8px;
-    background: rgba(56, 189, 248, 0.12);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, 0.35);
-    font-family: ui-monospace, monospace;
+    background: rgba(255, 255, 255, 0.07);
+    color: #ededed;
+    border: 1px solid rgba(255, 255, 255, 0.21);
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
 }
 button.btn-make-active {
-    background: #141828;
-    color: #94a3b8;
-    border: 1px solid #242c44;
-    border-radius: 6px;
+    background: #121212;
+    color: #a1a1a1;
+    border: 1px solid #2c2c2c;
+    border-radius: 2px;
     padding: 4px 10px;
     font-size: 11px;
     font-weight: 600;
     transition: all 120ms ease;
 }
 button.btn-make-active:hover {
-    background: #38bdf8;
-    color: #021220;
-    border-color: #38bdf8;
+    background: #ededed;
+    color: #0c0c0c;
+    border-color: #ededed;
 }
 button.btn-del-profile {
     background: transparent;
     border: none;
-    border-radius: 6px;
+    border-radius: 2px;
     padding: 4px;
-    color: #64748b;
+    color: #727272;
     opacity: 0;
-    cursor: pointer;
     transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
 }
 button.btn-del-profile image {
@@ -1144,28 +1008,28 @@ button.btn-del-profile image {
 button.btn-del-profile:hover {
     background: rgba(244, 63, 94, 0.18);
     color: #fb7185;
-    opacity: 1 !important;
+    opacity: 1;
 }
 .profile-section-label {
     font-size: 10.5px;
     font-weight: 700;
-    color: #64748b;
+    color: #727272;
     letter-spacing: 0.05em;
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     margin-top: 6px;
 }
 .profile-entry-box {
-    background: #0f121d;
-    border: 1px solid #1f253a;
-    border-radius: 8px;
+    background: #0e0e0e;
+    border: 1px solid #1c1c1c;
+    border-radius: 3px;
     padding: 8px 12px;
-    color: #f1f5f9;
+    color: #f4f4f4;
     font-size: 13px;
     transition: all 120ms ease;
 }
 .profile-entry-box:focus {
-    border-color: #38bdf8;
-    box-shadow: 0 0 0 1px #38bdf8;
+    border-color: #ededed;
+    box-shadow: 0 0 0 1px #ededed;
 }
 .profile-entry-box.error {
     border-color: #f87171;
@@ -1178,32 +1042,32 @@ button.btn-del-profile:hover {
     margin-top: 2px;
 }
 button.btn-create-profile {
-    background: #121626;
-    border: 1px solid #1f273d;
-    border-radius: 8px;
+    background: #111111;
+    border: 1px solid #1d1d1d;
+    border-radius: 3px;
     padding: 7px 18px;
     transition: all 120ms ease;
 }
 button.btn-create-profile label {
-    color: #64748b;
+    color: #727272;
     font-weight: 600;
     font-size: 12px;
 }
 button.btn-create-profile:disabled {
-    background: #0f121d;
-    border-color: #1a2032;
+    background: #0e0e0e;
+    border-color: #181818;
 }
 button.btn-create-profile.active-ready {
-    background: #38bdf8;
-    border-color: #38bdf8;
+    background: #ededed;
+    border-color: #ededed;
 }
 button.btn-create-profile.active-ready label {
-    color: #021220;
+    color: #0c0c0c;
     font-weight: 700;
 }
 button.btn-create-profile.active-ready:hover {
-    background: #7dd3fc;
-    border-color: #7dd3fc;
+    background: #d4d4d4;
+    border-color: #d4d4d4;
 }
 
 .profile-badge-mini {
@@ -1216,8 +1080,8 @@ button.btn-create-profile.active-ready:hover {
     margin-left: 2px;
     margin-right: 4px;
     padding: 0 3px;
-    font-family: ui-monospace, monospace;
-    opacity: 1 !important;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
+    opacity: 1;
 }
 button.color-choice {
     min-width: 22px;
@@ -1232,136 +1096,135 @@ button.color-choice:hover {
 }
 button.color-choice.selected {
     border-color: #ffffff;
-    box-shadow: 0 0 0 2px #0d101a;
+    box-shadow: 0 0 0 2px #0c0c0c;
     transform: scale(1.15);
 }
 
 /* ---- JS script dialogs ---- */
 .js-dialog-window {
-    background: #0d101a;
+    background: #0c0c0c;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
+    border-radius: 5px;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9);
 }
 .js-dialog-title {
-    color: #38bdf8;
+    color: #ededed;
     font-size: 13px;
     font-weight: 700;
 }
 .js-dialog-message {
-    color: #e2e8f0;
+    color: #e7e7e7;
     font-size: 13px;
     line-height: 1.45;
 }
 .js-dialog-entry {
-    background: #111422;
+    background: #0f0f0f;
     color: #ffffff;
-    border: 1px solid #232c44;
-    border-radius: 7px;
+    border: 1px solid #2c2c2c;
+    border-radius: 3px;
     padding: 7px 11px;
     font-size: 13px;
 }
 .js-dialog-entry:focus {
-    border-color: #38bdf8;
+    border-color: #ededed;
     outline: none;
 }
 .js-dialog-btn-ok {
-    background: #0284c7;
+    background: #2b2b2b;
     color: #ffffff;
-    border-radius: 7px;
+    border-radius: 3px;
     padding: 6px 18px;
     font-size: 12px;
     font-weight: 600;
     border: none;
 }
 .js-dialog-btn-ok:hover {
-    background: #0369a1;
+    background: #3d3d3d;
 }
 .js-dialog-btn-cancel {
-    background: #1a2034;
-    color: #94a3b8;
-    border-radius: 7px;
+    background: #181818;
+    color: #a1a1a1;
+    border-radius: 3px;
     padding: 6px 14px;
     font-size: 12px;
     font-weight: 500;
     border: none;
 }
 .js-dialog-btn-cancel:hover {
-    background: #252e4a;
+    background: #2e2e2e;
     color: #ffffff;
 }
 
 /* ---- data backup & migration modal (Alt+I) ---- */
 .data-modal {
-    background: #0d101a;
+    background: #0c0c0c;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
+    border-radius: 6px;
     padding: 24px 28px;
     box-shadow: 0 32px 84px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.06);
     min-width: 520px;
-    max-width: 620px;
     margin-left: 16px;
     margin-right: 16px;
 }
 .data-modal-title {
     font-size: 17px;
     font-weight: 700;
-    color: #f8fafc;
+    color: #fafafa;
     letter-spacing: -0.02em;
-    font-family: system-ui, sans-serif;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
 }
 .data-modal-subtitle {
     font-size: 11.5px;
-    color: #64748b;
+    color: #727272;
     margin-top: 2px;
 }
 .data-section-box {
-    background: #111422;
-    border: 1px solid #1b2135;
-    border-radius: 10px;
+    background: #0f0f0f;
+    border: 1px solid #191919;
+    border-radius: 4px;
     padding: 12px 16px;
     margin-top: 8px;
 }
 .data-section-title {
     font-size: 12px;
     font-weight: 700;
-    color: #38bdf8;
+    color: #ededed;
     letter-spacing: 0.02em;
 }
 .data-section-desc {
     font-size: 11px;
-    color: #64748b;
+    color: #727272;
     margin-top: 2px;
     margin-bottom: 8px;
 }
 .data-info-card {
-    background: #0d0f19;
-    border: 1px solid #1e263d;
-    border-radius: 8px;
+    background: #0b0b0b;
+    border: 1px solid #1c1c1c;
+    border-radius: 3px;
     padding: 8px 12px;
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11px;
-    color: #94a3b8;
+    color: #a1a1a1;
 }
 .btn-data-action {
-    background: #151a2c;
-    border: 1px solid #273350;
-    border-radius: 7px;
-    color: #f1f5f9;
+    background: #141414;
+    border: 1px solid #333333;
+    border-radius: 3px;
+    color: #f4f4f4;
     font-size: 12px;
     font-weight: 600;
     padding: 5px 12px;
     transition: all 120ms ease;
 }
 .btn-data-action:hover {
-    background: #1e2640;
-    border-color: #38bdf8;
-    color: #38bdf8;
+    background: #1d1d1d;
+    border-color: #ededed;
+    color: #ededed;
 }
 .btn-data-primary {
-    background: #0284c7;
-    border: 1px solid #38bdf8;
-    border-radius: 7px;
+    background: #2b2b2b;
+    border: 1px solid #ededed;
+    border-radius: 3px;
     color: #ffffff;
     font-size: 12px;
     font-weight: 700;
@@ -1369,83 +1232,80 @@ button.color-choice.selected {
     transition: all 120ms ease;
 }
 .btn-data-primary:hover {
-    background: #0369a1;
-    border-color: #7dd3fc;
+    background: #3d3d3d;
+    border-color: #d4d4d4;
 }
 .data-status-lbl {
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11.5px;
     margin-top: 6px;
 }
 
 /* ---- html.css editor (Settings > Customize) ---- */
 .css-editor {
-    font-family: monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 12px;
 }
 .css-editor text {
-    background-color: #070a12;
-    color: #cbd5e1;
+    background-color: #070707;
+    color: #d4d4d4;
 }
 .css-editor-frame {
-    border: 1px solid #1a2238;
-    border-radius: 8px;
+    border: 1px solid #191919;
+    border-radius: 3px;
 }
 
 /* ---- floating settings modal (Alt+Shift+S) ---- */
 .settings-modal {
-    background: #0b0e18;
+    background: #0b0b0b;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 16px;
+    border-radius: 6px;
     box-shadow: 0 32px 84px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.06);
     min-width: 820px;
-    max-width: 880px;
     min-height: 540px;
-    max-height: 620px;
     margin-left: 20px;
     margin-right: 20px;
-    overflow: hidden;
 }
 .settings-header {
-    background: #0e1220;
+    background: #0e0e0e;
     padding: 12px 18px;
-    border-bottom: 1px solid #1a2238;
+    border-bottom: 1px solid #191919;
 }
 .settings-header-icon {
-    color: #38bdf8;
+    color: #ededed;
     margin-right: 8px;
 }
 .settings-title {
     font-size: 16px;
     font-weight: 700;
-    color: #f8fafc;
+    color: #fafafa;
     letter-spacing: -0.02em;
 }
 .settings-badge {
-    background: rgba(56, 189, 248, 0.12);
-    color: #38bdf8;
-    font-family: ui-monospace, monospace;
+    background: rgba(255, 255, 255, 0.07);
+    color: #ededed;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11px;
     font-weight: 600;
     padding: 2px 8px;
-    border-radius: 5px;
-    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
     margin-left: 8px;
 }
 .settings-body {
-    background: #0b0e18;
+    background: #0b0b0b;
 }
 .settings-sidebar {
-    background: #090c14;
-    border-right: 1px solid #161c2e;
+    background: #090909;
+    border-right: 1px solid #151515;
     padding: 12px 8px;
     min-width: 195px;
 }
 .settings-tab-btn {
     background: transparent;
     border: none;
-    border-radius: 8px;
-    color: #94a3b8;
+    border-radius: 3px;
+    color: #a1a1a1;
     padding: 9px 12px;
     margin-bottom: 4px;
     font-size: 12.5px;
@@ -1453,14 +1313,14 @@ button.color-choice.selected {
     transition: all 120ms ease;
 }
 .settings-tab-btn:hover {
-    background: #131726;
-    color: #f1f5f9;
+    background: #111111;
+    color: #f4f4f4;
 }
 .settings-tab-btn.active {
-    background: #171f34;
-    color: #38bdf8;
+    background: #171717;
+    color: #ededed;
     font-weight: 600;
-    box-shadow: inset 3px 0 0 0 #38bdf8;
+    box-shadow: inset 3px 0 0 0 #ededed;
 }
 .settings-content-page {
     padding: 18px 24px;
@@ -1468,72 +1328,72 @@ button.color-choice.selected {
 .settings-page-title {
     font-size: 16px;
     font-weight: 700;
-    color: #f8fafc;
+    color: #fafafa;
     letter-spacing: -0.01em;
 }
 .settings-page-subtitle {
     font-size: 11.5px;
-    color: #64748b;
+    color: #727272;
     margin-top: 2px;
     margin-bottom: 12px;
 }
 .settings-card {
-    background: #101423;
-    border: 1px solid #1a2238;
-    border-radius: 10px;
+    background: #0f0f0f;
+    border: 1px solid #191919;
+    border-radius: 4px;
     padding: 12px 16px;
     margin-bottom: 10px;
 }
 .settings-card-title {
     font-size: 12.5px;
     font-weight: 600;
-    color: #e2e8f0;
+    color: #e7e7e7;
 }
 .settings-card-desc {
     font-size: 11px;
-    color: #64748b;
+    color: #727272;
     margin-top: 2px;
     margin-bottom: 6px;
 }
 .settings-option-item {
-    background: #0d101c;
-    border: 1px solid #1a2238;
-    border-radius: 7px;
+    background: #0c0c0c;
+    border: 1px solid #191919;
+    border-radius: 3px;
     padding: 6px 12px;
     margin-right: 6px;
-    color: #cbd5e1;
+    color: #d4d4d4;
     font-size: 12px;
     font-weight: 500;
     transition: all 120ms ease;
 }
 .settings-option-item:hover {
-    background: #14192b;
-    border-color: #2b3858;
-    color: #f8fafc;
+    background: #131313;
+    border-color: #383838;
+    color: #fafafa;
 }
 .settings-option-item.active {
-    background: #0e273f;
-    border-color: #38bdf8;
-    color: #38bdf8;
+    background: #1b1b1b;
+    border-color: #ededed;
+    color: #ededed;
     font-weight: 600;
 }
 .shortcut-row {
     padding: 6px 10px;
-    border-bottom: 1px solid #141928;
+    border-bottom: 1px solid #131313;
 }
 .shortcut-row:last-child {
     border-bottom: none;
 }
 .shortcut-desc {
     font-size: 12px;
-    color: #cbd5e1;
+    color: #d4d4d4;
 }
 .shortcut-kbd {
-    background: #171d2e;
-    border: 1px solid #28334e;
-    border-radius: 4px;
-    color: #38bdf8;
-    font-family: ui-monospace, monospace;
+    background: #161616;
+    border: 1px solid #333333;
+    border-radius: 2px;
+    color: #ededed;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11px;
     font-weight: 600;
     padding: 2px 7px;
@@ -1541,80 +1401,75 @@ button.color-choice.selected {
 
 /* ---- floating minimap / roadmap (Alt+M) ---- */
 .minimap-window {
-    background: #0b0e17;
-    border: 1px solid #1c2438;
-    border-radius: 12px;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(56, 189, 248, 0.15);
-    overflow: hidden;
+    background: #0b0b0b;
+    border: 1px solid #1b1b1b;
+    border-radius: 5px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 .minimap-header {
-    background: #0e121e;
-    border-bottom: 1px solid #181e2e;
+    background: #0e0e0e;
+    border-bottom: 1px solid #161616;
     padding: 7px 12px;
-    cursor: grab;
 }
 .minimap-header:active {
-    cursor: grabbing;
 }
 .minimap-header-icon {
-    color: #38bdf8;
+    color: #ededed;
     margin-right: 4px;
 }
 .minimap-header-title {
     font-size: 11px;
     font-weight: 700;
-    color: #f8fafc;
+    color: #fafafa;
     letter-spacing: 0.03em;
-    font-family: system-ui, sans-serif;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
 }
 .minimap-header-title b {
-    color: #38bdf8;
+    color: #ededed;
 }
 .minimap-badge {
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 9px;
     font-weight: 700;
-    color: #38bdf8;
-    background: rgba(56, 189, 248, 0.12);
-    border: 1px solid rgba(56, 189, 248, 0.25);
-    border-radius: 4px;
+    color: #ededed;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
     padding: 1px 5px;
     margin: 0 4px;
 }
 .minimap-header-hint {
     font-size: 9.5px;
-    color: #64748b;
-    font-family: ui-monospace, monospace;
+    color: #727272;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
 }
 .minimap-canvas {
-    border-radius: 0 0 11px 11px;
-    cursor: grab;
+    border-radius: 0 0 4px 4px;
 }
 .minimap-canvas:active {
-    cursor: grabbing;
 }
 .minimap-location-btn {
-    background: #111524;
-    border: 1px solid #38bdf8;
-    border-radius: 20px;
+    background: #101010;
+    border: 1px solid #ededed;
+    border-radius: 8px;
     padding: 3px 10px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.85);
     transition: all 120ms ease;
 }
 .minimap-location-btn image {
-    color: #38bdf8;
+    color: #ededed;
     margin-right: 4px;
 }
 .minimap-location-btn label {
     font-size: 10px;
     font-weight: 700;
-    color: #38bdf8;
-    font-family: ui-monospace, monospace;
+    color: #ededed;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     letter-spacing: 0.02em;
 }
 .minimap-location-btn:hover {
-    background: #0284c7;
-    border-color: #7dd3fc;
+    background: #2b2b2b;
+    border-color: #d4d4d4;
 }
 .minimap-location-btn:hover image,
 .minimap-location-btn:hover label {
@@ -1623,19 +1478,19 @@ button.color-choice.selected {
 
 /* ---- Rail DevTools Panel (F12 / Alt+Shift+I / Alt+Shift+D) ---- */
 .devtools-panel {
-    background: #0b0e17;
+    background: #0b0b0b;
     box-shadow: 0 0 48px rgba(0, 0, 0, 0.85);
 }
 .devtools-panel.dock-bottom {
-    border-top: 1px solid #1a2032;
+    border-top: 1px solid #181818;
     box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.85);
 }
 .devtools-panel.dock-left {
-    border-right: 1px solid #1a2032;
+    border-right: 1px solid #181818;
     box-shadow: 16px 0 48px rgba(0, 0, 0, 0.85);
 }
 .devtools-panel.dock-right {
-    border-left: 1px solid #1a2032;
+    border-left: 1px solid #181818;
     box-shadow: -16px 0 48px rgba(0, 0, 0, 0.85);
 }
 .devtools-resize-handle {
@@ -1644,90 +1499,85 @@ button.color-choice.selected {
 }
 .devtools-panel.dock-bottom .devtools-resize-handle {
     min-height: 4px;
-    height: 4px;
-    cursor: ns-resize;
 }
 .devtools-panel.dock-bottom .devtools-resize-handle:hover {
-    background: rgba(56, 189, 248, 0.45);
+    background: rgba(255, 255, 255, 0.27);
 }
 .devtools-panel.dock-left .devtools-resize-handle,
 .devtools-panel.dock-right .devtools-resize-handle {
     min-width: 4px;
-    width: 4px;
-    cursor: ew-resize;
 }
 .devtools-panel.dock-left .devtools-resize-handle:hover,
 .devtools-panel.dock-right .devtools-resize-handle:hover {
-    background: rgba(56, 189, 248, 0.45);
+    background: rgba(255, 255, 255, 0.27);
 }
 .devtools-window-box {
-    background: #0b0e17;
+    background: #0b0b0b;
 }
 .devtools-header {
-    background: #0e121e;
-    border-bottom: 1px solid #181e2e;
+    background: #0e0e0e;
+    border-bottom: 1px solid #161616;
     padding: 6px 14px;
 }
 .devtools-brand-icon {
-    color: #38bdf8;
+    color: #ededed;
     margin-right: 6px;
 }
 .devtools-brand-label {
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11px;
     font-weight: 700;
-    color: #f8fafc;
+    color: #fafafa;
     margin-right: 14px;
 }
 .devtools-badge {
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 9px;
     font-weight: 700;
-    color: #38bdf8;
-    background: rgba(56, 189, 248, 0.12);
-    border: 1px solid rgba(56, 189, 248, 0.25);
-    border-radius: 4px;
+    color: #ededed;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
     padding: 1px 5px;
     margin-right: 12px;
 }
 .devtools-tab-btn {
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 5px;
+    border-radius: 2px;
     padding: 3px 10px;
-    color: #94a3b8;
-    font-family: ui-monospace, monospace;
+    color: #a1a1a1;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11px;
     font-weight: 600;
-    cursor: pointer;
     transition: all 120ms ease;
 }
 .devtools-tab-btn:hover {
     background: rgba(255, 255, 255, 0.05);
-    color: #f8fafc;
+    color: #fafafa;
 }
 .devtools-tab-btn.active {
-    background: rgba(56, 189, 248, 0.14);
-    color: #38bdf8;
-    border-color: rgba(56, 189, 248, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    color: #ededed;
+    border-color: rgba(255, 255, 255, 0.18);
 }
 .devtools-log-area {
-    background: #0b0e17;
+    background: #0b0b0b;
 }
 .devtools-log-box {
     padding: 6px 12px;
 }
 .devtools-log-row {
     padding: 3px 10px;
-    border-radius: 4px;
+    border-radius: 2px;
     margin-bottom: 2px;
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11.5px;
 }
 .devtools-log-row.level-in {
     background: rgba(255, 255, 255, 0.03);
-    color: #94a3b8;
-    border-left: 2px solid #64748b;
+    color: #a1a1a1;
+    border-left: 2px solid #727272;
 }
 .devtools-log-row.level-out {
     background: rgba(74, 222, 128, 0.06);
@@ -1740,59 +1590,137 @@ button.color-choice.selected {
     border-left: 2px solid #f87171;
 }
 .devtools-log-row.level-info {
-    background: rgba(56, 189, 248, 0.08);
-    color: #38bdf8;
-    border-left: 2px solid #38bdf8;
+    background: rgba(255, 255, 255, 0.05);
+    color: #ededed;
+    border-left: 2px solid #ededed;
 }
 .devtools-input-bar {
-    background: #0d111d;
-    border-top: 1px solid #1a2032;
+    background: #0d0d0d;
+    border-top: 1px solid #181818;
     padding: 5px 12px;
 }
 .devtools-prompt-char {
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 13px;
     font-weight: 800;
-    color: #38bdf8;
+    color: #ededed;
     margin-right: 8px;
 }
 .devtools-entry {
     background: transparent;
     border: none;
     box-shadow: none;
-    color: #f8fafc;
-    font-family: ui-monospace, monospace;
+    color: #fafafa;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 12px;
 }
 .devtools-text-view {
-    background: #0b0e17;
-    color: #cbd5e1;
-    font-family: ui-monospace, monospace;
+    background: #0b0b0b;
+    color: #d4d4d4;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11.5px;
     padding: 12px;
 }
 .devtools-card {
-    background: #0f1320;
-    border: 1px solid #1b2236;
-    border-radius: 8px;
+    background: #0e0e0e;
+    border: 1px solid #191919;
+    border-radius: 3px;
     padding: 12px 16px;
     margin: 8px 12px;
 }
 .devtools-card-title {
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11px;
     font-weight: 700;
-    color: #38bdf8;
+    color: #ededed;
     margin-bottom: 6px;
 }
 .devtools-card-row {
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11px;
-    color: #94a3b8;
+    color: #a1a1a1;
     padding: 2px 0;
 }
 .devtools-card-row b {
-    color: #f8fafc;
+    color: #fafafa;
+}
+/* ---- dev style: neutral black/white with a thin blue accent ---- */
+selection {
+    background: rgba(255, 255, 255, 0.24);
+    color: #ffffff;
+}
+.tab.focused {
+    border-color: #ededed;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
+}
+.zoomed .tab.focused {
+    border-color: #ededed;
+    outline: 1px solid #ededed;
+    box-shadow: none;
+}
+.tab-resize-handle:hover,
+.tab-resize-handle.active {
+    background: #ededed;
+    box-shadow: none;
+}
+
+/* ---- update card ---- */
+.update-card {
+    background: #0a0a0a;
+    border: 1px solid #2e2e2e;
+    border-radius: 4px;
+    padding: 12px 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+}
+.update-kicker {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: #8a8a8a;
+    font-weight: 700;
+}
+.update-ver {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fafafa;
+}
+.update-sub {
+    font-size: 11.5px;
+    color: #a3a3a3;
+}
+.update-err {
+    font-size: 11px;
+    color: #f87171;
+}
+button.update-get {
+    background: #ededed;
+    background-image: none;
+    color: #0a0a0a;
+    border: 1px solid #ededed;
+    border-radius: 3px;
+    padding: 5px 20px;
+    font-weight: 700;
+    box-shadow: none;
+}
+button.update-get:hover {
+    background: #ffffff;
+}
+button.update-get:disabled {
+    opacity: 0.6;
+}
+button.update-close {
+    background: transparent;
+    background-image: none;
+    border: none;
+    box-shadow: none;
+    color: #8a8a8a;
+    opacity: 0.35;
+    min-height: 0;
+    min-width: 0;
+    padding: 0 6px;
+}
+button.update-close:hover {
+    opacity: 0.9;
+    background: rgba(255, 255, 255, 0.08);
 }
 ";
 
@@ -1943,9 +1871,6 @@ struct App {
     settings_tab_buttons: RefCell<Vec<(SettingsTab, gtk::Button)>>,
     current_settings_tab: Cell<SettingsTab>,
     css_buffer: gtk::TextBuffer,
-    css_view: gtk::TextView,
-    css_chips: gtk::FlowBox,
-    css_status_lbl: gtk::Label,
     search_engine: RefCell<String>,
 }
 
@@ -1963,9 +1888,705 @@ pub enum SettingsTab {
     Profiles,
     Data,
     Privacy,
-    Shortcuts,
     Customize,
     About,
+}
+
+// ---------------------------------------------------------------------
+// Customizable keyboard shortcuts (Settings > Customize > Shortcuts)
+// ---------------------------------------------------------------------
+
+struct ShortcutDef {
+    id: &'static str,
+    group: &'static str,
+    desc: &'static str,
+    defaults: &'static [&'static str],
+}
+
+macro_rules! sc {
+    ($id:expr, $group:expr, $desc:expr, [$($d:expr),*]) => {
+        ShortcutDef { id: $id, group: $group, desc: $desc, defaults: &[$($d),*] }
+    };
+}
+
+const SC_LOCKED: &str = "settings";
+
+const G_TABS: &str = "Tabs & Workspaces";
+const G_PANELS: &str = "Panels, Settings & Tools";
+
+const SHORTCUT_DEFS: &[ShortcutDef] = &[
+    sc!("new_tab", G_TABS, "Open Omnibar / New tab", ["Alt+T"]),
+    sc!("focus_url", G_TABS, "Focus URL / Address bar", ["Alt+G"]),
+    sc!("close_tab", G_TABS, "Close focused tab", ["Alt+W"]),
+    sc!("reload", G_TABS, "Reload active tab", ["Alt+R"]),
+    sc!("full_tab", G_TABS, "Toggle Full Tab View", ["Alt+F"]),
+    sc!("split_v", G_TABS, "Split column vertically", ["Alt+N"]),
+    sc!("focus_left", G_TABS, "Focus column Left", ["Alt+H"]),
+    sc!("focus_right", G_TABS, "Focus column Right", ["Alt+L"]),
+    sc!("focus_down", G_TABS, "Focus row Down", ["Alt+J"]),
+    sc!("focus_up", G_TABS, "Focus row Up", ["Alt+K"]),
+    sc!("move_left", G_TABS, "Move tab column Left", ["Alt+Shift+H"]),
+    sc!("move_right", G_TABS, "Move tab column Right", ["Alt+Shift+L"]),
+    sc!("move_down", G_TABS, "Move tab row Down", ["Alt+Shift+J"]),
+    sc!("move_up", G_TABS, "Move tab row Up", ["Alt+Shift+K"]),
+    sc!("ws_1", G_TABS, "Switch to workspace 1", ["Alt+1"]),
+    sc!("ws_2", G_TABS, "Switch to workspace 2", ["Alt+2"]),
+    sc!("ws_3", G_TABS, "Switch to workspace 3", ["Alt+3"]),
+    sc!("ws_4", G_TABS, "Switch to workspace 4", ["Alt+4"]),
+    sc!("ws_5", G_TABS, "Switch to workspace 5", ["Alt+5"]),
+    sc!("ws_6", G_TABS, "Switch to workspace 6", ["Alt+6"]),
+    sc!("ws_7", G_TABS, "Switch to workspace 7", ["Alt+7"]),
+    sc!("ws_8", G_TABS, "Switch to workspace 8", ["Alt+8"]),
+    sc!("ws_9", G_TABS, "Switch to workspace 9", ["Alt+9"]),
+    sc!("mv_1", G_TABS, "Move tab to workspace 1", ["Alt+Shift+1"]),
+    sc!("mv_2", G_TABS, "Move tab to workspace 2", ["Alt+Shift+2"]),
+    sc!("mv_3", G_TABS, "Move tab to workspace 3", ["Alt+Shift+3"]),
+    sc!("mv_4", G_TABS, "Move tab to workspace 4", ["Alt+Shift+4"]),
+    sc!("mv_5", G_TABS, "Move tab to workspace 5", ["Alt+Shift+5"]),
+    sc!("settings", G_PANELS, "Toggle Settings panel", ["Alt+Shift+S"]),
+    sc!("settings_profiles", G_PANELS, "Open Settings > Profiles", ["Alt+Shift+P"]),
+    sc!("profiles", G_PANELS, "Profiles / profile switcher", ["Alt+P"]),
+    sc!("data", G_PANELS, "Data & Backup", ["Alt+I"]),
+    sc!("devtools", G_PANELS, "Toggle DevTools", ["F12"]),
+    sc!("devtools_dock", G_PANELS, "Cycle DevTools dock position", ["Alt+Shift+D"]),
+    sc!("map", G_PANELS, "Toggle Roadmap / Minimap", ["Alt+M"]),
+    sc!("overview", G_PANELS, "Toggle Spatial Overview", ["Alt+O"]),
+    sc!("sidebar", G_PANELS, "Toggle Sidebar", ["Alt+B"]),
+    sc!("touchpad", G_PANELS, "Toggle Touchpad Canvas Navigation", ["Alt+Shift+T"]),
+    sc!("back", G_PANELS, "Browser Back", ["Alt+Left"]),
+    sc!("forward", G_PANELS, "Browser Forward", ["Alt+Right"]),
+    sc!("fullscreen", G_PANELS, "Toggle Fullscreen", ["F11"]),
+    sc!("quit", G_PANELS, "Quit Rail", ["Alt+Q"]),
+];
+
+#[derive(Clone, Default)]
+struct ShortcutConfig {
+    overrides: std::collections::HashMap<String, Vec<String>>,
+    disabled: std::collections::HashSet<String>,
+    site_wins: bool,
+}
+
+enum ScResolve {
+    Action(String),
+    Disabled,
+    Unknown,
+}
+
+thread_local! {
+    static SHORTCUTS: RefCell<ShortcutConfig> = RefCell::new(ShortcutConfig::default());
+    static KEY_CTL: RefCell<Option<gtk::EventControllerKey>> = RefCell::new(None);
+}
+
+fn shortcuts_path() -> PathBuf {
+    customize_dir().join("shortcuts-customize.json")
+}
+
+/// Re-reads everything Customize stores on disk (used after a Data & Backup import).
+fn reload_customize_from_disk() {
+    SHORTCUTS.with(|c| *c.borrow_mut() = load_shortcuts_config());
+    apply_shortcut_priority();
+    apply_html_css(&load_html_css());
+}
+
+fn load_shortcuts_config() -> ShortcutConfig {
+    let mut cfg = ShortcutConfig::default();
+    let Ok(text) = std::fs::read_to_string(shortcuts_path()) else {
+        return cfg;
+    };
+    let Some(root) = minijson::parse(&text) else {
+        return cfg;
+    };
+    cfg.site_wins = root.get("priority").and_then(|v| v.as_str()) == Some("site");
+    if let Some(minijson::Json::Obj(items)) = root.get("shortcuts") {
+        for (id, v) in items {
+            let Some(def) = SHORTCUT_DEFS.iter().find(|d| d.id == id.as_str()) else {
+                continue;
+            };
+            if v.get("enabled").and_then(|b| b.as_bool()) == Some(false) {
+                cfg.disabled.insert(def.id.to_string());
+            }
+            if let Some(arr) = v.get("keys").and_then(|k| k.as_arr()) {
+                let list: Vec<String> = arr
+                    .iter()
+                    .filter_map(|x| x.as_str())
+                    .map(|s| s.trim().to_string())
+                    .filter(|c| sc_valid_combo(c))
+                    .collect();
+                cfg.overrides.insert(def.id.to_string(), list);
+            }
+        }
+    }
+    sc_normalize(&mut cfg);
+    cfg
+}
+
+fn save_shortcuts_config(cfg: &ShortcutConfig) -> bool {
+    let mut out = String::from("{\n  \"version\": 1,\n");
+    out.push_str(&format!(
+        "  \"priority\": \"{}\",\n",
+        if cfg.site_wins { "site" } else { "rail" }
+    ));
+    out.push_str("  \"shortcuts\": {\n");
+    let total = SHORTCUT_DEFS.len();
+    for (i, def) in SHORTCUT_DEFS.iter().enumerate() {
+        let keys: Vec<String> = sc_effective(def, cfg)
+            .iter()
+            .map(|k| format!("\"{}\"", minijson::escape(k)))
+            .collect();
+        out.push_str(&format!(
+            "    \"{}\": {{ \"description\": \"{}\", \"enabled\": {}, \"keys\": [{}] }}{}\n",
+            def.id,
+            minijson::escape(def.desc),
+            sc_enabled(cfg, def.id),
+            keys.join(", "),
+            if i + 1 < total { "," } else { "" }
+        ));
+    }
+    out.push_str("  }\n}\n");
+    let path = shortcuts_path();
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    std::fs::write(path, out).is_ok()
+}
+
+fn sc_effective(def: &ShortcutDef, cfg: &ShortcutConfig) -> Vec<String> {
+    match cfg.overrides.get(def.id) {
+        Some(list) => list.clone(),
+        None => def.defaults.iter().map(|s| s.to_string()).collect(),
+    }
+}
+
+fn sc_enabled(cfg: &ShortcutConfig, id: &str) -> bool {
+    id == SC_LOCKED || !cfg.disabled.contains(id)
+}
+
+fn sc_normalize(cfg: &mut ShortcutConfig) {
+    cfg.disabled.remove(SC_LOCKED);
+    cfg.disabled
+        .retain(|id| SHORTCUT_DEFS.iter().any(|d| d.id == id.as_str()));
+    for def in SHORTCUT_DEFS {
+        let is_default = cfg
+            .overrides
+            .get(def.id)
+            .map(|l| l.iter().map(|s| s.as_str()).eq(def.defaults.iter().copied()))
+            .unwrap_or(false);
+        if is_default {
+            cfg.overrides.remove(def.id);
+        }
+    }
+    // The Settings shortcut can never end up unbound.
+    if cfg.overrides.get(SC_LOCKED).map(|l| l.is_empty()).unwrap_or(false) {
+        cfg.overrides.remove(SC_LOCKED);
+    }
+}
+
+/// Puts `combo` into slot `slot` of `def`. Takes it away from any other shortcut that
+/// used it. Returns a short note about what moved, or why it was refused.
+fn sc_set_slot(
+    cfg: &mut ShortcutConfig,
+    def: &ShortcutDef,
+    slot: usize,
+    combo: &str,
+) -> Result<String, String> {
+    if !sc_valid_combo(combo) {
+        return Err("Pick Alt or Ctrl with a key (F-keys can be used alone).".to_string());
+    }
+    if def.id != SC_LOCKED {
+        if let Some(locked) = SHORTCUT_DEFS.iter().find(|d| d.id == SC_LOCKED) {
+            if sc_effective(locked, cfg).iter().any(|c| c == combo) {
+                return Err(format!("{} is reserved for opening Settings.", combo));
+            }
+        }
+    }
+    let mut note = String::new();
+    for other in SHORTCUT_DEFS {
+        if other.id == def.id {
+            continue;
+        }
+        let eff = sc_effective(other, cfg);
+        if eff.iter().any(|c| c == combo) {
+            let rest: Vec<String> = eff.into_iter().filter(|c| c != combo).collect();
+            cfg.overrides.insert(other.id.to_string(), rest);
+            note = format!("{} was taken from \"{}\".", combo, other.desc);
+        }
+    }
+    let mut list = sc_effective(def, cfg);
+    if slot < list.len() {
+        list[slot] = combo.to_string();
+    } else {
+        list.push(combo.to_string());
+    }
+    let mut seen: Vec<String> = Vec::new();
+    list.retain(|c| {
+        if seen.contains(c) {
+            false
+        } else {
+            seen.push(c.clone());
+            true
+        }
+    });
+    cfg.overrides.insert(def.id.to_string(), list);
+    Ok(note)
+}
+
+fn sc_valid_combo(c: &str) -> bool {
+    let parts: Vec<&str> = c.split('+').collect();
+    let has_mod = parts.iter().any(|p| matches!(*p, "Ctrl" | "Alt" | "Super"));
+    let last = parts.last().copied().unwrap_or("");
+    let is_fkey = last.len() >= 2
+        && last.len() <= 3
+        && last.starts_with('F')
+        && last[1..].chars().all(|ch| ch.is_ascii_digit());
+    has_mod || is_fkey
+}
+
+fn is_modifier_key(key: gdk::Key) -> bool {
+    matches!(
+        key,
+        gdk::Key::Shift_L
+            | gdk::Key::Shift_R
+            | gdk::Key::Control_L
+            | gdk::Key::Control_R
+            | gdk::Key::Alt_L
+            | gdk::Key::Alt_R
+            | gdk::Key::Super_L
+            | gdk::Key::Super_R
+            | gdk::Key::Meta_L
+            | gdk::Key::Meta_R
+            | gdk::Key::Hyper_L
+            | gdk::Key::Hyper_R
+            | gdk::Key::Caps_Lock
+            | gdk::Key::Num_Lock
+            | gdk::Key::ISO_Level3_Shift
+    )
+}
+
+/// Layout-independent name of a key press, e.g. "Alt+Shift+T" or "F12".
+fn shortcut_combo(key: gdk::Key, keycode: u32, state: gdk::ModifierType) -> Option<String> {
+    use gdk::ModifierType as M;
+    if is_modifier_key(key) {
+        return None;
+    }
+    let mut label: Option<String> = None;
+    if let Some(display) = gdk::Display::default() {
+        if let Some(entries) = display.map_keycode(keycode) {
+            for (kk, k) in entries.iter() {
+                if kk.level() != 0 {
+                    continue;
+                }
+                if let Some(c) = k.to_unicode() {
+                    if c.is_ascii_graphic() {
+                        label = Some(if c == '+' {
+                            "plus".to_string()
+                        } else {
+                            c.to_ascii_uppercase().to_string()
+                        });
+                        break;
+                    }
+                }
+            }
+            if label.is_none() {
+                for (kk, k) in entries.iter() {
+                    if kk.level() == 0 {
+                        if let Some(n) = k.name() {
+                            label = Some(n.to_string());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let label = match label {
+        Some(l) => l,
+        None => key.to_lower().name()?.to_string(),
+    };
+    let mut out = String::new();
+    if state.contains(M::CONTROL_MASK) {
+        out.push_str("Ctrl+");
+    }
+    if state.contains(M::ALT_MASK) {
+        out.push_str("Alt+");
+    }
+    if state.contains(M::SHIFT_MASK) {
+        out.push_str("Shift+");
+    }
+    if state.contains(M::SUPER_MASK) {
+        out.push_str("Super+");
+    }
+    out.push_str(&label);
+    Some(out)
+}
+
+/// Turns a default combo string back into a key event Rail's key handler understands.
+fn sc_synth(combo: &str) -> Option<(gdk::Key, gdk::ModifierType)> {
+    use gdk::ModifierType as M;
+    let mut mods = M::empty();
+    let mut name = "";
+    for part in combo.split('+') {
+        match part {
+            "Ctrl" => mods |= M::CONTROL_MASK,
+            "Alt" => mods |= M::ALT_MASK,
+            "Shift" => mods |= M::SHIFT_MASK,
+            "Super" => mods |= M::SUPER_MASK,
+            other => name = other,
+        }
+    }
+    let key = if name.chars().count() == 1 {
+        gdk::Key::from_name(name.to_lowercase())?
+    } else {
+        gdk::Key::from_name(name)?
+    };
+    Some((key, mods))
+}
+
+fn sc_resolve(combo: &str) -> ScResolve {
+    SHORTCUTS.with(|c| {
+        let cfg = c.borrow();
+        for def in SHORTCUT_DEFS {
+            if !sc_enabled(&cfg, def.id) {
+                continue;
+            }
+            if sc_effective(def, &cfg).iter().any(|x| x == combo) {
+                return ScResolve::Action(def.defaults[0].to_string());
+            }
+        }
+        for def in SHORTCUT_DEFS {
+            if def.defaults.contains(&combo) {
+                return ScResolve::Disabled;
+            }
+        }
+        ScResolve::Unknown
+    })
+}
+
+/// Rail first (capture phase) or the page first (bubble phase).
+fn apply_shortcut_priority() {
+    let site_wins = SHORTCUTS.with(|c| c.borrow().site_wins);
+    KEY_CTL.with(|k| {
+        if let Some(ctl) = k.borrow().as_ref() {
+            ctl.set_propagation_phase(if site_wins {
+                gtk::PropagationPhase::Bubble
+            } else {
+                gtk::PropagationPhase::Capture
+            });
+        }
+    });
+}
+
+#[derive(Clone)]
+struct ScUi {
+    rows: gtk::Box,
+    pending: Rc<RefCell<ShortcutConfig>>,
+    status: gtk::Label,
+}
+
+const SC_MODS: &[&str] = &["Alt", "Ctrl", "Alt+Shift", "Ctrl+Shift", "None"];
+const SC_KEY_ROWS: &[&str] = &["`1234567890-=", "QWERTYUIOP[]", "ASDFGHJKL;'", "ZXCVBNM,./\\"];
+
+fn sc_key_label(v: &str) -> String {
+    match v {
+        "" => "Pick key".to_string(),
+        "Left" => "\u{2190}".to_string(),
+        "Right" => "\u{2192}".to_string(),
+        "Up" => "\u{2191}".to_string(),
+        "Down" => "\u{2193}".to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// "Alt+Shift+T" -> (index into SC_MODS, "T")
+fn sc_split(combo: &str) -> (u32, String) {
+    let mut parts: Vec<&str> = combo.split('+').collect();
+    let key = parts.pop().unwrap_or("").to_string();
+    let ctrl = parts.contains(&"Ctrl");
+    let alt = parts.contains(&"Alt");
+    let shift = parts.contains(&"Shift");
+    let idx = if ctrl {
+        if shift { 3 } else { 1 }
+    } else if alt {
+        if shift { 2 } else { 0 }
+    } else {
+        4
+    };
+    (idx, key)
+}
+
+fn sc_join(mod_idx: u32, key: &str) -> String {
+    let prefix = match mod_idx {
+        0 => "Alt+",
+        1 => "Ctrl+",
+        2 => "Alt+Shift+",
+        3 => "Ctrl+Shift+",
+        _ => "",
+    };
+    format!("{}{}", prefix, key)
+}
+
+/// On-screen keyboard: the user taps a key instead of pressing it.
+/// What it offers follows the modifier dropdown: "None" only makes sense for F1-F12
+/// (a bare letter would steal normal typing), everything else gets the full keyboard.
+fn sc_build_picker(sel: Rc<Cell<u32>>, on_pick: Rc<dyn Fn(String)>) -> gtk::Popover {
+    let pop = gtk::Popover::new();
+    let grid = gtk::Grid::new();
+    grid.set_row_spacing(4);
+    grid.set_column_spacing(4);
+    grid.set_margin_top(8);
+    grid.set_margin_bottom(8);
+    grid.set_margin_start(8);
+    grid.set_margin_end(8);
+    pop.set_child(Some(&grid));
+
+    let fill = {
+        let grid = grid.clone();
+        let weak = pop.downgrade();
+        move |only_f: bool| {
+            while let Some(child) = grid.first_child() {
+                grid.remove(&child);
+            }
+            let make = |label: &str, value: &str| -> gtk::Button {
+                let b = gtk::Button::with_label(label);
+                b.add_css_class("settings-option-item");
+                b.set_size_request(if only_f { 52 } else { 34 }, 30);
+                let v = value.to_string();
+                let cb = on_pick.clone();
+                let w = weak.clone();
+                b.connect_clicked(move |_| {
+                    if let Some(p) = w.upgrade() {
+                        p.popdown();
+                    }
+                    cb(v.clone());
+                });
+                b
+            };
+            if only_f {
+                for n in 1..=12i32 {
+                    let s = format!("F{}", n);
+                    grid.attach(&make(&s, &s), (n - 1) % 6, (n - 1) / 6, 1, 1);
+                }
+                return;
+            }
+            for (r, chars) in SC_KEY_ROWS.iter().enumerate() {
+                for (c, ch) in chars.chars().enumerate() {
+                    let s = ch.to_string();
+                    grid.attach(&make(&s, &s), c as i32, r as i32, 1, 1);
+                }
+            }
+            for n in 1..=12 {
+                let s = format!("F{}", n);
+                grid.attach(&make(&s, &s), n - 1, 4, 1, 1);
+            }
+            let arrows = [
+                ("\u{2190}", "Left"),
+                ("\u{2191}", "Up"),
+                ("\u{2193}", "Down"),
+                ("\u{2192}", "Right"),
+            ];
+            for (i, (l, v)) in arrows.iter().enumerate() {
+                grid.attach(&make(l, v), i as i32, 5, 1, 1);
+            }
+        }
+    };
+    fill(sel.get() == 4);
+    pop.connect_show(move |_| fill(sel.get() == 4));
+    pop
+}
+
+fn sc_commit(ui: &ScUi) {
+    let cfg = {
+        let mut p = ui.pending.borrow_mut();
+        sc_normalize(&mut p);
+        p.clone()
+    };
+    if save_shortcuts_config(&cfg) {
+        SHORTCUTS.with(|c| *c.borrow_mut() = cfg);
+        apply_shortcut_priority();
+    } else {
+        ui.status.set_text("Could not write shortcuts-customize.json");
+    }
+}
+
+/// Rebuilds the rows after the current event finishes, keeping the scroll position.
+fn sc_refresh(ui: &ScUi) {
+    let ui = ui.clone();
+    glib::idle_add_local_once(move || {
+        let adj = ui
+            .rows
+            .ancestor(gtk::ScrolledWindow::static_type())
+            .and_then(|w| w.downcast::<gtk::ScrolledWindow>().ok())
+            .map(|sw| sw.vadjustment());
+        let pos = adj.as_ref().map(|a| a.value());
+        sc_build(&ui);
+        if let (Some(adj), Some(pos)) = (adj, pos) {
+            glib::idle_add_local_once(move || adj.set_value(pos));
+        }
+    });
+}
+
+fn sc_apply_slot(ui: &ScUi, def: &'static ShortcutDef, slot: usize, combo: String) {
+    let res = sc_set_slot(&mut ui.pending.borrow_mut(), def, slot, &combo);
+    match res {
+        Ok(note) => {
+            sc_commit(ui);
+            ui.status.set_text(&note);
+        }
+        Err(e) => ui.status.set_text(&e),
+    }
+    sc_refresh(ui);
+}
+
+fn sc_build(ui: &ScUi) {
+    let container = &ui.rows;
+    while let Some(child) = container.first_child() {
+        container.remove(&child);
+    }
+    let cfg = ui.pending.borrow().clone();
+    let mut last_group = "";
+    for def in SHORTCUT_DEFS {
+        if def.group != last_group {
+            last_group = def.group;
+            let h = gtk::Label::new(Some(def.group));
+            h.add_css_class("settings-card-title");
+            h.set_xalign(0.0);
+            h.set_margin_top(10);
+            h.set_margin_bottom(4);
+            container.append(&h);
+        }
+        let enabled = sc_enabled(&cfg, def.id);
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        row.add_css_class("shortcut-row");
+        row.set_margin_top(3);
+        row.set_margin_bottom(3);
+
+        let d = gtk::Label::new(Some(def.desc));
+        d.add_css_class("shortcut-desc");
+        d.set_xalign(0.0);
+        d.set_hexpand(true);
+        d.set_wrap(true);
+        d.set_valign(gtk::Align::Center);
+        d.set_opacity(if enabled { 1.0 } else { 0.45 });
+        row.append(&d);
+
+        if def.id == SC_LOCKED {
+            let lock = gtk::Image::from_icon_name("changes-prevent-symbolic");
+            lock.set_valign(gtk::Align::Center);
+            lock.set_tooltip_text(Some(
+                "Always on: this opens Settings, so it can't be turned off.",
+            ));
+            row.append(&lock);
+        } else {
+            let sw = gtk::Switch::new();
+            sw.set_active(enabled);
+            sw.set_valign(gtk::Align::Center);
+            sw.set_tooltip_text(Some("Turn this shortcut on or off"));
+            let ui2 = ui.clone();
+            sw.connect_active_notify(move |s| {
+                {
+                    let mut c = ui2.pending.borrow_mut();
+                    if s.is_active() {
+                        c.disabled.remove(def.id);
+                    } else {
+                        c.disabled.insert(def.id.to_string());
+                    }
+                }
+                sc_commit(&ui2);
+                sc_refresh(&ui2);
+            });
+            row.append(&sw);
+        }
+
+        let slots = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        slots.set_sensitive(enabled);
+        let eff = sc_effective(def, &cfg);
+        let count = eff.len().max(1);
+        for slot in 0..count {
+            let combo = eff.get(slot).cloned().unwrap_or_default();
+            let (mod_idx, key) = if combo.is_empty() {
+                (0u32, String::new())
+            } else {
+                sc_split(&combo)
+            };
+            let sel = Rc::new(Cell::new(mod_idx));
+            let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+
+            let dd = gtk::DropDown::from_strings(SC_MODS);
+            dd.set_selected(mod_idx);
+            {
+                let ui3 = ui.clone();
+                let sel = sel.clone();
+                let key = key.clone();
+                dd.connect_selected_notify(move |d| {
+                    sel.set(d.selected());
+                    let is_f = key.len() >= 2 && key.starts_with('F') && key[1..].chars().all(|c| c.is_ascii_digit());
+                    if sel.get() == 4 && !is_f {
+                        ui3.status.set_text("No modifier: tap the key button and pick F1-F12");
+                    } else if !key.is_empty() {
+                        sc_apply_slot(&ui3, def, slot, sc_join(sel.get(), &key));
+                    }
+                });
+            }
+            line.append(&dd);
+
+            let kb = gtk::MenuButton::new();
+            kb.set_label(&sc_key_label(&key));
+            kb.set_size_request(80, -1);
+            {
+                let ui4 = ui.clone();
+                let sel = sel.clone();
+                let pop = sc_build_picker(sel.clone(), Rc::new(move |v: String| {
+                    sc_apply_slot(&ui4, def, slot, sc_join(sel.get(), &v));
+                }));
+                kb.set_popover(Some(&pop));
+            }
+            line.append(&kb);
+
+            if eff.len() > 1 {
+                let rm = gtk::Button::from_icon_name("window-close-symbolic");
+                rm.add_css_class("flat");
+                rm.set_tooltip_text(Some("Remove this key"));
+                let ui5 = ui.clone();
+                rm.connect_clicked(move |_| {
+                    {
+                        let mut c = ui5.pending.borrow_mut();
+                        let mut list = sc_effective(def, &c);
+                        if slot < list.len() && list.len() > 1 {
+                            list.remove(slot);
+                            c.overrides.insert(def.id.to_string(), list);
+                        }
+                    }
+                    sc_commit(&ui5);
+                    sc_refresh(&ui5);
+                });
+                line.append(&rm);
+            }
+            slots.append(&line);
+        }
+        row.append(&slots);
+
+        if cfg.overrides.contains_key(def.id) || cfg.disabled.contains(def.id) {
+            let reset = gtk::Button::from_icon_name("edit-undo-symbolic");
+            reset.add_css_class("flat");
+            reset.set_valign(gtk::Align::Center);
+            reset.set_tooltip_text(Some("Reset to default"));
+            let ui6 = ui.clone();
+            reset.connect_clicked(move |_| {
+                {
+                    let mut c = ui6.pending.borrow_mut();
+                    c.overrides.remove(def.id);
+                    c.disabled.remove(def.id);
+                }
+                sc_commit(&ui6);
+                sc_refresh(&ui6);
+            });
+            row.append(&reset);
+        } else {
+            let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            spacer.set_size_request(32, -1);
+            row.append(&spacer);
+        }
+        container.append(&row);
+    }
 }
 
 fn to_uri(input: &str, search_engine: &str) -> String {
@@ -2640,7 +3261,7 @@ impl App {
         // Update URL and host badge in devtools header if ever needed
         let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_else(|| "about:blank".to_string());
         let host = host_of(&cur_uri).unwrap_or_else(|| "localhost".to_string());
-        self.devtools_url_lbl.set_markup(&format!("<span foreground='#38bdf8'>{}</span> <span color='#64748b'>•</span> <span color='#94a3b8'>{}</span>", glib::markup_escape_text(&host), glib::markup_escape_text(&cur_uri)));
+        self.devtools_url_lbl.set_markup(&format!("<span foreground='#fafafa'>{}</span> <span color='#64748b'>•</span> <span color='#94a3b8'>{}</span>", glib::markup_escape_text(&host), glib::markup_escape_text(&cur_uri)));
 
         let side = self.devtools_dock_side.get();
         self.set_devtools_dock_side(side);
@@ -2984,7 +3605,7 @@ impl App {
 
         menu.append(&ContextMenuItem::from_stock_action_with_label(
             ContextMenuAction::InspectElement,
-            "Inspect Element  (F12 / Alt+Shift+I)",
+            "Inspect Element  (F12)",
         ));
     }
 
@@ -3609,7 +4230,7 @@ impl App {
 
     fn show_touchpad_toast(self: &Rc<Self>, enabled: bool) {
         if enabled {
-            self.touchpad_toast.set_markup("<span weight='bold' foreground='#38bdf8'>Touchpad Slide: ON</span>  <span foreground='#94a3b8'>· 2-finger swipe to slide tabs</span>");
+            self.touchpad_toast.set_markup("<span weight='bold' foreground='#fafafa'>Touchpad Slide: ON</span>  <span foreground='#94a3b8'>· 2-finger swipe to slide tabs</span>");
         } else {
             self.touchpad_toast.set_markup("<span weight='bold' foreground='#94a3b8'>Touchpad Slide: OFF</span>  <span foreground='#64748b'>· Standard page scroll</span>");
         }
@@ -4695,7 +5316,6 @@ impl App {
             SettingsTab::Profiles => "profiles",
             SettingsTab::Data => "data",
             SettingsTab::Privacy => "privacy",
-            SettingsTab::Shortcuts => "shortcuts",
             SettingsTab::Customize => "customize",
             SettingsTab::About => "about",
         };
@@ -4742,13 +5362,7 @@ impl App {
     }
 
     fn reload_css_editor(&self) {
-        let text = load_html_css();
-        self.css_buffer.set_text(&text);
-        rebuild_css_chips(&self.css_chips, &self.css_buffer, &self.css_view);
-        self.css_status_lbl.set_text(&format!(
-            "Editing {}. Click an element above to jump to its rules.",
-            html_css_path().display()
-        ));
+        self.css_buffer.set_text(&load_html_css());
     }
 
     fn toggle_settings_modal(self: &Rc<Self>) {
@@ -4863,6 +5477,8 @@ impl App {
         match import_data(&path) {
             Ok(()) => {
                 // Reload profile manager from imported profiles.txt
+                reload_customize_from_disk();
+                self.reload_css_editor();
                 *self.profiles.borrow_mut() = ProfileManager::new(rail_data_dir());
                 self.rebuild_profiles_modal_list();
                 let active_id = self.profiles.borrow().active_profile().id;
@@ -5132,7 +5748,7 @@ impl App {
 
     fn draw_minimap(&self, cr: &gtk::cairo::Context, width: f64, height: f64) {
         // Rail deep obsidian canvas background (#060913)
-        cr.set_source_rgb(0.024, 0.035, 0.075);
+        cr.set_source_rgb(0.03, 0.03, 0.03);
         let _ = cr.paint();
 
         let rows = self.rows.borrow();
@@ -5179,10 +5795,10 @@ impl App {
                 Self::draw_rounded_rect(cr, sx, sy, sw, sh, corner_r);
 
                 // Sleek dark slate tile (#0f172a)
-                cr.set_source_rgb(0.059, 0.090, 0.165);
+                cr.set_source_rgb(0.08, 0.08, 0.08);
                 let _ = cr.fill_preserve();
                 // Subtle border (#1e293b)
-                cr.set_source_rgb(0.118, 0.161, 0.231);
+                cr.set_source_rgb(0.15, 0.15, 0.15);
                 cr.set_line_width((1.2 * zoom).clamp(0.8, 1.8));
                 let _ = cr.stroke();
             }
@@ -5198,12 +5814,12 @@ impl App {
 
             Self::draw_rounded_rect(cr, cur_sx, cur_sy, cur_sw, cur_sh, corner_r);
 
-            // Electric Rail cyan fill (#0284c7)
-            cr.set_source_rgba(0.008, 0.518, 0.780, 0.85);
+            // Dark fill
+            cr.set_source_rgba(0.22, 0.22, 0.22, 0.95);
             let _ = cr.fill_preserve();
 
-            // Radiant cyan border (#7dd3fc)
-            cr.set_source_rgb(0.490, 0.827, 0.988);
+            // Bright white border
+            cr.set_source_rgb(0.93, 0.93, 0.93);
             cr.set_line_width((2.0 * zoom).clamp(1.4, 2.8));
             let _ = cr.stroke();
 
@@ -6154,7 +6770,6 @@ fn build(gapp: &gtk::Application) {
         (SettingsTab::Profiles, "system-users-symbolic", "Profiles"),
         (SettingsTab::Data, "drive-harddisk-symbolic", "Data & Backup"),
         (SettingsTab::Privacy, "security-high-symbolic", "Privacy & Shield"),
-        (SettingsTab::Shortcuts, "input-keyboard-symbolic", "Shortcuts"),
         (SettingsTab::Customize, "document-edit-symbolic", "Customize"),
         (SettingsTab::About, "help-about-symbolic", "About Rail"),
     ];
@@ -6289,35 +6904,8 @@ fn build(gapp: &gtk::Application) {
     settings_stack.add_named(&page_gen_scroll, Some("general"));
 
     // --- Page: Customize (html.css editor) ---
-    let page_css = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    page_css.add_css_class("settings-content-page");
+    let page_css = gtk::Box::new(gtk::Orientation::Vertical, 10);
     page_css.set_vexpand(true);
-
-    let css_title = gtk::Label::new(Some("Customize HTML Defaults"));
-    css_title.add_css_class("settings-page-title");
-    css_title.set_xalign(0.0);
-    let css_subtitle = gtk::Label::new(Some(
-        "html.css holds Chrome's default look for every element (button, input types, select, headings...). Edit it freely.",
-    ));
-    css_subtitle.add_css_class("settings-page-subtitle");
-    css_subtitle.set_xalign(0.0);
-    css_subtitle.set_wrap(true);
-    page_css.append(&css_title);
-    page_css.append(&css_subtitle);
-
-    let css_chips = gtk::FlowBox::new();
-    css_chips.set_selection_mode(gtk::SelectionMode::None);
-    css_chips.set_homogeneous(false);
-    css_chips.set_column_spacing(6);
-    css_chips.set_row_spacing(6);
-    css_chips.set_max_children_per_line(12);
-    let chips_scroll = gtk::ScrolledWindow::new();
-    chips_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-    chips_scroll.set_min_content_height(64);
-    chips_scroll.set_max_content_height(96);
-    chips_scroll.set_propagate_natural_height(true);
-    chips_scroll.set_child(Some(&css_chips));
-    page_css.append(&chips_scroll);
 
     let css_buffer = gtk::TextBuffer::new(None::<&gtk::TextTagTable>);
     let css_view = gtk::TextView::with_buffer(&css_buffer);
@@ -6331,73 +6919,28 @@ fn build(gapp: &gtk::Application) {
     let css_scroll = gtk::ScrolledWindow::new();
     css_scroll.add_css_class("css-editor-frame");
     css_scroll.set_vexpand(true);
-    css_scroll.set_min_content_height(200);
+    css_scroll.set_min_content_height(300);
     css_scroll.set_child(Some(&css_view));
     page_css.append(&css_scroll);
 
-    let css_btn_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    let css_save_btn = gtk::Button::with_label("Save & Apply (Ctrl+S)");
+    let css_save_btn = gtk::Button::with_label("Save");
     css_save_btn.add_css_class("settings-option-item");
     css_save_btn.add_css_class("active");
-    let css_default_btn = gtk::Button::with_label("Load Chrome default");
-    css_default_btn.add_css_class("settings-option-item");
-    let css_reload_btn = gtk::Button::with_label("Reload from file");
-    css_reload_btn.add_css_class("settings-option-item");
-    css_btn_row.append(&css_save_btn);
-    css_btn_row.append(&css_default_btn);
-    css_btn_row.append(&css_reload_btn);
-    page_css.append(&css_btn_row);
-
-    let css_status_lbl = gtk::Label::new(None);
-    css_status_lbl.add_css_class("settings-card-desc");
-    css_status_lbl.set_xalign(0.0);
-    css_status_lbl.set_wrap(true);
-    css_status_lbl.set_selectable(true);
-    page_css.append(&css_status_lbl);
+    css_save_btn.set_halign(gtk::Align::Start);
+    page_css.append(&css_save_btn);
 
     {
         let buf = css_buffer.clone();
-        let st = css_status_lbl.clone();
-        let chips = css_chips.clone();
-        let view = css_view.clone();
-        css_save_btn.connect_clicked(move |_| {
-            save_css_editor(&buf, &st);
-            rebuild_css_chips(&chips, &buf, &view);
-        });
+        css_save_btn.connect_clicked(move |b| save_css_editor(&buf, b));
     }
     {
         let buf = css_buffer.clone();
-        let st = css_status_lbl.clone();
-        let chips = css_chips.clone();
-        let view = css_view.clone();
-        css_default_btn.connect_clicked(move |_| {
-            buf.set_text(DEFAULT_HTML_CSS);
-            rebuild_css_chips(&chips, &buf, &view);
-            st.set_text("Chrome default loaded into the editor. Press Save & Apply to use it.");
-        });
-    }
-    {
-        let buf = css_buffer.clone();
-        let st = css_status_lbl.clone();
-        let chips = css_chips.clone();
-        let view = css_view.clone();
-        css_reload_btn.connect_clicked(move |_| {
-            buf.set_text(&load_html_css());
-            rebuild_css_chips(&chips, &buf, &view);
-            st.set_text(&format!("Reloaded {}.", html_css_path().display()));
-        });
-    }
-    {
-        let buf = css_buffer.clone();
-        let st = css_status_lbl.clone();
-        let chips = css_chips.clone();
-        let view = css_view.clone();
+        let btn = css_save_btn.clone();
         let kc = gtk::EventControllerKey::new();
         kc.set_propagation_phase(gtk::PropagationPhase::Capture);
         kc.connect_key_pressed(move |_, key, _, state| {
             if state.contains(gdk::ModifierType::CONTROL_MASK) && key.to_lower() == gdk::Key::s {
-                save_css_editor(&buf, &st);
-                rebuild_css_chips(&chips, &buf, &view);
+                save_css_editor(&buf, &btn);
                 glib::Propagation::Stop
             } else {
                 glib::Propagation::Proceed
@@ -6406,7 +6949,120 @@ fn build(gapp: &gtk::Application) {
         css_view.add_controller(kc);
     }
 
-    settings_stack.add_named(&page_css, Some("customize"));
+    // --- Customize > Shortcuts subtab ---
+    let sc_pending: Rc<RefCell<ShortcutConfig>> = Rc::new(RefCell::new(ShortcutConfig::default()));
+    let sc_page = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    sc_page.set_vexpand(true);
+
+    let sc_prio = gtk::CheckButton::with_label("Rail shortcuts win over website shortcuts");
+    sc_prio.set_active(true);
+    let sc_prio_hint = gtk::Label::new(Some(
+        "Unchecked: when a page uses the same keys, the page wins and Rail stays out of the way.",
+    ));
+    sc_prio_hint.add_css_class("settings-card-desc");
+    sc_prio_hint.set_xalign(0.0);
+    sc_prio_hint.set_wrap(true);
+    sc_page.append(&sc_prio);
+    sc_page.append(&sc_prio_hint);
+
+    let sc_rows = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    let sc_scroll = gtk::ScrolledWindow::new();
+    sc_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    sc_scroll.set_vexpand(true);
+    sc_scroll.set_min_content_height(260);
+    sc_scroll.set_child(Some(&sc_rows));
+    sc_page.append(&sc_scroll);
+
+    let sc_status = gtk::Label::new(None);
+    sc_status.add_css_class("settings-card-desc");
+    sc_status.set_xalign(0.0);
+    sc_status.set_wrap(true);
+    sc_page.append(&sc_status);
+
+    let sc_reset_all = gtk::Button::with_label("Reset all to defaults");
+    sc_reset_all.add_css_class("settings-option-item");
+    sc_reset_all.set_halign(gtk::Align::Start);
+    sc_page.append(&sc_reset_all);
+
+    let sc_ui = ScUi {
+        rows: sc_rows.clone(),
+        pending: sc_pending.clone(),
+        status: sc_status.clone(),
+    };
+    {
+        let ui = sc_ui.clone();
+        sc_prio.connect_toggled(move |c| {
+            let want_site = !c.is_active();
+            if ui.pending.borrow().site_wins != want_site {
+                ui.pending.borrow_mut().site_wins = want_site;
+                sc_commit(&ui);
+            }
+        });
+    }
+    {
+        let ui = sc_ui.clone();
+        let prio = sc_prio.clone();
+        sc_page.connect_map(move |_| {
+            *ui.pending.borrow_mut() = SHORTCUTS.with(|c| c.borrow().clone());
+            let site_wins = ui.pending.borrow().site_wins;
+            prio.set_active(!site_wins);
+            ui.status.set_text("");
+            sc_build(&ui);
+        });
+    }
+    {
+        let ui = sc_ui.clone();
+        sc_reset_all.connect_clicked(move |_| {
+            {
+                let mut c = ui.pending.borrow_mut();
+                c.overrides.clear();
+                c.disabled.clear();
+            }
+            sc_commit(&ui);
+            ui.status.set_text("All shortcuts are back to their defaults.");
+            sc_build(&ui);
+        });
+    }
+
+    // --- Customize sub-tab bar ---
+    let customize_stack = gtk::Stack::new();
+    customize_stack.set_vexpand(true);
+    customize_stack.add_named(&page_css, Some("html"));
+    customize_stack.add_named(&sc_page, Some("shortcuts"));
+
+    let sub_bar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let sub_html = gtk::Button::with_label("HTML Defaults");
+    sub_html.add_css_class("settings-option-item");
+    sub_html.add_css_class("active");
+    let sub_sc = gtk::Button::with_label("Shortcuts");
+    sub_sc.add_css_class("settings-option-item");
+    sub_bar.append(&sub_html);
+    sub_bar.append(&sub_sc);
+    {
+        let stack = customize_stack.clone();
+        let other = sub_sc.clone();
+        sub_html.connect_clicked(move |b| {
+            stack.set_visible_child_name("html");
+            b.add_css_class("active");
+            other.remove_css_class("active");
+        });
+    }
+    {
+        let stack = customize_stack.clone();
+        let other = sub_html.clone();
+        sub_sc.connect_clicked(move |b| {
+            stack.set_visible_child_name("shortcuts");
+            b.add_css_class("active");
+            other.remove_css_class("active");
+        });
+    }
+
+    let page_customize = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    page_customize.add_css_class("settings-content-page");
+    page_customize.set_vexpand(true);
+    page_customize.append(&sub_bar);
+    page_customize.append(&customize_stack);
+    settings_stack.add_named(&page_customize, Some("customize"));
 
     // --- Page 2: Profiles ---
     let profiles_list_box = gtk::ListBox::new();
@@ -6689,97 +7345,6 @@ fn build(gapp: &gtk::Application) {
     page_priv_scroll.set_child(Some(&page_privacy));
     settings_stack.add_named(&page_priv_scroll, Some("privacy"));
 
-    // --- Page 5: Shortcuts ---
-    let page_shortcuts = gtk::Box::new(gtk::Orientation::Vertical, 10);
-    page_shortcuts.add_css_class("settings-content-page");
-
-    let sc_title = gtk::Label::new(Some("Keyboard Shortcuts Reference"));
-    sc_title.add_css_class("settings-page-title");
-    sc_title.set_xalign(0.0);
-    let sc_subtitle = gtk::Label::new(Some("Speed up your workflow with full keyboard navigation"));
-    sc_subtitle.add_css_class("settings-page-subtitle");
-    sc_subtitle.set_xalign(0.0);
-    page_shortcuts.append(&sc_title);
-    page_shortcuts.append(&sc_subtitle);
-
-    let sc_card1 = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    sc_card1.add_css_class("settings-card");
-    let sc_sec1 = gtk::Label::new(Some("Tabs & Workspaces"));
-    sc_sec1.add_css_class("settings-card-title");
-    sc_sec1.set_xalign(0.0);
-    sc_card1.append(&sc_sec1);
-
-    let sc_list1 = [
-        ("Open Omnibar / New tab", "Alt + T"),
-        ("Focus URL / Address bar in tab", "Alt + G"),
-        ("Close focused tab", "Alt + W  or  x"),
-        ("Reload active tab", "Alt + R"),
-        ("Toggle Full Tab View", "Alt + F"),
-        ("Switch to workspace 1..9", "Alt + 1..9"),
-        ("Move tab to workspace 1..9", "Alt + Shift + 1..9"),
-        ("Split column vertically", "Alt + N  or  Alt + Shift + V"),
-        ("Focus column Left / Right", "Alt + H  /  Alt + L"),
-        ("Focus row Down / Up", "Alt + J  /  Alt + K"),
-        ("Move tab column Left / Right", "Alt + Shift + H  /  L"),
-        ("Move tab row Down / Up", "Alt + Shift + J  /  K"),
-    ];
-    for (desc, kbd) in sc_list1 {
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-        row.add_css_class("shortcut-row");
-        let d = gtk::Label::new(Some(desc));
-        d.add_css_class("shortcut-desc");
-        d.set_xalign(0.0);
-        d.set_hexpand(true);
-        let k = gtk::Label::new(Some(kbd));
-        k.add_css_class("shortcut-kbd");
-        row.append(&d);
-        row.append(&k);
-        sc_card1.append(&row);
-    }
-    page_shortcuts.append(&sc_card1);
-
-    let sc_card2 = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    sc_card2.add_css_class("settings-card");
-    let sc_sec2 = gtk::Label::new(Some("Panels, Settings & Tools"));
-    sc_sec2.add_css_class("settings-card-title");
-    sc_sec2.set_xalign(0.0);
-    sc_card2.append(&sc_sec2);
-
-    let sc_list2 = [
-        ("Toggle Floating Settings Panel", "Alt + Shift + S"),
-        ("Open Settings → Profiles Tab", "Alt + P"),
-        ("Open Settings → Data Backup Tab", "Alt + I"),
-        ("Toggle WebKit DevTools Console", "F12  or  Alt + Shift + I"),
-        ("Cycle DevTools Dock Position", "Alt + Shift + D"),
-        ("Toggle Roadmap / Minimap", "Alt + M"),
-        ("Toggle Spatial Overview (Zoom)", "Alt + O"),
-        ("Toggle Sidebar", "Alt + B"),
-        ("Toggle Touchpad Canvas Navigation", "Alt + Shift + T"),
-        ("Browser Back / Forward", "Alt + Left  /  Alt + Right"),
-        ("Toggle Fullscreen", "F11"),
-        ("Close modal / Dismiss overlay", "Esc"),
-        ("Quit Rail", "Alt + Q"),
-    ];
-    for (desc, kbd) in sc_list2 {
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-        row.add_css_class("shortcut-row");
-        let d = gtk::Label::new(Some(desc));
-        d.add_css_class("shortcut-desc");
-        d.set_xalign(0.0);
-        d.set_hexpand(true);
-        let k = gtk::Label::new(Some(kbd));
-        k.add_css_class("shortcut-kbd");
-        row.append(&d);
-        row.append(&k);
-        sc_card2.append(&row);
-    }
-    page_shortcuts.append(&sc_card2);
-
-    let page_sc_scroll = gtk::ScrolledWindow::new();
-    page_sc_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-    page_sc_scroll.set_child(Some(&page_shortcuts));
-    settings_stack.add_named(&page_sc_scroll, Some("shortcuts"));
-
     // --- Page 6: About Rail ---
     let page_about = gtk::Box::new(gtk::Orientation::Vertical, 10);
     page_about.add_css_class("settings-content-page");
@@ -6922,7 +7487,7 @@ fn build(gapp: &gtk::Application) {
     devtools_icon.add_css_class("devtools-brand-icon");
 
     let devtools_title = gtk::Label::new(None);
-    devtools_title.set_markup("<span font_family='ui-monospace' font_weight='800'>rail</span><span foreground='#38bdf8'>.devtools</span>");
+    devtools_title.set_markup("<span font_family='ui-monospace' font_weight='800'>rail</span><span foreground='#38bdf8'>.</span><span font_family='ui-monospace' foreground='#a1a1a1'>devtools</span>");
     devtools_title.add_css_class("devtools-brand-label");
 
     let devtools_badge = gtk::Label::new(Some("F12"));
@@ -6996,6 +7561,9 @@ fn build(gapp: &gtk::Application) {
         .decorated(false)
         .child(&overlay)
         .build();
+    update::ensure_icon();
+    gtk::Window::set_default_icon_name("rail");
+    overlay.add_overlay(&update::build_card(&win));
 
     let app = Rc::new(App {
         win: win.clone(),
@@ -7068,9 +7636,6 @@ fn build(gapp: &gtk::Application) {
         settings_tab_buttons: RefCell::new(tab_buttons_vec.clone()),
         current_settings_tab: Cell::new(SettingsTab::General),
         css_buffer: css_buffer.clone(),
-        css_view: css_view.clone(),
-        css_chips: css_chips.clone(),
-        css_status_lbl: css_status_lbl.clone(),
         search_engine: RefCell::new("google".to_string()),
     });
 
@@ -7710,6 +8275,9 @@ fn build(gapp: &gtk::Application) {
 
     let keys = gtk::EventControllerKey::new();
     keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    SHORTCUTS.with(|c| *c.borrow_mut() = load_shortcuts_config());
+    KEY_CTL.with(|k| *k.borrow_mut() = Some(keys.clone()));
+    apply_shortcut_priority();
     let held_shortcut: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
 
     let a = app.clone();
@@ -7727,7 +8295,20 @@ fn build(gapp: &gtk::Application) {
             }
         }
 
-        let handled = a.on_key(key, keycode, state);
+        let combo = shortcut_combo(key, keycode, state);
+        let handled = match combo.as_deref().map(sc_resolve) {
+            Some(ScResolve::Action(def_combo)) => {
+                if Some(def_combo.as_str()) == combo.as_deref() {
+                    a.on_key(key, keycode, state)
+                } else if let Some((k2, m2)) = sc_synth(&def_combo) {
+                    a.on_key(k2, 0, m2)
+                } else {
+                    false
+                }
+            }
+            Some(ScResolve::Disabled) => false,
+            _ => a.on_key(key, keycode, state),
+        };
         if handled {
             if ctrl || alt || super_key {
                 held.set(Some(keycode));
@@ -7913,6 +8494,9 @@ fn main() -> glib::ExitCode {
             println!("rail {}", env!("CARGO_PKG_VERSION"));
             return glib::ExitCode::SUCCESS;
         }
+        if arg == "--update" {
+            return update::cli_update();
+        }
         if arg == "--help" || arg == "-h" {
             println!("Usage: rail [OPTIONS] [URL]");
             println!();
@@ -7921,6 +8505,7 @@ fn main() -> glib::ExitCode {
             println!("      --export <FILE.tar.gz> Export all tabs, profiles, logins & cookies into archive");
             println!("      --import <FILE.tar.gz> Import all tabs, profiles, logins & cookies from archive");
             println!("      --data-info            Show current storage directory and environment details");
+            println!("      --update               Download and install the newest release");
             println!("  -v, --version              Show version");
             println!("  -h, --help                 Show help message");
             println!();
@@ -8068,7 +8653,7 @@ mod tests {
     #[test]
     fn test_settings_tab_enum() {
         assert_ne!(SettingsTab::General, SettingsTab::Profiles);
-        assert_ne!(SettingsTab::Data, SettingsTab::Shortcuts);
+        assert_ne!(SettingsTab::Data, SettingsTab::Customize);
         assert_eq!(SettingsTab::General, SettingsTab::General);
     }
 

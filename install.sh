@@ -4,7 +4,7 @@ set -euo pipefail
 
 APP_NAME="Rail"
 REPO="${RAIL_REPO:-mrdevs2011/rail}"
-VERSION="${RAIL_VERSION:-v0.2.0}"
+VERSION="${RAIL_VERSION:-latest}"
 INSTALL_DIR="${RAIL_DIR:-$HOME/MR/Applictions}"
 BIN_DIR="$HOME/.local/bin"
 BIN_LINK="$BIN_DIR/rail"
@@ -66,7 +66,11 @@ if [ "$USE_STANDALONE" -eq 0 ]; then
   # Faqat ~400 KB binar fayl yuklanadi
   TARGET="$BIN_LINK"
   echo "==> Rail binar fayli yuklab olinmoqda (atigi ~400 KB)..."
-  download "https://github.com/${REPO}/releases/download/${VERSION}/rail-x86_64" "$TARGET"
+  if [ "$VERSION" = "latest" ]; then
+    download "https://github.com/${REPO}/releases/latest/download/rail-linux-x86_64" "$TARGET"
+  else
+    download "https://github.com/${REPO}/releases/download/${VERSION}/rail-linux-x86_64" "$TARGET"
+  fi
   chmod +x "$TARGET"
 else
   # WebKit bo'lmasa, to'liq AppImage yuklanadi
@@ -81,10 +85,11 @@ fi
 ICON="$ICON_CACHE/rail.svg"
 cat > "$ICON" <<'EOF'
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <rect width="256" height="256" rx="56" fill="#16161e"/>
-  <rect x="34" y="70" width="86" height="116" rx="14" fill="#7aa2f7"/>
-  <rect x="136" y="70" width="86" height="116" rx="14" fill="#2a2b3d"/>
-  <circle cx="198" cy="206" r="9" fill="#7aa2f7"/>
+  <rect width="256" height="256" rx="40" fill="#000000"/>
+  <g transform="translate(-6 -12)">
+    <path d="M96 104V176M96 142C96 116 114 106 142 108" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="square" stroke-linejoin="round"/>
+    <circle cx="170" cy="176" r="11" fill="#38bdf8"/>
+  </g>
 </svg>
 EOF
 

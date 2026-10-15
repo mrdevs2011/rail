@@ -20,9 +20,19 @@ Agar tizimingizda `libwebkitgtk-6.0` mavjud bo‘lsa, to‘g‘ridan-to‘g‘ri
 
 ```bash
 mkdir -p ~/.local/bin
-curl -fL -o ~/.local/bin/rail https://github.com/mrdevs2011/rail/releases/download/v0.2.0/rail-x86_64
+curl -fL -o ~/.local/bin/rail https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64
 chmod +x ~/.local/bin/rail
 ```
+
+---
+
+## 🔄 Yangilanish (Update)
+
+Har safar Rail ochilganda yangi versiya tekshiriladi. Bor bo'lsa pastki o'ngda karta chiqadi: "v0.5.1 is out, you are on v0.5.0, 3 versions behind".
+
+- **Update**: yangi versiyani yuklaydi va Rail o'zi qayta ochiladi (tablar joyida).
+- **x**: kartani yopadi, keyingi ochilishda yana eslatadi.
+- Terminaldan: `rail --update`
 
 ---
 
