@@ -29,3 +29,9 @@
 - Qilindi: Eski ~/Claude/work/rail (v0.1.0, 1.8GB) o'chirildi; tekshiruv: work da faqat rail-browser, which -a rail faqat ~/.local/bin/rail (sha ba4ad6da... mos), bitta rail.desktop, git main...origin/main toza, sayt 200
 - Keyingi qadam: Rail brauzer va docs/index.html ni to'liq o'zbekcha qilish (uz default, uz/en/ru toggle, Settings > Language)
 - Git holati: 5b182d7 site: interactive landing (docs/index.html), roadmap rewrite (free path, no domain), installer: atomic update + single desktop entry
+
+---
+### 2026-10-15 17:35
+- Qilindi: v0.5.2: uz/en/ru i18n (default uz), Settings>Interface Language, sayt 3 tilda + header toggle, Production.md, release.sh; push+release+o'rnatish bajarildi
+- Keyingi qadam: Windows/macOS build, Vercel deploy (kirish yo'q), tilni qayta ochmasdan almashtirish
+- Git holati: 09468e5 feat(i18n): uz/en/ru tizimi (default uz), Settings > Interface Language, to'liq o'zbekcha sayt + header toggle, Production.md, release.sh (v0.5.2)
