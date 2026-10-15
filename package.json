@@ -1,0 +1,13 @@
+{
+  "name": "rail-browser",
+  "version": "0.5.5",
+  "type": "module",
+  "private": true,
+  "description": "Rail Browser — Minimalist keyboard-driven spatial browser",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1"
+  }
+}
