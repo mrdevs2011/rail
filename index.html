@@ -32,15 +32,16 @@ p{color:#cfcfcf;margin-bottom:14px}
 button,select,input{font:inherit;color:#fff;background:#000;border:1px solid #fff;padding:8px 14px;cursor:pointer;border-radius:0}
 select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path fill='%23fff' d='M0 0l6 8 6-8z'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
 select option{background:#0a0a0a;color:#fff}
-.os-dd{position:relative;margin-bottom:8px}
-.os-dd-btn{width:100%;text-align:left;background:#0a0a0a;border:1px solid #fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
-.os-dd-btn:hover{background:#111}
-.os-dd-list{position:absolute;top:100%;left:0;right:0;background:#0a0a0a;border:1px solid #fff;border-top:none;z-index:10;display:none}
+.os-dd{position:relative;margin-bottom:10px;user-select:none}
+.os-dd-btn{width:100%;text-align:left;background:#0a0a0a;border:1px solid #3a3a3a;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;font-size:15px;transition:border-color .15s,background .15s}
+.os-dd-btn:hover,.os-dd.open .os-dd-btn{border-color:#fff;background:#111}
+.os-dd-list{position:absolute;top:calc(100% - 1px);left:0;right:0;background:#0a0a0a;border:1px solid #fff;border-top:none;z-index:20;display:none;box-shadow:0 12px 32px rgba(0,0,0,.6)}
 .os-dd.open .os-dd-list{display:block}
-.os-dd-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid #222}
+.os-dd-item{padding:12px 16px;cursor:pointer;border-bottom:1px solid #222;transition:background .1s}
 .os-dd-item:last-child{border-bottom:none}
-.os-dd-item:hover,.os-dd-item.on{background:#1a1a1a;color:#fff}
-.os-dd-item.soon{color:#888}
+.os-dd-item:hover{background:#1a1a1a}
+.os-dd-item.on{background:#1a1a1a;color:#fff;font-weight:600}
+.os-dd-item.soon{color:#777}
 button:hover:not(:disabled){background:#fff;color:#000}
 button:disabled{border-color:#444;color:#555;cursor:not-allowed}
 .big{display:block;width:100%;padding:18px;font-size:18px;margin:16px 0;text-align:center;text-decoration:none;color:#fff;border:1px solid #fff}
@@ -74,7 +75,7 @@ footer{position:fixed;bottom:0;left:0;right:0;height:54px;border-top:1px solid v
 <header>
   <div class="logo">r</div>
   <b>rail</b>
-  <span class="pill" id="ver">v0.5.2</span>
+  <span class="pill" id="ver">v0.5.5</span>
   <span class="pill made" data-t="made_s">Muhammdrasul</span>
   <a href="docs/index.html" class="pill docs-link" id="navDocs">
     <i class="dot" style="display:inline-block"></i>
@@ -289,7 +290,7 @@ window.addEventListener('storage',function(ev){
 function t(k){var d=T[lang];return d&&d[k]!=null?d[k]:T.uz[k]}
 function fm(s,o){return s.replace(/\{(\w+)\}/g,function(_,k){return o[k]})}
 var $=function(i){return document.getElementById(i)};
-var R=$('rail'),cols=[].slice.call(R.children),cur=0,VER='0.5.2',lock=0;
+var R=$('rail'),cols=[].slice.call(R.children),cur=0,VER='0.5.5',lock=0;
 for(var bi0=0;bi0<5;bi0++)(function(i){var b=document.createElement('button');b.className='mm';b.onclick=function(){go(i)};$('mm').appendChild(b)})(bi0);
 function setCur(i){cur=i;cols.forEach(function(c,k){c.classList.toggle('on',k==i)});[].forEach.call($('mm').children,function(b,k){b.classList.toggle('on',k==i)})}
 function go(i){i=Math.max(0,Math.min(cols.length-1,i));R.scrollTo({left:cols[i].offsetLeft,behavior:'smooth'})}
@@ -306,7 +307,16 @@ function bootRun(){var tok=++bootTok,L=t('boot'),bi=0,bj=0,bt='';$('boot').textC
 var RAW='https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh',INS=['cu','rl -fsSL ',RAW,' | ba','sh'].join('');
 var LINUX_URL='https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64';
 function steps(v){return v=='linux'?[t('s_l1'),t('s_l2'),t('s_l3')]:v=='macos'?[t('s_m1'),t('s_m2'),t('soon_dot')]:[t('s_w1'),t('s_w2'),t('soon_dot')]}
-function setOS(v){var on=v=='linux',a=$('dl');$('os').value=v;a.className='big'+(on?'':' off');a.href=on?LINUX_URL:'#';a.textContent=on?fm(t('dl_on'),{v:VER}):t('soon');var h=on?'<div class="cmd" data-c="'+INS+'">'+INS+'<button onclick="cp(this)">'+t('copy')+'</button></div>':'';$('steps').innerHTML=h+'<ol>'+steps(v).map(function(x){return '<li>'+x+'</li>'}).join('')+'</ol>'}
+var ASSETS={linux:LINUX_URL,macos:null,windows:null};
+function setOS(v){
+  var a=$('dl'),url=ASSETS[v]||null,on=!!url;
+  $('os').value=v;
+  a.className='big'+(on?'':' off');
+  a.href=on?url:'#';
+  a.textContent=on?fm(t('dl_on').replace('Linux',v=='macos'?'macOS':v=='windows'?'Windows':'Linux'),{v:VER}):t('soon');
+  var h=on&&v=='linux'?'<div class="cmd" data-c="'+INS+'">'+INS+'<button onclick="cp(this)">'+t('copy')+'</button></div>':'';
+  $('steps').innerHTML=h+'<ol>'+steps(v).map(function(x){return '<li>'+x+'</li>'}).join('')+'</ol>';
+}
 function cp(b){var x=b.parentNode.getAttribute('data-c');if(navigator.clipboard)navigator.clipboard.writeText(x);b.textContent=t('copied');setTimeout(function(){b.textContent=t('copy')},1200)}
 $('os').onchange=function(){setOS(this.value)};
 // Custom dark dropdown
@@ -322,7 +332,14 @@ addEventListener('click',function(){osdd.classList.remove('open')});
 var _setOS=setOS;
 setOS=function(v){_setOS(v);var it=osdd.querySelector('[data-v="'+v+'"]');if(it)osbtn.innerHTML=it.textContent+' <span>▼</span>';};
 var ua=navigator.userAgent,os0=/Win/.test(ua)?'windows':(/Mac/.test(ua)&&!/iPhone|iPad/.test(ua))?'macos':'linux';
-fetch('https://api.github.com/repos/mrdevs2011/rail/releases/latest').then(function(r){return r.json()}).then(function(j){if(j.tag_name){VER=j.tag_name.replace(/^v/,'');$('ver').textContent='v'+VER;setOS($('os').value)}}).catch(function(){});
+fetch('https://api.github.com/repos/mrdevs2011/rail/releases/latest').then(function(r){return r.json()}).then(function(j){
+  if(j.tag_name){VER=j.tag_name.replace(/^v/,'');$('ver').textContent='v'+VER;}
+  if(j.assets){j.assets.forEach(function(a){
+    if(/macos|darwin/i.test(a.name)) ASSETS.macos=a.browser_download_url;
+    if(/windows|win.*\.exe/i.test(a.name)) ASSETS.windows=a.browser_download_url;
+  });}
+  setOS($('os').value);
+}).catch(function(){setOS($('os').value);});
 var jars=[[],[]],ap=0,jst=-1;
 function draw(){[0,1].forEach(function(i){var j=$('j'+i),on=i==ap,p=$('p'+(i+1));j.className='jar'+(on?' act':'');j.innerHTML='<b><i class="dot" style="opacity:'+(on?1:.2)+'"></i>'+t('profile')+' '+(i+1)+(on?' ('+t('active')+')':'')+'</b>'+(jars[i].length?jars[i].join('<br>'):'<span style="color:#666">'+t('nocookie')+'</span>');p.textContent=t('profile')+' '+(i+1);p.style.background=on?'#fff':'';p.style.color=on?'#000':''});$('jmsg').textContent=jst<0?t('jmsg0'):fm(t('signed'),{a:jst+1,b:2-jst})}
 function pick(i){ap=i;draw()}

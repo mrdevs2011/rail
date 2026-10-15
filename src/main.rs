@@ -5,6 +5,7 @@ mod strip;
 mod i18n;
 mod i18n_tables;
 mod update;
+mod sync;
 use i18n::{tr, trf};
 
 use gtk::glib;
@@ -1938,6 +1939,8 @@ struct App {
     data_modal_status_lbl: gtk::Label,
     data_export_entry: gtk::Entry,
     data_import_entry: gtk::Entry,
+    sync_url_result_entry: gtk::Entry,
+    sync_restore_entry: gtk::Entry,
     // Minimap / Roadmap (Alt+M)
     map_container: gtk::Box,
     map_drawing_area: gtk::DrawingArea,
@@ -5588,6 +5591,7 @@ impl App {
         }
     }
 
+    #[allow(dead_code)]
     fn clear_history_action(self: &Rc<Self>) {
         self.history.borrow_mut().clear();
         self.data_modal_status_lbl.set_markup(&format!(
@@ -5596,6 +5600,7 @@ impl App {
         ));
     }
 
+    #[allow(dead_code)]
     fn clear_cache_action(self: &Rc<Self>) {
         let dir = rail_data_dir();
         if let Ok(entries) = std::fs::read_dir(&dir) {
@@ -5626,6 +5631,283 @@ impl App {
             &[&dir.display().to_string(), &total_tabs.to_string(), &ws_count.to_string(), &prof_count.to_string()],
         );
         self.data_modal_info_lbl.set_text(&info_text);
+    }
+
+    fn show_password_dialog<F>(
+        &self,
+        title: &'static str,
+        prompt_text: &'static str,
+        is_confirm_needed: bool,
+        on_confirm: F,
+    ) where
+        F: Fn(String) + 'static,
+    {
+        let dialog = gtk::Window::builder()
+            .title(tr(title))
+            .modal(true)
+            .transient_for(&self.win)
+            .default_width(380)
+            .resizable(false)
+            .build();
+        dialog.add_css_class("settings-modal-window");
+
+        let vbox = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        vbox.set_margin_top(16);
+        vbox.set_margin_bottom(16);
+        vbox.set_margin_start(18);
+        vbox.set_margin_end(18);
+
+        let lbl_title = gtk::Label::new(Some(tr(title)));
+        lbl_title.add_css_class("settings-card-title");
+        lbl_title.set_xalign(0.0);
+        vbox.append(&lbl_title);
+
+        let lbl_desc = gtk::Label::new(Some(tr(prompt_text)));
+        lbl_desc.add_css_class("data-section-desc");
+        lbl_desc.set_xalign(0.0);
+        lbl_desc.set_wrap(true);
+        vbox.append(&lbl_desc);
+
+        let entry_pass = gtk::PasswordEntry::new();
+        entry_pass.add_css_class("profile-entry-box");
+        entry_pass.set_show_peek_icon(true);
+        vbox.append(&entry_pass);
+
+        let entry_confirm = if is_confirm_needed {
+            let lbl_c = gtk::Label::new(Some(tr("Confirm password...")));
+            lbl_c.add_css_class("data-section-desc");
+            lbl_c.set_xalign(0.0);
+            vbox.append(&lbl_c);
+            let e = gtk::PasswordEntry::new();
+            e.add_css_class("profile-entry-box");
+            e.set_show_peek_icon(true);
+            vbox.append(&e);
+            Some(e)
+        } else {
+            None
+        };
+
+        let err_lbl = gtk::Label::new(None);
+        err_lbl.add_css_class("data-status-lbl");
+        err_lbl.set_xalign(0.0);
+        err_lbl.set_visible(false);
+        vbox.append(&err_lbl);
+
+        let btns_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        btns_row.set_halign(gtk::Align::End);
+        btns_row.set_margin_top(8);
+
+        let btn_cancel = gtk::Button::with_label(tr("Cancel"));
+        btn_cancel.add_css_class("btn-data-action");
+
+        let confirm_label = if is_confirm_needed { tr("Encrypt & Sync") } else { tr("Decrypt & Restore") };
+        let btn_ok = gtk::Button::with_label(confirm_label);
+        btn_ok.add_css_class("btn-data-primary");
+
+        btns_row.append(&btn_cancel);
+        btns_row.append(&btn_ok);
+        vbox.append(&btns_row);
+
+        dialog.set_child(Some(&vbox));
+
+        let d = dialog.clone();
+        btn_cancel.connect_clicked(move |_| d.close());
+
+        let d = dialog.clone();
+        let on_confirm = std::rc::Rc::new(on_confirm);
+        let ep = entry_pass.clone();
+        let ec = entry_confirm.clone();
+        let el = err_lbl.clone();
+        let do_submit = move || {
+            let p1 = ep.text().to_string();
+            if p1.trim().len() < 4 {
+                el.set_markup(&format!("<span foreground='#f87171'>{}</span>", tr("Password must be at least 4 characters.")));
+                el.set_visible(true);
+                return;
+            }
+            if let Some(ref c) = ec {
+                let p2 = c.text().to_string();
+                if p1 != p2 {
+                    el.set_markup(&format!("<span foreground='#f87171'>{}</span>", tr("Passwords do not match.")));
+                    el.set_visible(true);
+                    return;
+                }
+            }
+            d.close();
+            on_confirm(p1);
+        };
+
+        let ds1 = do_submit.clone();
+        btn_ok.connect_clicked(move |_| ds1());
+
+        let ds2 = do_submit.clone();
+        entry_pass.connect_activate(move |_| ds2());
+
+        if let Some(c) = entry_confirm {
+            let ds3 = do_submit.clone();
+            c.connect_activate(move |_| ds3());
+        }
+
+        dialog.present();
+        entry_pass.grab_focus();
+    }
+
+    fn prompt_and_execute_sync(self: &Rc<Self>) {
+        let app = self.clone();
+        self.show_password_dialog(
+            "Encryption Password",
+            "Set a password to encrypt your data. Without this password, no one can restore or access your data.",
+            true,
+            move |password| {
+                app.data_modal_status_lbl.set_markup(&format!(
+                    "<span foreground='#38bdf8'><b>{}</b></span>",
+                    tr("Syncing: Encrypting and uploading data to cloud...")
+                ));
+
+                app.save_session_immediate();
+                let mut s = load_app_settings();
+                s.search_engine = app.search_engine.borrow().clone();
+                s.touchpad_mode = app.touchpad_mode.get();
+                save_app_settings(&s);
+
+                let data_dir = rail_data_dir();
+                let server_url = sync::sync_server_url();
+                let (tx, rx) = std::sync::mpsc::channel();
+
+                std::thread::spawn(move || {
+                    let res = (|| -> Result<sync::SyncResult, String> {
+                        let cipher_b64 = sync::pack_and_encrypt(&data_dir, &password)?;
+                        sync::upload_sync_payload(&cipher_b64, &server_url)
+                    })();
+                    let _ = tx.send(res);
+                });
+
+                let app_check = app.clone();
+                glib::timeout_add_local(Duration::from_millis(50), move || {
+                    if let Ok(res) = rx.try_recv() {
+                        match res {
+                            Ok(r) => {
+                                app_check.sync_url_result_entry.set_text(&r.url);
+                                app_check.win.clipboard().set_text(&r.url);
+                                app_check.data_modal_status_lbl.set_markup(&format!(
+                                    "<span foreground='#4ade80'><b>{}</b> {} ({})</span>",
+                                    tr("Sync Successful:"),
+                                    tr("URL copied to clipboard! Remember your password to restore."),
+                                    glib::markup_escape_text(&r.url)
+                                ));
+                            }
+                            Err(e) => {
+                                app_check.data_modal_status_lbl.set_markup(&format!(
+                                    "<span foreground='#f87171'><b>{}</b> {}</span>",
+                                    tr("Sync Failed:"),
+                                    glib::markup_escape_text(&e)
+                                ));
+                            }
+                        }
+                        glib::ControlFlow::Break
+                    } else {
+                        glib::ControlFlow::Continue
+                    }
+                });
+            },
+        );
+    }
+
+    fn prompt_and_execute_restore(self: &Rc<Self>) {
+        let raw = self.sync_restore_entry.text().to_string();
+        if raw.trim().is_empty() {
+            self.data_modal_status_lbl.set_markup(&format!(
+                "<span foreground='#f87171'><b>{}</b> {}</span>",
+                tr("Error:"),
+                tr("Please enter a valid Sync URL or ID.")
+            ));
+            return;
+        }
+
+        let app = self.clone();
+        self.show_password_dialog(
+            "Enter Decryption Password",
+            "Enter the password used to encrypt this backup:",
+            false,
+            move |password| {
+                app.data_modal_status_lbl.set_markup(&format!(
+                    "<span foreground='#38bdf8'><b>{}</b></span>",
+                    tr("Restoring: Downloading and decrypting cloud data...")
+                ));
+
+                let raw_input = raw.clone();
+                let server_url = sync::sync_server_url();
+                let rand_id = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0) % 10000000).to_string();
+                let temp_tar = std::env::temp_dir().join(format!("rail_cloud_restore_{}.tar.gz", rand_id));
+                let temp_tar_thread = temp_tar.clone();
+                let (tx, rx) = std::sync::mpsc::channel();
+
+                std::thread::spawn(move || {
+                    let res = sync::download_and_decrypt(&raw_input, &password, &server_url, &temp_tar_thread);
+                    let _ = tx.send(res);
+                });
+
+                let app_check = app.clone();
+                glib::timeout_add_local(Duration::from_millis(50), move || {
+                    if let Ok(res) = rx.try_recv() {
+                        match res {
+                            Ok(()) => {
+                                let imp_res = import_data(&temp_tar);
+                                let _ = std::fs::remove_file(&temp_tar);
+                                match imp_res {
+                                    Ok(()) => {
+                                        let imported_settings = load_app_settings();
+                                        *app_check.search_engine.borrow_mut() = imported_settings.search_engine.clone();
+                                        app_check.touchpad_mode.set(imported_settings.touchpad_mode);
+                                        app_check.tp_switch.set_active(imported_settings.touchpad_mode);
+                                        reload_customize_from_disk();
+                                        app_check.reload_css_editor();
+                                        *app_check.profiles.borrow_mut() = ProfileManager::new(rail_data_dir());
+                                        app_check.rebuild_profiles_modal_list();
+                                        let active_id = app_check.profiles.borrow().active_profile().id;
+                                        app_check.select_palette_profile(&active_id);
+                                        app_check.restore_session();
+                                        app_check.refresh_sidebar();
+                                        app_check.refresh_data_modal_info();
+                                        app_check.data_modal_status_lbl.set_markup(&format!(
+                                            "<span foreground='#4ade80'><b>{}</b> {}</span>",
+                                            tr("Restore Successful:"),
+                                            tr("All workspaces, tabs, accounts & cookies restored!")
+                                        ));
+                                    }
+                                    Err(e) => {
+                                        app_check.data_modal_status_lbl.set_markup(&format!(
+                                            "<span foreground='#f87171'><b>{}</b> {}</span>",
+                                            tr("Restore Failed:"),
+                                            glib::markup_escape_text(&e)
+                                        ));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                let _ = std::fs::remove_file(&temp_tar);
+                                if e == "INCORRECT_PASSWORD" {
+                                    app_check.data_modal_status_lbl.set_markup(&format!(
+                                        "<span foreground='#f87171'><b>{}</b> {}</span>",
+                                        tr("Error:"),
+                                        tr("Incorrect password! Data cannot be restored without the correct password.")
+                                    ));
+                                } else {
+                                    app_check.data_modal_status_lbl.set_markup(&format!(
+                                        "<span foreground='#f87171'><b>{}</b> {}</span>",
+                                        tr("Restore Failed:"),
+                                        glib::markup_escape_text(&e)
+                                    ));
+                                }
+                            }
+                        }
+                        glib::ControlFlow::Break
+                    } else {
+                        glib::ControlFlow::Continue
+                    }
+                });
+            },
+        );
     }
 
     fn execute_export_action(self: &Rc<Self>) {
@@ -7071,7 +7353,7 @@ fn build(gapp: &gtk::Application) {
     let sidebar_items = [
         (SettingsTab::General, "preferences-system-symbolic", tr("General")),
         (SettingsTab::Profiles, "system-users-symbolic", tr("Profiles")),
-        (SettingsTab::Data, "drive-harddisk-symbolic", tr("Data & Backup")),
+        (SettingsTab::Data, "drive-harddisk-symbolic", tr("Cloud Sync & Data")),
         (SettingsTab::Privacy, "security-high-symbolic", tr("Privacy & Shield")),
         (SettingsTab::Customize, "document-edit-symbolic", tr("Customize")),
         (SettingsTab::Update, "software-update-available-symbolic", tr("Updates")),
@@ -7539,93 +7821,129 @@ fn build(gapp: &gtk::Application) {
     page_prof_scroll.set_child(Some(&page_profiles));
     settings_stack.add_named(&page_prof_scroll, Some("profiles"));
 
-    // --- Page 3: Data & Backup ---
+    // --- Page 3: Cloud Sync & Data ---
     let data_info_lbl = gtk::Label::new(None);
     data_info_lbl.add_css_class("data-info-card");
     data_info_lbl.set_xalign(0.0);
     data_info_lbl.set_margin_top(4);
 
-    let export_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    export_box.add_css_class("data-section-box");
+    // Section 1: Cloud Sync (Encrypted)
+    let sync_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    sync_card.add_css_class("data-section-box");
 
-    let export_title = gtk::Label::new(Some(tr("Export Environment (All Data)")));
-    export_title.add_css_class("data-section-title");
-    export_title.set_xalign(0.0);
+    let sync_title = gtk::Label::new(Some(tr("☁️ Cloud Sync (Encrypted)")));
+    sync_title.add_css_class("data-section-title");
+    sync_title.set_xalign(0.0);
 
-    let export_desc = gtk::Label::new(Some(tr("Pack all your open tabs, workspaces, profiles, accounts & cookies into a single portable .tar.gz archive.")));
-    export_desc.add_css_class("data-section-desc");
-    export_desc.set_xalign(0.0);
-    export_desc.set_wrap(true);
+    let sync_desc = gtk::Label::new(Some(tr("Upload all workspaces, tabs, profiles, logins and settings with mandatory password encryption. Generates a secure sync link.")));
+    sync_desc.add_css_class("data-section-desc");
+    sync_desc.set_xalign(0.0);
+    sync_desc.set_wrap(true);
 
-    let data_export_entry = gtk::Entry::new();
-    data_export_entry.add_css_class("profile-entry-box");
-    data_export_entry.set_hexpand(true);
+    let btn_sync_now = gtk::Button::with_label(tr("Sync Your Data"));
+    btn_sync_now.add_css_class("btn-data-primary");
+    btn_sync_now.set_halign(gtk::Align::Start);
 
-    let btn_export_browse = gtk::Button::with_label(tr("Browse..."));
-    btn_export_browse.add_css_class("btn-data-action");
+    let sync_result_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let sync_url_result_entry = gtk::Entry::new();
+    sync_url_result_entry.add_css_class("profile-entry-box");
+    sync_url_result_entry.set_hexpand(true);
+    sync_url_result_entry.set_placeholder_text(Some(tr("Generated Sync URL will appear here...")));
+    sync_url_result_entry.set_editable(false);
 
-    let btn_export_do = gtk::Button::with_label(tr("Export Backup"));
-    btn_export_do.add_css_class("btn-data-primary");
+    let btn_copy_sync_url = gtk::Button::with_label(tr("Copy Link"));
+    btn_copy_sync_url.add_css_class("btn-data-action");
 
-    let export_actions_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    export_actions_row.append(&data_export_entry);
-    export_actions_row.append(&btn_export_browse);
-    export_actions_row.append(&btn_export_do);
+    sync_result_box.append(&sync_url_result_entry);
+    sync_result_box.append(&btn_copy_sync_url);
 
-    export_box.append(&export_title);
-    export_box.append(&export_desc);
-    export_box.append(&export_actions_row);
+    sync_card.append(&sync_title);
+    sync_card.append(&sync_desc);
+    sync_card.append(&btn_sync_now);
+    sync_card.append(&sync_result_box);
 
-    let import_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    import_box.add_css_class("data-section-box");
+    // Section 2: Restore from Sync URL
+    let restore_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    restore_card.add_css_class("data-section-box");
 
-    let import_title = gtk::Label::new(Some(tr("Import Environment")));
-    import_title.add_css_class("data-section-title");
-    import_title.set_xalign(0.0);
+    let restore_title = gtk::Label::new(Some(tr("📥 Restore from Sync URL")));
+    restore_title.add_css_class("data-section-title");
+    restore_title.set_xalign(0.0);
 
-    let import_desc = gtk::Label::new(Some(tr("Restore tabs, workspaces, profiles, and logins from a .tar.gz archive. Replaces current session.")));
-    import_desc.add_css_class("data-section-desc");
-    import_desc.set_xalign(0.0);
-    import_desc.set_wrap(true);
+    let restore_desc = gtk::Label::new(Some(tr("Enter a sync URL or Sync ID. You must enter the decryption password to restore your data.")));
+    restore_desc.add_css_class("data-section-desc");
+    restore_desc.set_xalign(0.0);
+    restore_desc.set_wrap(true);
 
-    let data_import_entry = gtk::Entry::new();
-    data_import_entry.add_css_class("profile-entry-box");
-    data_import_entry.set_placeholder_text(Some(tr("Select or enter path to .tar.gz backup...")));
-    data_import_entry.set_hexpand(true);
+    let restore_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let sync_restore_entry = gtk::Entry::new();
+    sync_restore_entry.add_css_class("profile-entry-box");
+    sync_restore_entry.set_hexpand(true);
+    sync_restore_entry.set_placeholder_text(Some(tr("Enter Sync URL (e.g. https://.../sync?id=...) or Sync ID...")));
 
-    let btn_import_browse = gtk::Button::with_label(tr("Browse..."));
-    btn_import_browse.add_css_class("btn-data-action");
+    let btn_sync_restore = gtk::Button::with_label(tr("Restore Data"));
+    btn_sync_restore.add_css_class("btn-data-primary");
 
-    let btn_import_do = gtk::Button::with_label(tr("Import & Restore"));
-    btn_import_do.add_css_class("btn-data-primary");
+    restore_row.append(&sync_restore_entry);
+    restore_row.append(&btn_sync_restore);
 
-    let import_actions_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    import_actions_row.append(&data_import_entry);
-    import_actions_row.append(&btn_import_browse);
-    import_actions_row.append(&btn_import_do);
+    restore_card.append(&restore_title);
+    restore_card.append(&restore_desc);
+    restore_card.append(&restore_row);
 
-    import_box.append(&import_title);
-    import_box.append(&import_desc);
-    import_box.append(&import_actions_row);
+    // Section 3: Local Offline Backup (.tar.gz)
+    let local_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    local_card.add_css_class("data-section-box");
 
-    let maint_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    maint_box.add_css_class("data-section-box");
+    let local_title = gtk::Label::new(Some(tr("💾 Local Archive (.tar.gz)")));
+    local_title.add_css_class("data-section-title");
+    local_title.set_xalign(0.0);
+
+    let local_desc = gtk::Label::new(Some(tr("Offline backup file on your local disk.")));
+    local_desc.add_css_class("data-section-desc");
+    local_desc.set_xalign(0.0);
+
+    let local_btns_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let btn_export_local = gtk::Button::with_label(tr("Export to File..."));
+    btn_export_local.add_css_class("btn-data-action");
+    let btn_import_local = gtk::Button::with_label(tr("Import from File..."));
+    btn_import_local.add_css_class("btn-data-action");
+
+    local_btns_row.append(&btn_export_local);
+    local_btns_row.append(&btn_import_local);
+
+    local_card.append(&local_title);
+    local_card.append(&local_desc);
+    local_card.append(&local_btns_row);
+
+    // Section 4: Data Maintenance & Cache
+    let maint_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    maint_card.add_css_class("data-section-box");
+
     let maint_title = gtk::Label::new(Some(tr("Data Maintenance & Cache")));
     maint_title.add_css_class("data-section-title");
     maint_title.set_xalign(0.0);
+
     let maint_desc = gtk::Label::new(Some(tr("Clear local Omnibar suggestions history or purge temporary network disk caches.")));
     maint_desc.add_css_class("data-section-desc");
     maint_desc.set_xalign(0.0);
+
     let maint_btns_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     let btn_clear_hist = gtk::Button::with_label(tr("Clear Omnibar History"));
     btn_clear_hist.add_css_class("btn-data-action");
     let btn_clear_cache = gtk::Button::with_label(tr("Clear Disk Cache"));
     btn_clear_cache.add_css_class("btn-data-action");
+
     maint_btns_row.append(&btn_clear_hist);
     maint_btns_row.append(&btn_clear_cache);
-    maint_box.append(&maint_title);
-    maint_box.append(&maint_desc);
-    maint_box.append(&maint_btns_row);
+
+    maint_card.append(&maint_title);
+    maint_card.append(&maint_desc);
+    maint_card.append(&maint_btns_row);
+
+    // Keep hidden entries for legacy CLI or local paths if needed
+    let data_export_entry = gtk::Entry::new();
+    let data_import_entry = gtk::Entry::new();
 
     let data_modal_status_lbl = gtk::Label::new(None);
     data_modal_status_lbl.add_css_class("data-status-lbl");
@@ -7635,19 +7953,20 @@ fn build(gapp: &gtk::Application) {
     let page_data = gtk::Box::new(gtk::Orientation::Vertical, 8);
     page_data.add_css_class("settings-content-page");
 
-    let data_page_title = gtk::Label::new(Some(tr("Data Backup & Migration")));
+    let data_page_title = gtk::Label::new(Some(tr("Cloud Sync & Data")));
     data_page_title.add_css_class("settings-page-title");
     data_page_title.set_xalign(0.0);
-    let data_page_subtitle = gtk::Label::new(Some(tr("Export or import all workspaces, profiles, logins & cookies  (Alt+I)")));
+    let data_page_subtitle = gtk::Label::new(Some(tr("End-to-end encrypted backup and instant cloud synchronization across devices  (Alt+I)")));
     data_page_subtitle.add_css_class("settings-page-subtitle");
     data_page_subtitle.set_xalign(0.0);
 
     page_data.append(&data_page_title);
     page_data.append(&data_page_subtitle);
     page_data.append(&data_info_lbl);
-    page_data.append(&export_box);
-    page_data.append(&import_box);
-    page_data.append(&maint_box);
+    page_data.append(&sync_card);
+    page_data.append(&restore_card);
+    page_data.append(&local_card);
+    page_data.append(&maint_card);
     page_data.append(&data_modal_status_lbl);
 
     let page_data_scroll = gtk::ScrolledWindow::new();
@@ -8207,6 +8526,8 @@ fn build(gapp: &gtk::Application) {
         data_modal_status_lbl: data_modal_status_lbl.clone(),
         data_export_entry: data_export_entry.clone(),
         data_import_entry: data_import_entry.clone(),
+        sync_url_result_entry: sync_url_result_entry.clone(),
+        sync_restore_entry: sync_restore_entry.clone(),
         map_container: map_container.clone(),
         map_drawing_area: map_drawing_area.clone(),
         map_location_btn: map_location_btn.clone(),
@@ -8515,24 +8836,45 @@ fn build(gapp: &gtk::Application) {
     });
 
     let a = app.clone();
-    btn_export_do.connect_clicked(move |_| a.execute_export_action());
+    btn_sync_now.connect_clicked(move |_| a.prompt_and_execute_sync());
 
     let a = app.clone();
-    btn_import_do.connect_clicked(move |_| a.execute_import_action());
+    btn_sync_restore.connect_clicked(move |_| a.prompt_and_execute_restore());
+
+    let a = app.clone();
+    let entry_res = sync_url_result_entry.clone();
+    btn_copy_sync_url.connect_clicked(move |btn| {
+        let text = entry_res.text().to_string();
+        if !text.is_empty() {
+            a.win.clipboard().set_text(&text);
+            btn.set_label(tr("Copied!"));
+            let b = btn.clone();
+            glib::timeout_add_local_once(Duration::from_millis(1500), move || {
+                b.set_label(tr("Copy Link"));
+            });
+        }
+    });
 
     let a = app.clone();
     let win_weak = win.downgrade();
-    btn_export_browse.connect_clicked(move |_| {
+    btn_export_local.connect_clicked(move |_| {
         let Some(win) = win_weak.upgrade() else { return };
+        let timestamp = glib::DateTime::now_local()
+            .ok()
+            .and_then(|d| d.format("%Y%m%d_%H%M%S").ok())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "backup".to_string());
+        let default_name = format!("rail_backup_{}.tar.gz", timestamp);
         let dialog = gtk::FileDialog::builder()
             .title(tr("Save Rail Backup Archive (.tar.gz)"))
-            .initial_name("rail_backup.tar.gz")
+            .initial_name(&default_name)
             .build();
         let a = a.clone();
         dialog.save(Some(&win), gio::Cancellable::NONE, move |res| {
             if let Ok(file) = res {
                 if let Some(path) = file.path() {
                     a.data_export_entry.set_text(&path.to_string_lossy());
+                    a.execute_export_action();
                 }
             }
         });
@@ -8540,7 +8882,7 @@ fn build(gapp: &gtk::Application) {
 
     let a = app.clone();
     let win_weak = win.downgrade();
-    btn_import_browse.connect_clicked(move |_| {
+    btn_import_local.connect_clicked(move |_| {
         let Some(win) = win_weak.upgrade() else { return };
         let dialog = gtk::FileDialog::builder()
             .title(tr("Select Rail Backup Archive (.tar.gz)"))
@@ -8550,6 +8892,7 @@ fn build(gapp: &gtk::Application) {
             if let Ok(file) = res {
                 if let Some(path) = file.path() {
                     a.data_import_entry.set_text(&path.to_string_lossy());
+                    a.execute_import_action();
                 }
             }
         });
@@ -8963,6 +9306,8 @@ fn export_data(archive_path: &Path) -> Result<(), String> {
     };
 
     let status = std::process::Command::new("tar")
+        .arg("--exclude=*/cache")
+        .arg("--exclude=*/cache/*")
         .arg("-czf")
         .arg(&abs_archive)
         .arg("-C")

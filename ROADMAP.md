@@ -1,7 +1,7 @@
 # Rail Roadmap
 
 > **Maqsad:** bitta kod, uch tizim (Linux, macOS, Windows), hammasi **bepul**. Toza qora-oq dasturchi brauzeri. O'rnatish va yangilash foydalanuvchi uchun 1 bosish.
-> Oxirgi yangilanish: 2026-10-15 (v0.5.4). Sayt: https://rail-browser.vercel.app
+> Oxirgi yangilanish: 2026-10-15 (v0.5.5). Sayt: https://rail-browser.vercel.app
 >
 > **Qaror:** rail.uz domeni olinmaydi. Sayt Vercel'da (rail-browser.vercel.app) turaveradi. Butun yo'l 100% bepul.
 
@@ -20,8 +20,10 @@ Belgilar: [x] tayyor, [ ] qilinadi, [?] tajribada tekshiriladi, [~] boshlangan /
 
 ---
 
-## 1. Hozirgi holat (v0.5.4) — Linux to'liq ishlaydi
+## 1. Hozirgi holat (v0.5.5) — Linux to'liq ishlaydi
 
+- [x] End-to-end shifrlangan Cloud Sync (Vercel + Supabase, majburiy parol, zero-knowledge)
+- [x] Soddalashtirilgan, o'ta toza Cloud Sync & Data sozlamalar sahifasi
 - [x] Linux: GTK4 + WebKitGTK, niri uslubidagi 2D lenta (ustunlar + vertikal stack)
 - [x] Izolyatsiyalangan profillar, profil belgisi (3 xonagacha)
 - [x] Qora-oq dev UI, ko'k faqat nuqta
@@ -63,7 +65,7 @@ Belgilar: [x] tayyor, [ ] qilinadi, [?] tajribada tekshiriladi, [~] boshlangan /
 | 1 | Sayt | 1 kun | [x] tayyor (qo'lda tekshiruv qoldi) |
 | 2 | Tizimga qarab yangilash | 1 kun | [~] OS/ARCH + SHA256 hisoblash + temp fayl tayyor |
 | 3 | Tajriba (spike): tao + wry | 1 hafta | [ ] eng muhim qaror |
-| 4 | CI: bitta tag, uch build | 1 kun | [~] .github/workflows/release.yml skeleton yaratildi |
+| 4 | CI: bitta tag, uch build | 1 kun | [~] skeleton + continue-on-error (Linux doim ishlaydi) |
 | 5 | Funksiyalarni ko'chirish | 2-4 hafta | [ ] spike'dan keyin |
 | 6 | Tarqatish | 1 hafta | [ ] |
 
@@ -172,4 +174,4 @@ Tekshiriladigan savollar:
 
 ---
 
-**Hozirgi aniq holat (2026-10-15):** Linuxda to'liq ishlaydi (v0.5.4). Settings > Updates tabi va OS/ARCH-aware updater tayyor. Keyingi katta qadam — tao + wry spike.
+**Hozirgi aniq holat (2026-10-15):** Linuxda to'liq ishlaydi (v0.5.5). Settings > Updates tabi va OS/ARCH-aware updater tayyor. Keyingi katta qadam — tao + wry spike.

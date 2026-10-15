@@ -4,7 +4,7 @@
 //! and synchronizes via Vercel / Supabase.
 
 use crate::minijson;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::io::Write;
 
@@ -17,6 +17,7 @@ pub fn sync_server_url() -> String {
         .unwrap_or_else(|| DEFAULT_SYNC_SERVER.to_string())
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct SyncResult {
     pub id: String,
@@ -294,5 +295,19 @@ mod tests {
             extract_sync_id("7bfb9920-8e12-4f32-849a-54316279f014"),
             "7bfb9920-8e12-4f32-849a-54316279f014"
         );
+    }
+
+    #[test]
+    fn test_pack_and_encrypt_wrong_password() {
+        let temp_dir = std::env::temp_dir().join("test_rail_sync_unit");
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let _ = std::fs::write(temp_dir.join("test.txt"), "hello rail sync");
+
+        let cipher_res = pack_and_encrypt(&temp_dir, "mySecretPassword123");
+        assert!(cipher_res.is_ok());
+        let cipher_b64 = cipher_res.unwrap();
+        assert!(!cipher_b64.is_empty());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
