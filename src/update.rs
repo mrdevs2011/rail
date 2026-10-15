@@ -1,7 +1,6 @@
 //! "New version available" card: checks GitHub releases once per launch and can
 //! download the newest binary over the installed one.
 
-use crate::minijson;
 use gtk::prelude::*;
 use gtk::{gio, glib};
 use gtk4 as gtk;
@@ -38,55 +37,55 @@ fn parse_ver(s: &str) -> Option<[u32; 3]> {
 struct UpdateInfo {
     latest_tag: String,
     newer_count: usize,
+    more: bool,
     url: String,
 }
 
 fn fetch_update() -> Option<UpdateInfo> {
-    let api = format!("https://api.github.com/repos/{}/releases?per_page=100", REPO);
+    // The public releases feed has no API rate limit (the REST API allows only 60 calls/hour per IP).
+    let feed_url = format!("https://github.com/{}/releases.atom", REPO);
     let out = Command::new("curl")
-        .args([
-            "-fsSL",
-            "-m",
-            "8",
-            "-H",
-            "Accept: application/vnd.github+json",
-            "-H",
-            "User-Agent: rail-browser",
-            &api,
-        ])
+        .args(["-fsSL", "-m", "8", "-A", "rail-browser", &feed_url])
         .stdin(Stdio::null())
         .output()
         .ok()?;
     if !out.status.success() {
         return None;
     }
-    let root = minijson::parse(&String::from_utf8_lossy(&out.stdout))?;
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
     let current = parse_ver(&current_version())?;
+    let marker = "/releases/tag/";
+    let mut seen: Vec<String> = Vec::new();
+    let mut rest = text.as_str();
+    while let Some(i) = rest.find(marker) {
+        rest = &rest[i + marker.len()..];
+        let end = rest.find(['"', '<', '\'', ' ']).unwrap_or(rest.len());
+        let tag = rest[..end].to_string();
+        if !seen.contains(&tag) {
+            seen.push(tag);
+        }
+    }
     let mut count = 0usize;
     let mut best: Option<([u32; 3], String)> = None;
-    for rel in root.as_arr()? {
-        let flag = |k: &str| rel.get(k).and_then(|v| v.as_bool()) == Some(true);
-        if flag("draft") || flag("prerelease") {
-            continue;
-        }
-        let Some(tag) = rel.get("tag_name").and_then(|v| v.as_str()) else {
-            continue;
-        };
+    for tag in &seen {
         let Some(ver) = parse_ver(tag) else {
             continue;
         };
         if ver > current {
             count += 1;
             if best.as_ref().map(|(b, _)| ver > *b).unwrap_or(true) {
-                best = Some((ver, tag.to_string()));
+                best = Some((ver, tag.clone()));
             }
         }
     }
     let (_, tag) = best?;
+    // The feed lists only the last 10 releases: if all of them are newer, the real gap is bigger.
+    let more = !seen.is_empty() && count >= seen.len();
     Some(UpdateInfo {
         url: format!("https://github.com/{}/releases/download/{}/{}", REPO, tag, ASSET),
         latest_tag: tag,
         newer_count: count,
+        more,
     })
 }
 
@@ -272,9 +271,10 @@ pub fn build_card(win: &gtk::ApplicationWindow) -> gtk::Revealer {
                 ver.set_text(&format!("{} is out", inf.latest_tag));
                 let n = inf.newer_count;
                 sub.set_text(&format!(
-                    "You are on v{}, {} version{} behind.",
+                    "You are on v{}, {}{} version{} behind.",
                     current_version(),
                     n,
+                    if inf.more { "+" } else { "" },
                     if n == 1 { "" } else { "s" }
                 ));
                 *info.borrow_mut() = Some(inf);
