@@ -283,7 +283,7 @@ impl HistoryManager {
         // Always include default web search suggestion at the end
         let query_esc = url_encode(raw_q);
         results.push(HistorySuggestion {
-            display_title: format!("Search web for \"{}\"", raw_q),
+            display_title: crate::i18n::trf("Search web for \"{}\"", &[raw_q]),
             display_url: format!("duckduckgo.com/?q={}", query_esc),
             target_url: format!("https://duckduckgo.com/?q={}", query_esc),
             autofill_text: raw_q.to_string(),

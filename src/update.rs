@@ -1,6 +1,7 @@
 //! "New version available" card: checks GitHub releases once per launch and can
 //! download the newest binary over the installed one.
 
+use crate::i18n::{tr, trf};
 use gtk::prelude::*;
 use gtk::{gio, glib};
 use gtk4 as gtk;
@@ -103,8 +104,8 @@ fn install_path() -> PathBuf {
 fn download_and_install(url: &str) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     let dest = install_path();
-    let dir = dest.parent().ok_or("Bad install path")?.to_path_buf();
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Cannot write to {}: {}", dir.display(), e))?;
+    let dir = dest.parent().ok_or_else(|| tr("Bad install path").to_string())?.to_path_buf();
+    std::fs::create_dir_all(&dir).map_err(|e| trf("Cannot write to {}: {}", &[&dir.display().to_string(), &e.to_string()]))?;
     let tmp = dir.join(".rail-update.tmp");
     let status = Command::new("curl")
         .args(["-fsSL", "-m", "240", "-o"])
@@ -112,15 +113,15 @@ fn download_and_install(url: &str) -> Result<(), String> {
         .arg(url)
         .stdin(Stdio::null())
         .status()
-        .map_err(|e| format!("curl failed: {}", e))?;
+        .map_err(|e| trf("curl failed: {}", &[&e.to_string()]))?;
     if !status.success() {
         let _ = std::fs::remove_file(&tmp);
-        return Err("Download failed. Check your connection.".to_string());
+        return Err(tr("Download failed. Check your connection.").to_string());
     }
     let size = std::fs::metadata(&tmp).map(|m| m.len()).unwrap_or(0);
     if size < 200_000 {
         let _ = std::fs::remove_file(&tmp);
-        return Err("Downloaded file looks wrong.".to_string());
+        return Err(tr("Downloaded file looks wrong.").to_string());
     }
     let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755));
     let ok = Command::new(&tmp)
@@ -131,15 +132,15 @@ fn download_and_install(url: &str) -> Result<(), String> {
         .unwrap_or(false);
     if !ok {
         let _ = std::fs::remove_file(&tmp);
-        return Err("Downloaded binary does not run on this system.".to_string());
+        return Err(tr("Downloaded binary does not run on this system.").to_string());
     }
     std::fs::rename(&tmp, &dest).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
-        format!("Cannot replace {}: {}", dest.display(), e)
+        trf("Cannot replace {}: {}", &[&dest.display().to_string(), &e.to_string()])
     })
 }
 
-fn restart(win: &gtk::ApplicationWindow) {
+pub fn restart(win: &gtk::ApplicationWindow) {
     let exe = install_path();
     let _ = Command::new("sh")
         .arg("-c")
@@ -167,13 +168,13 @@ pub fn build_card(win: &gtk::ApplicationWindow) -> gtk::Revealer {
     card.set_size_request(270, -1);
 
     let top = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    let kicker = gtk::Label::new(Some("UPDATE AVAILABLE"));
+    let kicker = gtk::Label::new(Some(tr("UPDATE AVAILABLE")));
     kicker.add_css_class("update-kicker");
     kicker.set_xalign(0.0);
     kicker.set_hexpand(true);
     let close = gtk::Button::with_label("\u{00d7}");
     close.add_css_class("update-close");
-    close.set_tooltip_text(Some("Dismiss (shows again next launch)"));
+    close.set_tooltip_text(Some(tr("Dismiss (shows again next launch)")));
     top.append(&kicker);
     top.append(&close);
 
@@ -190,7 +191,7 @@ pub fn build_card(win: &gtk::ApplicationWindow) -> gtk::Revealer {
     err.set_wrap(true);
     err.set_visible(false);
 
-    let get = gtk::Button::with_label("Update");
+    let get = gtk::Button::with_label(tr("Update"));
     get.add_css_class("update-get");
     get.set_halign(gtk::Align::Start);
     get.set_margin_top(6);
@@ -226,7 +227,7 @@ pub fn build_card(win: &gtk::ApplicationWindow) -> gtk::Revealer {
                 return;
             };
             b.set_sensitive(false);
-            b.set_label("Updating...");
+            b.set_label(tr("Updating..."));
             err2.set_visible(false);
             let b = b.clone();
             let installed = installed.clone();
@@ -241,9 +242,9 @@ pub fn build_card(win: &gtk::ApplicationWindow) -> gtk::Revealer {
                 match res {
                     Ok(Ok(())) => {
                         installed.set(true);
-                        ver.set_text(&format!("{} installed", inf.latest_tag));
-                        sub.set_text("Restarting. Your tabs come back.");
-                        b.set_label("Restarting...");
+                        ver.set_text(&trf("{} installed", &[&inf.latest_tag]));
+                        sub.set_text(tr("Restarting. Your tabs come back."));
+                        b.set_label(tr("Restarting..."));
                         b.set_sensitive(false);
                         let win = win_done.clone();
                         glib::timeout_add_local_once(std::time::Duration::from_millis(700), move || restart(&win));
@@ -251,12 +252,12 @@ pub fn build_card(win: &gtk::ApplicationWindow) -> gtk::Revealer {
                     Ok(Err(e)) => {
                         err.set_text(&e);
                         err.set_visible(true);
-                        b.set_label("Retry");
+                        b.set_label(tr("Retry"));
                     }
                     Err(_) => {
-                        err.set_text("Update failed unexpectedly.");
+                        err.set_text(tr("Update failed unexpectedly."));
                         err.set_visible(true);
-                        b.set_label("Retry");
+                        b.set_label(tr("Retry"));
                     }
                 }
             });
@@ -268,14 +269,12 @@ pub fn build_card(win: &gtk::ApplicationWindow) -> gtk::Revealer {
         glib::spawn_future_local(async move {
             let res = gio::spawn_blocking(fetch_update).await;
             if let Ok(Some(inf)) = res {
-                ver.set_text(&format!("{} is out", inf.latest_tag));
+                ver.set_text(&trf("{} is out", &[&inf.latest_tag]));
                 let n = inf.newer_count;
-                sub.set_text(&format!(
-                    "You are on v{}, {}{} version{} behind.",
-                    current_version(),
-                    n,
-                    if inf.more { "+" } else { "" },
-                    if n == 1 { "" } else { "s" }
+                let behind = format!("{}{}", n, if inf.more { "+" } else { "" });
+                sub.set_text(&trf(
+                    if n == 1 { "You are on v{}, {} version behind." } else { "You are on v{}, {} versions behind." },
+                    &[&current_version(), &behind],
                 ));
                 *info.borrow_mut() = Some(inf);
                 rev.set_reveal_child(true);
@@ -303,14 +302,14 @@ pub fn ensure_icon() {
 pub fn cli_update() -> glib::ExitCode {
     match fetch_update() {
         None => {
-            println!("rail {} is up to date", current_version());
+            println!("{}", trf("rail {} is up to date", &[&current_version()]));
             glib::ExitCode::SUCCESS
         }
         Some(inf) => {
-            println!("Updating v{} -> {} ...", current_version(), inf.latest_tag);
+            println!("{}", trf("Updating v{} -> {} ...", &[&current_version(), &inf.latest_tag]));
             match download_and_install(&inf.url) {
                 Ok(()) => {
-                    println!("Done: {}", install_path().display());
+                    println!("{}", trf("Done: {}", &[&install_path().display().to_string()]));
                     glib::ExitCode::SUCCESS
                 }
                 Err(e) => {

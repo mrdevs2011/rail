@@ -2,7 +2,10 @@ mod history;
 mod minijson;
 mod profile;
 mod strip;
+mod i18n;
+mod i18n_tables;
 mod update;
+use i18n::{tr, trf};
 
 use gtk::glib;
 use gtk::{gdk, gio};
@@ -115,12 +118,12 @@ fn save_css_editor(buffer: &gtk::TextBuffer, btn: &gtk::Button) {
     match std::fs::write(&path, &text) {
         Ok(_) => {
             apply_html_css(&text);
-            btn.set_label("Saved");
+            btn.set_label(tr("Saved"));
         }
-        Err(_) => btn.set_label("Save failed"),
+        Err(_) => btn.set_label(tr("Save failed")),
     }
     let b = btn.clone();
-    glib::timeout_add_local_once(Duration::from_millis(1500), move || b.set_label("Save"));
+    glib::timeout_add_local_once(Duration::from_millis(1500), move || b.set_label(tr("Save")));
 }
 
 const START_PAGE: &str = r##"<!doctype html>
@@ -240,6 +243,14 @@ body {
 </div>
 </body>
 </html>"##;
+
+/// Boshlang'ich sahifa: til, sarlavha, tavsif va qidiruv placeholder joriy tilga o'giriladi.
+fn start_page() -> String {
+    START_PAGE
+        .replacen("<html lang=\"en\">", &format!("<html lang=\"{}\">", i18n::current().code()), 1)
+        .replacen("keyboard-first browser for developers", tr("keyboard-first browser for developers"), 1)
+        .replacen("placeholder=\"search or enter url\"", &format!("placeholder=\"{}\"", tr("search or enter url")), 1)
+}
 
 const GOOGLE_G_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
   <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
@@ -2090,12 +2101,12 @@ fn sc_set_slot(
     combo: &str,
 ) -> Result<String, String> {
     if !sc_valid_combo(combo) {
-        return Err("Pick Alt or Ctrl with a key (F-keys can be used alone).".to_string());
+        return Err(tr("Pick Alt or Ctrl with a key (F-keys can be used alone).").to_string());
     }
     if def.id != SC_LOCKED {
         if let Some(locked) = SHORTCUT_DEFS.iter().find(|d| d.id == SC_LOCKED) {
             if sc_effective(locked, cfg).iter().any(|c| c == combo) {
-                return Err(format!("{} is reserved for opening Settings.", combo));
+                return Err(trf("{} is reserved for opening Settings.", &[&combo]));
             }
         }
     }
@@ -2108,7 +2119,7 @@ fn sc_set_slot(
         if eff.iter().any(|c| c == combo) {
             let rest: Vec<String> = eff.into_iter().filter(|c| c != combo).collect();
             cfg.overrides.insert(other.id.to_string(), rest);
-            note = format!("{} was taken from \"{}\".", combo, other.desc);
+            note = trf("{} was taken from \"{}\".", &[&combo, tr(other.desc)]);
         }
     }
     let mut list = sc_effective(def, cfg);
@@ -2287,7 +2298,7 @@ const SC_KEY_ROWS: &[&str] = &["`1234567890-=", "QWERTYUIOP[]", "ASDFGHJKL;'", "
 
 fn sc_key_label(v: &str) -> String {
     match v {
-        "" => "Pick key".to_string(),
+        "" => tr("Pick key").to_string(),
         "Left" => "\u{2190}".to_string(),
         "Right" => "\u{2192}".to_string(),
         "Up" => "\u{2191}".to_string(),
@@ -2403,7 +2414,7 @@ fn sc_commit(ui: &ScUi) {
         SHORTCUTS.with(|c| *c.borrow_mut() = cfg);
         apply_shortcut_priority();
     } else {
-        ui.status.set_text("Could not write shortcuts-customize.json");
+        ui.status.set_text(tr("Could not write shortcuts-customize.json"));
     }
 }
 
@@ -2446,7 +2457,7 @@ fn sc_build(ui: &ScUi) {
     for def in SHORTCUT_DEFS {
         if def.group != last_group {
             last_group = def.group;
-            let h = gtk::Label::new(Some(def.group));
+            let h = gtk::Label::new(Some(tr(def.group)));
             h.add_css_class("settings-card-title");
             h.set_xalign(0.0);
             h.set_margin_top(10);
@@ -2459,7 +2470,7 @@ fn sc_build(ui: &ScUi) {
         row.set_margin_top(3);
         row.set_margin_bottom(3);
 
-        let d = gtk::Label::new(Some(def.desc));
+        let d = gtk::Label::new(Some(tr(def.desc)));
         d.add_css_class("shortcut-desc");
         d.set_xalign(0.0);
         d.set_hexpand(true);
@@ -2472,14 +2483,14 @@ fn sc_build(ui: &ScUi) {
             let lock = gtk::Image::from_icon_name("changes-prevent-symbolic");
             lock.set_valign(gtk::Align::Center);
             lock.set_tooltip_text(Some(
-                "Always on: this opens Settings, so it can't be turned off.",
+                tr("Always on: this opens Settings, so it can't be turned off."),
             ));
             row.append(&lock);
         } else {
             let sw = gtk::Switch::new();
             sw.set_active(enabled);
             sw.set_valign(gtk::Align::Center);
-            sw.set_tooltip_text(Some("Turn this shortcut on or off"));
+            sw.set_tooltip_text(Some(tr("Turn this shortcut on or off")));
             let ui2 = ui.clone();
             sw.connect_active_notify(move |s| {
                 {
@@ -2520,7 +2531,7 @@ fn sc_build(ui: &ScUi) {
                     sel.set(d.selected());
                     let is_f = key.len() >= 2 && key.starts_with('F') && key[1..].chars().all(|c| c.is_ascii_digit());
                     if sel.get() == 4 && !is_f {
-                        ui3.status.set_text("No modifier: tap the key button and pick F1-F12");
+                        ui3.status.set_text(tr("No modifier: tap the key button and pick F1-F12"));
                     } else if !key.is_empty() {
                         sc_apply_slot(&ui3, def, slot, sc_join(sel.get(), &key));
                     }
@@ -2544,7 +2555,7 @@ fn sc_build(ui: &ScUi) {
             if eff.len() > 1 {
                 let rm = gtk::Button::from_icon_name("window-close-symbolic");
                 rm.add_css_class("flat");
-                rm.set_tooltip_text(Some("Remove this key"));
+                rm.set_tooltip_text(Some(tr("Remove this key")));
                 let ui5 = ui.clone();
                 rm.connect_clicked(move |_| {
                     {
@@ -2568,7 +2579,7 @@ fn sc_build(ui: &ScUi) {
             let reset = gtk::Button::from_icon_name("edit-undo-symbolic");
             reset.add_css_class("flat");
             reset.set_valign(gtk::Align::Center);
-            reset.set_tooltip_text(Some("Reset to default"));
+            reset.set_tooltip_text(Some(tr("Reset to default")));
             let ui6 = ui.clone();
             reset.connect_clicked(move |_| {
                 {
@@ -3011,7 +3022,7 @@ impl App {
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
-        view.load_html(START_PAGE, Some("rail://start/"));
+        view.load_html(&start_page(), Some("rail://start/"));
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view, prof_id.clone(), false);
         self.select_palette_profile(&prof_id);
@@ -3023,7 +3034,7 @@ impl App {
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
-        view.load_html(START_PAGE, Some("rail://start/"));
+        view.load_html(&start_page(), Some("rail://start/"));
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view, prof_id.clone(), true);
         self.select_palette_profile(&prof_id);
@@ -3200,7 +3211,7 @@ impl App {
                             }
                         }
                     }
-                    win.set_title(Some(&format!("Rail DevTools - {}", host)));
+                    win.set_title(Some(&trf("Rail DevTools - {}", &[&host])));
                     win.present();
                 } else {
                     let win_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -3231,7 +3242,7 @@ impl App {
                     win_box.add_controller(dt_win_click);
 
                     let win = gtk::Window::builder()
-                        .title(&format!("Rail DevTools - {}", host))
+                        .title(&trf("Rail DevTools - {}", &[&host]))
                         .default_width(1050)
                         .default_height(720)
                         .child(&win_box)
@@ -3299,14 +3310,14 @@ impl App {
         let host = view.uri()
             .and_then(|u| glib::Uri::parse(&u, glib::UriFlags::NONE).ok())
             .and_then(|u| u.host().map(|h| h.to_string()))
-            .unwrap_or_else(|| "This page".to_string());
+            .unwrap_or_else(|| tr("This page").to_string());
 
         let title_text = match dialog_type {
-            ScriptDialogType::Alert => format!("{} says:", host),
-            ScriptDialogType::Confirm => format!("Confirm from {}", host),
-            ScriptDialogType::Prompt => format!("Prompt from {}", host),
-            ScriptDialogType::BeforeUnloadConfirm => "Leave Site?".to_string(),
-            _ => format!("Message from {}", host),
+            ScriptDialogType::Alert => trf("{} says:", &[&host]),
+            ScriptDialogType::Confirm => trf("Confirm from {}", &[&host]),
+            ScriptDialogType::Prompt => trf("Prompt from {}", &[&host]),
+            ScriptDialogType::BeforeUnloadConfirm => tr("Leave Site?").to_string(),
+            _ => trf("Message from {}", &[&host]),
         };
 
         let dlg_win = gtk::Window::builder()
@@ -3330,7 +3341,7 @@ impl App {
         vbox.append(&header_lbl);
 
         let msg_text = if dialog_type == ScriptDialogType::BeforeUnloadConfirm && message.is_empty() {
-            "Changes you made may not be saved. Are you sure you want to leave?".to_string()
+            tr("Changes you made may not be saved. Are you sure you want to leave?").to_string()
         } else {
             message
         };
@@ -3395,7 +3406,7 @@ impl App {
         };
 
         if dialog_type != ScriptDialogType::Alert {
-            let cancel_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm { "Stay" } else { "Cancel" };
+            let cancel_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm { tr("Stay") } else { tr("Cancel") };
             let cancel_btn = gtk::Button::with_label(cancel_label);
             cancel_btn.add_css_class("js-dialog-btn-cancel");
             let cd = close_dialog.clone();
@@ -3403,7 +3414,7 @@ impl App {
             btn_row.append(&cancel_btn);
         }
 
-        let ok_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm { "Leave" } else { "OK" };
+        let ok_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm { tr("Leave") } else { tr("OK") };
         let ok_btn = gtk::Button::with_label(ok_label);
         ok_btn.add_css_class("js-dialog-btn-ok");
         let cd_ok = close_dialog.clone();
@@ -3468,7 +3479,7 @@ impl App {
                     app_t.new_tab_with_url(&uri_t);
                 });
                 self.win.add_action(&act_tab);
-                menu.append(&ContextMenuItem::from_gaction(&act_tab, "Open Link in New Tab", None));
+                menu.append(&ContextMenuItem::from_gaction(&act_tab, tr("Open Link in New Tab"), None));
 
                 let uri_s = uri.clone();
                 let app_s = self.clone();
@@ -3477,16 +3488,16 @@ impl App {
                     app_s.split_with_url(&uri_s);
                 });
                 self.win.add_action(&act_split);
-                menu.append(&ContextMenuItem::from_gaction(&act_split, "Open Link in Split View", None));
+                menu.append(&ContextMenuItem::from_gaction(&act_split, tr("Open Link in Split View"), None));
 
                 menu.append(&ContextMenuItem::from_stock_action_with_label(
                     ContextMenuAction::CopyLinkToClipboard,
-                    "Copy Link Address",
+                    tr("Copy Link Address"),
                 ));
 
                 menu.append(&ContextMenuItem::from_stock_action_with_label(
                     ContextMenuAction::DownloadLinkToDisk,
-                    "Save Link As...",
+                    tr("Save Link As..."),
                 ));
 
                 menu.append(&ContextMenuItem::new_separator());
@@ -3503,21 +3514,21 @@ impl App {
                     app_t.new_tab_with_url(&img_t);
                 });
                 self.win.add_action(&act_img);
-                menu.append(&ContextMenuItem::from_gaction(&act_img, "Open Image in New Tab", None));
+                menu.append(&ContextMenuItem::from_gaction(&act_img, tr("Open Image in New Tab"), None));
 
                 menu.append(&ContextMenuItem::from_stock_action_with_label(
                     ContextMenuAction::CopyImageUrlToClipboard,
-                    "Copy Image Address",
+                    tr("Copy Image Address"),
                 ));
 
                 menu.append(&ContextMenuItem::from_stock_action_with_label(
                     ContextMenuAction::CopyImageToClipboard,
-                    "Copy Image",
+                    tr("Copy Image"),
                 ));
 
                 menu.append(&ContextMenuItem::from_stock_action_with_label(
                     ContextMenuAction::DownloadImageToDisk,
-                    "Save Image As...",
+                    tr("Save Image As..."),
                 ));
 
                 menu.append(&ContextMenuItem::new_separator());
@@ -3528,29 +3539,29 @@ impl App {
         if is_media {
             menu.append(&ContextMenuItem::from_stock_action_with_label(
                 ContextMenuAction::OpenVideoInNewWindow,
-                "Open Media in New Tab",
+                tr("Open Media in New Tab"),
             ));
             menu.append(&ContextMenuItem::from_stock_action_with_label(
                 ContextMenuAction::CopyVideoLinkToClipboard,
-                "Copy Media Address",
+                tr("Copy Media Address"),
             ));
             menu.append(&ContextMenuItem::from_stock_action_with_label(
                 ContextMenuAction::DownloadVideoToDisk,
-                "Save Media As...",
+                tr("Save Media As..."),
             ));
             menu.append(&ContextMenuItem::new_separator());
         }
 
         // 4. Editable text
         if is_editable {
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Cut, "Cut"));
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Copy, "Copy"));
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Paste, "Paste"));
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::PasteAsPlainText, "Paste as Plain Text"));
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::SelectAll, "Select All"));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Cut, tr("Cut")));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Copy, tr("Copy")));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Paste, tr("Paste")));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::PasteAsPlainText, tr("Paste as Plain Text")));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::SelectAll, tr("Select All")));
             menu.append(&ContextMenuItem::new_separator());
         } else if is_selection {
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Copy, "Copy"));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Copy, tr("Copy")));
 
             let app_sel = self.clone();
             let v_sel = view.clone();
@@ -3575,19 +3586,19 @@ impl App {
                 );
             });
             self.win.add_action(&act_search);
-            menu.append(&ContextMenuItem::from_gaction(&act_search, "Search Google for Selection", None));
+            menu.append(&ContextMenuItem::from_gaction(&act_search, tr("Search Google for Selection"), None));
             menu.append(&ContextMenuItem::new_separator());
         }
 
         // 5. Page navigation
         if !is_link && !is_editable && !is_selection {
             if view.can_go_back() {
-                menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::GoBack, "Back"));
+                menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::GoBack, tr("Back")));
             }
             if view.can_go_forward() {
-                menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::GoForward, "Forward"));
+                menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::GoForward, tr("Forward")));
             }
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Reload, "Reload"));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Reload, tr("Reload")));
             menu.append(&ContextMenuItem::new_separator());
         }
 
@@ -3600,12 +3611,12 @@ impl App {
                 app_src.show_devtools();
             });
             self.win.add_action(&act_src);
-            menu.append(&ContextMenuItem::from_gaction(&act_src, "View Page Source  (F12)", None));
+            menu.append(&ContextMenuItem::from_gaction(&act_src, tr("View Page Source  (F12)"), None));
         }
 
         menu.append(&ContextMenuItem::from_stock_action_with_label(
             ContextMenuAction::InspectElement,
-            "Inspect Element  (F12)",
+            tr("Inspect Element  (F12)"),
         ));
     }
 
@@ -4152,7 +4163,7 @@ impl App {
             let prof_id = self.profiles.borrow().active_profile().id;
             let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
             let view = Self::create_web_view(&session, &prof_id);
-            view.load_html(START_PAGE, Some("rail://start/"));
+            view.load_html(&start_page(), Some("rail://start/"));
             view.set_can_target(!self.ov.get());
             let (container, resize_handle) = Self::create_tab_widget(&view);
             self.setup_tab_signals(&container, &view, &resize_handle);
@@ -4199,7 +4210,7 @@ impl App {
             let prof_id = self.profiles.borrow().active_profile().id;
             let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
             let view = Self::create_web_view(&session, &prof_id);
-            view.load_html(START_PAGE, Some("rail://start/"));
+            view.load_html(&start_page(), Some("rail://start/"));
             view.set_can_target(!self.ov.get());
             let (container, resize_handle) = Self::create_tab_widget(&view);
             self.setup_tab_signals(&container, &view, &resize_handle);
@@ -4230,9 +4241,9 @@ impl App {
 
     fn show_touchpad_toast(self: &Rc<Self>, enabled: bool) {
         if enabled {
-            self.touchpad_toast.set_markup("<span weight='bold' foreground='#fafafa'>Touchpad Slide: ON</span>  <span foreground='#94a3b8'>· 2-finger swipe to slide tabs</span>");
+            self.touchpad_toast.set_markup(&format!("<span weight='bold' foreground='#fafafa'>{}</span>  <span foreground='#94a3b8'>· {}</span>", tr("Touchpad Slide: ON"), tr("2-finger swipe to slide tabs")));
         } else {
-            self.touchpad_toast.set_markup("<span weight='bold' foreground='#94a3b8'>Touchpad Slide: OFF</span>  <span foreground='#64748b'>· Standard page scroll</span>");
+            self.touchpad_toast.set_markup(&format!("<span weight='bold' foreground='#94a3b8'>{}</span>  <span foreground='#64748b'>· {}</span>", tr("Touchpad Slide: OFF"), tr("Standard page scroll")));
         }
         self.touchpad_toast.set_visible(true);
         let toast = self.touchpad_toast.clone();
@@ -4379,7 +4390,7 @@ impl App {
             let session = self.profiles.borrow_mut().get_or_create_session(&item.profile_id);
             let view = Self::create_web_view(&session, &item.profile_id);
             if item.url.is_empty() || item.url.starts_with("about:") {
-                view.load_html(START_PAGE, Some("rail://start/"));
+                view.load_html(&start_page(), Some("rail://start/"));
             } else {
                 view.load_uri(&item.url);
             }
@@ -4432,7 +4443,7 @@ impl App {
                 .view
                 .uri()
                 .filter(|u| !u.starts_with("about:"))
-                .map_or("New tab".into(), |u| host_of(&u).unwrap_or(u.to_string())),
+                .map_or(tr("New tab").into(), |u| host_of(&u).unwrap_or(u.to_string())),
         }
     }
 
@@ -4477,22 +4488,22 @@ impl App {
                 ws_box.add_css_class("active-workspace");
             }
 
-            let ws_title = gtk::Label::new(Some(&format!("Workspace {}", ri + 1)));
+            let ws_title = gtk::Label::new(Some(&trf("Workspace {}", &[&(ri + 1).to_string()])));
             ws_title.add_css_class("workspace-title");
             ws_title.set_xalign(0.0);
             ws_title.set_hexpand(true);
             ws_box.append(&ws_title);
 
             if ri == cur_r {
-                let active_badge = gtk::Label::new(Some("ACTIVE"));
+                let active_badge = gtk::Label::new(Some(tr("ACTIVE")));
                 active_badge.add_css_class("workspace-badge");
                 ws_box.append(&active_badge);
             }
 
             let count_text = if row.tabs.len() == 1 {
-                "1 tab".to_string()
+                tr("1 tab").to_string()
             } else {
-                format!("{} tabs", row.tabs.len())
+                trf("{} tabs", &[&row.tabs.len().to_string()])
             };
             let count_lbl = gtk::Label::new(Some(&count_text));
             count_lbl.add_css_class("workspace-tab-count");
@@ -4500,7 +4511,7 @@ impl App {
 
             let add_btn = gtk::Button::from_icon_name("list-add-symbolic");
             add_btn.add_css_class("btn-ws-add");
-            add_btn.set_tooltip_text(Some(&format!("Add tab to Workspace {}", ri + 1)));
+            add_btn.set_tooltip_text(Some(&trf("Add tab to Workspace {}", &[&(ri + 1).to_string()])));
             let app = self.clone();
             add_btn.connect_clicked(move |_| {
                 app.focus_row(ri);
@@ -4546,7 +4557,7 @@ impl App {
                         p_dot.set_halign(gtk::Align::Center);
                         p_dot.set_width_request(18);
                         p_dot.set_height_request(16);
-                        p_dot.set_tooltip_text(Some(&format!("Profile: {}", p.name)));
+                        p_dot.set_tooltip_text(Some(&trf("Profile: {}", &[&p.display_name()])));
                         content_box.append(&p_dot);
                     }
                 }
@@ -4566,7 +4577,7 @@ impl App {
                 content_box.append(&title_lbl);
 
                 if t.container.has_css_class("full") {
-                    let full_tag = gtk::Label::new(Some("FULL"));
+                    let full_tag = gtk::Label::new(Some(tr("FULL")));
                     full_tag.add_css_class("tab-full-badge");
                     full_tag.set_valign(gtk::Align::Center);
                     content_box.append(&full_tag);
@@ -4725,7 +4736,7 @@ impl App {
         new_ws_box.add_css_class("btn-new-workspace");
         new_ws_box.set_halign(gtk::Align::Fill);
         let new_ws_icon = gtk::Image::from_icon_name("list-add-symbolic");
-        let new_ws_lbl = gtk::Label::new(Some("+ New Workspace (Alt+Shift+V)"));
+        let new_ws_lbl = gtk::Label::new(Some(tr("+ New Workspace (Alt+Shift+V)")));
         new_ws_lbl.set_xalign(0.0);
         new_ws_lbl.set_hexpand(true);
         new_ws_box.append(&new_ws_icon);
@@ -4740,7 +4751,7 @@ impl App {
 
         let text = match self.focused_view().and_then(|v| v.uri()) {
             Some(u) if !u.starts_with("about:") => host_of(&u).unwrap_or(u.to_string()),
-            _ => "Search or enter address".into(),
+            _ => tr("Search or enter address").into(),
         };
         self.pill_label.set_text(&text);
     }
@@ -4826,7 +4837,7 @@ impl App {
             }
             self.profile_btn.add_css_class(&format!("prof-bg-{}", p.color_idx));
             let persona = ProfilePersona::for_id(&p.id);
-            self.profile_btn.set_tooltip_text(Some(&format!("Profile: {} [{}] (100% Isolated)", p.name, persona.summary())));
+            self.profile_btn.set_tooltip_text(Some(&trf("Profile: {} [{}] (100% Isolated)", &[&p.display_name(), &persona.summary()])));
         }
     }
 
@@ -4837,7 +4848,7 @@ impl App {
         box_menu.set_margin_start(4);
         box_menu.set_margin_end(4);
 
-        let title = gtk::Label::new(Some("Select Profile"));
+        let title = gtk::Label::new(Some(tr("Select Profile")));
         title.add_css_class("profile-popover-title");
         title.set_xalign(0.0);
         title.set_margin_start(8);
@@ -4874,7 +4885,7 @@ impl App {
             let name_col = gtk::Box::new(gtk::Orientation::Vertical, 1);
             name_col.set_hexpand(true);
 
-            let name_lbl = gtk::Label::new(Some(&p.name));
+            let name_lbl = gtk::Label::new(Some(&p.display_name()));
             name_lbl.add_css_class("profile-item-name");
             name_lbl.set_xalign(0.0);
 
@@ -4922,7 +4933,7 @@ impl App {
         manage_btn.add_css_class("profile-item-btn");
         let manage_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let manage_icon = gtk::Image::from_icon_name("preferences-system-symbolic");
-        let manage_lbl = gtk::Label::new(Some("Manage Profiles in Settings (Alt+P)"));
+        let manage_lbl = gtk::Label::new(Some(tr("Manage Profiles in Settings (Alt+P)")));
         manage_lbl.add_css_class("profile-item-name");
         manage_lbl.set_xalign(0.0);
         manage_box.append(&manage_icon);
@@ -5060,9 +5071,9 @@ impl App {
             }
 
             let badge_text = match sug.kind {
-                SuggestionKind::History => "History",
-                SuggestionKind::Popular => "Top",
-                SuggestionKind::Search => "Search",
+                SuggestionKind::History => tr("History"),
+                SuggestionKind::Popular => tr("Top"),
+                SuggestionKind::Search => tr("Search"),
             };
             let badge = gtk::Label::new(Some(badge_text));
             badge.add_css_class("palette-sug-badge");
@@ -5246,12 +5257,12 @@ impl App {
 
         if let Some(uri) = current_uri {
             if uri.starts_with("about:") || uri.is_empty() {
-                new_view.load_html(START_PAGE, Some("rail://start/"));
+                new_view.load_html(&start_page(), Some("rail://start/"));
             } else {
                 new_view.load_uri(&uri);
             }
         } else {
-            new_view.load_html(START_PAGE, Some("rail://start/"));
+            new_view.load_html(&start_page(), Some("rail://start/"));
         }
 
         self.refresh_sidebar();
@@ -5402,9 +5413,10 @@ impl App {
 
     fn clear_history_action(self: &Rc<Self>) {
         self.history.borrow_mut().clear();
-        self.data_modal_status_lbl.set_markup(
-            "<span foreground='#4ade80'><b>History Cleared:</b> All Omnibar history and suggestions have been purged.</span>"
-        );
+        self.data_modal_status_lbl.set_markup(&format!(
+            "<span foreground='#4ade80'><b>{}</b> {}</span>",
+            tr("History Cleared:"), tr("All Omnibar history and suggestions have been purged.")
+        ));
     }
 
     fn clear_cache_action(self: &Rc<Self>) {
@@ -5418,9 +5430,10 @@ impl App {
                 }
             }
         }
-        self.data_modal_status_lbl.set_markup(
-            "<span foreground='#4ade80'><b>Cache Cleared:</b> Profile network disk caches purged successfully.</span>"
-        );
+        self.data_modal_status_lbl.set_markup(&format!(
+            "<span foreground='#4ade80'><b>{}</b> {}</span>",
+            tr("Cache Cleared:"), tr("Profile network disk caches purged successfully.")
+        ));
     }
 
     fn refresh_data_modal_info(&self) {
@@ -5431,9 +5444,9 @@ impl App {
         drop(rows);
         let prof_count = self.profiles.borrow().profiles().len();
 
-        let info_text = format!(
+        let info_text = trf(
             "Directory: {}\nStatus:    {} open tab(s) in {} workspace(s) | {} profiles (cookies/logins active)",
-            dir.display(), total_tabs, ws_count, prof_count
+            &[&dir.display().to_string(), &total_tabs.to_string(), &ws_count.to_string(), &prof_count.to_string()],
         );
         self.data_modal_info_lbl.set_text(&info_text);
     }
@@ -5443,7 +5456,7 @@ impl App {
         let path_str = self.data_export_entry.text().to_string();
         let path = PathBuf::from(path_str.trim());
         if path.as_os_str().is_empty() {
-            self.data_modal_status_lbl.set_markup("<span foreground='#f87171'><b>Error:</b> Please specify an export destination file.</span>");
+            self.data_modal_status_lbl.set_markup(&format!("<span foreground='#f87171'><b>{}</b> {}</span>", tr("Error:"), tr("Please specify an export destination file.")));
             return;
         }
 
@@ -5451,16 +5464,16 @@ impl App {
             Ok(()) => {
                 let size_str = std::fs::metadata(&path)
                     .map(|m| format!("{:.1} KB", m.len() as f64 / 1024.0))
-                    .unwrap_or_else(|_| "saved".into());
+                    .unwrap_or_else(|_| tr("saved").to_string());
                 self.data_modal_status_lbl.set_markup(&format!(
-                    "<span foreground='#4ade80'><b>Export Successful:</b> {} ({})</span>",
-                    glib::markup_escape_text(&path.to_string_lossy()), size_str
+                    "<span foreground='#4ade80'><b>{}</b> {} ({})</span>",
+                    tr("Export Successful:"), glib::markup_escape_text(&path.to_string_lossy()), size_str
                 ));
             }
             Err(e) => {
                 self.data_modal_status_lbl.set_markup(&format!(
-                    "<span foreground='#f87171'><b>Export Failed:</b> {}</span>",
-                    glib::markup_escape_text(&e)
+                    "<span foreground='#f87171'><b>{}</b> {}</span>",
+                    tr("Export Failed:"), glib::markup_escape_text(&e)
                 ));
             }
         }
@@ -5470,7 +5483,7 @@ impl App {
         let path_str = self.data_import_entry.text().to_string();
         let path = PathBuf::from(path_str.trim());
         if path.as_os_str().is_empty() || !path.exists() {
-            self.data_modal_status_lbl.set_markup("<span foreground='#f87171'><b>Error:</b> Please select a valid .tar.gz backup file.</span>");
+            self.data_modal_status_lbl.set_markup(&format!("<span foreground='#f87171'><b>{}</b> {}</span>", tr("Error:"), tr("Please select a valid .tar.gz backup file.")));
             return;
         }
 
@@ -5489,14 +5502,15 @@ impl App {
                 self.refresh_sidebar();
                 self.refresh_data_modal_info();
 
-                self.data_modal_status_lbl.set_markup(
-                    "<span foreground='#4ade80'><b>Import Successful:</b> All workspaces, tabs, accounts & cookies restored!</span>"
-                );
+                self.data_modal_status_lbl.set_markup(&format!(
+                    "<span foreground='#4ade80'><b>{}</b> {}</span>",
+                    tr("Import Successful:"), tr("All workspaces, tabs, accounts & cookies restored!")
+                ));
             }
             Err(e) => {
                 self.data_modal_status_lbl.set_markup(&format!(
-                    "<span foreground='#f87171'><b>Import Failed:</b> {}</span>",
-                    glib::markup_escape_text(&e)
+                    "<span foreground='#f87171'><b>{}</b> {}</span>",
+                    tr("Import Failed:"), glib::markup_escape_text(&e)
                 ));
             }
         }
@@ -5896,7 +5910,7 @@ impl App {
             drag_handle.add_css_class("profile-drag-handle");
             drag_handle.set_cursor_from_name(Some("grab"));
             drag_handle.set_valign(gtk::Align::Center);
-            drag_handle.set_tooltip_text(Some("Drag up or down to reorder profiles"));
+            drag_handle.set_tooltip_text(Some(tr("Drag up or down to reorder profiles")));
 
             if total_profiles > 1 {
                 let drag = gtk::GestureDrag::new();
@@ -6009,12 +6023,12 @@ impl App {
             info_box.set_hexpand(true);
             info_box.set_valign(gtk::Align::Center);
 
-            let name_lbl = gtk::Label::new(Some(&p.name));
+            let name_lbl = gtk::Label::new(Some(&p.display_name()));
             name_lbl.add_css_class("profile-card-name");
             name_lbl.set_xalign(0.0);
 
             let persona = ProfilePersona::for_id(&p.id);
-            let sub_text = format!("@{} - {} (100% Isolated)", p.id, persona.summary());
+            let sub_text = trf("@{} - {} (100% Isolated)", &[&p.id, &persona.summary()]);
             let sub_lbl = gtk::Label::new(Some(&sub_text));
             sub_lbl.add_css_class("profile-card-sub");
             sub_lbl.set_xalign(0.0);
@@ -6026,11 +6040,11 @@ impl App {
             actions_box.set_valign(gtk::Align::Center);
 
             if p.id == active_id {
-                let active_badge = gtk::Label::new(Some("Active"));
+                let active_badge = gtk::Label::new(Some(tr("Active")));
                 active_badge.add_css_class("profile-badge-active");
                 actions_box.append(&active_badge);
             } else {
-                let set_act_btn = gtk::Button::with_label("Make Active");
+                let set_act_btn = gtk::Button::with_label(tr("Make Active"));
                 set_act_btn.add_css_class("btn-make-active");
                 let app = self.clone();
                 let pid = p.id.clone();
@@ -6049,7 +6063,7 @@ impl App {
             if can_delete && p.id != "default" {
                 let del_btn = gtk::Button::from_icon_name("window-close-symbolic");
                 del_btn.add_css_class("btn-del-profile");
-                del_btn.set_tooltip_text(Some("Delete Profile"));
+                del_btn.set_tooltip_text(Some(tr("Delete Profile")));
                 let app = self.clone();
                 let pid = p.id.clone();
                 del_btn.connect_clicked(move |_| {
@@ -6104,7 +6118,7 @@ impl App {
             self.add_prof_btn.set_sensitive(false);
             self.add_prof_btn.remove_css_class("active-ready");
         } else if self.profiles.borrow().profile_exists(clean) {
-            self.new_profile_error_lbl.set_text("Profile already exists");
+            self.new_profile_error_lbl.set_text(tr("Profile already exists"));
             self.new_profile_error_lbl.set_visible(true);
             self.new_profile_entry.add_css_class("error");
             self.add_prof_btn.set_sensitive(false);
@@ -6142,7 +6156,7 @@ impl App {
                 });
             }
             Err(err) => {
-                self.new_profile_error_lbl.set_text(&err);
+                self.new_profile_error_lbl.set_text(tr(err));
                 self.new_profile_error_lbl.set_visible(true);
                 self.new_profile_entry.add_css_class("error");
                 self.add_prof_btn.set_sensitive(false);
@@ -6597,13 +6611,13 @@ fn build(gapp: &gtk::Application) {
     brand.set_xalign(0.0);
     let add = gtk::Button::from_icon_name("list-add-symbolic");
     add.add_css_class("btn-add-tab");
-    add.set_tooltip_text(Some("New tab  (Alt+T)"));
+    add.set_tooltip_text(Some(tr("New tab  (Alt+T)")));
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     head.set_margin_start(4);
     head.append(&brand);
     head.append(&add);
 
-    let pill_label = gtk::Label::new(Some("Search or enter address"));
+    let pill_label = gtk::Label::new(Some(tr("Search or enter address")));
     pill_label.set_xalign(0.0);
     pill_label.set_hexpand(true);
     pill_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
@@ -6613,13 +6627,13 @@ fn build(gapp: &gtk::Application) {
     s_icon.add_css_class("pill-icon");
     pill_inner.append(&s_icon);
     pill_inner.append(&pill_label);
-    let pill_chip = gtk::Label::new(Some("Alt+G"));
+    let pill_chip = gtk::Label::new(Some(tr("Alt+G")));
     pill_chip.add_css_class("pill-chip");
     pill_inner.append(&pill_chip);
     let pill = gtk::Button::new();
     pill.add_css_class("pill");
     pill.set_child(Some(&pill_inner));
-    pill.set_tooltip_text(Some("Go to address  (Alt+G)"));
+    pill.set_tooltip_text(Some(tr("Go to address  (Alt+G)")));
 
     let list = gtk::ListBox::new();
     list.add_css_class("tablist");
@@ -6663,7 +6677,7 @@ fn build(gapp: &gtk::Application) {
     let entry = gtk::Entry::new();
     entry.add_css_class("palette-entry");
     entry.set_hexpand(true);
-    entry.set_placeholder_text(Some("Search Google or enter web address..."));
+    entry.set_placeholder_text(Some(tr("Search Google or enter web address...")));
 
     let sicon = create_google_icon(20);
 
@@ -6696,7 +6710,7 @@ fn build(gapp: &gtk::Application) {
     palette_suggestions_box.add_css_class("palette-suggestions-box");
     palette_suggestions_box.set_visible(false);
 
-    let phint = gtk::Label::new(Some("Enter  go      Esc  cancel      Alt+P  profiles"));
+    let phint = gtk::Label::new(Some(tr("Enter  go      Esc  cancel      Alt+P  profiles")));
     phint.add_css_class("palette-hint");
     phint.set_xalign(0.0);
     let palette = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -6731,10 +6745,10 @@ fn build(gapp: &gtk::Application) {
     let settings_icon = gtk::Image::from_icon_name("preferences-system-symbolic");
     settings_icon.add_css_class("settings-header-icon");
 
-    let settings_title = gtk::Label::new(Some("Settings"));
+    let settings_title = gtk::Label::new(Some(tr("Settings")));
     settings_title.add_css_class("settings-title");
 
-    let settings_badge = gtk::Label::new(Some("rail.preferences"));
+    let settings_badge = gtk::Label::new(Some(tr("rail.preferences")));
     settings_badge.add_css_class("settings-badge");
 
     let header_spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -6742,7 +6756,7 @@ fn build(gapp: &gtk::Application) {
 
     let settings_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
     settings_close_btn.add_css_class("flat-icon");
-    settings_close_btn.set_tooltip_text(Some("Close Settings (Esc)"));
+    settings_close_btn.set_tooltip_text(Some(tr("Close Settings (Esc)")));
 
     settings_header.append(&settings_icon);
     settings_header.append(&settings_title);
@@ -6766,12 +6780,12 @@ fn build(gapp: &gtk::Application) {
     settings_stack.set_vexpand(true);
 
     let sidebar_items = [
-        (SettingsTab::General, "preferences-system-symbolic", "General"),
-        (SettingsTab::Profiles, "system-users-symbolic", "Profiles"),
-        (SettingsTab::Data, "drive-harddisk-symbolic", "Data & Backup"),
-        (SettingsTab::Privacy, "security-high-symbolic", "Privacy & Shield"),
-        (SettingsTab::Customize, "document-edit-symbolic", "Customize"),
-        (SettingsTab::About, "help-about-symbolic", "About Rail"),
+        (SettingsTab::General, "preferences-system-symbolic", tr("General")),
+        (SettingsTab::Profiles, "system-users-symbolic", tr("Profiles")),
+        (SettingsTab::Data, "drive-harddisk-symbolic", tr("Data & Backup")),
+        (SettingsTab::Privacy, "security-high-symbolic", tr("Privacy & Shield")),
+        (SettingsTab::Customize, "document-edit-symbolic", tr("Customize")),
+        (SettingsTab::About, "help-about-symbolic", tr("About Rail")),
     ];
 
     let mut tab_buttons_vec: Vec<(SettingsTab, gtk::Button)> = Vec::new();
@@ -6797,7 +6811,7 @@ fn build(gapp: &gtk::Application) {
     sidebar_spacer.set_vexpand(true);
     settings_sidebar.append(&sidebar_spacer);
 
-    let esc_hint = gtk::Label::new(Some("Esc to close"));
+    let esc_hint = gtk::Label::new(Some(tr("Esc to close")));
     esc_hint.add_css_class("data-section-desc");
     esc_hint.set_xalign(0.5);
     esc_hint.set_margin_bottom(8);
@@ -6811,10 +6825,10 @@ fn build(gapp: &gtk::Application) {
     let page_general = gtk::Box::new(gtk::Orientation::Vertical, 10);
     page_general.add_css_class("settings-content-page");
 
-    let gen_title = gtk::Label::new(Some("General Preferences"));
+    let gen_title = gtk::Label::new(Some(tr("General Preferences")));
     gen_title.add_css_class("settings-page-title");
     gen_title.set_xalign(0.0);
-    let gen_subtitle = gtk::Label::new(Some("Configure default search engine, new tab behavior, and browsing controls"));
+    let gen_subtitle = gtk::Label::new(Some(tr("Configure default search engine, new tab behavior, and browsing controls")));
     gen_subtitle.add_css_class("settings-page-subtitle");
     gen_subtitle.set_xalign(0.0);
     page_general.append(&gen_title);
@@ -6823,10 +6837,10 @@ fn build(gapp: &gtk::Application) {
     // Search Engine Card
     let engine_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
     engine_card.add_css_class("settings-card");
-    let engine_title = gtk::Label::new(Some("Default Search Engine"));
+    let engine_title = gtk::Label::new(Some(tr("Default Search Engine")));
     engine_title.add_css_class("settings-card-title");
     engine_title.set_xalign(0.0);
-    let engine_desc = gtk::Label::new(Some("Applied when searching via the Omnibar (Alt+T / Alt+G)"));
+    let engine_desc = gtk::Label::new(Some(tr("Applied when searching via the Omnibar (Alt+T / Alt+G)")));
     engine_desc.add_css_class("settings-card-desc");
     engine_desc.set_xalign(0.0);
     engine_card.append(&engine_title);
@@ -6853,16 +6867,78 @@ fn build(gapp: &gtk::Application) {
     engine_card.append(&engines_row);
     page_general.append(&engine_card);
 
+    // Language Card
+    let lang_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    lang_card.add_css_class("settings-card");
+    let lang_title = gtk::Label::new(Some(tr("Interface Language")));
+    lang_title.add_css_class("settings-card-title");
+    lang_title.set_xalign(0.0);
+    let lang_desc = gtk::Label::new(Some(tr("Choose the language of Rail menus and settings. Applies after restart.")));
+    lang_desc.add_css_class("settings-card-desc");
+    lang_desc.set_xalign(0.0);
+    lang_desc.set_wrap(true);
+    lang_card.append(&lang_title);
+    lang_card.append(&lang_desc);
+    let lang_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let lang_status = gtk::Label::new(None);
+    lang_status.add_css_class("settings-card-desc");
+    lang_status.set_xalign(0.0);
+    lang_status.set_visible(false);
+    let lang_restart = gtk::Button::with_label(tr("Restart now"));
+    lang_restart.add_css_class("settings-option-item");
+    lang_restart.set_halign(gtk::Align::Start);
+    lang_restart.set_visible(false);
+    lang_restart.connect_clicked(|b| {
+        if let Some(w) = b.root().and_then(|r| r.downcast::<gtk::ApplicationWindow>().ok()) {
+            update::restart(&w);
+        }
+    });
+    let mut lang_buttons: Vec<(i18n::Lang, gtk::Button)> = Vec::new();
+    for (lang, name) in [(i18n::Lang::Uz, "O'zbekcha"), (i18n::Lang::En, "English"), (i18n::Lang::Ru, "Русский")] {
+        let btn = gtk::Button::with_label(name);
+        btn.add_css_class("settings-option-item");
+        if lang == i18n::current() {
+            btn.add_css_class("active");
+        }
+        lang_row.append(&btn);
+        lang_buttons.push((lang, btn));
+    }
+    for (lang, btn) in lang_buttons.iter() {
+        let lang = *lang;
+        let all = lang_buttons.clone();
+        let status = lang_status.clone();
+        let restart_btn = lang_restart.clone();
+        btn.connect_clicked(move |_| {
+            if i18n::set_language(lang) {
+                for (l, b) in all.iter() {
+                    if *l == lang {
+                        b.add_css_class("active");
+                    } else {
+                        b.remove_css_class("active");
+                    }
+                }
+                let changed = lang != i18n::current();
+                status.set_text(tr("Language saved. Restart Rail to apply."));
+                status.set_visible(changed);
+                restart_btn.set_visible(changed);
+            }
+        });
+    }
+    lang_card.append(&lang_row);
+    lang_card.append(&lang_status);
+    lang_card.append(&lang_restart);
+    page_general.append(&lang_card);
+
     // Browsing Controls Card
     let browse_card = gtk::Box::new(gtk::Orientation::Vertical, 8);
     browse_card.add_css_class("settings-card");
-    let browse_title = gtk::Label::new(Some("Browsing Ergonomics & Gestures"));
+    let browse_title = gtk::Label::new(Some(tr("Browsing Ergonomics & Gestures")));
     browse_title.add_css_class("settings-card-title");
     browse_title.set_xalign(0.0);
     browse_card.append(&browse_title);
 
     let tp_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let tp_lbl = gtk::Label::new(Some("Touchpad Canvas Navigation (Two-finger swipe navigates 2D canvas)"));
+    let tp_lbl = gtk::Label::new(Some(tr("Touchpad Canvas Navigation (Two-finger swipe navigates 2D canvas)")));
     tp_lbl.add_css_class("shortcut-desc");
     tp_lbl.set_hexpand(true);
     tp_lbl.set_xalign(0.0);
@@ -6874,7 +6950,7 @@ fn build(gapp: &gtk::Application) {
     browse_card.append(&tp_row);
 
     let scroll_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let scroll_lbl = gtk::Label::new(Some("WebKit Smooth Kinetic Scrolling"));
+    let scroll_lbl = gtk::Label::new(Some(tr("WebKit Smooth Kinetic Scrolling")));
     scroll_lbl.add_css_class("shortcut-desc");
     scroll_lbl.set_hexpand(true);
     scroll_lbl.set_xalign(0.0);
@@ -6886,11 +6962,11 @@ fn build(gapp: &gtk::Application) {
     browse_card.append(&scroll_row);
 
     let hw_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let hw_lbl = gtk::Label::new(Some("Hardware Acceleration Policy"));
+    let hw_lbl = gtk::Label::new(Some(tr("Hardware Acceleration Policy")));
     hw_lbl.add_css_class("shortcut-desc");
     hw_lbl.set_hexpand(true);
     hw_lbl.set_xalign(0.0);
-    let hw_badge = gtk::Label::new(Some("Always (GSK GPU)"));
+    let hw_badge = gtk::Label::new(Some(tr("Always (GSK GPU)")));
     hw_badge.add_css_class("shortcut-kbd");
     hw_row.append(&hw_lbl);
     hw_row.append(&hw_badge);
@@ -6923,7 +6999,7 @@ fn build(gapp: &gtk::Application) {
     css_scroll.set_child(Some(&css_view));
     page_css.append(&css_scroll);
 
-    let css_save_btn = gtk::Button::with_label("Save");
+    let css_save_btn = gtk::Button::with_label(tr("Save"));
     css_save_btn.add_css_class("settings-option-item");
     css_save_btn.add_css_class("active");
     css_save_btn.set_halign(gtk::Align::Start);
@@ -6954,10 +7030,10 @@ fn build(gapp: &gtk::Application) {
     let sc_page = gtk::Box::new(gtk::Orientation::Vertical, 6);
     sc_page.set_vexpand(true);
 
-    let sc_prio = gtk::CheckButton::with_label("Rail shortcuts win over website shortcuts");
+    let sc_prio = gtk::CheckButton::with_label(tr("Rail shortcuts win over website shortcuts"));
     sc_prio.set_active(true);
     let sc_prio_hint = gtk::Label::new(Some(
-        "Unchecked: when a page uses the same keys, the page wins and Rail stays out of the way.",
+        tr("Unchecked: when a page uses the same keys, the page wins and Rail stays out of the way."),
     ));
     sc_prio_hint.add_css_class("settings-card-desc");
     sc_prio_hint.set_xalign(0.0);
@@ -6979,7 +7055,7 @@ fn build(gapp: &gtk::Application) {
     sc_status.set_wrap(true);
     sc_page.append(&sc_status);
 
-    let sc_reset_all = gtk::Button::with_label("Reset all to defaults");
+    let sc_reset_all = gtk::Button::with_label(tr("Reset all to defaults"));
     sc_reset_all.add_css_class("settings-option-item");
     sc_reset_all.set_halign(gtk::Align::Start);
     sc_page.append(&sc_reset_all);
@@ -7019,7 +7095,7 @@ fn build(gapp: &gtk::Application) {
                 c.disabled.clear();
             }
             sc_commit(&ui);
-            ui.status.set_text("All shortcuts are back to their defaults.");
+            ui.status.set_text(tr("All shortcuts are back to their defaults."));
             sc_build(&ui);
         });
     }
@@ -7031,10 +7107,10 @@ fn build(gapp: &gtk::Application) {
     customize_stack.add_named(&sc_page, Some("shortcuts"));
 
     let sub_bar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    let sub_html = gtk::Button::with_label("HTML Defaults");
+    let sub_html = gtk::Button::with_label(tr("HTML Defaults"));
     sub_html.add_css_class("settings-option-item");
     sub_html.add_css_class("active");
-    let sub_sc = gtk::Button::with_label("Shortcuts");
+    let sub_sc = gtk::Button::with_label(tr("Shortcuts"));
     sub_sc.add_css_class("settings-option-item");
     sub_bar.append(&sub_html);
     sub_bar.append(&sub_sc);
@@ -7073,13 +7149,13 @@ fn build(gapp: &gtk::Application) {
     sep.set_margin_top(8);
     sep.set_margin_bottom(8);
 
-    let new_lbl = gtk::Label::new(Some("CREATE NEW PROFILE"));
+    let new_lbl = gtk::Label::new(Some(tr("CREATE NEW PROFILE")));
     new_lbl.add_css_class("profile-section-label");
     new_lbl.set_xalign(0.0);
 
     let new_profile_entry = gtk::Entry::new();
     new_profile_entry.add_css_class("profile-entry-box");
-    new_profile_entry.set_placeholder_text(Some("Enter unique profile name (e.g. Work, School)..."));
+    new_profile_entry.set_placeholder_text(Some(tr("Enter unique profile name (e.g. Work, School)...")));
     new_profile_entry.set_hexpand(true);
 
     let new_profile_error_lbl = gtk::Label::new(None);
@@ -7087,7 +7163,7 @@ fn build(gapp: &gtk::Application) {
     new_profile_error_lbl.set_xalign(0.0);
     new_profile_error_lbl.set_visible(false);
 
-    let add_prof_btn = gtk::Button::with_label("Create Profile");
+    let add_prof_btn = gtk::Button::with_label(tr("Create Profile"));
     add_prof_btn.add_css_class("btn-create-profile");
     add_prof_btn.set_sensitive(false);
     add_prof_btn.set_valign(gtk::Align::Center);
@@ -7121,10 +7197,10 @@ fn build(gapp: &gtk::Application) {
     let page_profiles = gtk::Box::new(gtk::Orientation::Vertical, 6);
     page_profiles.add_css_class("settings-content-page");
 
-    let prof_page_title = gtk::Label::new(Some("Profiles & Workspaces"));
+    let prof_page_title = gtk::Label::new(Some(tr("Profiles & Workspaces")));
     prof_page_title.add_css_class("settings-page-title");
     prof_page_title.set_xalign(0.0);
-    let prof_page_subtitle = gtk::Label::new(Some("Isolated workspaces, sessions & cookie storage  (Alt+P)"));
+    let prof_page_subtitle = gtk::Label::new(Some(tr("Isolated workspaces, sessions & cookie storage  (Alt+P)")));
     prof_page_subtitle.add_css_class("settings-page-subtitle");
     prof_page_subtitle.set_xalign(0.0);
 
@@ -7153,11 +7229,11 @@ fn build(gapp: &gtk::Application) {
     let export_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
     export_box.add_css_class("data-section-box");
 
-    let export_title = gtk::Label::new(Some("Export Environment (All Data)"));
+    let export_title = gtk::Label::new(Some(tr("Export Environment (All Data)")));
     export_title.add_css_class("data-section-title");
     export_title.set_xalign(0.0);
 
-    let export_desc = gtk::Label::new(Some("Pack all your open tabs, workspaces, profiles, accounts & cookies into a single portable .tar.gz archive."));
+    let export_desc = gtk::Label::new(Some(tr("Pack all your open tabs, workspaces, profiles, accounts & cookies into a single portable .tar.gz archive.")));
     export_desc.add_css_class("data-section-desc");
     export_desc.set_xalign(0.0);
     export_desc.set_wrap(true);
@@ -7166,10 +7242,10 @@ fn build(gapp: &gtk::Application) {
     data_export_entry.add_css_class("profile-entry-box");
     data_export_entry.set_hexpand(true);
 
-    let btn_export_browse = gtk::Button::with_label("Browse...");
+    let btn_export_browse = gtk::Button::with_label(tr("Browse..."));
     btn_export_browse.add_css_class("btn-data-action");
 
-    let btn_export_do = gtk::Button::with_label("Export Backup");
+    let btn_export_do = gtk::Button::with_label(tr("Export Backup"));
     btn_export_do.add_css_class("btn-data-primary");
 
     let export_actions_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -7184,24 +7260,24 @@ fn build(gapp: &gtk::Application) {
     let import_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
     import_box.add_css_class("data-section-box");
 
-    let import_title = gtk::Label::new(Some("Import Environment"));
+    let import_title = gtk::Label::new(Some(tr("Import Environment")));
     import_title.add_css_class("data-section-title");
     import_title.set_xalign(0.0);
 
-    let import_desc = gtk::Label::new(Some("Restore tabs, workspaces, profiles, and logins from a .tar.gz archive. Replaces current session."));
+    let import_desc = gtk::Label::new(Some(tr("Restore tabs, workspaces, profiles, and logins from a .tar.gz archive. Replaces current session.")));
     import_desc.add_css_class("data-section-desc");
     import_desc.set_xalign(0.0);
     import_desc.set_wrap(true);
 
     let data_import_entry = gtk::Entry::new();
     data_import_entry.add_css_class("profile-entry-box");
-    data_import_entry.set_placeholder_text(Some("Select or enter path to .tar.gz backup..."));
+    data_import_entry.set_placeholder_text(Some(tr("Select or enter path to .tar.gz backup...")));
     data_import_entry.set_hexpand(true);
 
-    let btn_import_browse = gtk::Button::with_label("Browse...");
+    let btn_import_browse = gtk::Button::with_label(tr("Browse..."));
     btn_import_browse.add_css_class("btn-data-action");
 
-    let btn_import_do = gtk::Button::with_label("Import & Restore");
+    let btn_import_do = gtk::Button::with_label(tr("Import & Restore"));
     btn_import_do.add_css_class("btn-data-primary");
 
     let import_actions_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -7215,16 +7291,16 @@ fn build(gapp: &gtk::Application) {
 
     let maint_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
     maint_box.add_css_class("data-section-box");
-    let maint_title = gtk::Label::new(Some("Data Maintenance & Cache"));
+    let maint_title = gtk::Label::new(Some(tr("Data Maintenance & Cache")));
     maint_title.add_css_class("data-section-title");
     maint_title.set_xalign(0.0);
-    let maint_desc = gtk::Label::new(Some("Clear local Omnibar suggestions history or purge temporary network disk caches."));
+    let maint_desc = gtk::Label::new(Some(tr("Clear local Omnibar suggestions history or purge temporary network disk caches.")));
     maint_desc.add_css_class("data-section-desc");
     maint_desc.set_xalign(0.0);
     let maint_btns_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    let btn_clear_hist = gtk::Button::with_label("Clear Omnibar History");
+    let btn_clear_hist = gtk::Button::with_label(tr("Clear Omnibar History"));
     btn_clear_hist.add_css_class("btn-data-action");
-    let btn_clear_cache = gtk::Button::with_label("Clear Disk Cache");
+    let btn_clear_cache = gtk::Button::with_label(tr("Clear Disk Cache"));
     btn_clear_cache.add_css_class("btn-data-action");
     maint_btns_row.append(&btn_clear_hist);
     maint_btns_row.append(&btn_clear_cache);
@@ -7240,10 +7316,10 @@ fn build(gapp: &gtk::Application) {
     let page_data = gtk::Box::new(gtk::Orientation::Vertical, 8);
     page_data.add_css_class("settings-content-page");
 
-    let data_page_title = gtk::Label::new(Some("Data Backup & Migration"));
+    let data_page_title = gtk::Label::new(Some(tr("Data Backup & Migration")));
     data_page_title.add_css_class("settings-page-title");
     data_page_title.set_xalign(0.0);
-    let data_page_subtitle = gtk::Label::new(Some("Export or import all workspaces, profiles, logins & cookies  (Alt+I)"));
+    let data_page_subtitle = gtk::Label::new(Some(tr("Export or import all workspaces, profiles, logins & cookies  (Alt+I)")));
     data_page_subtitle.add_css_class("settings-page-subtitle");
     data_page_subtitle.set_xalign(0.0);
 
@@ -7264,10 +7340,10 @@ fn build(gapp: &gtk::Application) {
     let page_privacy = gtk::Box::new(gtk::Orientation::Vertical, 10);
     page_privacy.add_css_class("settings-content-page");
 
-    let priv_title = gtk::Label::new(Some("Privacy & Security Shield"));
+    let priv_title = gtk::Label::new(Some(tr("Privacy & Security Shield")));
     priv_title.add_css_class("settings-page-title");
     priv_title.set_xalign(0.0);
-    let priv_subtitle = gtk::Label::new(Some("Container isolation, fingerprint shielding, and network leak prevention"));
+    let priv_subtitle = gtk::Label::new(Some(tr("Container isolation, fingerprint shielding, and network leak prevention")));
     priv_subtitle.add_css_class("settings-page-subtitle");
     priv_subtitle.set_xalign(0.0);
     page_privacy.append(&priv_title);
@@ -7275,10 +7351,10 @@ fn build(gapp: &gtk::Application) {
 
     let iso_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
     iso_card.add_css_class("settings-card");
-    let iso_title = gtk::Label::new(Some("🛡️ Multi-Container Storage Isolation"));
+    let iso_title = gtk::Label::new(Some(tr("🛡️ Multi-Container Storage Isolation")));
     iso_title.add_css_class("settings-card-title");
     iso_title.set_xalign(0.0);
-    let iso_desc = gtk::Label::new(Some("Each profile runs in its own isolated WebKit WebsiteDataManager directory with completely independent cookie jars, IndexedDB databases, and localStorage partitions. Websites cannot cross-track you between personas."));
+    let iso_desc = gtk::Label::new(Some(tr("Each profile runs in its own isolated WebKit WebsiteDataManager directory with completely independent cookie jars, IndexedDB databases, and localStorage partitions. Websites cannot cross-track you between personas.")));
     iso_desc.add_css_class("settings-card-desc");
     iso_desc.set_xalign(0.0);
     iso_desc.set_wrap(true);
@@ -7288,13 +7364,13 @@ fn build(gapp: &gtk::Application) {
 
     let leak_card = gtk::Box::new(gtk::Orientation::Vertical, 8);
     leak_card.add_css_class("settings-card");
-    let leak_title = gtk::Label::new(Some("Network Leak Protections"));
+    let leak_title = gtk::Label::new(Some(tr("Network Leak Protections")));
     leak_title.add_css_class("settings-card-title");
     leak_title.set_xalign(0.0);
     leak_card.append(&leak_title);
 
     let webrtc_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let webrtc_lbl = gtk::Label::new(Some("WebRTC Peer Connections (Enabled for video calls & audio)"));
+    let webrtc_lbl = gtk::Label::new(Some(tr("WebRTC Peer Connections (Enabled for video calls & audio)")));
     webrtc_lbl.add_css_class("shortcut-desc");
     webrtc_lbl.set_hexpand(true);
     webrtc_lbl.set_xalign(0.0);
@@ -7306,33 +7382,33 @@ fn build(gapp: &gtk::Application) {
     leak_card.append(&webrtc_row);
 
     let dns_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let dns_lbl = gtk::Label::new(Some("DNS Prefetching Shield (Blocks unrequested domain lookup leaks)"));
+    let dns_lbl = gtk::Label::new(Some(tr("DNS Prefetching Shield (Blocks unrequested domain lookup leaks)")));
     dns_lbl.add_css_class("shortcut-desc");
     dns_lbl.set_hexpand(true);
     dns_lbl.set_xalign(0.0);
-    let dns_badge = gtk::Label::new(Some("Shielded"));
+    let dns_badge = gtk::Label::new(Some(tr("Shielded")));
     dns_badge.add_css_class("shortcut-kbd");
     dns_row.append(&dns_lbl);
     dns_row.append(&dns_badge);
     leak_card.append(&dns_row);
 
     let ping_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let ping_lbl = gtk::Label::new(Some("Hyperlink Auditing (Blocks <a ping> click beacons)"));
+    let ping_lbl = gtk::Label::new(Some(tr("Hyperlink Auditing (Blocks <a ping> click beacons)")));
     ping_lbl.add_css_class("shortcut-desc");
     ping_lbl.set_hexpand(true);
     ping_lbl.set_xalign(0.0);
-    let ping_badge = gtk::Label::new(Some("Blocked"));
+    let ping_badge = gtk::Label::new(Some(tr("Blocked")));
     ping_badge.add_css_class("shortcut-kbd");
     ping_row.append(&ping_lbl);
     ping_row.append(&ping_badge);
     leak_card.append(&ping_row);
 
     let dnt_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let dnt_lbl = gtk::Label::new(Some("Do Not Track & Global Privacy Control"));
+    let dnt_lbl = gtk::Label::new(Some(tr("Do Not Track & Global Privacy Control")));
     dnt_lbl.add_css_class("shortcut-desc");
     dnt_lbl.set_hexpand(true);
     dnt_lbl.set_xalign(0.0);
-    let dnt_badge = gtk::Label::new(Some("Active"));
+    let dnt_badge = gtk::Label::new(Some(tr("Active")));
     dnt_badge.add_css_class("shortcut-kbd");
     dnt_row.append(&dnt_lbl);
     dnt_row.append(&dnt_badge);
@@ -7349,10 +7425,10 @@ fn build(gapp: &gtk::Application) {
     let page_about = gtk::Box::new(gtk::Orientation::Vertical, 10);
     page_about.add_css_class("settings-content-page");
 
-    let about_title = gtk::Label::new(Some("About Rail Browser"));
+    let about_title = gtk::Label::new(Some(tr("About Rail Browser")));
     about_title.add_css_class("settings-page-title");
     about_title.set_xalign(0.0);
-    let about_subtitle = gtk::Label::new(Some("High-performance native browser engineered in Rust"));
+    let about_subtitle = gtk::Label::new(Some(tr("High-performance native browser engineered in Rust")));
     about_subtitle.add_css_class("settings-page-subtitle");
     about_subtitle.set_xalign(0.0);
     page_about.append(&about_title);
@@ -7364,7 +7440,7 @@ fn build(gapp: &gtk::Application) {
     let brand_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     let brand_logo = gtk::Label::new(None);
     brand_logo.set_markup("<span weight='bold' font_family='monospace' size='xx-large' foreground='#f8fafc'>rail</span><span weight='bold' size='xx-large' foreground='#38bdf8'>.</span>");
-    let version_badge = gtk::Label::new(Some("v0.4.5 Liquid Edition"));
+    let version_badge = gtk::Label::new(Some(&format!("v{}", update::current_version())));
     version_badge.add_css_class("settings-badge");
     version_badge.set_valign(gtk::Align::Center);
     brand_row.append(&brand_logo);
@@ -7372,12 +7448,12 @@ fn build(gapp: &gtk::Application) {
     about_card.append(&brand_row);
 
     let specs = [
-        ("Core Engine", "WebKitGTK 4.1 / WebKit 6.0"),
-        ("GUI Framework", "GTK 4.0 + GSK GPU Compositor"),
-        ("Language", "100% Pure Native Rust"),
-        ("Architecture", "Zero-Electron / Multi-Persona Sandboxed Profiles"),
-        ("Data Directory", "~/.local/share/rail/"),
-        ("License", "MIT License"),
+        (tr("Core Engine"), "WebKitGTK 4.1 / WebKit 6.0"),
+        (tr("GUI Framework"), "GTK 4.0 + GSK GPU Compositor"),
+        (tr("Language"), tr("100% Pure Native Rust")),
+        (tr("Architecture"), tr("Zero-Electron / Multi-Persona Sandboxed Profiles")),
+        (tr("Data Directory"), "~/.local/share/rail/"),
+        (tr("License"), "MIT License"),
     ];
     for (k_txt, v_txt) in specs {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -7400,7 +7476,7 @@ fn build(gapp: &gtk::Application) {
     settings_stack.add_named(&page_about_scroll, Some("about"));
 
     // ---- overview hint ----
-    let ov_hint = gtk::Label::new(Some("h/l/j/k  move      Enter  open      x  close      Esc  cancel"));
+    let ov_hint = gtk::Label::new(Some(tr("h/l/j/k  move      Enter  open      x  close      Esc  cancel")));
     ov_hint.add_css_class("ov-hint");
     ov_hint.set_halign(gtk::Align::Center);
     ov_hint.set_valign(gtk::Align::End);
@@ -7428,16 +7504,16 @@ fn build(gapp: &gtk::Application) {
     map_title.set_hexpand(true);
     map_title.set_xalign(0.0);
 
-    let map_badge = gtk::Label::new(Some("Alt+M"));
+    let map_badge = gtk::Label::new(Some(tr("Alt+M")));
     map_badge.add_css_class("minimap-badge");
 
-    let map_hint = gtk::Label::new(Some("Drag header"));
+    let map_hint = gtk::Label::new(Some(tr("Drag header")));
     map_hint.add_css_class("minimap-header-hint");
     map_hint.set_xalign(0.0);
 
     let map_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
     map_close_btn.add_css_class("flat-icon");
-    map_close_btn.set_tooltip_text(Some("Close Map (Alt+M / Esc)"));
+    map_close_btn.set_tooltip_text(Some(tr("Close Map (Alt+M / Esc)")));
     map_close_btn.set_cursor_from_name(Some("pointer"));
 
     map_header_row.append(&map_icon);
@@ -7454,7 +7530,7 @@ fn build(gapp: &gtk::Application) {
     let map_location_btn = gtk::Button::new();
     let loc_box = gtk::Box::new(gtk::Orientation::Horizontal, 5);
     let loc_icon = gtk::Image::from_icon_name("find-location-symbolic");
-    let loc_lbl = gtk::Label::new(Some("recenter"));
+    let loc_lbl = gtk::Label::new(Some(tr("recenter")));
     loc_box.append(&loc_icon);
     loc_box.append(&loc_lbl);
     map_location_btn.set_child(Some(&loc_box));
@@ -7503,11 +7579,11 @@ fn build(gapp: &gtk::Application) {
 
     let devtools_detach_btn = gtk::Button::from_icon_name("view-restore-symbolic");
     devtools_detach_btn.add_css_class("flat-icon");
-    devtools_detach_btn.set_tooltip_text(Some("Detach to Separate Window / Dock"));
+    devtools_detach_btn.set_tooltip_text(Some(tr("Detach to Separate Window / Dock")));
 
     let devtools_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
     devtools_close_btn.add_css_class("flat-icon");
-    devtools_close_btn.set_tooltip_text(Some("Close DevTools (Esc / F12)"));
+    devtools_close_btn.set_tooltip_text(Some(tr("Close DevTools (Esc / F12)")));
 
     devtools_header.append(&devtools_icon);
     devtools_header.append(&devtools_title);
@@ -7930,7 +8006,7 @@ fn build(gapp: &gtk::Application) {
     btn_export_browse.connect_clicked(move |_| {
         let Some(win) = win_weak.upgrade() else { return };
         let dialog = gtk::FileDialog::builder()
-            .title("Save Rail Backup Archive (.tar.gz)")
+            .title(tr("Save Rail Backup Archive (.tar.gz)"))
             .initial_name("rail_backup.tar.gz")
             .build();
         let a = a.clone();
@@ -7948,7 +8024,7 @@ fn build(gapp: &gtk::Application) {
     btn_import_browse.connect_clicked(move |_| {
         let Some(win) = win_weak.upgrade() else { return };
         let dialog = gtk::FileDialog::builder()
-            .title("Select Rail Backup Archive (.tar.gz)")
+            .title(tr("Select Rail Backup Archive (.tar.gz)"))
             .build();
         let a = a.clone();
         dialog.open(Some(&win), gio::Cancellable::NONE, move |res| {
@@ -8356,10 +8432,10 @@ fn build(gapp: &gtk::Application) {
 fn export_data(archive_path: &Path) -> Result<(), String> {
     let dir = rail_data_dir();
     if !dir.exists() {
-        return Err(format!("Storage directory does not exist: {}", dir.display()));
+        return Err(trf("Storage directory does not exist: {}", &[&dir.display().to_string()]));
     }
     let parent = dir.parent().unwrap_or(&dir);
-    let name = dir.file_name().ok_or_else(|| "Invalid directory name".to_string())?;
+    let name = dir.file_name().ok_or_else(|| tr("Invalid directory name").to_string())?;
 
     let abs_archive = if archive_path.is_absolute() {
         archive_path.to_path_buf()
@@ -8374,14 +8450,14 @@ fn export_data(archive_path: &Path) -> Result<(), String> {
         .arg(parent)
         .arg(name)
         .status()
-        .map_err(|e| format!("Failed to run tar command: {}", e))?;
+        .map_err(|e| trf("Failed to run tar command: {}", &[&e.to_string()]))?;
 
     if status.success() {
-        println!("Successfully exported all Rail data to: {}", abs_archive.display());
-        println!("This file contains all your tabs, workspaces, profiles, logins, and cookies.");
+        println!("{}", trf("Successfully exported all Rail data to: {}", &[&abs_archive.display().to_string()]));
+        println!("{}", tr("This file contains all your tabs, workspaces, profiles, logins, and cookies."));
         Ok(())
     } else {
-        Err(format!("tar command failed with status: {}", status))
+        Err(trf("tar command failed with status: {}", &[&status.to_string()]))
     }
 }
 
@@ -8393,7 +8469,7 @@ fn import_data(archive_path: &Path) -> Result<(), String> {
     };
 
     if !abs_archive.exists() {
-        return Err(format!("Archive file does not exist: {}", abs_archive.display()));
+        return Err(trf("Archive file does not exist: {}", &[&abs_archive.display().to_string()]));
     }
 
     let dest_dir = rail_data_dir();
@@ -8406,23 +8482,23 @@ fn import_data(archive_path: &Path) -> Result<(), String> {
         .arg("-C")
         .arg(parent)
         .status()
-        .map_err(|e| format!("Failed to run tar command: {}", e))?;
+        .map_err(|e| trf("Failed to run tar command: {}", &[&e.to_string()]))?;
 
     if status.success() {
-        println!("Successfully imported all Rail data into: {}", dest_dir.display());
-        println!("You can now launch 'rail' and all tabs, workspaces, logins, and accounts will be active.");
+        println!("{}", trf("Successfully imported all Rail data into: {}", &[&dest_dir.display().to_string()]));
+        println!("{}", tr("You can now launch 'rail' and all tabs, workspaces, logins, and accounts will be active."));
         Ok(())
     } else {
-        Err(format!("tar command failed with status: {}", status))
+        Err(trf("tar command failed with status: {}", &[&status.to_string()]))
     }
 }
 
 fn print_data_info() {
     let dir = rail_data_dir();
-    println!("Rail Unified Storage Directory: {}", dir.display());
+    println!("{}", trf("Rail Unified Storage Directory: {}", &[&dir.display().to_string()]));
     println!("--------------------------------------------------");
     if !dir.exists() {
-        println!("Status: Directory does not exist yet (clean slate)");
+        println!("{}", tr("Status: Directory does not exist yet (clean slate)"));
         return;
     }
 
@@ -8430,17 +8506,17 @@ fn print_data_info() {
     if session_file.exists() {
         if let Ok(c) = std::fs::read_to_string(&session_file) {
             let tabs = c.lines().filter(|l| l.starts_with("tab\t")).count();
-            println!("  Session:       {} saved tabs", tabs);
+            println!("{}", trf("  Session:       {} saved tabs", &[&tabs.to_string()]));
         }
     } else {
-        println!("  Session:       No saved session (clean start on next launch)");
+        println!("{}", tr("  Session:       No saved session (clean start on next launch)"));
     }
 
     let profiles_file = dir.join("profiles.txt");
     if profiles_file.exists() {
         if let Ok(c) = std::fs::read_to_string(&profiles_file) {
             let count = c.lines().filter(|l| !l.trim().is_empty()).count();
-            println!("  Profiles:      {} profiles configured", count);
+            println!("{}", trf("  Profiles:      {} profiles configured", &[&count.to_string()]));
         }
     }
 
@@ -8453,17 +8529,17 @@ fn print_data_info() {
                     let name = p.file_name().unwrap_or_default().to_string_lossy();
                     let has_cookies = p.join("data").join("cookies.sqlite").exists();
                     let has_storage = p.join("data").join("storage").exists();
-                    println!("    - Profile '{}': accounts/cookies={}, localStorage/IndexedDB={}", name, has_cookies, has_storage);
+                    println!("{}", trf("    - Profile '{}': accounts/cookies={}, localStorage/IndexedDB={}", &[&name, &has_cookies.to_string(), &has_storage.to_string()]));
                 }
             }
         }
     }
 
     println!();
-    println!("To share your exact environment with a friend:");
+    println!("{}", tr("To share your exact environment with a friend:"));
     println!("  Export:   rail --export rail_backup.tar.gz");
     println!("  Import:   rail --import rail_backup.tar.gz");
-    println!("  Or copy:  cp -r {} /path/to/destination", dir.display());
+    println!("{}", trf("  Or copy:  cp -r {} /path/to/destination", &[&dir.display().to_string()]));
 }
 
 fn main() -> glib::ExitCode {
@@ -8498,19 +8574,19 @@ fn main() -> glib::ExitCode {
             return update::cli_update();
         }
         if arg == "--help" || arg == "-h" {
-            println!("Usage: rail [OPTIONS] [URL]");
+            println!("{}", tr("Usage: rail [OPTIONS] [URL]"));
             println!();
-            println!("Options:");
-            println!("  -d, --data-dir <PATH>      Use custom storage directory for 100% portable environment");
-            println!("      --export <FILE.tar.gz> Export all tabs, profiles, logins & cookies into archive");
-            println!("      --import <FILE.tar.gz> Import all tabs, profiles, logins & cookies from archive");
-            println!("      --data-info            Show current storage directory and environment details");
-            println!("      --update               Download and install the newest release");
-            println!("  -v, --version              Show version");
-            println!("  -h, --help                 Show help message");
+            println!("{}", tr("Options:"));
+            println!("{}", tr("  -d, --data-dir <PATH>      Use custom storage directory for 100% portable environment"));
+            println!("{}", tr("      --export <FILE.tar.gz> Export all tabs, profiles, logins & cookies into archive"));
+            println!("{}", tr("      --import <FILE.tar.gz> Import all tabs, profiles, logins & cookies from archive"));
+            println!("{}", tr("      --data-info            Show current storage directory and environment details"));
+            println!("{}", tr("      --update               Download and install the newest release"));
+            println!("{}", tr("  -v, --version              Show version"));
+            println!("{}", tr("  -h, --help                 Show help message"));
             println!();
-            println!("Environment Variables:");
-            println!("  RAIL_DATA_DIR              Override default storage directory (~/.local/share/rail)");
+            println!("{}", tr("Environment Variables:"));
+            println!("{}", tr("  RAIL_DATA_DIR              Override default storage directory (~/.local/share/rail)"));
             return glib::ExitCode::SUCCESS;
         }
         if arg == "--data-info" {
@@ -8521,12 +8597,12 @@ fn main() -> glib::ExitCode {
             if i + 1 < args.len() {
                 let out = PathBuf::from(&args[i + 1]);
                 if let Err(e) = export_data(&out) {
-                    eprintln!("Error exporting data: {}", e);
+                    eprintln!("{}", trf("Error exporting data: {}", &[&e]));
                     return glib::ExitCode::FAILURE;
                 }
                 return glib::ExitCode::SUCCESS;
             } else {
-                eprintln!("Error: --export requires an output filename (e.g. rail --export backup.tar.gz)");
+                eprintln!("{}", tr("Error: --export requires an output filename (e.g. rail --export backup.tar.gz)"));
                 return glib::ExitCode::FAILURE;
             }
         }
@@ -8534,12 +8610,12 @@ fn main() -> glib::ExitCode {
             if i + 1 < args.len() {
                 let inp = PathBuf::from(&args[i + 1]);
                 if let Err(e) = import_data(&inp) {
-                    eprintln!("Error importing data: {}", e);
+                    eprintln!("{}", trf("Error importing data: {}", &[&e]));
                     return glib::ExitCode::FAILURE;
                 }
                 return glib::ExitCode::SUCCESS;
             } else {
-                eprintln!("Error: --import requires an archive filename (e.g. rail --import backup.tar.gz)");
+                eprintln!("{}", tr("Error: --import requires an archive filename (e.g. rail --import backup.tar.gz)"));
                 return glib::ExitCode::FAILURE;
             }
         }

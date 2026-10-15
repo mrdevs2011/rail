@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8">
+<html lang="uz"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>rail — a browser that is a ribbon</title>
-<meta name="description" content="Rail: keyboard-driven browser. Infinite horizontal ribbon of columns, isolated profiles. Black, white, one blue dot.">
+<title>rail — lenta shaklidagi brauzer</title>
+<meta name="description" id="md" content="Rail: klaviatura bilan boshqariladigan brauzer. Cheksiz gorizontal ustunlar lentasi, izolyatsiyalangan profillar. Qora, oq va bitta ko'k nuqta. O'zbeklar tomonidan yaratilgan.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='8' y='23' font-size='22' font-family='monospace' fill='%23fff'%3Er%3C/text%3E%3Ccircle cx='25' cy='25' r='3' fill='%232f6bff'/%3E%3C/svg%3E">
 <style>
 :root{--blue:#2f6bff;--line:#2a2a2a;--dim:#8a8a8a;--sx:0px}
@@ -48,35 +48,147 @@ footer{position:fixed;bottom:0;left:0;right:0;height:54px;border-top:1px solid v
 .mm.on{width:70px;border-color:#fff;background:var(--blue)}
 #cur{position:fixed;width:18px;height:18px;border:1px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9;transform:translate(-50%,-50%);transition:width .2s,height .2s}
 @media(max-width:640px){.hint{display:none}.jars{grid-template-columns:1fr}}
-</style></head><body>
+
+.lang{display:flex;gap:4px}.lang button{padding:2px 8px;font-size:12px;border-color:#444}.lang button.on{background:#fff;color:#000;border-color:#fff}
+.pill.made{border-color:var(--blue);color:#fff}
+@media(max-width:640px){.pill.made{display:none}}</style></head><body>
 <div id="cur"></div>
-<header><div class="logo">r</div><b>rail</b><span class="pill" id="ver">v0.5.1</span><span class="sp"></span><span class="hint">← → · drag · scroll · 0-4</span></header>
+<header><div class="logo">r</div><b>rail</b><span class="pill" id="ver">v0.5.2</span><span class="pill made" data-t="made_s">O'zbeklar yaratgan</span><span class="sp"></span><span class="hint" data-t="hint">← → · torting · aylantiring · 0-4</span>
+<div class="lang" role="group" aria-label="Language / Til / Язык"><button data-l="uz">UZ</button><button data-l="en">EN</button><button data-l="ru">RU</button></div></header>
 <main id="rail">
-<section class="col on" id="c0"><div class="idx"><i class="dot"></i>00 / boot</div>
+<section class="col on" id="c0"><div class="idx"><i class="dot"></i><span data-t="idx0">00 / boshlash</span></div>
 <pre id="boot" style="border:0;background:none;padding:0;color:var(--dim);min-height:72px"></pre>
-<h1 id="h">Welcome<br>to rail<span class="cur"></span></h1>
-<p>A browser that is a ribbon. Columns slide left and right, stacks go up and down, profiles never touch each other. Black, white, one blue dot.</p>
-<p>This page is built the same way. Press <b>→</b>, drag, or swipe.</p>
-<div class="row"><button onclick="go(1)">Download →</button><button onclick="go(3)">Try the shell</button></div></section>
-<section class="col" id="c1"><div class="idx"><i class="dot"></i>01 / get it</div><h2>Select your OS</h2>
-<select id="os" style="width:100%;margin-bottom:6px"><option value="linux">Linux</option><option value="macos">macOS (coming soon)</option><option value="windows">Windows (coming soon)</option></select>
-<a class="big" id="dl" href="#">Download</a><div id="steps"></div></section>
-<section class="col" id="c2"><div class="idx"><i class="dot"></i>02 / profiles</div><h2>100% isolated</h2>
-<p>Pick a profile, sign in, then switch. Each profile owns its cookies and storage. Nothing leaks.</p>
-<div class="row"><button id="p1" onclick="pick(0)">profile 1</button><button id="p2" onclick="pick(1)">profile 2</button><button onclick="signin()">sign in to site.com</button><button onclick="wipe()">clear</button></div>
+<h1 id="h"><span data-th="h1">Rail'ga<br>xush kelibsiz</span><span class="cur"></span></h1>
+<p data-th="p1">Lenta shaklidagi brauzer. Ustunlar chapga va o'ngga suriladi, to'plamlar yuqoriga va pastga, profillar esa bir-biriga hech qachon tegmaydi. Qora, oq va bitta ko'k nuqta.</p>
+<p data-th="p2">Bu sahifa ham xuddi shunday qurilgan. <b>→</b> ni bosing, torting yoki suring.</p>
+<p data-th="made">Rail <b>o'zbeklar tomonidan yaratilgan</b> — o'zbek dasturchilarining mahsuli. Brauzer interfeysi sukut bo'yicha o'zbek tilida.</p>
+<div class="row"><button onclick="go(1)" data-t="b_dl">Yuklab olish →</button><button onclick="go(3)" data-t="b_shell">Terminalni sinash</button></div></section>
+<section class="col" id="c1"><div class="idx"><i class="dot"></i><span data-t="idx1">01 / yuklab olish</span></div><h2 data-t="os_h">Operatsion tizimni tanlang</h2>
+<select id="os" style="width:100%;margin-bottom:6px"><option value="linux">Linux</option><option value="macos" data-t="os_mac">macOS (tez orada)</option><option value="windows" data-t="os_win">Windows (tez orada)</option></select>
+<a class="big" id="dl" href="#">Linux</a><div id="steps"></div></section>
+<section class="col" id="c2"><div class="idx"><i class="dot"></i><span data-t="idx2">02 / profillar</span></div><h2 data-t="prof_h">100% izolyatsiya</h2>
+<p data-t="prof_p">Profilni tanlang, tizimga kiring, so'ng almashtiring. Har bir profilning o'z cookie va xotirasi bor. Hech narsa sizib chiqmaydi.</p>
+<div class="row"><button id="p1" onclick="pick(0)"></button><button id="p2" onclick="pick(1)"></button><button onclick="signin()" data-t="signin">site.com ga kirish</button><button onclick="wipe()" data-t="clear">tozalash</button></div>
 <div class="jars"><div class="jar" id="j0"></div><div class="jar" id="j1"></div></div>
-<p style="color:var(--dim)" id="jmsg">Same site, two accounts, zero mixing.</p></section>
-<section class="col" id="c3"><div class="idx"><i class="dot"></i>03 / shell</div><h2>rail&gt;_</h2>
-<div id="term" onclick="q.focus()"><span id="out" style="color:#cfcfcf">type help and press Enter</span>
+<p style="color:var(--dim)" id="jmsg"></p></section>
+<section class="col" id="c3"><div class="idx"><i class="dot"></i><span data-t="idx3">03 / terminal</span></div><h2>rail&gt;_</h2>
+<div id="term" onclick="q.focus()"><span id="out" style="color:#cfcfcf">help yozing va Enter bosing</span>
 <br>$ <input id="q" autocomplete="off" spellcheck="false"></div></section>
-<section class="col" id="c4"><div class="idx"><i class="dot"></i>04 / roadmap</div><h2>Where this goes</h2><div id="road"></div></section>
+<section class="col" id="c4"><div class="idx"><i class="dot"></i><span data-t="idx4">04 / yo'l xaritasi</span></div><h2 data-t="road_h">Bu qayoqqa boradi</h2><div id="road"></div></section>
 </main>
 <footer id="mm"></footer>
 <style>i.dot{display:inline-block}</style>
 <script>
+var T={
+uz:{
+title:"rail — lenta shaklidagi brauzer",
+desc:"Rail: klaviatura bilan boshqariladigan brauzer. Cheksiz gorizontal ustunlar lentasi, izolyatsiyalangan profillar. Qora, oq va bitta ko'k nuqta. O'zbeklar tomonidan yaratilgan.",
+hint:"← → · torting · aylantiring · 0-4",
+made_s:"O'zbeklar yaratgan",
+made:"Rail <b>o'zbeklar tomonidan yaratilgan</b> — o'zbek dasturchilarining mahsuli. Brauzer interfeysi sukut bo'yicha o'zbek tilida.",
+h1:"Rail'ga<br>xush kelibsiz",
+p1:"Lenta shaklidagi brauzer. Ustunlar chapga va o'ngga suriladi, to'plamlar yuqoriga va pastga, profillar esa bir-biriga hech qachon tegmaydi. Qora, oq va bitta ko'k nuqta.",
+p2:"Bu sahifa ham xuddi shunday qurilgan. <b>→</b> ni bosing, torting yoki suring.",
+b_dl:"Yuklab olish →",b_shell:"Terminalni sinash",
+idx0:"00 / boshlash",idx1:"01 / yuklab olish",idx2:"02 / profillar",idx3:"03 / terminal",idx4:"04 / yo'l xaritasi",
+nav:["boshlash","yuklab olish","profillar","terminal","yo'l xaritasi"],
+os_h:"Operatsion tizimni tanlang",os_mac:"macOS (tez orada)",os_win:"Windows (tez orada)",
+dl_on:"Linux uchun rail v{v} ni yuklab olish",soon:"Tez orada",
+s_l1:"Buyruqni terminalga qo'ying yoki faylni yuklab olib, ishga tushiriladigan qiling.",
+s_l2:"rail ni ishga tushiring. U ilovalar menyusida ham paydo bo'ladi.",
+s_l3:"Yangilash: burchakdagi Yangilash kartasi yoki rail --update.",
+s_m1:"Rail'ni Applications papkasiga tashlang.",s_m2:"Birinchi ishga tushirish: o'ng tugma, so'ng Open.",
+s_w1:".exe faylni oching.",s_w2:"More info, so'ng Run anyway.",soon_dot:"Tez orada.",
+copy:"nusxa",copied:"nusxalandi",
+prof_h:"100% izolyatsiya",
+prof_p:"Profilni tanlang, tizimga kiring, so'ng almashtiring. Har bir profilning o'z cookie va xotirasi bor. Hech narsa sizib chiqmaydi.",
+profile:"profil",active:"faol",nocookie:"site.com: cookie yo'q",signin:"site.com ga kirish",clear:"tozalash",
+jmsg0:"Bitta sayt, ikkita akkaunt, aralashish yo'q.",
+signed:"{a}-profilda tizimga kirildi. {b}-profil bundan bexabar.",
+shell_init:"help yozing va Enter bosing",
+road_h:"Bu qayoqqa boradi",
+road:[["1. Sayt","shu sahifa, OT tanlash, bir bosishda yuklab olish",70,"Tayyor. Vercel'da 100% bepul turadi."],["2. OT bo'yicha yangilagich","har bir OT uchun reliz fayli, SHA256 tekshiruvi",0,"Fayl OT va ARCH bo'yicha tanlanadi. Windows: ishlayotgan exe nomini o'zgartirish. macOS: karantinni olib tashlash."],["3. Sinov: tao + wry","3 ta tizimda ko'p webview",0,"Hammasini shu hal qiladi. Bo'lmasa Linux GTK4 da qoladi, mac/win uchun yengilroq qobiq."],["4. CI","bitta teg, uchta build",0,"v* teglarida GitHub Actions, relizda SHA256SUMS."],["5. Funksiyalarni ko'chirish","lenta, profillar, omnibar, devtools",0,"Avval umumiy rail-core crate, keyin interfeys."],["6. Tarqatish","dmg, exe, brew, scoop, winget",0,"Hammasi bepul. Windows imzolash uchun SignPath."]],
+road_f:"v0.5 Linux, v0.6 sayt + yangilagich, v0.7 sinov, v0.9 beta, v1.0 barqaror.",
+boot:["$ rail --open","lenta yuklanmoqda... ok","profillar: izolyatsiyalangan","mavzu: qora, oq, bitta ko'k nuqta"],
+whoami:"zavqi bor dasturchi",upd:"relizlar tekshirilmoqda...\nrail v{v} eng so'nggi. tablar joyida qoladi.",
+nf:" +---+  rail v{v}\n | r*|  lenta: 5 ustun\n +---+  #000 #fff va bitta ko'k nuqta",
+sudo:"yaxshi urinish.",nocmd:"rail: buyruq topilmadi: "
+},
+en:{
+title:"rail — a browser that is a ribbon",
+desc:"Rail: keyboard-driven browser. Infinite horizontal ribbon of columns, isolated profiles. Black, white, one blue dot. Made by Uzbeks.",
+hint:"← → · drag · scroll · 0-4",
+made_s:"Made by Uzbeks",
+made:"Rail is <b>made by Uzbeks</b> — built by Uzbek developers. The browser interface is in Uzbek by default.",
+h1:"Welcome<br>to rail",
+p1:"A browser that is a ribbon. Columns slide left and right, stacks go up and down, profiles never touch each other. Black, white, one blue dot.",
+p2:"This page is built the same way. Press <b>→</b>, drag, or swipe.",
+b_dl:"Download →",b_shell:"Try the shell",
+idx0:"00 / boot",idx1:"01 / get it",idx2:"02 / profiles",idx3:"03 / shell",idx4:"04 / roadmap",
+nav:["boot","get","profiles","shell","roadmap"],
+os_h:"Select your OS",os_mac:"macOS (coming soon)",os_win:"Windows (coming soon)",
+dl_on:"Download rail v{v} for Linux",soon:"Coming soon",
+s_l1:"Paste the command in a terminal, or download the file and make it executable.",
+s_l2:"Run rail. It also lands in your apps menu.",
+s_l3:"Updates: the Update card in the corner, or rail --update.",
+s_m1:"Drop Rail into Applications.",s_m2:"First launch: right click, then Open.",
+s_w1:"Open the .exe.",s_w2:"More info, then Run anyway.",soon_dot:"Coming soon.",
+copy:"copy",copied:"copied",
+prof_h:"100% isolated",
+prof_p:"Pick a profile, sign in, then switch. Each profile owns its cookies and storage. Nothing leaks.",
+profile:"profile",active:"active",nocookie:"site.com: no cookies",signin:"sign in to site.com",clear:"clear",
+jmsg0:"Same site, two accounts, zero mixing.",
+signed:"Signed in on profile {a}. Profile {b} has no idea.",
+shell_init:"type help and press Enter",
+road_h:"Where this goes",
+road:[["1. Site","this page, OS picker, one-click download",70,"Live on Vercel, 100% free."],["2. Per-OS updater","release asset per OS, SHA256 check",0,"Pick the file by OS and ARCH. Windows: rename the running exe. macOS: strip quarantine."],["3. Spike: tao + wry","many webviews on 3 systems",0,"Decides everything. If it fails, Linux stays GTK4 and mac/win get a lighter shell."],["4. CI","one tag, three builds",0,"GitHub Actions on v* tags, SHA256SUMS in the release."],["5. Port features","ribbon, profiles, omnibar, devtools",0,"Shared rail-core crate first, UI after."],["6. Distribution","dmg, exe, brew, scoop, winget",0,"All free. SignPath for Windows signing."]],
+road_f:"v0.5 Linux, v0.6 site + updater, v0.7 spike, v0.9 beta, v1.0 stable.",
+boot:["$ rail --open","loading ribbon... ok","profiles: isolated","theme: black, white, one blue dot"],
+whoami:"a developer with taste",upd:"checking releases...\nrail v{v} is the latest. tabs stay put.",
+nf:" +---+  rail v{v}\n | r*|  ribbon: 5 columns\n +---+  #000 #fff and one blue dot",
+sudo:"nice try.",nocmd:"rail: command not found: "
+},
+ru:{
+title:"rail — браузер в виде ленты",
+desc:"Rail: браузер с управлением с клавиатуры. Бесконечная горизонтальная лента столбцов, изолированные профили. Чёрный, белый и одна синяя точка. Сделано узбеками.",
+hint:"← → · тяните · прокрутка · 0-4",
+made_s:"Сделано узбеками",
+made:"Rail <b>создан узбеками</b> — это продукт узбекских разработчиков. Интерфейс браузера по умолчанию на узбекском.",
+h1:"Добро пожаловать<br>в rail",
+p1:"Браузер в виде ленты. Столбцы скользят влево и вправо, стопки — вверх и вниз, а профили никогда не пересекаются. Чёрный, белый и одна синяя точка.",
+p2:"Эта страница устроена так же. Нажмите <b>→</b>, потяните или смахните.",
+b_dl:"Скачать →",b_shell:"Попробовать терминал",
+idx0:"00 / старт",idx1:"01 / скачать",idx2:"02 / профили",idx3:"03 / терминал",idx4:"04 / дорожная карта",
+nav:["старт","скачать","профили","терминал","дорожная карта"],
+os_h:"Выберите вашу ОС",os_mac:"macOS (скоро)",os_win:"Windows (скоро)",
+dl_on:"Скачать rail v{v} для Linux",soon:"Скоро",
+s_l1:"Вставьте команду в терминал или скачайте файл и сделайте его исполняемым.",
+s_l2:"Запустите rail. Он также появится в меню приложений.",
+s_l3:"Обновления: карточка «Обновить» в углу или rail --update.",
+s_m1:"Перетащите Rail в «Программы».",s_m2:"Первый запуск: правый клик, затем «Открыть».",
+s_w1:"Откройте .exe.",s_w2:"Подробнее, затем «Выполнить в любом случае».",soon_dot:"Скоро.",
+copy:"копировать",copied:"скопировано",
+prof_h:"100% изоляция",
+prof_p:"Выберите профиль, войдите, затем переключитесь. У каждого профиля свои cookie и хранилище. Ничего не утекает.",
+profile:"профиль",active:"активен",nocookie:"site.com: нет cookie",signin:"войти на site.com",clear:"очистить",
+jmsg0:"Один сайт, два аккаунта, никакого смешивания.",
+signed:"Вход выполнен в профиле {a}. Профиль {b} ничего не знает.",
+shell_init:"введите help и нажмите Enter",
+road_h:"Куда всё идёт",
+road:[["1. Сайт","эта страница, выбор ОС, загрузка в один клик",70,"Работает на Vercel, 100% бесплатно."],["2. Обновление по ОС","релизный файл для каждой ОС, проверка SHA256",0,"Файл выбирается по ОС и архитектуре. Windows: переименовать запущенный exe. macOS: снять карантин."],["3. Проба: tao + wry","много webview на 3 системах",0,"Это всё решит. Если не выйдет, Linux остаётся на GTK4, а mac/win получат облегчённую оболочку."],["4. CI","один тег, три сборки",0,"GitHub Actions по тегам v*, SHA256SUMS в релизе."],["5. Перенос функций","лента, профили, omnibar, devtools",0,"Сначала общий crate rail-core, затем интерфейс."],["6. Распространение","dmg, exe, brew, scoop, winget",0,"Всё бесплатно. SignPath для подписи Windows."]],
+road_f:"v0.5 Linux, v0.6 сайт + обновление, v0.7 проба, v0.9 бета, v1.0 стабильная.",
+boot:["$ rail --open","загрузка ленты... ok","профили: изолированы","тема: чёрный, белый, одна синяя точка"],
+whoami:"разработчик со вкусом",upd:"проверка релизов...\nrail v{v} — последняя версия. вкладки на месте.",
+nf:" +---+  rail v{v}\n | r*|  лента: 5 столбцов\n +---+  #000 #fff и одна синяя точка",
+sudo:"хорошая попытка.",nocmd:"rail: команда не найдена: "
+}};
+var LANGS=['uz','en','ru'],lang='uz';
+try{var q0=new URLSearchParams(location.search).get('lang')||localStorage.getItem('rail-lang');if(LANGS.indexOf(q0)>-1)lang=q0}catch(e){}
+function t(k){var d=T[lang];return d&&d[k]!=null?d[k]:T.uz[k]}
+function fm(s,o){return s.replace(/\{(\w+)\}/g,function(_,k){return o[k]})}
 var $=function(i){return document.getElementById(i)};
-var R=$('rail'),cols=[].slice.call(R.children),cur=0,VER='0.5.1',lock=0;
-['boot','get','profiles','shell','roadmap'].forEach(function(n,i){var b=document.createElement('button');b.className='mm';b.title=n;b.onclick=function(){go(i)};$('mm').appendChild(b)});
+var R=$('rail'),cols=[].slice.call(R.children),cur=0,VER='0.5.2',lock=0;
+for(var bi0=0;bi0<5;bi0++)(function(i){var b=document.createElement('button');b.className='mm';b.onclick=function(){go(i)};$('mm').appendChild(b)})(bi0);
 function setCur(i){cur=i;cols.forEach(function(c,k){c.classList.toggle('on',k==i)});[].forEach.call($('mm').children,function(b,k){b.classList.toggle('on',k==i)})}
 function go(i){i=Math.max(0,Math.min(cols.length-1,i));R.scrollTo({left:cols[i].offsetLeft,behavior:'smooth'})}
 function near(){var x=R.scrollLeft,b=0,d=1e9;cols.forEach(function(c,i){var e=Math.abs(c.offsetLeft-x);if(e<d){d=e;b=i}});if(x+R.clientWidth>=R.scrollWidth-2)b=cols.length-1;return b}
@@ -86,28 +198,36 @@ var dn=0,sx=0,sl=0;
 R.addEventListener('pointerdown',function(e){if(e.pointerType!='mouse'||e.target.closest('button,select,input,a,#term,.st'))return;dn=1;sx=e.clientX;sl=R.scrollLeft;R.style.scrollSnapType='none';R.style.cursor='grabbing'});
 addEventListener('pointermove',function(e){if(dn)R.scrollLeft=sl-(e.clientX-sx)});
 addEventListener('pointerup',function(){if(!dn)return;dn=0;R.style.scrollSnapType='';R.style.cursor='';go(near())});
-addEventListener('keydown',function(e){var t=e.target.tagName;if(t=='INPUT'||t=='SELECT')return;var k=e.key;if(k=='ArrowRight'||k=='l')go(cur+1);else if(k=='ArrowLeft'||k=='h')go(cur-1);else if(/^[0-4]$/.test(k))go(+k)});
-var L=['$ rail --open','loading ribbon... ok','profiles: isolated','theme: black, white, one blue dot'],bi=0,bj=0,bt='';
-(function t(){if(bi>=L.length)return;bt+=L[bi][bj++]||'';$('boot').textContent=bt;if(bj>L[bi].length){bt+='\n';bi++;bj=0;setTimeout(t,260)}else setTimeout(t,28)})();
+addEventListener('keydown',function(e){var tg=e.target.tagName;if(tg=='INPUT'||tg=='SELECT')return;var k=e.key;if(k=='ArrowRight'||k=='l')go(cur+1);else if(k=='ArrowLeft'||k=='h')go(cur-1);else if(/^[0-4]$/.test(k))go(+k)});
+var bootTok=0;
+function bootRun(){var tok=++bootTok,L=t('boot'),bi=0,bj=0,bt='';$('boot').textContent='';(function s(){if(tok!=bootTok||bi>=L.length)return;bt+=L[bi][bj++]||'';$('boot').textContent=bt;if(bj>L[bi].length){bt+='\n';bi++;bj=0;setTimeout(s,200)}else setTimeout(s,18)})()}
 var RAW='https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh',INS=['cu','rl -fsSL ',RAW,' | ba','sh'].join('');
-var D={linux:{url:'https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64',cmd:INS,s:['Paste the command in a terminal, or download the file and make it executable.','Run rail. It also lands in your apps menu.','Updates: the Update card in the corner, or rail --update.']},macos:{s:['Drop Rail into Applications.','First launch: right click, then Open.','Coming soon.']},windows:{s:['Open the .exe.','More info, then Run anyway.','Coming soon.']}};
-function setOS(v){var d=D[v],on=!!d.url,a=$('dl');$('os').value=v;a.className='big'+(on?'':' off');a.href=on?d.url:'#';a.textContent=on?'Download rail v'+VER+' for Linux':'Coming soon';var h=d.cmd?'<div class="cmd" data-c="'+d.cmd+'">'+d.cmd+'<button onclick="cp(this)">copy</button></div>':'';$('steps').innerHTML=h+'<ol>'+d.s.map(function(x){return '<li>'+x+'</li>'}).join('')+'</ol>'}
-function cp(b){var t=b.parentNode.getAttribute('data-c');if(navigator.clipboard)navigator.clipboard.writeText(t);b.textContent='copied';setTimeout(function(){b.textContent='copy'},1200)}
+var LINUX_URL='https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64';
+function steps(v){return v=='linux'?[t('s_l1'),t('s_l2'),t('s_l3')]:v=='macos'?[t('s_m1'),t('s_m2'),t('soon_dot')]:[t('s_w1'),t('s_w2'),t('soon_dot')]}
+function setOS(v){var on=v=='linux',a=$('dl');$('os').value=v;a.className='big'+(on?'':' off');a.href=on?LINUX_URL:'#';a.textContent=on?fm(t('dl_on'),{v:VER}):t('soon');var h=on?'<div class="cmd" data-c="'+INS+'">'+INS+'<button onclick="cp(this)">'+t('copy')+'</button></div>':'';$('steps').innerHTML=h+'<ol>'+steps(v).map(function(x){return '<li>'+x+'</li>'}).join('')+'</ol>'}
+function cp(b){var x=b.parentNode.getAttribute('data-c');if(navigator.clipboard)navigator.clipboard.writeText(x);b.textContent=t('copied');setTimeout(function(){b.textContent=t('copy')},1200)}
 $('os').onchange=function(){setOS(this.value)};
-var ua=navigator.userAgent;setOS(/Win/.test(ua)?'windows':(/Mac/.test(ua)&&!/iPhone|iPad/.test(ua))?'macos':'linux');
+var ua=navigator.userAgent,os0=/Win/.test(ua)?'windows':(/Mac/.test(ua)&&!/iPhone|iPad/.test(ua))?'macos':'linux';
 fetch('https://api.github.com/repos/mrdevs2011/rail/releases/latest').then(function(r){return r.json()}).then(function(j){if(j.tag_name){VER=j.tag_name.replace(/^v/,'');$('ver').textContent='v'+VER;setOS($('os').value)}}).catch(function(){});
-var jars=[[],[]],ap=0;
-function draw(){[0,1].forEach(function(i){var j=$('j'+i),on=i==ap,p=$('p'+(i+1));j.className='jar'+(on?' act':'');j.innerHTML='<b><i class="dot" style="opacity:'+(on?1:.2)+'"></i>profile '+(i+1)+(on?' (active)':'')+'</b>'+(jars[i].length?jars[i].join('<br>'):'<span style="color:#666">site.com: no cookies</span>');p.style.background=on?'#fff':'';p.style.color=on?'#000':''})}
+var jars=[[],[]],ap=0,jst=-1;
+function draw(){[0,1].forEach(function(i){var j=$('j'+i),on=i==ap,p=$('p'+(i+1));j.className='jar'+(on?' act':'');j.innerHTML='<b><i class="dot" style="opacity:'+(on?1:.2)+'"></i>'+t('profile')+' '+(i+1)+(on?' ('+t('active')+')':'')+'</b>'+(jars[i].length?jars[i].join('<br>'):'<span style="color:#666">'+t('nocookie')+'</span>');p.textContent=t('profile')+' '+(i+1);p.style.background=on?'#fff':'';p.style.color=on?'#000':''});$('jmsg').textContent=jst<0?t('jmsg0'):fm(t('signed'),{a:jst+1,b:2-jst})}
 function pick(i){ap=i;draw()}
-function signin(){jars[ap]=['sid='+Math.random().toString(36).slice(2,10),'user=account_'+(ap+1)];$('jmsg').textContent='Signed in on profile '+(ap+1)+'. Profile '+(2-ap)+' has no idea.';draw()}
+function signin(){jars[ap]=['sid='+Math.random().toString(36).slice(2,10),'user=account_'+(ap+1)];jst=ap;draw()}
 function wipe(){jars[ap]=[];draw()}
-draw();
-var S=[['1. Site','this page, OS picker, one-click download',70,'Live. Next: the rail.uz domain.'],['2. Per-OS updater','release asset per OS, SHA256 check',0,'Pick the file by OS and ARCH. Windows: rename the running exe. macOS: strip quarantine.'],['3. Spike: tao + wry','many webviews on 3 systems',0,'Decides everything. If it fails, Linux stays GTK4 and mac/win get a lighter shell.'],['4. CI','one tag, three builds',0,'GitHub Actions on v* tags, SHA256SUMS in the release.'],['5. Port features','ribbon, profiles, omnibar, devtools',0,'Shared rail-core crate first, UI after.'],['6. Distribution','dmg, exe, brew, scoop, winget',0,'All free. SignPath for Windows signing.']];
-$('road').innerHTML=S.map(function(s){return '<div class="st" onclick="this.classList.toggle(\'open\')"><b>'+s[0]+'</b> <span style="color:#8a8a8a">'+s[1]+'</span><div class="bar"><i style="width:'+s[2]+'%"></i></div><div class="more">'+s[3]+'</div></div>'}).join('')+'<p style="color:#8a8a8a">v0.5 Linux, v0.6 site + updater, v0.7 spike, v0.9 beta, v1.0 stable.</p>';
-var out=$('out'),q=$('q'),H=[],hi=0;
-var C={help:function(){return 'help version update ls roadmap whoami neofetch clear'},version:function(){return 'rail v'+VER},whoami:function(){return 'a developer with taste'},ls:function(){return 'boot/ get/ profiles/ shell/ roadmap/'},roadmap:function(){return S.map(function(s){return s[0]+' - '+s[1]}).join('\n')},update:function(){return 'checking releases...\nrail v'+VER+' is the latest. tabs stay put.'},neofetch:function(){return ' +---+  rail v'+VER+'\n | r*|  ribbon: 5 columns\n +---+  #000 #fff and one blue dot'},sudo:function(){return 'nice try.'}};
-q.onkeydown=function(e){e.stopPropagation();var t=$('term');if(e.key=='Enter'){var c=q.value.trim();out.textContent+='\n$ '+c;if(c=='clear')out.textContent='';else if(c){var k=c=='rail --update'?'update':c.split(' ')[0],f=C[k];out.textContent+='\n'+(f?f():'rail: command not found: '+c)}if(c)H.push(c);hi=H.length;q.value='';t.scrollTop=t.scrollHeight}else if(e.key=='ArrowUp'&&hi>0){q.value=H[--hi];e.preventDefault()}else if(e.key=='ArrowDown'){q.value=hi<H.length-1?H[++hi]:'';hi=Math.min(hi+1,H.length)}};
+function renderRoad(){var S=t('road');$('road').innerHTML=S.map(function(s){return '<div class="st" onclick="this.classList.toggle(\'open\')"><b>'+s[0]+'</b> <span style="color:#8a8a8a">'+s[1]+'</span><div class="bar"><i style="width:'+s[2]+'%"></i></div><div class="more">'+s[3]+'</div></div>'}).join('')+'<p style="color:#8a8a8a">'+t('road_f')+'</p>'}
+var out=$('out'),q=$('q'),H=[],hi=0,used=0;
+var C={help:function(){return 'help version update ls roadmap whoami neofetch lang clear'},version:function(){return 'rail v'+VER},whoami:function(){return t('whoami')},ls:function(){return 'boot/ get/ profiles/ shell/ roadmap/'},roadmap:function(){return t('road').map(function(s){return s[0]+' - '+s[1]}).join('\n')},update:function(){return fm(t('upd'),{v:VER})},neofetch:function(){return fm(t('nf'),{v:VER})},sudo:function(){return t('sudo')}};
+q.onkeydown=function(e){e.stopPropagation();var tm=$('term');if(e.key=='Enter'){var c=q.value.trim();if(!used){out.textContent='';used=1}out.textContent+='\n$ '+c;var w=c.split(/\s+/);if(c=='clear')out.textContent='';else if(w[0]=='lang'){if(LANGS.indexOf(w[1])>-1){setLang(w[1]);out.textContent+='\n'+w[1]}else out.textContent+='\nlang uz|en|ru'}else if(c){var k=c=='rail --update'?'update':w[0],f=C[k];out.textContent+='\n'+(f?f():t('nocmd')+c)}if(c)H.push(c);hi=H.length;q.value='';tm.scrollTop=tm.scrollHeight}else if(e.key=='ArrowUp'&&hi>0){q.value=H[--hi];e.preventDefault()}else if(e.key=='ArrowDown'){q.value=hi<H.length-1?H[++hi]:'';hi=Math.min(hi+1,H.length)}};
+function apply(){
+document.documentElement.lang=lang;document.title=t('title');$('md').setAttribute('content',t('desc'));
+[].forEach.call(document.querySelectorAll('[data-t]'),function(e){e.textContent=t(e.getAttribute('data-t'))});
+[].forEach.call(document.querySelectorAll('[data-th]'),function(e){e.innerHTML=t(e.getAttribute('data-th'))});
+[].forEach.call(document.querySelectorAll('.lang button'),function(b){b.classList.toggle('on',b.getAttribute('data-l')==lang)});
+var n=t('nav');[].forEach.call($('mm').children,function(b,i){b.title=n[i]});
+setOS($('os').value);draw();renderRoad();if(!used)out.textContent=t('shell_init');bootRun()}
+function setLang(l){if(LANGS.indexOf(l)<0)return;lang=l;try{localStorage.setItem('rail-lang',l)}catch(e){}apply()}
+[].forEach.call(document.querySelectorAll('.lang button'),function(b){b.onclick=function(){setLang(b.getAttribute('data-l'))}});
 var dt=$('cur'),mx=0,my=0,cx=0,cy=0;
 if(matchMedia('(pointer:fine)').matches){addEventListener('pointermove',function(e){mx=e.clientX;my=e.clientY;dt.style.width=dt.style.height=e.target.closest('button,a,select,.st')?'34px':'18px'});(function f(){cx+=(mx-cx)*.18;cy+=(my-cy)*.18;dt.style.left=cx+'px';dt.style.top=cy+'px';requestAnimationFrame(f)})()}else dt.style.display='none';
-setCur(0);
+setOS(os0);setCur(0);apply();
 </script></body></html>

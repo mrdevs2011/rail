@@ -20,7 +20,7 @@ Belgilar: [x] tayyor, [ ] qilinadi, [?] tajribada tekshiriladi, [~] boshlangan.
 
 ---
 
-## 1. Hozirgi holat (v0.5.1)
+## 1. Hozirgi holat (v0.5.2)
 
 - [x] Linux: GTK4 + WebKitGTK, niri uslubidagi 2D lenta (ustunlar + vertikal stack)
 - [x] Izolyatsiyalangan profillar, profil belgisi (3 xonagacha)
@@ -81,7 +81,7 @@ Maqsad: 5 yoshli bola ham yuklab olib ishga tushira olsin.
 - [x] macOS va Windows: "coming soon"
 - [x] Interaktiv: sayt o'zi lenta (ustunlar chapga-o'ngga, drag, swipe, strelka, 0-4 raqamlar, minimap)
 - [x] Profil izolyatsiyasi demosi, mini shell (help, version, update, roadmap), roadmap kartalari
-- [x] Oxirgi versiya GitHub Releases API orqali olinadi (ko'rinadigan joyga yoziladi, qo'lda emas). Olinmasa v0.5.1 ko'rinadi
+- [x] Oxirgi versiya GitHub Releases API orqali olinadi (ko'rinadigan joyga yoziladi, qo'lda emas). Olinmasa v0.5.2 ko'rinadi
 - [x] Vercel'ga production deploy (loyiha: rail-browser)
 - [ ] Mobil va turli brauzerlarda qo'lda tekshiruv
 - [ ] Open Graph rasm (havola ulashganda chiroyli chiqishi uchun)

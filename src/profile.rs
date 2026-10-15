@@ -581,6 +581,17 @@ impl ProfilePersona {
     }
 }
 
+impl Profile {
+    /// Ko'rsatiladigan nom: standart profil joriy tilda nomlanadi.
+    pub fn display_name(&self) -> String {
+        if self.id == "default" && self.name == "Default" {
+            crate::i18n::tr("Default").to_string()
+        } else {
+            self.name.clone()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
