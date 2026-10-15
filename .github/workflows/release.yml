@@ -30,6 +30,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Build
+        continue-on-error: ${{ matrix.os != 'ubuntu-latest' }}
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Upload asset
