@@ -2016,6 +2016,15 @@ const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("move_right", G_TABS, "Move tab column Right", ["Alt+Shift+L"]),
     sc!("move_down", G_TABS, "Move tab row Down", ["Alt+Shift+J"]),
     sc!("move_up", G_TABS, "Move tab row Up", ["Alt+Shift+K"]),
+    sc!("tab_1", G_TABS, "Switch to tab 1", ["Ctrl+1"]),
+    sc!("tab_2", G_TABS, "Switch to tab 2", ["Ctrl+2"]),
+    sc!("tab_3", G_TABS, "Switch to tab 3", ["Ctrl+3"]),
+    sc!("tab_4", G_TABS, "Switch to tab 4", ["Ctrl+4"]),
+    sc!("tab_5", G_TABS, "Switch to tab 5", ["Ctrl+5"]),
+    sc!("tab_6", G_TABS, "Switch to tab 6", ["Ctrl+6"]),
+    sc!("tab_7", G_TABS, "Switch to tab 7", ["Ctrl+7"]),
+    sc!("tab_8", G_TABS, "Switch to tab 8", ["Ctrl+8"]),
+    sc!("tab_9", G_TABS, "Switch to tab 9 (or last tab)", ["Ctrl+9"]),
     sc!("ws_1", G_TABS, "Switch to workspace 1", ["Alt+1"]),
     sc!("ws_2", G_TABS, "Switch to workspace 2", ["Alt+2"]),
     sc!("ws_3", G_TABS, "Switch to workspace 3", ["Alt+3"]),
@@ -4228,6 +4237,34 @@ impl App {
         } else if target_r == rows.len() {
             drop(rows);
             self.split_vertical();
+        }
+    }
+
+    fn focus_tab_index(self: &Rc<Self>, target_c: usize) {
+        if self.overview_open() {
+            self.exit_overview();
+        }
+        let cur_r = self.focus_row.get();
+        let rows = self.rows.borrow();
+        if cur_r < rows.len() && !rows[cur_r].tabs.is_empty() {
+            let num_tabs = rows[cur_r].tabs.len();
+            if target_c < num_tabs {
+                drop(rows);
+                self.focus_coords(cur_r, target_c);
+            }
+        }
+    }
+
+    fn focus_last_tab(self: &Rc<Self>) {
+        if self.overview_open() {
+            self.exit_overview();
+        }
+        let cur_r = self.focus_row.get();
+        let rows = self.rows.borrow();
+        if cur_r < rows.len() && !rows[cur_r].tabs.is_empty() {
+            let last_c = rows[cur_r].tabs.len() - 1;
+            drop(rows);
+            self.focus_coords(cur_r, last_c);
         }
     }
 
@@ -6536,12 +6573,13 @@ impl App {
             return false;
         }
         let global = (alt && !ctrl && (matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::T | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I | gdk::Key::s | gdk::Key::S | gdk::Key::d | gdk::Key::D) || keycode == 28 || keycode == 39))
-            || (ctrl && shift && !alt && matches!(k, gdk::Key::t | gdk::Key::T));
+            || (ctrl && shift && !alt && matches!(k, gdk::Key::t | gdk::Key::T))
+            || (ctrl && !shift && !alt && (matches!(k, gdk::Key::_1 | gdk::Key::_2 | gdk::Key::_3 | gdk::Key::_4 | gdk::Key::_5 | gdk::Key::_6 | gdk::Key::_7 | gdk::Key::_8 | gdk::Key::_9 | gdk::Key::KP_1 | gdk::Key::KP_2 | gdk::Key::KP_3 | gdk::Key::KP_4 | gdk::Key::KP_5 | gdk::Key::KP_6 | gdk::Key::KP_7 | gdk::Key::KP_8 | gdk::Key::KP_9) || (keycode >= 10 && keycode <= 18) || (keycode >= 87 && keycode <= 95)));
         if self.overview_open() && !global && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
             return true;
         }
 
-        // Standard universal browser shortcuts (Ctrl+R, Ctrl+T, Ctrl+W, Ctrl+L, F5)
+        // Standard universal browser shortcuts (Ctrl+R, Ctrl+T, Ctrl+W, Ctrl+L, F5, Ctrl+1..9)
         if ctrl && !shift && !alt {
             match k {
                 gdk::Key::r | gdk::Key::R => {
@@ -6567,6 +6605,44 @@ impl App {
                     return true;
                 }
                 _ => {}
+            }
+
+            // Tab switching within active workspace (Ctrl+1..8 to tabs 1..8, Ctrl+9 to last tab)
+            if keycode == 10 || keycode == 87 || k == gdk::Key::_1 || k == gdk::Key::KP_1 || key.to_unicode() == Some('1') {
+                self.focus_tab_index(0);
+                return true;
+            }
+            if keycode == 11 || keycode == 88 || k == gdk::Key::_2 || k == gdk::Key::KP_2 || key.to_unicode() == Some('2') {
+                self.focus_tab_index(1);
+                return true;
+            }
+            if keycode == 12 || keycode == 89 || k == gdk::Key::_3 || k == gdk::Key::KP_3 || key.to_unicode() == Some('3') {
+                self.focus_tab_index(2);
+                return true;
+            }
+            if keycode == 13 || keycode == 90 || k == gdk::Key::_4 || k == gdk::Key::KP_4 || key.to_unicode() == Some('4') {
+                self.focus_tab_index(3);
+                return true;
+            }
+            if keycode == 14 || keycode == 91 || k == gdk::Key::_5 || k == gdk::Key::KP_5 || key.to_unicode() == Some('5') {
+                self.focus_tab_index(4);
+                return true;
+            }
+            if keycode == 15 || keycode == 92 || k == gdk::Key::_6 || k == gdk::Key::KP_6 || key.to_unicode() == Some('6') {
+                self.focus_tab_index(5);
+                return true;
+            }
+            if keycode == 16 || keycode == 93 || k == gdk::Key::_7 || k == gdk::Key::KP_7 || key.to_unicode() == Some('7') {
+                self.focus_tab_index(6);
+                return true;
+            }
+            if keycode == 17 || keycode == 94 || k == gdk::Key::_8 || k == gdk::Key::KP_8 || key.to_unicode() == Some('8') {
+                self.focus_tab_index(7);
+                return true;
+            }
+            if keycode == 18 || keycode == 95 || k == gdk::Key::_9 || k == gdk::Key::KP_9 || key.to_unicode() == Some('9') {
+                self.focus_last_tab();
+                return true;
             }
         }
         if !ctrl && !shift && !alt && (k == gdk::Key::F5 || keycode == 71) {
@@ -9276,6 +9352,16 @@ mod tests {
         assert!(!sc_enabled(&cfg, "data"));
         assert!(!sc_enabled(&cfg, "ws_1"));
         assert!(sc_enabled(&cfg, SC_LOCKED)); // Settings remains accessible
+    }
+
+    #[test]
+    fn test_ctrl_tab_shortcuts_definitions() {
+        for num in 1..=9 {
+            let id = format!("tab_{}", num);
+            let def = SHORTCUT_DEFS.iter().find(|d| d.id == id).expect("tab shortcut exists");
+            let expected = format!("Ctrl+{}", num);
+            assert_eq!(def.defaults[0], expected.as_str());
+        }
     }
 }
 
