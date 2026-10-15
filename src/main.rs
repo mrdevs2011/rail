@@ -386,7 +386,7 @@ scrollbar.horizontal:hover slider {
     color: #ededed;
 }
 button.btn-add-tab {
-    background: #0f0f0f;
+    background: #111111;
     border: 1px solid #1a1a1a;
     border-radius: 3px;
     min-width: 28px;
@@ -416,7 +416,7 @@ button.flat-icon:hover {
     color: #f4f4f4;
 }
 button.pill {
-    background: #0f0f0f;
+    background: #111111;
     border: 1px solid #1a1a1a;
     border-radius: 4px;
     padding: 7px 11px;
@@ -470,7 +470,7 @@ button.pill:hover .pill-chip {
     transition: all 100ms ease;
 }
 .tablist row:hover {
-    background: #0f0f0f;
+    background: #111111;
     border-color: #181818;
 }
 .tablist row:selected {
@@ -915,7 +915,7 @@ button.profile-item-btn:hover image {
     border-color: transparent;
 }
 .profile-card {
-    background: #0f0f0f;
+    background: #111111;
     border: 1px solid #191919;
     border-radius: 4px;
     padding: 10px 14px;
@@ -1209,7 +1209,7 @@ button.color-choice.selected {
     margin-bottom: 8px;
 }
 .data-info-card {
-    background: #0b0b0b;
+    background: #111111;
     border: 1px solid #1c1c1c;
     border-radius: 3px;
     padding: 8px 12px;
@@ -1349,7 +1349,7 @@ button.color-choice.selected {
     margin-bottom: 12px;
 }
 .settings-card {
-    background: #0f0f0f;
+    background: #111111;
     border: 1px solid #191919;
     border-radius: 4px;
     padding: 12px 16px;
@@ -1633,7 +1633,7 @@ button.color-choice.selected {
     padding: 12px;
 }
 .devtools-card {
-    background: #0e0e0e;
+    background: #111111;
     border: 1px solid #191919;
     border-radius: 3px;
     padding: 12px 16px;
@@ -1677,7 +1677,7 @@ selection {
 
 /* ---- update card ---- */
 .update-card {
-    background: #0a0a0a;
+    background: #111111;
     border: 1px solid #2e2e2e;
     border-radius: 4px;
     padding: 12px 14px;
