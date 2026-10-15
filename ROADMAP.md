@@ -96,13 +96,13 @@ Maqsad: 5 yoshli bola ham yuklab olib ishga tushira olsin.
 
 Hozir updater faqat rail-linux-x86_64 ni biladi.
 
-- [ ] Release asset nomlari: rail-linux-x86_64, rail-macos-arm64, rail-macos-x86_64, rail-windows-x86_64.exe
-- [ ] Koddagi std::env::consts::OS va ARCH orqali o'z tizimining faylini tanlash
+- [~] Release asset nomlari: rail-linux-x86_64, rail-macos-arm64, rail-macos-x86_64, rail-windows-x86_64.exe (asset_name() qo'shildi)
+- [x] Koddagi std::env::consts::OS va ARCH orqali o'z tizimining faylini tanlash (asset_name())
 - [ ] Yangilanish kartasi uchala tizimda bir xil: Update, yuklaydi, qayta ochadi
 - [ ] Windows: ishlab turgan .exe ni almashtirib bo'lmaydi. Eskisini rail.old.exe ga o'zgartirib, yangisini joyiga qo'yadi, keyingi ochilishda rail.old.exe ni o'chiradi
 - [ ] macOS: yuklangan faylga quarantine belgisini olib tashlash va bajarish ruxsati
 - [ ] Yuklangan fayl SHA256 bilan tekshiriladi (release ichida SHA256SUMS). Mos kelmasa o'rnatilmaydi
-- [ ] Yuklash uzilsa yarim fayl qolmaydi (vaqtinchalik nomga yozib, tugagach almashtirish)
+- [x] Yuklash uzilsa yarim fayl qolmaydi (vaqtinchalik nomga yozib, tugagach almashtirish) — .rail-update.tmp + rename
 - [ ] rail --update uchala tizimda
 
 **Tayyor deyiladi:** har tizimda eski versiyadan yangisiga bir bosishda o'tadi, tablar joyida qoladi.

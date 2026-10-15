@@ -11,7 +11,18 @@ use std::process::{Command, Stdio};
 use std::rc::Rc;
 
 const REPO: &str = "mrdevs2011/rail";
-const ASSET: &str = "rail-linux-x86_64";
+/// Asset name for the current OS and architecture.
+fn asset_name() -> String {
+    use std::env::consts::{OS, ARCH};
+    match (OS, ARCH) {
+        ("linux", "x86_64") => "rail-linux-x86_64".to_string(),
+        ("linux", "aarch64") => "rail-linux-aarch64".to_string(),
+        ("macos", "aarch64") => "rail-macos-arm64".to_string(),
+        ("macos", "x86_64") => "rail-macos-x86_64".to_string(),
+        ("windows", "x86_64") => "rail-windows-x86_64.exe".to_string(),
+        _ => format!("rail-{}-{}", OS, ARCH),
+    }
+}
 
 /// The running version. `RAIL_FAKE_VERSION` lets you test the card without a real old build.
 pub fn current_version() -> String {
@@ -35,11 +46,59 @@ fn parse_ver(s: &str) -> Option<[u32; 3]> {
 }
 
 #[derive(Clone)]
-struct UpdateInfo {
-    latest_tag: String,
-    newer_count: usize,
-    more: bool,
-    url: String,
+pub struct UpdateInfo {
+    pub latest_tag: String,
+    pub newer_count: usize,
+    pub more: bool,
+    pub url: String,
+}
+
+/// Fetches all tags from the atom feed (last ~10) and latest update info if any newer.
+pub fn fetch_releases() -> Option<(Vec<String>, Option<UpdateInfo>)> {
+    let feed_url = format!("https://github.com/{}/releases.atom", REPO);
+    let out = Command::new("curl")
+        .args(["-fsSL", "-m", "8", "-A", "rail-browser", &feed_url])
+        .stdin(Stdio::null())
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    let current = parse_ver(&current_version())?;
+    let marker = "/releases/tag/";
+    let mut seen: Vec<String> = Vec::new();
+    let mut rest = text.as_str();
+    while let Some(i) = rest.find(marker) {
+        rest = &rest[i + marker.len()..];
+        let end = rest.find(['"', '<', '\'', ' ']).unwrap_or(rest.len());
+        let tag = rest[..end].to_string();
+        if !seen.contains(&tag) {
+            seen.push(tag);
+        }
+    }
+    if seen.is_empty() {
+        return None;
+    }
+    let mut count = 0usize;
+    let mut best: Option<([u32; 3], String)> = None;
+    for tag in &seen {
+        let Some(ver) = parse_ver(tag) else { continue; };
+        if ver > current {
+            count += 1;
+            if best.as_ref().map(|(b, _)| ver > *b).unwrap_or(true) {
+                best = Some((ver, tag.clone()));
+            }
+        }
+    }
+    let more = !seen.is_empty() && count >= seen.len();
+    let info = best.map(|(_, tag)| UpdateInfo {
+        url: format!("https://github.com/{}/releases/download/{}/{}", REPO, tag, asset_name()),
+        latest_tag: tag,
+        newer_count: count,
+        more,
+    });
+    Some((seen, info))
 }
 
 fn fetch_update() -> Option<UpdateInfo> {
@@ -83,7 +142,7 @@ fn fetch_update() -> Option<UpdateInfo> {
     // The feed lists only the last 10 releases: if all of them are newer, the real gap is bigger.
     let more = !seen.is_empty() && count >= seen.len();
     Some(UpdateInfo {
-        url: format!("https://github.com/{}/releases/download/{}/{}", REPO, tag, ASSET),
+        url: format!("https://github.com/{}/releases/download/{}/{}", REPO, tag, asset_name()),
         latest_tag: tag,
         newer_count: count,
         more,
@@ -101,7 +160,7 @@ fn install_path() -> PathBuf {
     }
 }
 
-fn download_and_install(url: &str) -> Result<(), String> {
+pub fn download_and_install(url: &str) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     let dest = install_path();
     let dir = dest.parent().ok_or_else(|| tr("Bad install path").to_string())?.to_path_buf();
@@ -123,6 +182,9 @@ fn download_and_install(url: &str) -> Result<(), String> {
         let _ = std::fs::remove_file(&tmp);
         return Err(tr("Downloaded file looks wrong.").to_string());
     }
+    // SHA256 verification: currently relies on running the binary with --version
+    // (see below). Full SHA256SUMS check can be added when the release includes it.
+    // Temporary file is renamed only after successful verification.
     let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755));
     let ok = Command::new(&tmp)
         .arg("--version")
