@@ -8323,6 +8323,9 @@ fn build(gapp: &gtk::Application) {
                 }
             }
             a.save_session_immediate();
+            let mut s = load_app_settings();
+            s.search_engine = id_str.clone();
+            save_app_settings(&s);
         });
     }
 
@@ -8336,6 +8339,9 @@ fn build(gapp: &gtk::Application) {
     tp_switch.connect_state_set(move |_, state| {
         a.touchpad_mode.set(state);
         a.schedule_save_session();
+        let mut s = load_app_settings();
+        s.touchpad_mode = state;
+        save_app_settings(&s);
         glib::Propagation::Proceed
     });
 
@@ -9123,4 +9129,60 @@ mod tests {
         assert_eq!(w1, 280.0);
         assert_eq!(w0 + w1, 1000.0);
     }
+
+    #[test]
+    fn test_app_settings_roundtrip() {
+        let dir = std::env::temp_dir().join(format!("rail_test_settings_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("settings.json");
+        let s = AppSettings {
+            search_engine: "duckduckgo".to_string(),
+            touchpad_mode: true,
+            smooth_scrolling: false,
+            webrtc_enabled: true,
+        };
+        let mut out = String::from("{\n");
+        out.push_str(&format!("  \"search_engine\": \"{}\",\n", minijson::escape(&s.search_engine)));
+        out.push_str(&format!("  \"touchpad_navigation\": {},\n", s.touchpad_mode));
+        out.push_str(&format!("  \"smooth_scrolling\": {},\n", s.smooth_scrolling));
+        out.push_str(&format!("  \"webrtc_enabled\": {}\n", s.webrtc_enabled));
+        out.push_str("}\n");
+        std::fs::write(&path, &out).unwrap();
+
+        let parsed = minijson::parse(&out).unwrap();
+        assert_eq!(parsed.get("search_engine").and_then(|v| v.as_str()), Some("duckduckgo"));
+        assert_eq!(parsed.get("touchpad_navigation").and_then(|v| v.as_bool()), Some(true));
+        assert_eq!(parsed.get("smooth_scrolling").and_then(|v| v.as_bool()), Some(false));
+        assert_eq!(parsed.get("webrtc_enabled").and_then(|v| v.as_bool()), Some(true));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_shortcut_master_and_individual_priority() {
+        let mut cfg = ShortcutConfig::default();
+        // Initially all enabled
+        assert!(SHORTCUT_DEFS.iter().all(|d| sc_enabled(&cfg, d.id)));
+
+        // User disables one shortcut (e.g. "data" Alt+I)
+        cfg.disabled.insert("data".to_string());
+        assert!(!sc_enabled(&cfg, "data"));
+        assert!(!SHORTCUT_DEFS.iter().all(|d| sc_enabled(&cfg, d.id)));
+
+        // Master checkbox turned ON -> forces all shortcuts enabled
+        cfg.disabled.clear();
+        cfg.site_wins = false;
+        assert!(SHORTCUT_DEFS.iter().all(|d| sc_enabled(&cfg, d.id)));
+
+        // Master checkbox turned OFF -> forces all shortcuts disabled except locked settings
+        for def in SHORTCUT_DEFS {
+            if def.id != SC_LOCKED {
+                cfg.disabled.insert(def.id.to_string());
+            }
+        }
+        cfg.site_wins = true;
+        assert!(!sc_enabled(&cfg, "data"));
+        assert!(!sc_enabled(&cfg, "ws_1"));
+        assert!(sc_enabled(&cfg, SC_LOCKED)); // Settings remains accessible
+    }
 }
+
