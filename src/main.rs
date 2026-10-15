@@ -744,14 +744,14 @@ entry.palette-entry, entry.palette-entry:focus-within {
 }
 
 /* ---- profile colors (True Dark Multi-Persona) ---- */
-.prof-bg-0 { background-color: #ededed; }
-.prof-bg-1 { background-color: #c084fc; }
-.prof-bg-2 { background-color: #4ade80; }
-.prof-bg-3 { background-color: #facc15; }
-.prof-bg-4 { background-color: #f87171; }
-.prof-bg-5 { background-color: #22d3ee; }
-.prof-bg-6 { background-color: #fb923c; }
-.prof-bg-7 { background-color: #2dd4bf; }
+.prof-bg-0 { background-color: #ededed; color: #050811 !important; }
+.prof-bg-1 { background-color: #c084fc; color: #050811 !important; }
+.prof-bg-2 { background-color: #4ade80; color: #050811 !important; }
+.prof-bg-3 { background-color: #facc15; color: #050811 !important; }
+.prof-bg-4 { background-color: #f87171; color: #050811 !important; }
+.prof-bg-5 { background-color: #22d3ee; color: #050811 !important; }
+.prof-bg-6 { background-color: #fb923c; color: #050811 !important; }
+.prof-bg-7 { background-color: #2dd4bf; color: #050811 !important; }
 
 /* ---- profile circle button in URL palette ---- */
 button.profile-circle-btn {
@@ -836,8 +836,7 @@ button.profile-item-btn.selected {
     border-left: 2px solid #ededed;
     color: #ffffff;
 }
-button.profile-item-btn label,
-popover.profile-popover label {
+button.profile-item-btn {
     color: #ffffff;
 }
 .profile-item-dot,
@@ -848,7 +847,6 @@ button.profile-item-btn .profile-item-dot {
     font-size: 10px;
     letter-spacing: -0.03em;
     font-weight: 800;
-    color: #ffffff;
     padding: 0 2px;
     opacity: 1;
 }
@@ -1927,10 +1925,10 @@ const G_TABS: &str = "Tabs & Workspaces";
 const G_PANELS: &str = "Panels, Settings & Tools";
 
 const SHORTCUT_DEFS: &[ShortcutDef] = &[
-    sc!("new_tab", G_TABS, "Open Omnibar / New tab", ["Alt+T"]),
-    sc!("focus_url", G_TABS, "Focus URL / Address bar", ["Alt+G"]),
-    sc!("close_tab", G_TABS, "Close focused tab", ["Alt+W"]),
-    sc!("reload", G_TABS, "Reload active tab", ["Alt+R"]),
+    sc!("new_tab", G_TABS, "Open Omnibar / New tab", ["Alt+T", "Ctrl+T"]),
+    sc!("focus_url", G_TABS, "Focus URL / Address bar", ["Alt+G", "Ctrl+L"]),
+    sc!("close_tab", G_TABS, "Close focused tab", ["Alt+W", "Ctrl+W"]),
+    sc!("reload", G_TABS, "Reload active tab", ["Alt+R", "Ctrl+R", "F5"]),
     sc!("full_tab", G_TABS, "Toggle Full Tab View", ["Alt+F"]),
     sc!("split_v", G_TABS, "Split column vertically", ["Alt+N"]),
     sc!("focus_left", G_TABS, "Focus column Left", ["Alt+H"]),
@@ -1959,7 +1957,7 @@ const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("settings_profiles", G_PANELS, "Open Settings > Profiles", ["Alt+Shift+P"]),
     sc!("profiles", G_PANELS, "Profiles / profile switcher", ["Alt+P"]),
     sc!("data", G_PANELS, "Data & Backup", ["Alt+I"]),
-    sc!("devtools", G_PANELS, "Toggle DevTools", ["F12"]),
+    sc!("devtools", G_PANELS, "Toggle DevTools", ["F12", "Ctrl+Shift+I"]),
     sc!("devtools_dock", G_PANELS, "Cycle DevTools dock position", ["Alt+Shift+D"]),
     sc!("map", G_PANELS, "Toggle Roadmap / Minimap", ["Alt+M"]),
     sc!("overview", G_PANELS, "Toggle Spatial Overview", ["Alt+O"]),
@@ -4871,8 +4869,10 @@ impl App {
             let row_box = gtk::Box::new(gtk::Orientation::Horizontal, 10);
 
             let dot = gtk::Label::new(None);
+            let fg = p.text_color();
             dot.set_markup(&format!(
-                "<span foreground='#ffffff' font_weight='800'>{}</span>",
+                "<span foreground='{}' font_weight='800'>{}</span>",
+                fg,
                 glib::markup_escape_text(&p.initial_letter())
             ));
             dot.add_css_class("profile-item-dot");
