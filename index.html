@@ -30,6 +30,17 @@ p{color:#cfcfcf;margin-bottom:14px}
 .cur{display:inline-block;width:.55em;height:1em;background:var(--blue);vertical-align:-2px;animation:b 1s steps(1) infinite}
 @keyframes b{50%{opacity:0}}
 button,select,input{font:inherit;color:#fff;background:#000;border:1px solid #fff;padding:8px 14px;cursor:pointer;border-radius:0}
+select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path fill='%23fff' d='M0 0l6 8 6-8z'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+select option{background:#0a0a0a;color:#fff}
+.os-dd{position:relative;margin-bottom:8px}
+.os-dd-btn{width:100%;text-align:left;background:#0a0a0a;border:1px solid #fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+.os-dd-btn:hover{background:#111}
+.os-dd-list{position:absolute;top:100%;left:0;right:0;background:#0a0a0a;border:1px solid #fff;border-top:none;z-index:10;display:none}
+.os-dd.open .os-dd-list{display:block}
+.os-dd-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid #222}
+.os-dd-item:last-child{border-bottom:none}
+.os-dd-item:hover,.os-dd-item.on{background:#1a1a1a;color:#fff}
+.os-dd-item.soon{color:#888}
 button:hover:not(:disabled){background:#fff;color:#000}
 button:disabled{border-color:#444;color:#555;cursor:not-allowed}
 .big{display:block;width:100%;padding:18px;font-size:18px;margin:16px 0;text-align:center;text-decoration:none;color:#fff;border:1px solid #fff}
@@ -93,10 +104,18 @@ footer{position:fixed;bottom:0;left:0;right:0;height:54px;border-top:1px solid v
 <section class="col" id="c1">
   <div class="idx"><i class="dot"></i><span data-t="idx1">01 / yuklab olish</span></div>
   <h2 data-t="os_h">Operatsion tizimni tanlang</h2>
-  <select id="os" style="width:100%;margin-bottom:6px">
+  <div class="os-dd" id="osdd">
+    <button class="os-dd-btn" type="button" id="osbtn">Linux <span>▼</span></button>
+    <div class="os-dd-list">
+      <div class="os-dd-item on" data-v="linux">Linux</div>
+      <div class="os-dd-item soon" data-v="macos" data-t="os_mac">macOS (tez orada)</div>
+      <div class="os-dd-item soon" data-v="windows" data-t="os_win">Windows (tez orada)</div>
+    </div>
+  </div>
+  <select id="os" style="display:none">
     <option value="linux">Linux</option>
-    <option value="macos" data-t="os_mac">macOS (tez orada)</option>
-    <option value="windows" data-t="os_win">Windows (tez orada)</option>
+    <option value="macos">macOS</option>
+    <option value="windows">Windows</option>
   </select>
   <a class="big" id="dl" href="#">Linux</a>
   <div id="steps"></div>
@@ -289,6 +308,18 @@ function steps(v){return v=='linux'?[t('s_l1'),t('s_l2'),t('s_l3')]:v=='macos'?[
 function setOS(v){var on=v=='linux',a=$('dl');$('os').value=v;a.className='big'+(on?'':' off');a.href=on?LINUX_URL:'#';a.textContent=on?fm(t('dl_on'),{v:VER}):t('soon');var h=on?'<div class="cmd" data-c="'+INS+'">'+INS+'<button onclick="cp(this)">'+t('copy')+'</button></div>':'';$('steps').innerHTML=h+'<ol>'+steps(v).map(function(x){return '<li>'+x+'</li>'}).join('')+'</ol>'}
 function cp(b){var x=b.parentNode.getAttribute('data-c');if(navigator.clipboard)navigator.clipboard.writeText(x);b.textContent=t('copied');setTimeout(function(){b.textContent=t('copy')},1200)}
 $('os').onchange=function(){setOS(this.value)};
+// Custom dark dropdown
+var osdd=$('osdd'),osbtn=$('osbtn');
+osbtn.onclick=function(e){e.stopPropagation();osdd.classList.toggle('open')};
+[].forEach.call(osdd.querySelectorAll('.os-dd-item'),function(it){
+  it.onclick=function(){var v=it.getAttribute('data-v');$('os').value=v;setOS(v);osdd.classList.remove('open');
+    [].forEach.call(osdd.querySelectorAll('.os-dd-item'),function(x){x.classList.toggle('on',x===it)});
+    osbtn.innerHTML=it.textContent+' <span>▼</span>';};
+});
+addEventListener('click',function(){osdd.classList.remove('open')});
+// Sync button text on setOS
+var _setOS=setOS;
+setOS=function(v){_setOS(v);var it=osdd.querySelector('[data-v="'+v+'"]');if(it)osbtn.innerHTML=it.textContent+' <span>▼</span>';};
 var ua=navigator.userAgent,os0=/Win/.test(ua)?'windows':(/Mac/.test(ua)&&!/iPhone|iPad/.test(ua))?'macos':'linux';
 fetch('https://api.github.com/repos/mrdevs2011/rail/releases/latest').then(function(r){return r.json()}).then(function(j){if(j.tag_name){VER=j.tag_name.replace(/^v/,'');$('ver').textContent='v'+VER;setOS($('os').value)}}).catch(function(){});
 var jars=[[],[]],ap=0,jst=-1;
