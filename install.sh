@@ -12,7 +12,7 @@ DESKTOP_DIR="$HOME/.local/share/applications"
 ICON_CACHE="$HOME/.cache/rail-icons"
 
 echo "==> $APP_NAME o‘rnatilmoqda..."
-mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$DESKTOP_DIR" "$ICON_CACHE"
+mkdir -p "$BIN_DIR" "$DESKTOP_DIR"
 
 download() {
   if command -v curl >/dev/null 2>&1; then
@@ -67,13 +67,15 @@ if [ "$USE_STANDALONE" -eq 0 ]; then
   TARGET="$BIN_LINK"
   echo "==> Rail binar fayli yuklab olinmoqda (atigi ~400 KB)..."
   if [ "$VERSION" = "latest" ]; then
-    download "https://github.com/${REPO}/releases/latest/download/rail-linux-x86_64" "$TARGET"
+    download "https://github.com/${REPO}/releases/latest/download/rail-linux-x86_64" "$TARGET.new"
   else
-    download "https://github.com/${REPO}/releases/download/${VERSION}/rail-linux-x86_64" "$TARGET"
+    download "https://github.com/${REPO}/releases/download/${VERSION}/rail-linux-x86_64" "$TARGET.new"
   fi
-  chmod +x "$TARGET"
+  chmod +x "$TARGET.new"
+  mv -f "$TARGET.new" "$TARGET"
 else
   # WebKit bo'lmasa, to'liq AppImage yuklanadi
+  mkdir -p "$INSTALL_DIR"
   TARGET="$INSTALL_DIR/rail-x86_64.AppImage"
   echo "==> Rail Standalone AppImage yuklab olinmoqda..."
   download "https://github.com/${REPO}/releases/download/v0.1.0/rail-x86_64.AppImage" "$TARGET"
@@ -82,7 +84,8 @@ else
 fi
 
 # Icon
-ICON="$ICON_CACHE/rail.svg"
+ICON="$HOME/.local/share/icons/hicolor/scalable/apps/rail.svg"
+mkdir -p "$(dirname "$ICON")"
 cat > "$ICON" <<'EOF'
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
   <rect width="256" height="256" rx="40" fill="#000000"/>
@@ -93,7 +96,8 @@ cat > "$ICON" <<'EOF'
 </svg>
 EOF
 
-cat > "$DESKTOP_DIR/dev.rail.browser.desktop" <<EOF
+rm -f "$DESKTOP_DIR/dev.rail.browser.desktop"
+cat > "$DESKTOP_DIR/rail.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Rail
@@ -107,7 +111,7 @@ MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;
 StartupWMClass=dev.rail.browser
 EOF
 
-chmod +x "$DESKTOP_DIR/dev.rail.browser.desktop" 2>/dev/null || true
+chmod +x "$DESKTOP_DIR/rail.desktop" 2>/dev/null || true
 update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
 
 echo "==> Rail muvaffaqiyatli o‘rnatildi!"

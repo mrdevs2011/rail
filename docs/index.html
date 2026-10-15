@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>rail — a browser that is a ribbon</title>
+<meta name="description" content="Rail: keyboard-driven browser. Infinite horizontal ribbon of columns, isolated profiles. Black, white, one blue dot.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='8' y='23' font-size='22' font-family='monospace' fill='%23fff'%3Er%3C/text%3E%3Ccircle cx='25' cy='25' r='3' fill='%232f6bff'/%3E%3C/svg%3E">
+<style>
+:root{--blue:#2f6bff;--line:#2a2a2a;--dim:#8a8a8a;--sx:0px}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;color:#fff;font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:hidden}
+body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(#111 1px,transparent 1px),linear-gradient(90deg,#111 1px,transparent 1px);background-size:44px 44px;background-position:var(--sx) 0;pointer-events:none}
+header{position:fixed;top:0;left:0;right:0;height:48px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:#000c;backdrop-filter:blur(6px);z-index:5}
+.logo{width:24px;height:24px;background:#000;border:1px solid #fff;display:grid;place-items:center;position:relative;font-weight:700}
+.logo::after,.dot{content:"";width:6px;height:6px;border-radius:50%;background:var(--blue)}
+.logo::after{position:absolute;right:2px;bottom:2px;width:4px;height:4px}
+.pill{border:1px solid var(--line);padding:1px 8px;color:var(--dim);font-size:12px}
+.sp{flex:1}.hint{color:var(--dim);font-size:12px}
+#rail{position:fixed;top:48px;bottom:54px;left:0;right:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;cursor:grab}
+#rail::-webkit-scrollbar{display:none}
+.col{flex:0 0 min(92vw,640px);border-right:1px solid var(--line);padding:30px 28px 40px;overflow-y:auto;scroll-snap-align:start;opacity:.35;transition:opacity .35s;scrollbar-width:none}
+.col.on{opacity:1}
+.col:last-child{flex-basis:min(92vw,760px)}
+.idx{color:var(--dim);font-size:12px;margin-bottom:18px;display:flex;gap:8px;align-items:center}
+h1{font-size:clamp(34px,7vw,60px);line-height:1.02;letter-spacing:-2px;margin:10px 0 18px}
+h2{font-size:24px;letter-spacing:-1px;margin-bottom:14px}
+p{color:#cfcfcf;margin-bottom:14px}
+.cur{display:inline-block;width:.55em;height:1em;background:var(--blue);vertical-align:-2px;animation:b 1s steps(1) infinite}
+@keyframes b{50%{opacity:0}}
+button,select,input{font:inherit;color:#fff;background:#000;border:1px solid #fff;padding:8px 14px;cursor:pointer;border-radius:0}
+button:hover:not(:disabled){background:#fff;color:#000}
+button:disabled{border-color:#444;color:#555;cursor:not-allowed}
+.big{display:block;width:100%;padding:18px;font-size:18px;margin:16px 0;text-align:center;text-decoration:none;color:#fff;border:1px solid #fff}
+.big:hover{background:#fff;color:#000}.big.off{border-color:#444;color:#555;pointer-events:none}
+pre,.cmd{background:#080808;border:1px solid var(--line);padding:10px 12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin-bottom:12px;position:relative}
+.cmd button{position:absolute;right:6px;top:6px;padding:2px 8px;font-size:12px}
+ol{padding-left:20px;color:#cfcfcf}ol li{margin-bottom:10px}
+.jars{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.jar{border:1px solid var(--line);padding:10px;min-height:110px;font-size:12px;word-break:break-all}
+.jar.act{border-color:#fff}.jar b{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+#term{height:300px;overflow-y:auto;background:#050505;border:1px solid var(--line);padding:12px;white-space:pre-wrap}
+#term input{border:0;border-bottom:1px solid var(--blue);width:calc(100% - 20px);padding:2px 0;background:transparent}
+.st{border:1px solid var(--line);margin-bottom:10px;padding:12px 14px;cursor:pointer}
+.st:hover{border-color:#fff}.st .bar{height:3px;background:#222;margin:8px 0}.st .bar i{display:block;height:100%;background:#fff}
+.st .more{display:none;color:#bbb;margin-top:8px}.st.open .more{display:block}
+footer{position:fixed;bottom:0;left:0;right:0;height:54px;border-top:1px solid var(--line);background:#000c;display:flex;align-items:center;justify-content:center;gap:10px;z-index:5}
+.mm{width:34px;height:14px;border:1px solid #555;background:#000;padding:0;transition:.3s}
+.mm.on{width:70px;border-color:#fff;background:var(--blue)}
+#cur{position:fixed;width:18px;height:18px;border:1px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9;transform:translate(-50%,-50%);transition:width .2s,height .2s}
+@media(max-width:640px){.hint{display:none}.jars{grid-template-columns:1fr}}
+</style></head><body>
+<div id="cur"></div>
+<header><div class="logo">r</div><b>rail</b><span class="pill" id="ver">v0.5.1</span><span class="sp"></span><span class="hint">← → · drag · scroll · 0-4</span></header>
+<main id="rail">
+<section class="col on" id="c0"><div class="idx"><i class="dot"></i>00 / boot</div>
+<pre id="boot" style="border:0;background:none;padding:0;color:var(--dim);min-height:72px"></pre>
+<h1 id="h">Welcome<br>to rail<span class="cur"></span></h1>
+<p>A browser that is a ribbon. Columns slide left and right, stacks go up and down, profiles never touch each other. Black, white, one blue dot.</p>
+<p>This page is built the same way. Press <b>→</b>, drag, or swipe.</p>
+<div class="row"><button onclick="go(1)">Download →</button><button onclick="go(3)">Try the shell</button></div></section>
+<section class="col" id="c1"><div class="idx"><i class="dot"></i>01 / get it</div><h2>Select your OS</h2>
+<select id="os" style="width:100%;margin-bottom:6px"><option value="linux">Linux</option><option value="macos">macOS (coming soon)</option><option value="windows">Windows (coming soon)</option></select>
+<a class="big" id="dl" href="#">Download</a><div id="steps"></div></section>
+<section class="col" id="c2"><div class="idx"><i class="dot"></i>02 / profiles</div><h2>100% isolated</h2>
+<p>Pick a profile, sign in, then switch. Each profile owns its cookies and storage. Nothing leaks.</p>
+<div class="row"><button id="p1" onclick="pick(0)">profile 1</button><button id="p2" onclick="pick(1)">profile 2</button><button onclick="signin()">sign in to site.com</button><button onclick="wipe()">clear</button></div>
+<div class="jars"><div class="jar" id="j0"></div><div class="jar" id="j1"></div></div>
+<p style="color:var(--dim)" id="jmsg">Same site, two accounts, zero mixing.</p></section>
+<section class="col" id="c3"><div class="idx"><i class="dot"></i>03 / shell</div><h2>rail&gt;_</h2>
+<div id="term" onclick="q.focus()"><span id="out" style="color:#cfcfcf">type help and press Enter</span>
+<br>$ <input id="q" autocomplete="off" spellcheck="false"></div></section>
+<section class="col" id="c4"><div class="idx"><i class="dot"></i>04 / roadmap</div><h2>Where this goes</h2><div id="road"></div></section>
+</main>
+<footer id="mm"></footer>
+<style>i.dot{display:inline-block}</style>
+<script>
+var $=function(i){return document.getElementById(i)};
+var R=$('rail'),cols=[].slice.call(R.children),cur=0,VER='0.5.1',lock=0;
+['boot','get','profiles','shell','roadmap'].forEach(function(n,i){var b=document.createElement('button');b.className='mm';b.title=n;b.onclick=function(){go(i)};$('mm').appendChild(b)});
+function setCur(i){cur=i;cols.forEach(function(c,k){c.classList.toggle('on',k==i)});[].forEach.call($('mm').children,function(b,k){b.classList.toggle('on',k==i)})}
+function go(i){i=Math.max(0,Math.min(cols.length-1,i));R.scrollTo({left:cols[i].offsetLeft,behavior:'smooth'})}
+function near(){var x=R.scrollLeft,b=0,d=1e9;cols.forEach(function(c,i){var e=Math.abs(c.offsetLeft-x);if(e<d){d=e;b=i}});if(x+R.clientWidth>=R.scrollWidth-2)b=cols.length-1;return b}
+R.addEventListener('scroll',function(){var b=near();if(b!=cur)setCur(b);document.body.style.setProperty('--sx',(-R.scrollLeft*.35)+'px')});
+R.addEventListener('wheel',function(e){var c=e.target.closest('.col');if(e.target.closest('#term')||(c&&c.scrollHeight>c.clientHeight+2))return;var d=Math.abs(e.deltaY)>Math.abs(e.deltaX)?e.deltaY:e.deltaX;if(Math.abs(d)>8){e.preventDefault();if(!lock){go(cur+(d>0?1:-1));lock=1;setTimeout(function(){lock=0},600)}}},{passive:false});
+var dn=0,sx=0,sl=0;
+R.addEventListener('pointerdown',function(e){if(e.pointerType!='mouse'||e.target.closest('button,select,input,a,#term,.st'))return;dn=1;sx=e.clientX;sl=R.scrollLeft;R.style.scrollSnapType='none';R.style.cursor='grabbing'});
+addEventListener('pointermove',function(e){if(dn)R.scrollLeft=sl-(e.clientX-sx)});
+addEventListener('pointerup',function(){if(!dn)return;dn=0;R.style.scrollSnapType='';R.style.cursor='';go(near())});
+addEventListener('keydown',function(e){var t=e.target.tagName;if(t=='INPUT'||t=='SELECT')return;var k=e.key;if(k=='ArrowRight'||k=='l')go(cur+1);else if(k=='ArrowLeft'||k=='h')go(cur-1);else if(/^[0-4]$/.test(k))go(+k)});
+var L=['$ rail --open','loading ribbon... ok','profiles: isolated','theme: black, white, one blue dot'],bi=0,bj=0,bt='';
+(function t(){if(bi>=L.length)return;bt+=L[bi][bj++]||'';$('boot').textContent=bt;if(bj>L[bi].length){bt+='\n';bi++;bj=0;setTimeout(t,260)}else setTimeout(t,28)})();
+var RAW='https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh',INS=['cu','rl -fsSL ',RAW,' | ba','sh'].join('');
+var D={linux:{url:'https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64',cmd:INS,s:['Paste the command in a terminal, or download the file and make it executable.','Run rail. It also lands in your apps menu.','Updates: the Update card in the corner, or rail --update.']},macos:{s:['Drop Rail into Applications.','First launch: right click, then Open.','Coming soon.']},windows:{s:['Open the .exe.','More info, then Run anyway.','Coming soon.']}};
+function setOS(v){var d=D[v],on=!!d.url,a=$('dl');$('os').value=v;a.className='big'+(on?'':' off');a.href=on?d.url:'#';a.textContent=on?'Download rail v'+VER+' for Linux':'Coming soon';var h=d.cmd?'<div class="cmd" data-c="'+d.cmd+'">'+d.cmd+'<button onclick="cp(this)">copy</button></div>':'';$('steps').innerHTML=h+'<ol>'+d.s.map(function(x){return '<li>'+x+'</li>'}).join('')+'</ol>'}
+function cp(b){var t=b.parentNode.getAttribute('data-c');if(navigator.clipboard)navigator.clipboard.writeText(t);b.textContent='copied';setTimeout(function(){b.textContent='copy'},1200)}
+$('os').onchange=function(){setOS(this.value)};
+var ua=navigator.userAgent;setOS(/Win/.test(ua)?'windows':(/Mac/.test(ua)&&!/iPhone|iPad/.test(ua))?'macos':'linux');
+fetch('https://api.github.com/repos/mrdevs2011/rail/releases/latest').then(function(r){return r.json()}).then(function(j){if(j.tag_name){VER=j.tag_name.replace(/^v/,'');$('ver').textContent='v'+VER;setOS($('os').value)}}).catch(function(){});
+var jars=[[],[]],ap=0;
+function draw(){[0,1].forEach(function(i){var j=$('j'+i),on=i==ap,p=$('p'+(i+1));j.className='jar'+(on?' act':'');j.innerHTML='<b><i class="dot" style="opacity:'+(on?1:.2)+'"></i>profile '+(i+1)+(on?' (active)':'')+'</b>'+(jars[i].length?jars[i].join('<br>'):'<span style="color:#666">site.com: no cookies</span>');p.style.background=on?'#fff':'';p.style.color=on?'#000':''})}
+function pick(i){ap=i;draw()}
+function signin(){jars[ap]=['sid='+Math.random().toString(36).slice(2,10),'user=account_'+(ap+1)];$('jmsg').textContent='Signed in on profile '+(ap+1)+'. Profile '+(2-ap)+' has no idea.';draw()}
+function wipe(){jars[ap]=[];draw()}
+draw();
+var S=[['1. Site','this page, OS picker, one-click download',70,'Live. Next: the rail.uz domain.'],['2. Per-OS updater','release asset per OS, SHA256 check',0,'Pick the file by OS and ARCH. Windows: rename the running exe. macOS: strip quarantine.'],['3. Spike: tao + wry','many webviews on 3 systems',0,'Decides everything. If it fails, Linux stays GTK4 and mac/win get a lighter shell.'],['4. CI','one tag, three builds',0,'GitHub Actions on v* tags, SHA256SUMS in the release.'],['5. Port features','ribbon, profiles, omnibar, devtools',0,'Shared rail-core crate first, UI after.'],['6. Distribution','dmg, exe, brew, scoop, winget',0,'All free. SignPath for Windows signing.']];
+$('road').innerHTML=S.map(function(s){return '<div class="st" onclick="this.classList.toggle(\'open\')"><b>'+s[0]+'</b> <span style="color:#8a8a8a">'+s[1]+'</span><div class="bar"><i style="width:'+s[2]+'%"></i></div><div class="more">'+s[3]+'</div></div>'}).join('')+'<p style="color:#8a8a8a">v0.5 Linux, v0.6 site + updater, v0.7 spike, v0.9 beta, v1.0 stable.</p>';
+var out=$('out'),q=$('q'),H=[],hi=0;
+var C={help:function(){return 'help version update ls roadmap whoami neofetch clear'},version:function(){return 'rail v'+VER},whoami:function(){return 'a developer with taste'},ls:function(){return 'boot/ get/ profiles/ shell/ roadmap/'},roadmap:function(){return S.map(function(s){return s[0]+' - '+s[1]}).join('\n')},update:function(){return 'checking releases...\nrail v'+VER+' is the latest. tabs stay put.'},neofetch:function(){return ' +---+  rail v'+VER+'\n | r*|  ribbon: 5 columns\n +---+  #000 #fff and one blue dot'},sudo:function(){return 'nice try.'}};
+q.onkeydown=function(e){e.stopPropagation();var t=$('term');if(e.key=='Enter'){var c=q.value.trim();out.textContent+='\n$ '+c;if(c=='clear')out.textContent='';else if(c){var k=c=='rail --update'?'update':c.split(' ')[0],f=C[k];out.textContent+='\n'+(f?f():'rail: command not found: '+c)}if(c)H.push(c);hi=H.length;q.value='';t.scrollTop=t.scrollHeight}else if(e.key=='ArrowUp'&&hi>0){q.value=H[--hi];e.preventDefault()}else if(e.key=='ArrowDown'){q.value=hi<H.length-1?H[++hi]:'';hi=Math.min(hi+1,H.length)}};
+var dt=$('cur'),mx=0,my=0,cx=0,cy=0;
+if(matchMedia('(pointer:fine)').matches){addEventListener('pointermove',function(e){mx=e.clientX;my=e.clientY;dt.style.width=dt.style.height=e.target.closest('button,a,select,.st')?'34px':'18px'});(function f(){cx+=(mx-cx)*.18;cy+=(my-cy)*.18;dt.style.left=cx+'px';dt.style.top=cy+'px';requestAnimationFrame(f)})()}else dt.style.display='none';
+setCur(0);
+</script></body></html>
