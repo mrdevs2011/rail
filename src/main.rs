@@ -842,7 +842,7 @@ button.profile-item-btn .profile-item-persona {
     border-radius: 10px;
     padding: 10px 14px;
     margin-bottom: 6px;
-    transition: all 120ms ease;
+    transition: transform 180ms cubic-bezier(0.2, 0, 0, 1), background-color 120ms ease, border-color 120ms ease;
 }
 .profile-card:hover {
     border-color: #283350;
@@ -853,21 +853,19 @@ button.profile-item-btn .profile-item-persona {
     background: #13192c;
     box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
 }
+.profile-card.shift-up {
+    transform: translateY(-60px);
+}
+.profile-card.shift-down {
+    transform: translateY(60px);
+}
 .profile-card.dragging {
-    opacity: 0.88;
+    z-index: 1000 !important;
+    opacity: 0.98 !important;
     border-color: #38bdf8 !important;
-    background: #182238 !important;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 0 16px rgba(56, 189, 248, 0.35) !important;
-}
-.profile-card.drop-target-above {
-    border-top: 3px solid #38bdf8 !important;
-    background: rgba(56, 189, 248, 0.14) !important;
-    box-shadow: 0 -3px 10px rgba(56, 189, 248, 0.3) !important;
-}
-.profile-card.drop-target-below {
-    border-bottom: 3px solid #38bdf8 !important;
-    background: rgba(56, 189, 248, 0.14) !important;
-    box-shadow: 0 3px 10px rgba(56, 189, 248, 0.3) !important;
+    background: #172136 !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 24px rgba(56, 189, 248, 0.4) !important;
+    transition: none !important;
 }
 .profile-drag-handle {
     font-size: 15px;
@@ -4512,6 +4510,14 @@ impl App {
         };
         let total_profiles = profiles.len();
         let rows_vec: Rc<RefCell<Vec<gtk::Box>>> = Rc::new(RefCell::new(Vec::new()));
+        let drag_provider = Rc::new(gtk::CssProvider::new());
+        if let Some(disp) = gdk::Display::default() {
+            gtk::style_context_add_provider_for_display(
+                &disp,
+                &*drag_provider,
+                gtk::STYLE_PROVIDER_PRIORITY_USER,
+            );
+        }
 
         for (idx, p) in profiles.into_iter().enumerate() {
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -4535,32 +4541,52 @@ impl App {
 
                 let row_drag = row.clone();
                 let handle_drag = drag_handle.clone();
+                let drag_provider_begin = drag_provider.clone();
                 drag.connect_drag_begin(move |_gesture, _start_x, _start_y| {
                     row_drag.add_css_class("dragging");
                     row_drag.set_cursor_from_name(Some("grabbing"));
                     handle_drag.set_cursor_from_name(Some("grabbing"));
+                    drag_provider_begin.load_from_string(".profile-card.dragging { z-index: 1000 !important; }");
                 });
 
                 let rows_vec_update = rows_vec.clone();
+                let drag_provider_update = drag_provider.clone();
                 let from_idx = idx;
                 drag.connect_drag_update(move |_gesture, _offset_x, offset_y| {
-                    let card_height = 54.0f64;
-                    let delta = (offset_y / card_height).round() as isize;
+                    // Physical translation of dragged card under cursor
+                    drag_provider_update.load_from_string(&format!(
+                        ".profile-card.dragging {{ transform: translateY({:.1}px) !important; z-index: 1000 !important; }}",
+                        offset_y
+                    ));
+
+                    let stride = 60.0f64;
+                    let delta = (offset_y / stride).round() as isize;
                     let target_idx = ((from_idx as isize) + delta).clamp(0, (total_profiles - 1) as isize) as usize;
 
                     let rows_ref = rows_vec_update.borrow();
                     for (i, r_box) in rows_ref.iter().enumerate() {
-                        if i == target_idx && target_idx != from_idx {
-                            if delta < 0 {
-                                r_box.add_css_class("drop-target-above");
-                                r_box.remove_css_class("drop-target-below");
+                        if i == from_idx {
+                            continue;
+                        }
+                        if from_idx < target_idx {
+                            if i > from_idx && i <= target_idx {
+                                r_box.add_css_class("shift-up");
+                                r_box.remove_css_class("shift-down");
                             } else {
-                                r_box.add_css_class("drop-target-below");
-                                r_box.remove_css_class("drop-target-above");
+                                r_box.remove_css_class("shift-up");
+                                r_box.remove_css_class("shift-down");
+                            }
+                        } else if from_idx > target_idx {
+                            if i >= target_idx && i < from_idx {
+                                r_box.add_css_class("shift-down");
+                                r_box.remove_css_class("shift-up");
+                            } else {
+                                r_box.remove_css_class("shift-up");
+                                r_box.remove_css_class("shift-down");
                             }
                         } else {
-                            r_box.remove_css_class("drop-target-above");
-                            r_box.remove_css_class("drop-target-below");
+                            r_box.remove_css_class("shift-up");
+                            r_box.remove_css_class("shift-down");
                         }
                     }
                 });
@@ -4570,20 +4596,22 @@ impl App {
                 let app_end = self.clone();
                 let from_idx = idx;
                 let rows_vec_end = rows_vec.clone();
+                let drag_provider_end = drag_provider.clone();
                 drag.connect_drag_end(move |_gesture, _offset_x, offset_y| {
+                    drag_provider_end.load_from_string("");
                     row_end.remove_css_class("dragging");
                     row_end.set_cursor_from_name(Some("grab"));
                     handle_end.set_cursor_from_name(Some("grab"));
 
                     let rows_ref = rows_vec_end.borrow();
                     for r_box in rows_ref.iter() {
-                        r_box.remove_css_class("drop-target-above");
-                        r_box.remove_css_class("drop-target-below");
+                        r_box.remove_css_class("shift-up");
+                        r_box.remove_css_class("shift-down");
                     }
                     drop(rows_ref);
 
-                    let card_height = 54.0f64;
-                    let delta = (offset_y / card_height).round() as isize;
+                    let stride = 60.0f64;
+                    let delta = (offset_y / stride).round() as isize;
                     let target_idx = ((from_idx as isize) + delta).clamp(0, (total_profiles - 1) as isize) as usize;
 
                     if target_idx != from_idx {
