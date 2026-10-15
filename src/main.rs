@@ -3173,6 +3173,9 @@ impl App {
                 while let Some(c) = self.devtools_content_box.first_child() {
                     self.devtools_content_box.remove(&c);
                 }
+                if widget.parent().is_some() {
+                    widget.unparent();
+                }
                 widget.set_vexpand(true);
                 widget.set_hexpand(true);
                 self.devtools_content_box.append(&widget);
@@ -3203,6 +3206,9 @@ impl App {
                 while let Some(c) = self.devtools_content_box.first_child() {
                     self.devtools_content_box.remove(&c);
                 }
+                if widget.parent().is_some() {
+                    widget.unparent();
+                }
                 widget.set_vexpand(true);
                 widget.set_hexpand(true);
                 self.devtools_content_box.append(&widget);
@@ -3232,6 +3238,9 @@ impl App {
                 }
                 while let Some(c) = self.devtools_content_box.first_child() {
                     self.devtools_content_box.remove(&c);
+                }
+                if widget.parent().is_some() {
+                    widget.unparent();
                 }
                 widget.set_vexpand(true);
                 widget.set_hexpand(true);
@@ -3268,6 +3277,9 @@ impl App {
                     if let Some(child) = win.child() {
                         if let Some(box_container) = child.downcast_ref::<gtk::Box>() {
                             if widget.parent().as_ref() != Some(box_container.upcast_ref()) {
+                                if widget.parent().is_some() {
+                                    widget.unparent();
+                                }
                                 while let Some(c) = box_container.first_child() {
                                     box_container.remove(&c);
                                 }
@@ -3282,6 +3294,9 @@ impl App {
                 } else {
                     let win_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
                     win_box.add_css_class("devtools-window-box");
+                    if widget.parent().is_some() {
+                        widget.unparent();
+                    }
                     widget.set_vexpand(true);
                     widget.set_hexpand(true);
                     win_box.append(&widget);
@@ -3311,12 +3326,19 @@ impl App {
                         .title(&trf("Rail DevTools - {}", &[&host]))
                         .default_width(1050)
                         .default_height(720)
+                        .transient_for(&self.win)
                         .child(&win_box)
                         .build();
                     win.add_css_class("devtools-window");
 
                     let app_win = self.clone();
-                    win.connect_close_request(move |_| {
+                    let win_box_ref = win_box.clone();
+                    win.connect_close_request(move |w| {
+                        while let Some(c) = win_box_ref.first_child() {
+                            win_box_ref.remove(&c);
+                        }
+                        w.set_child(None::<&gtk::Widget>);
+                        app_win.devtools_window.borrow_mut().take();
                         app_win.hide_devtools();
                         glib::Propagation::Proceed
                     });
@@ -3345,16 +3367,30 @@ impl App {
     }
 
     fn hide_devtools(&self) {
+        if !self.devtools_open.get() {
+            return;
+        }
+        self.devtools_open.set(false);
+
         if let Some(view) = self.focused_view() {
             if let Some(insp) = view.inspector() {
+                if let Some(w) = insp.web_view() {
+                    let widget: gtk::Widget = w.upcast();
+                    if widget.parent().is_some() {
+                        widget.unparent();
+                    }
+                }
                 insp.close();
             }
         }
-        if let Some(win) = self.devtools_window.borrow().as_ref() {
-            win.set_visible(false);
+        if let Some(win) = self.devtools_window.borrow_mut().take() {
+            win.set_child(None::<&gtk::Widget>);
+            win.close();
+        }
+        while let Some(c) = self.devtools_content_box.first_child() {
+            self.devtools_content_box.remove(&c);
         }
         self.devtools_panel.set_visible(false);
-        self.devtools_open.set(false);
         if let Some(v) = self.focused_view() {
             v.grab_focus();
         }
@@ -3741,6 +3777,31 @@ impl App {
         let app = self.clone();
         view.connect_script_dialog(move |v, dialog| {
             app.show_script_dialog(v, dialog);
+            true
+        });
+
+        // HTML <input type="color"> color chooser dialog
+        let app = self.clone();
+        view.connect_run_color_chooser(move |_v, request| {
+            let dialog = gtk::ColorDialog::new();
+            dialog.set_modal(true);
+            dialog.set_title(&tr("Select Color"));
+            dialog.set_with_alpha(false);
+            let initial = request.rgba();
+            let req = request.clone();
+            let cancellable = gio::Cancellable::new();
+            let c_clone = cancellable.clone();
+            request.connect_finished(move |_| {
+                c_clone.cancel();
+            });
+            dialog.choose_rgba(Some(&app.win), Some(&initial), Some(&cancellable), move |res| {
+                if let Ok(rgba) = res {
+                    req.set_rgba(&rgba);
+                    req.finish();
+                } else {
+                    req.cancel();
+                }
+            });
             true
         });
 
@@ -9215,25 +9276,6 @@ mod tests {
         assert!(!sc_enabled(&cfg, "data"));
         assert!(!sc_enabled(&cfg, "ws_1"));
         assert!(sc_enabled(&cfg, SC_LOCKED)); // Settings remains accessible
-    }
-
-    #[test]
-    fn test_color_chooser() {
-        let _ = |r: webkit6::ColorChooserRequest, parent: &gtk::Window| {
-            let dialog = gtk::ColorDialog::new();
-            dialog.set_modal(true);
-            dialog.set_title("Select Color");
-            let initial = r.rgba();
-            let req = r.clone();
-            dialog.choose_rgba(Some(parent), Some(&initial), gio::Cancellable::NONE, move |res| {
-                if let Ok(rgba) = res {
-                    req.set_rgba(&rgba);
-                    req.finish();
-                } else {
-                    req.cancel();
-                }
-            });
-        };
     }
 }
 

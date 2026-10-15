@@ -65,6 +65,7 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Saved", "Saqlandi", "Сохранено"),
     ("Search Google or enter web address...", "Google'dan qidiring yoki veb manzil kiriting...", "Искать в Google или ввести адрес..."),
     ("Search or enter address", "Qidiring yoki manzil kiriting", "Поиск или адрес"),
+    ("Select Color", "Rangni tanlash", "Выбрать цвет"),
     ("Select Profile", "Profilni tanlang", "Выберите профиль"),
     ("Select or enter path to .tar.gz backup...", ".tar.gz zaxira yo'lini tanlang yoki kiriting...", "Выберите или введите путь к резервной копии .tar.gz..."),
     ("Settings", "Sozlamalar", "Настройки"),
