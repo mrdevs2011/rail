@@ -3116,21 +3116,21 @@ impl App {
 
         let settings = webkit6::Settings::new();
         settings.set_user_agent(Some(persona.user_agent));
-        settings.set_enable_webrtc(false); // RAM: disable until site needs it
+        settings.set_enable_webrtc(false);
         settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_dns_prefetching(false);
         settings.set_enable_smooth_scrolling(true);
-        settings.set_enable_webgl(true);
+        settings.set_enable_webgl(false); // RAM: WebGL processes are heavy
         settings.set_enable_developer_extras(true);
         settings.set_enable_back_forward_navigation_gestures(true);
-        settings.set_enable_webaudio(false); // RAM: enable on demand via sites
+        settings.set_enable_webaudio(false);
         settings.set_enable_html5_local_storage(true);
         settings.set_enable_html5_database(true);
         settings.set_enable_site_specific_quirks(true);
         settings.set_javascript_can_access_clipboard(true);
-        // OnDemand reduces GPU/RAM when tabs are backgrounded
-        settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
-        settings.set_enable_page_cache(false); // RAM: avoid bfcache keeping full page in memory
+        // Never: less GPU/VRAM; CPU software path uses less peak RAM on multi-tab
+        settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Never);
+        settings.set_enable_page_cache(false);
 
         let stealth_js = persona.stealth_script();
         let script = webkit6::UserScript::new(
@@ -3935,8 +3935,13 @@ impl App {
         });
         let app = self.clone();
         view.connect_close(move |v| app.close_view(v));
+        let app_term = self.clone();
         view.connect_web_process_terminated(move |v, _reason| {
-            v.reload();
+            // Background tabs are intentionally suspended (terminate) to free RAM.
+            // Only the focused tab auto-reloads so the user keeps browsing.
+            if app_term.focused_view().as_ref() == Some(v) {
+                v.reload();
+            }
         });
     }
 
@@ -4217,8 +4222,19 @@ impl App {
             for (ci, tab) in row.tabs.iter().enumerate() {
                 if ri == r_clamped && ci == c_clamped {
                     tab.view.add_css_class("focused");
+                    // Wake focused tab if it was suspended
+                    if !tab.view.is_web_process_responsive() {
+                        let uri = tab.view.uri().unwrap_or_default();
+                        if !uri.is_empty() && !uri.starts_with("about:") && !uri.starts_with("rail:") {
+                            tab.view.reload();
+                        }
+                    }
                 } else {
                     tab.view.remove_css_class("focused");
+                    // Suspend background tab web process — biggest RAM win with many tabs
+                    if tab.view.is_web_process_responsive() {
+                        tab.view.terminate_web_process();
+                    }
                 }
             }
         }
@@ -9569,6 +9585,27 @@ fn print_data_info() {
 }
 
 fn main() -> glib::ExitCode {
+    // RAM: constrain WebKit early (before any NetworkSession / WebView)
+    // DocumentViewer cache model uses far less memory than full WebBrowser.
+    unsafe {
+        // Prefer software path / less compositor memory when many processes spawn
+        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+    {
+        let mut mps = webkit6::MemoryPressureSettings::new();
+        // Soft limit ~384 MiB of process memory before WebKit starts reclaiming aggressively
+        mps.set_memory_limit(384);
+        mps.set_conservative_threshold(0.33);
+        mps.set_strict_threshold(0.50);
+        mps.set_kill_threshold(0.0); // 0 = disabled kill; we suspend tabs ourselves
+        mps.set_poll_interval(5.0);
+        webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
+        if let Some(ctx) = webkit6::WebContext::default() {
+            ctx.set_cache_model(webkit6::CacheModel::DocumentViewer);
+        }
+    }
+
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a.starts_with("--appimage-")) {
         return glib::ExitCode::FAILURE;
