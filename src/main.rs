@@ -1785,6 +1785,7 @@ struct App {
     color_buttons: RefCell<Vec<gtk::Button>>,
     touchpad_mode: Cell<bool>,
     tp_switch: gtk::Switch,
+    touchpad_toast: gtk::Label,
     last_saved_session: RefCell<String>,
     save_session_gen: Cell<u64>,
     data_modal_info_lbl: gtk::Label,
@@ -2151,7 +2152,7 @@ impl App {
         self.strip.add_tick_callback(move |strip, clock| {
             let now = clock.frame_time();
             let dt = last.replace(Some(now)).map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
-            let k = 1.0 - (-dt / 0.06).exp();
+            let k = 1.0 - (-dt / 0.08).exp();
 
             let (oxc, oxt) = (app.layout.offset_x(), app.target_x.get());
             let (oyc, oyt) = (app.layout.offset_y(), app.target_y.get());
@@ -3461,6 +3462,20 @@ impl App {
         self.touchpad_mode.set(new_state);
         self.tp_switch.set_active(new_state);
         self.schedule_save_session();
+        self.show_touchpad_toast(new_state);
+    }
+
+    fn show_touchpad_toast(self: &Rc<Self>, enabled: bool) {
+        if enabled {
+            self.touchpad_toast.set_markup("<span weight='bold' foreground='#38bdf8'>Touchpad Slide: ON</span>  <span foreground='#94a3b8'>· 2-finger swipe to slide tabs</span>");
+        } else {
+            self.touchpad_toast.set_markup("<span weight='bold' foreground='#94a3b8'>Touchpad Slide: OFF</span>  <span foreground='#64748b'>· Standard page scroll</span>");
+        }
+        self.touchpad_toast.set_visible(true);
+        let toast = self.touchpad_toast.clone();
+        glib::timeout_add_local_once(std::time::Duration::from_millis(1800), move || {
+            toast.set_visible(false);
+        });
     }
 
     fn save_session_internal(&self, sync: bool) {
@@ -5584,10 +5599,22 @@ impl App {
             }
             return false;
         }
-        let global = alt && !ctrl && (matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::T | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I | gdk::Key::s | gdk::Key::S | gdk::Key::d | gdk::Key::D) || keycode == 28 || keycode == 39);
+        let global = (alt && !ctrl && (matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::T | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I | gdk::Key::s | gdk::Key::S | gdk::Key::d | gdk::Key::D) || keycode == 28 || keycode == 39))
+            || (ctrl && shift && !alt && matches!(k, gdk::Key::t | gdk::Key::T));
         if self.overview_open() && !global && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
             return true;
         }
+
+        if ctrl && shift && !alt {
+            match k {
+                gdk::Key::t | gdk::Key::T => {
+                    self.toggle_touchpad_mode();
+                    return true;
+                }
+                _ => {}
+            }
+        }
+
         if !ctrl && !shift && !alt && k == gdk::Key::F11 {
             self.win.set_fullscreened(!self.win.is_fullscreen());
             return true;
@@ -6670,8 +6697,17 @@ fn build(gapp: &gtk::Application) {
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&shell));
     overlay.add_overlay(&load_bar);
+    let touchpad_toast = gtk::Label::new(None);
+    touchpad_toast.add_css_class("ov-hint");
+    touchpad_toast.set_halign(gtk::Align::Center);
+    touchpad_toast.set_valign(gtk::Align::End);
+    touchpad_toast.set_margin_bottom(28);
+    touchpad_toast.set_can_target(false);
+    touchpad_toast.set_visible(false);
+
     overlay.add_overlay(&palette);
     overlay.add_overlay(&ov_hint);
+    overlay.add_overlay(&touchpad_toast);
     overlay.add_overlay(&settings_modal);
     overlay.add_overlay(&map_container);
     overlay.add_overlay(&devtools_panel);
@@ -6732,6 +6768,7 @@ fn build(gapp: &gtk::Application) {
         color_buttons: RefCell::new(color_btns),
         touchpad_mode: Cell::new(false),
         tp_switch: tp_switch.clone(),
+        touchpad_toast,
         last_saved_session: RefCell::new(String::new()),
         save_session_gen: Cell::new(0),
         data_modal_info_lbl: data_info_lbl.clone(),
@@ -7278,20 +7315,30 @@ fn build(gapp: &gtk::Application) {
     let accum_x = Rc::new(Cell::new(0.0f64));
     let accum_y = Rc::new(Cell::new(0.0f64));
     let last_scroll = Rc::new(Cell::new(0i64));
+    let last_swipe = Rc::new(Cell::new(0i64));
     let a = app.clone();
     let ax = accum_x.clone();
     let ay = accum_y.clone();
     let ls = last_scroll.clone();
+    let l_swipe = last_swipe.clone();
     scroll.connect_scroll(move |_, dx, dy| {
         // 1. Modals, dialogs, and popovers must ALWAYS receive raw scroll events without interference
         if a.settings_modal_open() || a.palette_open() || a.map_open() {
             return glib::Propagation::Proceed;
         }
 
+        let now = glib::monotonic_time();
+
         // 2. Overview mode: 2D canvas pan navigation on zoomed-out workspace grid
         if a.ov.get() {
-            let now = glib::monotonic_time();
-            if now - ls.get() > 300_000 {
+            // Cooldown prevents jumping across multiple rows/columns in a single swipe stroke
+            if now - l_swipe.get() < 280_000 {
+                ax.set(0.0);
+                ay.set(0.0);
+                return glib::Propagation::Stop;
+            }
+
+            if now - ls.get() > 250_000 {
                 ax.set(0.0);
                 ay.set(0.0);
             }
@@ -7302,23 +7349,27 @@ fn build(gapp: &gtk::Application) {
             ax.set(nx);
             ay.set(ny);
 
-            const OV_THRESHOLD: f64 = 2.0;
+            const OV_THRESHOLD: f64 = 6.0;
             if nx > OV_THRESHOLD {
                 ax.set(0.0);
+                l_swipe.set(now);
                 a.focus_column_right();
                 return glib::Propagation::Stop;
             } else if nx < -OV_THRESHOLD {
                 ax.set(0.0);
+                l_swipe.set(now);
                 a.focus_column_left();
                 return glib::Propagation::Stop;
             }
 
             if ny > OV_THRESHOLD {
                 ay.set(0.0);
+                l_swipe.set(now);
                 a.focus_row_down();
                 return glib::Propagation::Stop;
             } else if ny < -OV_THRESHOLD {
                 ay.set(0.0);
+                l_swipe.set(now);
                 a.focus_row_up();
                 return glib::Propagation::Stop;
             }
@@ -7326,15 +7377,20 @@ fn build(gapp: &gtk::Application) {
         }
 
         // 3. Normal browsing mode:
-        // NEVER hijack vertical scrolling (dy) on web pages! Reading documents must be 100% smooth.
+        // NEVER hijack scrolling when touchpad navigation mode is disabled.
         if !a.touchpad_mode.get() {
             return glib::Propagation::Proceed;
         }
 
+        // If a swipe just triggered, absorb trailing kinetic momentum from the same physical stroke
+        if now - l_swipe.get() < 350_000 {
+            ax.set(0.0);
+            return glib::Propagation::Stop;
+        }
+
         // Only handle intentional horizontal two-finger canvas navigation (dx)
-        if dx.abs() > 1.8 && dx.abs() > 2.0 * dy.abs() {
-            let now = glib::monotonic_time();
-            if now - ls.get() > 300_000 {
+        if dx.abs() > 0.8 && dx.abs() > 1.3 * dy.abs() {
+            if now - ls.get() > 250_000 {
                 ax.set(0.0);
             }
             ls.set(now);
@@ -7342,26 +7398,32 @@ fn build(gapp: &gtk::Application) {
             let nx = ax.get() + dx;
             ax.set(nx);
 
-            const SWIPE_THRESHOLD: f64 = 2.5;
+            const SWIPE_THRESHOLD: f64 = 8.0;
             if nx > SWIPE_THRESHOLD {
                 ax.set(0.0);
+                l_swipe.set(now);
                 a.focus_column_right();
                 return glib::Propagation::Stop;
             } else if nx < -SWIPE_THRESHOLD {
                 ax.set(0.0);
+                l_swipe.set(now);
                 a.focus_column_left();
                 return glib::Propagation::Stop;
             }
+            // Block horizontal swipe event from bleeding into page horizontal scroll while gesture is in flight
+            return glib::Propagation::Stop;
         }
 
-        // All other scrolling (especially vertical web reading) proceeds smoothly!
+        // All vertical scrolling proceeds 100% smoothly to the web page for reading documents!
         glib::Propagation::Proceed
     });
     let ax2 = accum_x.clone();
     let ay2 = accum_y.clone();
+    let l_swipe2 = last_swipe.clone();
     scroll.connect_decelerate(move |_, _, _| {
         ax2.set(0.0);
         ay2.set(0.0);
+        l_swipe2.set(0); // Gesture finished, ready for next swipe
     });
     win.add_controller(scroll);
 
