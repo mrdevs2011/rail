@@ -1,0 +1,182 @@
+/* Rail html.css
+   Chrome-like default styles for HTML elements (adapted for WebKit).
+   Edit anything here, then press "Save & Apply" (Ctrl+S) in Settings > Customize.
+   Sites that set their own CSS still win; this layer only replaces the defaults. */
+
+/* ===== document ===== */
+html { display: block; }
+body { display: block; margin: 8px; }
+[hidden], area, base, basefont, datalist, head, link, meta, noembed, noframes, param, rp, script, style, template, title { display: none; }
+:focus-visible { outline: -webkit-focus-ring-color auto 1px; }
+
+/* ===== headings ===== */
+h1 { display: block; font-size: 2em; margin-block: 0.67em; font-weight: bold; }
+h2 { display: block; font-size: 1.5em; margin-block: 0.83em; font-weight: bold; }
+h3 { display: block; font-size: 1.17em; margin-block: 1em; font-weight: bold; }
+h4 { display: block; font-size: 1em; margin-block: 1.33em; font-weight: bold; }
+h5 { display: block; font-size: 0.83em; margin-block: 1.67em; font-weight: bold; }
+h6 { display: block; font-size: 0.67em; margin-block: 2.33em; font-weight: bold; }
+
+/* ===== text ===== */
+p { display: block; margin-block: 1em; }
+blockquote { display: block; margin-block: 1em; margin-inline: 40px; }
+address, cite, dfn, em, i, var { font-style: italic; }
+b, strong { font-weight: bolder; }
+small { font-size: smaller; }
+big { font-size: larger; }
+sub { vertical-align: sub; font-size: smaller; }
+sup { vertical-align: super; font-size: smaller; }
+u, ins { text-decoration: underline; }
+s, strike, del { text-decoration: line-through; }
+mark { background-color: yellow; color: black; }
+abbr[title], acronym[title] { text-decoration: underline dotted; }
+q::before { content: open-quote; }
+q::after { content: close-quote; }
+
+/* ===== links ===== */
+a:any-link { color: #0000ee; text-decoration: underline; cursor: pointer; }
+a:visited { color: #551a8b; }
+a:any-link:active { color: #ff0000; }
+
+/* ===== lists ===== */
+ul, menu, dir { display: block; list-style-type: disc; margin-block: 1em; padding-inline-start: 40px; }
+ol { display: block; list-style-type: decimal; margin-block: 1em; padding-inline-start: 40px; }
+ul ul, ol ul { list-style-type: circle; }
+ul ul ul, ol ul ul, ul ol ul, ol ol ul { list-style-type: square; }
+li { display: list-item; text-align: match-parent; }
+dl { display: block; margin-block: 1em; }
+dd { display: block; margin-inline-start: 40px; }
+dt { display: block; }
+
+/* ===== code and pre ===== */
+pre, listing, plaintext, xmp { display: block; font-family: monospace; white-space: pre; margin-block: 1em; }
+code, kbd, samp, tt { font-family: monospace; }
+
+/* ===== hr ===== */
+hr { display: block; margin-block: 0.5em; margin-inline: auto; border-style: inset; border-width: 1px; color: gray; overflow: hidden; }
+
+/* ===== table ===== */
+table { display: table; border-collapse: separate; border-spacing: 2px; box-sizing: border-box; text-indent: initial; }
+caption { display: table-caption; text-align: center; }
+thead { display: table-header-group; vertical-align: middle; }
+tbody { display: table-row-group; vertical-align: middle; }
+tfoot { display: table-footer-group; vertical-align: middle; }
+tr { display: table-row; vertical-align: inherit; }
+td { display: table-cell; vertical-align: inherit; padding: 1px; }
+th { display: table-cell; vertical-align: inherit; padding: 1px; font-weight: bold; text-align: center; }
+
+/* ===== media ===== */
+img { overflow: clip; }
+video { object-fit: contain; }
+audio:not([controls]) { display: none; }
+iframe { border: 2px inset; }
+
+/* ===== details ===== */
+details { display: block; }
+summary { display: list-item; cursor: default; }
+dialog:not([open]) { display: none; }
+dialog { position: absolute; inset-inline: 0; width: fit-content; height: fit-content; margin: auto; border: solid; padding: 1em; background-color: white; color: black; }
+
+/* ===== form controls ===== */
+input, textarea, select, button {
+  margin: 0em;
+  font: -webkit-small-control;
+  text-rendering: auto;
+  color: black;
+  letter-spacing: normal;
+  word-spacing: normal;
+  line-height: normal;
+  text-transform: none;
+  text-indent: 0;
+  text-shadow: none;
+  display: inline-block;
+  text-align: start;
+}
+label { cursor: default; }
+fieldset { display: block; margin-inline: 2px; border: 2px groove rgb(192, 192, 192); padding-block: 0.35em 0.625em; padding-inline: 0.75em; min-inline-size: min-content; }
+legend { display: block; padding-inline: 2px; }
+::placeholder { color: rgb(117, 117, 117); }
+input:disabled, textarea:disabled, select:disabled { color: rgb(84, 84, 84); cursor: default; }
+
+/* ===== button ===== */
+button, input[type="button"], input[type="submit"], input[type="reset"] {
+  box-sizing: border-box;
+  padding: 1px 6px;
+  background-color: rgb(239, 239, 239);
+  border: 1px solid rgb(118, 118, 118);
+  border-radius: 3px;
+  color: black;
+  text-align: center;
+  align-items: flex-start;
+  cursor: default;
+}
+button:hover, input[type="button"]:hover, input[type="submit"]:hover, input[type="reset"]:hover {
+  background-color: rgb(229, 229, 229);
+  border-color: rgb(79, 79, 79);
+}
+button:active, input[type="button"]:active, input[type="submit"]:active, input[type="reset"]:active {
+  background-color: rgb(245, 245, 245);
+  border-color: rgb(118, 118, 118);
+}
+button:disabled, input[type="button"]:disabled, input[type="submit"]:disabled, input[type="reset"]:disabled {
+  background-color: rgba(239, 239, 239, 0.3);
+  border-color: rgba(118, 118, 118, 0.3);
+  color: rgba(16, 16, 16, 0.3);
+}
+
+/* ===== input (text fields) ===== */
+input, input[type="text"], input[type="search"], input[type="email"], input[type="url"], input[type="tel"], input[type="password"], input[type="number"], input[type="date"], input[type="datetime-local"], input[type="month"], input[type="week"], input[type="time"] {
+  padding: 2px 3px;
+  background-color: white;
+  border: 1px solid rgb(118, 118, 118);
+  border-radius: 2px;
+  cursor: text;
+}
+input:disabled, input[type="text"]:disabled, input[type="search"]:disabled, input[type="email"]:disabled, input[type="url"]:disabled, input[type="tel"]:disabled, input[type="password"]:disabled, input[type="number"]:disabled {
+  background-color: rgba(239, 239, 239, 0.3);
+  border-color: rgba(118, 118, 118, 0.3);
+}
+input[type="hidden"] { display: none; }
+
+/* ===== input type=search ===== */
+input[type="search"] { box-sizing: border-box; }
+
+/* ===== input type=password ===== */
+input[type="password"] { -webkit-text-security: disc; }
+
+/* ===== input type=number ===== */
+input[type="number"] { appearance: textfield; }
+
+/* ===== input date and time ===== */
+input[type="date"], input[type="datetime-local"], input[type="month"], input[type="week"], input[type="time"] { align-items: center; overflow: hidden; }
+
+/* ===== input type=checkbox ===== */
+input[type="checkbox"] { margin: 3px 3px 3px 4px; padding: initial; background-color: initial; border: initial; cursor: default; box-sizing: border-box; }
+
+/* ===== input type=radio ===== */
+input[type="radio"] { margin: 3px 3px 0px 5px; padding: initial; background-color: initial; border: initial; cursor: default; box-sizing: border-box; }
+
+/* ===== input type=range ===== */
+input[type="range"] { margin: 2px; padding: initial; background-color: initial; border: initial; cursor: default; color: rgb(16, 16, 16); }
+
+/* ===== input type=color ===== */
+input[type="color"] { width: 50px; height: 27px; padding: 1px 2px; background-color: rgb(239, 239, 239); border: 1px solid rgb(118, 118, 118); border-radius: 0; cursor: default; box-sizing: border-box; }
+
+/* ===== input type=file ===== */
+input[type="file"] { align-items: baseline; padding: initial; background-color: initial; border: initial; color: inherit; text-align: start; cursor: default; }
+
+/* ===== input type=image ===== */
+input[type="image"] { padding: initial; background-color: initial; border: initial; cursor: pointer; }
+
+/* ===== textarea ===== */
+textarea { box-sizing: border-box; padding: 2px; background-color: white; border: 1px solid rgb(118, 118, 118); border-radius: 0; font-family: monospace; white-space: pre-wrap; overflow-wrap: break-word; resize: both; overflow: auto; cursor: text; }
+
+/* ===== select ===== */
+select { box-sizing: border-box; background-color: white; border: 1px solid rgb(118, 118, 118); border-radius: 0; align-items: center; white-space: pre; cursor: default; }
+select:disabled { background-color: rgba(239, 239, 239, 0.3); border-color: rgba(118, 118, 118, 0.3); }
+option { display: block; padding: 0 2px 1px; min-height: 1.2em; white-space: nowrap; }
+optgroup { display: block; font-weight: bolder; }
+
+/* ===== progress and meter ===== */
+progress { display: inline-block; box-sizing: border-box; vertical-align: -0.2em; width: 10em; height: 1em; }
+meter { display: inline-block; box-sizing: border-box; vertical-align: -0.2em; width: 5em; height: 1em; }

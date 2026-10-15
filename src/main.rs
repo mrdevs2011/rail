@@ -35,6 +35,124 @@ pub fn rail_data_dir() -> PathBuf {
     glib::user_data_dir().join("rail")
 }
 
+const DEFAULT_HTML_CSS: &str = include_str!("html_default.css");
+
+thread_local! {
+    static STYLE_MANAGERS: RefCell<Vec<glib::WeakRef<webkit6::UserContentManager>>> =
+        RefCell::new(Vec::new());
+}
+
+/// Editable Chrome-like default stylesheet, stored next to the rest of Rail's data.
+pub fn html_css_path() -> PathBuf {
+    rail_data_dir().join("html.css")
+}
+
+/// Reads html.css; creates it from the built-in default the first time.
+pub fn load_html_css() -> String {
+    let path = html_css_path();
+    match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(_) => {
+            if let Some(dir) = path.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            let _ = std::fs::write(&path, DEFAULT_HTML_CSS);
+            DEFAULT_HTML_CSS.to_string()
+        }
+    }
+}
+
+fn user_style_sheet(css: &str) -> webkit6::UserStyleSheet {
+    webkit6::UserStyleSheet::new(
+        css,
+        webkit6::UserContentInjectedFrames::AllFrames,
+        webkit6::UserStyleLevel::User,
+        &[],
+        &[],
+    )
+}
+
+/// Pushes the css to every live web view; returns how many views were updated.
+pub fn apply_html_css(css: &str) -> usize {
+    let mut applied = 0;
+    STYLE_MANAGERS.with(|list| {
+        let mut list = list.borrow_mut();
+        list.retain(|w| w.upgrade().is_some());
+        for w in list.iter() {
+            if let Some(ucm) = w.upgrade() {
+                ucm.remove_all_style_sheets();
+                if !css.trim().is_empty() {
+                    ucm.add_style_sheet(&user_style_sheet(css));
+                }
+                applied += 1;
+            }
+        }
+    });
+    applied
+}
+
+fn css_jump_to_line(buffer: &gtk::TextBuffer, view: &gtk::TextView, line: i32) {
+    if let Some(iter) = buffer.iter_at_line(line) {
+        buffer.place_cursor(&iter);
+        let mark = match buffer.mark("rail-jump") {
+            Some(m) => {
+                buffer.move_mark(&m, &iter);
+                m
+            }
+            None => buffer.create_mark(Some("rail-jump"), &iter, true),
+        };
+        view.scroll_to_mark(&mark, 0.0, true, 0.0, 0.02);
+        view.grab_focus();
+    }
+}
+
+fn rebuild_css_chips(chips: &gtk::FlowBox, buffer: &gtk::TextBuffer, view: &gtk::TextView) {
+    while let Some(child) = chips.child_at_index(0) {
+        chips.remove(&child);
+    }
+    let (start, end) = buffer.bounds();
+    let text = buffer.text(&start, &end, false).to_string();
+    for (idx, line) in text.lines().enumerate() {
+        let t = line.trim();
+        if t.starts_with("/* =====") && t.ends_with("===== */") {
+            let name = t
+                .trim_start_matches("/* =====")
+                .trim_end_matches("===== */")
+                .trim();
+            if name.is_empty() {
+                continue;
+            }
+            let btn = gtk::Button::with_label(name);
+            btn.add_css_class("settings-option-item");
+            let b = buffer.clone();
+            let v = view.clone();
+            let line_no = idx as i32;
+            btn.connect_clicked(move |_| css_jump_to_line(&b, &v, line_no));
+            chips.append(&btn);
+        }
+    }
+}
+
+fn save_css_editor(buffer: &gtk::TextBuffer, status: &gtk::Label) {
+    let (start, end) = buffer.bounds();
+    let text = buffer.text(&start, &end, false).to_string();
+    let path = html_css_path();
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    match std::fs::write(&path, &text) {
+        Ok(_) => {
+            let n = apply_html_css(&text);
+            status.set_text(&format!(
+                "Saved to {} and applied to {} open view(s). New page loads use it immediately; reload a tab if it did not refresh.",
+                path.display(),
+                n
+            ));
+        }
+        Err(e) => status.set_text(&format!("Save failed: {}", e)),
+    }
+}
+
 const START_PAGE: &str = r##"<!doctype html>
 <html lang="en">
 <head>
@@ -1260,6 +1378,20 @@ button.color-choice.selected {
     margin-top: 6px;
 }
 
+/* ---- html.css editor (Settings > Customize) ---- */
+.css-editor {
+    font-family: monospace;
+    font-size: 12px;
+}
+.css-editor text {
+    background-color: #070a12;
+    color: #cbd5e1;
+}
+.css-editor-frame {
+    border: 1px solid #1a2238;
+    border-radius: 8px;
+}
+
 /* ---- floating settings modal (Alt+Shift+S) ---- */
 .settings-modal {
     background: #0b0e18;
@@ -1810,6 +1942,10 @@ struct App {
     settings_stack: gtk::Stack,
     settings_tab_buttons: RefCell<Vec<(SettingsTab, gtk::Button)>>,
     current_settings_tab: Cell<SettingsTab>,
+    css_buffer: gtk::TextBuffer,
+    css_view: gtk::TextView,
+    css_chips: gtk::FlowBox,
+    css_status_lbl: gtk::Label,
     search_engine: RefCell<String>,
 }
 
@@ -1828,6 +1964,7 @@ pub enum SettingsTab {
     Data,
     Privacy,
     Shortcuts,
+    Customize,
     About,
 }
 
@@ -2235,6 +2372,11 @@ impl App {
         );
         let ucm = webkit6::UserContentManager::new();
         ucm.add_script(&script);
+        let html_css = load_html_css();
+        if !html_css.trim().is_empty() {
+            ucm.add_style_sheet(&user_style_sheet(&html_css));
+        }
+        STYLE_MANAGERS.with(|l| l.borrow_mut().push(ucm.downgrade()));
 
         WebView::builder()
             .network_session(session)
@@ -4554,6 +4696,7 @@ impl App {
             SettingsTab::Data => "data",
             SettingsTab::Privacy => "privacy",
             SettingsTab::Shortcuts => "shortcuts",
+            SettingsTab::Customize => "customize",
             SettingsTab::About => "about",
         };
         self.settings_stack.set_visible_child_name(tab_name);
@@ -4589,10 +4732,23 @@ impl App {
                 self.data_modal_status_lbl.set_text("");
                 self.data_export_entry.grab_focus();
             }
+            SettingsTab::Customize => {
+                self.reload_css_editor();
+            }
             _ => {}
         }
 
         self.settings_modal.set_visible(true);
+    }
+
+    fn reload_css_editor(&self) {
+        let text = load_html_css();
+        self.css_buffer.set_text(&text);
+        rebuild_css_chips(&self.css_chips, &self.css_buffer, &self.css_view);
+        self.css_status_lbl.set_text(&format!(
+            "Editing {}. Click an element above to jump to its rules.",
+            html_css_path().display()
+        ));
     }
 
     fn toggle_settings_modal(self: &Rc<Self>) {
@@ -5999,6 +6155,7 @@ fn build(gapp: &gtk::Application) {
         (SettingsTab::Data, "drive-harddisk-symbolic", "Data & Backup"),
         (SettingsTab::Privacy, "security-high-symbolic", "Privacy & Shield"),
         (SettingsTab::Shortcuts, "input-keyboard-symbolic", "Shortcuts"),
+        (SettingsTab::Customize, "document-edit-symbolic", "Customize"),
         (SettingsTab::About, "help-about-symbolic", "About Rail"),
     ];
 
@@ -6130,6 +6287,126 @@ fn build(gapp: &gtk::Application) {
     page_gen_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
     page_gen_scroll.set_child(Some(&page_general));
     settings_stack.add_named(&page_gen_scroll, Some("general"));
+
+    // --- Page: Customize (html.css editor) ---
+    let page_css = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    page_css.add_css_class("settings-content-page");
+    page_css.set_vexpand(true);
+
+    let css_title = gtk::Label::new(Some("Customize HTML Defaults"));
+    css_title.add_css_class("settings-page-title");
+    css_title.set_xalign(0.0);
+    let css_subtitle = gtk::Label::new(Some(
+        "html.css holds Chrome's default look for every element (button, input types, select, headings...). Edit it freely.",
+    ));
+    css_subtitle.add_css_class("settings-page-subtitle");
+    css_subtitle.set_xalign(0.0);
+    css_subtitle.set_wrap(true);
+    page_css.append(&css_title);
+    page_css.append(&css_subtitle);
+
+    let css_chips = gtk::FlowBox::new();
+    css_chips.set_selection_mode(gtk::SelectionMode::None);
+    css_chips.set_homogeneous(false);
+    css_chips.set_column_spacing(6);
+    css_chips.set_row_spacing(6);
+    css_chips.set_max_children_per_line(12);
+    let chips_scroll = gtk::ScrolledWindow::new();
+    chips_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    chips_scroll.set_min_content_height(64);
+    chips_scroll.set_max_content_height(96);
+    chips_scroll.set_propagate_natural_height(true);
+    chips_scroll.set_child(Some(&css_chips));
+    page_css.append(&chips_scroll);
+
+    let css_buffer = gtk::TextBuffer::new(None::<&gtk::TextTagTable>);
+    let css_view = gtk::TextView::with_buffer(&css_buffer);
+    css_view.add_css_class("css-editor");
+    css_view.set_monospace(true);
+    css_view.set_wrap_mode(gtk::WrapMode::None);
+    css_view.set_left_margin(10);
+    css_view.set_right_margin(10);
+    css_view.set_top_margin(8);
+    css_view.set_bottom_margin(8);
+    let css_scroll = gtk::ScrolledWindow::new();
+    css_scroll.add_css_class("css-editor-frame");
+    css_scroll.set_vexpand(true);
+    css_scroll.set_min_content_height(200);
+    css_scroll.set_child(Some(&css_view));
+    page_css.append(&css_scroll);
+
+    let css_btn_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let css_save_btn = gtk::Button::with_label("Save & Apply (Ctrl+S)");
+    css_save_btn.add_css_class("settings-option-item");
+    css_save_btn.add_css_class("active");
+    let css_default_btn = gtk::Button::with_label("Load Chrome default");
+    css_default_btn.add_css_class("settings-option-item");
+    let css_reload_btn = gtk::Button::with_label("Reload from file");
+    css_reload_btn.add_css_class("settings-option-item");
+    css_btn_row.append(&css_save_btn);
+    css_btn_row.append(&css_default_btn);
+    css_btn_row.append(&css_reload_btn);
+    page_css.append(&css_btn_row);
+
+    let css_status_lbl = gtk::Label::new(None);
+    css_status_lbl.add_css_class("settings-card-desc");
+    css_status_lbl.set_xalign(0.0);
+    css_status_lbl.set_wrap(true);
+    css_status_lbl.set_selectable(true);
+    page_css.append(&css_status_lbl);
+
+    {
+        let buf = css_buffer.clone();
+        let st = css_status_lbl.clone();
+        let chips = css_chips.clone();
+        let view = css_view.clone();
+        css_save_btn.connect_clicked(move |_| {
+            save_css_editor(&buf, &st);
+            rebuild_css_chips(&chips, &buf, &view);
+        });
+    }
+    {
+        let buf = css_buffer.clone();
+        let st = css_status_lbl.clone();
+        let chips = css_chips.clone();
+        let view = css_view.clone();
+        css_default_btn.connect_clicked(move |_| {
+            buf.set_text(DEFAULT_HTML_CSS);
+            rebuild_css_chips(&chips, &buf, &view);
+            st.set_text("Chrome default loaded into the editor. Press Save & Apply to use it.");
+        });
+    }
+    {
+        let buf = css_buffer.clone();
+        let st = css_status_lbl.clone();
+        let chips = css_chips.clone();
+        let view = css_view.clone();
+        css_reload_btn.connect_clicked(move |_| {
+            buf.set_text(&load_html_css());
+            rebuild_css_chips(&chips, &buf, &view);
+            st.set_text(&format!("Reloaded {}.", html_css_path().display()));
+        });
+    }
+    {
+        let buf = css_buffer.clone();
+        let st = css_status_lbl.clone();
+        let chips = css_chips.clone();
+        let view = css_view.clone();
+        let kc = gtk::EventControllerKey::new();
+        kc.set_propagation_phase(gtk::PropagationPhase::Capture);
+        kc.connect_key_pressed(move |_, key, _, state| {
+            if state.contains(gdk::ModifierType::CONTROL_MASK) && key.to_lower() == gdk::Key::s {
+                save_css_editor(&buf, &st);
+                rebuild_css_chips(&chips, &buf, &view);
+                glib::Propagation::Stop
+            } else {
+                glib::Propagation::Proceed
+            }
+        });
+        css_view.add_controller(kc);
+    }
+
+    settings_stack.add_named(&page_css, Some("customize"));
 
     // --- Page 2: Profiles ---
     let profiles_list_box = gtk::ListBox::new();
@@ -6790,6 +7067,10 @@ fn build(gapp: &gtk::Application) {
         settings_stack: settings_stack.clone(),
         settings_tab_buttons: RefCell::new(tab_buttons_vec.clone()),
         current_settings_tab: Cell::new(SettingsTab::General),
+        css_buffer: css_buffer.clone(),
+        css_view: css_view.clone(),
+        css_chips: css_chips.clone(),
+        css_status_lbl: css_status_lbl.clone(),
         search_engine: RefCell::new("google".to_string()),
     });
 
