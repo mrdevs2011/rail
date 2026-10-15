@@ -348,50 +348,107 @@ label {
 }
 
 /* ---- dev-style ultra-thin minimalist scrollbars ---- */
-scrollbar {
+scrollbar,
+scrollbar.horizontal,
+scrollbar.vertical,
+scrollbar.overlay-indicator {
     background: transparent;
+    background-color: transparent;
     border: none;
+    box-shadow: none;
     padding: 0;
     margin: 0;
-    -GtkScrollbar-has-backward-stepper: 0;
-    -GtkScrollbar-has-forward-stepper: 0;
+    min-width: 0;
+    min-height: 0;
+    -GtkScrollbar-has-backward-stepper: false;
+    -GtkScrollbar-has-forward-stepper: false;
 }
-scrollbar.vertical {
-    min-width: 3px;
-    width: 3px;
-    margin: 0;
-    padding: 0;
-}
-scrollbar.horizontal {
+scrollbar.horizontal,
+scrollbar.horizontal.overlay-indicator {
     min-height: 3px;
     height: 3px;
-    margin: 0;
-    padding: 0;
 }
-scrollbar trough {
+scrollbar.vertical,
+scrollbar.vertical.overlay-indicator {
+    min-width: 3px;
+    width: 3px;
+}
+scrollbar trough,
+scrollbar.horizontal trough,
+scrollbar.vertical trough,
+scrollbar.overlay-indicator trough,
+scrollbar range trough {
     background: transparent;
+    background-color: transparent;
     border: none;
+    box-shadow: none;
     margin: 0;
     padding: 0;
+    min-width: 0;
+    min-height: 0;
 }
-scrollbar slider {
+scrollbar slider,
+scrollbar.horizontal slider,
+scrollbar.vertical slider,
+scrollbar.overlay-indicator slider,
+scrollbar.overlay-indicator:not(.dragging):not(.hovering) slider,
+scrollbar range trough slider {
     min-width: 3px;
     min-height: 24px;
     border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.25);
+    background-color: rgba(255, 255, 255, 0.25);
     border: none;
+    box-shadow: none;
     margin: 0;
     padding: 0;
-    transition: background 120ms ease, min-width 120ms ease, min-height 120ms ease;
+    transition: background-color 120ms ease, min-width 120ms ease, min-height 120ms ease;
+}
+scrollbar.horizontal slider,
+scrollbar.horizontal.overlay-indicator slider,
+scrollbar.overlay-indicator:not(.dragging):not(.hovering).horizontal slider {
+    min-height: 3px;
+    height: 3px;
+    min-width: 24px;
+    margin: 0;
+    border: none;
+}
+scrollbar.vertical slider,
+scrollbar.vertical.overlay-indicator slider,
+scrollbar.overlay-indicator:not(.dragging):not(.hovering).vertical slider {
+    min-width: 3px;
+    width: 3px;
+    min-height: 24px;
+    margin: 0;
+    border: none;
 }
 scrollbar:hover slider,
-scrollbar.dragging slider {
-    background: rgba(255, 255, 255, 0.45);
-    min-width: 5px;
-}
+scrollbar.dragging slider,
 scrollbar.horizontal:hover slider,
 scrollbar.horizontal.dragging slider {
+    background: rgba(255, 255, 255, 0.55);
+    background-color: rgba(255, 255, 255, 0.55);
     min-height: 5px;
+    height: 5px;
+    border: none;
+}
+scrollbar.vertical:hover slider,
+scrollbar.vertical.dragging slider {
+    background: rgba(255, 255, 255, 0.55);
+    background-color: rgba(255, 255, 255, 0.55);
+    min-width: 5px;
+    width: 5px;
+    border: none;
+}
+scrollbar button {
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    background-color: transparent;
+    -gtk-icon-source: none;
 }
 
 /* ---- columns & tabs (Spatial 2D Strip) ---- */
@@ -7164,7 +7221,7 @@ fn build(gapp: &gtk::Application) {
     gtk::style_context_add_provider_for_display(
         &gdk::Display::default().expect("no display"),
         &provider,
-        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        gtk::STYLE_PROVIDER_PRIORITY_USER,
     );
 
     let profile_mgr = ProfileManager::new(rail_data_dir());
@@ -7562,13 +7619,14 @@ fn build(gapp: &gtk::Application) {
     let css_view = gtk::TextView::with_buffer(&css_buffer);
     css_view.add_css_class("css-editor");
     css_view.set_monospace(true);
-    css_view.set_wrap_mode(gtk::WrapMode::None);
+    css_view.set_wrap_mode(gtk::WrapMode::Word);
     css_view.set_left_margin(10);
     css_view.set_right_margin(10);
     css_view.set_top_margin(8);
     css_view.set_bottom_margin(8);
     let css_scroll = gtk::ScrolledWindow::new();
     css_scroll.add_css_class("css-editor-frame");
+    css_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     css_scroll.set_vexpand(true);
     css_scroll.set_min_content_height(300);
     css_scroll.set_child(Some(&css_view));
