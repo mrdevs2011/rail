@@ -285,6 +285,35 @@ label {
     color: #94a3b8;
 }
 
+/* ---- modern sleek scrollbars ---- */
+scrollbar {
+    background: transparent;
+    transition: all 200ms ease;
+}
+scrollbar.horizontal {
+    min-height: 8px;
+}
+scrollbar.vertical {
+    min-width: 8px;
+}
+scrollbar slider {
+    min-width: 6px;
+    min-height: 24px;
+    border-radius: 4px;
+    background: rgba(148, 163, 184, 0.25);
+    transition: background 150ms ease, min-width 150ms ease, min-height 150ms ease;
+}
+scrollbar:hover slider,
+scrollbar.dragging slider {
+    background: rgba(56, 189, 248, 0.6);
+}
+scrollbar.vertical:hover slider {
+    min-width: 8px;
+}
+scrollbar.horizontal:hover slider {
+    min-height: 8px;
+}
+
 /* ---- columns & tabs (Spatial 2D Strip) ---- */
 .rail-col {
     background: transparent;
@@ -1745,6 +1774,7 @@ struct App {
     new_profile_color_idx: Cell<usize>,
     color_buttons: RefCell<Vec<gtk::Button>>,
     touchpad_mode: Cell<bool>,
+    tp_switch: gtk::Switch,
     last_saved_session: RefCell<String>,
     save_session_gen: Cell<u64>,
     data_modal_info_lbl: gtk::Label,
@@ -3411,7 +3441,9 @@ impl App {
     }
 
     fn toggle_touchpad_mode(self: &Rc<Self>) {
-        self.touchpad_mode.set(!self.touchpad_mode.get());
+        let new_state = !self.touchpad_mode.get();
+        self.touchpad_mode.set(new_state);
+        self.tp_switch.set_active(new_state);
         self.schedule_save_session();
     }
 
@@ -3516,6 +3548,7 @@ impl App {
 
         if let Some(tp) = state.touchpad_mode {
             self.touchpad_mode.set(tp);
+            self.tp_switch.set_active(tp);
         }
 
         if let Some(engine) = state.search_engine {
@@ -4503,6 +4536,9 @@ impl App {
         }
 
         match tab {
+            SettingsTab::General => {
+                self.tp_switch.set_active(self.touchpad_mode.get());
+            }
             SettingsTab::Profiles => {
                 self.rebuild_profiles_modal_list();
                 self.new_profile_entry.set_text("");
@@ -6679,6 +6715,7 @@ fn build(gapp: &gtk::Application) {
         new_profile_color_idx,
         color_buttons: RefCell::new(color_btns),
         touchpad_mode: Cell::new(false),
+        tp_switch: tp_switch.clone(),
         last_saved_session: RefCell::new(String::new()),
         save_session_gen: Cell::new(0),
         data_modal_info_lbl: data_info_lbl.clone(),
