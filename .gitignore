@@ -3,3 +3,4 @@ rail-x86_64
 rail-linux-x86_64
 .ai-lock
 .vercel
+.env*

@@ -12,3 +12,9 @@
 ## Eslatmalar
 - Release: https://github.com/mrdevs2011/rail/releases/tag/v0.5.4
 - SHA256: cebfb7560780cba193498ea1583d999515d719776f526ba38bbde0811d7b1c28
+
+---
+### 2026-10-15 20:24
+- Qilindi: Cloud Sync (Supabase + Vercel, AES-256 mandatory password encryption), clean Data settings page, v0.5.5 release
+- Keyingi qadam: User sets Vercel SUPABASE_URL / SUPABASE_ANON env vars and runs supabase-sync-schema.sql
+- Git holati: 76f611c feat(site+ci): dark polished dropdown + auto-enable Win/mac downloads when assets exist; CI continue-on-error for non-Linux
