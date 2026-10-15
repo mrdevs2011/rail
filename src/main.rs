@@ -244,7 +244,7 @@ kbd {
       spellcheck="false"
       onkeydown="if(event.key==='Enter'){var q=this.value.trim();if(q){if(q.indexOf('://')!==-1||(q.indexOf('.')!==-1&&q.indexOf(' ')===-1)){location.href=q.indexOf('://')===-1?'https://'+q:q;}else{location.href='https://www.google.com/search?q='+encodeURIComponent(q);}}}"
     />
-    <span class="search-hint">Ctrl + G</span>
+    <span class="search-hint">Alt + G</span>
   </div>
 </div>
 </body>
@@ -841,7 +841,7 @@ button.profile-item-btn .profile-item-persona {
     color: #38bdf8 !important;
 }
 
-/* ---- profiles manager modal (Ctrl+P) ---- */
+/* ---- profiles manager modal (Alt+P) ---- */
 .profiles-modal {
     background: #0d101a;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1121,7 +1121,7 @@ button.color-choice.selected {
     color: #ffffff;
 }
 
-/* ---- data backup & migration modal (Ctrl+I) ---- */
+/* ---- data backup & migration modal (Alt+I) ---- */
 .data-modal {
     background: #0d101a;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1208,7 +1208,7 @@ button.color-choice.selected {
     margin-top: 6px;
 }
 
-/* ---- floating settings modal (Ctrl+Shift+S) ---- */
+/* ---- floating settings modal (Alt+Shift+S) ---- */
 .settings-modal {
     background: #0b0e18;
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1355,7 +1355,7 @@ button.color-choice.selected {
     padding: 2px 7px;
 }
 
-/* ---- floating minimap / roadmap (Ctrl+M) ---- */
+/* ---- floating minimap / roadmap (Alt+M) ---- */
 .minimap-window {
     background: #0b0e17;
     border: 1px solid #1c2438;
@@ -1437,7 +1437,7 @@ button.color-choice.selected {
     color: #ffffff;
 }
 
-/* ---- Rail DevTools Panel (F12 / Ctrl+Shift+I / Ctrl+Shift+D) ---- */
+/* ---- Rail DevTools Panel (F12 / Alt+Shift+I / Alt+Shift+D) ---- */
 .devtools-panel {
     background: #0b0e17;
     box-shadow: 0 0 48px rgba(0, 0, 0, 0.85);
@@ -1738,12 +1738,12 @@ struct App {
     data_modal_status_lbl: gtk::Label,
     data_export_entry: gtk::Entry,
     data_import_entry: gtk::Entry,
-    // Minimap / Roadmap (Ctrl+M)
+    // Minimap / Roadmap (Alt+M)
     map_container: gtk::Box,
     map_drawing_area: gtk::DrawingArea,
     map_location_btn: gtk::Button,
     map_state: RefCell<MinimapState>,
-    // DevTools Panel (F12 / Ctrl+Shift+I / Ctrl+Shift+D)
+    // DevTools Panel (F12 / Alt+Shift+I / Alt+Shift+D)
     devtools_open: Cell<bool>,
     devtools_dock_side: Cell<DevToolsDockSide>,
     devtools_panel: gtk::Box,
@@ -1751,7 +1751,7 @@ struct App {
     devtools_resize_handle: gtk::Box,
     devtools_url_lbl: gtk::Label,
     devtools_window: RefCell<Option<gtk::Window>>,
-    // Floating Settings Panel (Ctrl+Shift+S / Ctrl+P / Ctrl+I)
+    // Floating Settings Panel (Alt+Shift+S / Alt+P / Alt+I)
     settings_modal: gtk::Box,
     settings_stack: gtk::Stack,
     settings_tab_buttons: RefCell<Vec<(SettingsTab, gtk::Button)>>,
@@ -2229,7 +2229,7 @@ impl App {
         self.add_view(view, prof_id, true);
     }
 
-    // ---- DevTools (Ctrl+Shift+I / F12 / Ctrl+Shift+D) ----
+    // ---- DevTools (Alt+Shift+I / F12 / Alt+Shift+D) ----
 
     fn devtools_open(&self) -> bool {
         self.devtools_open.get()
@@ -2782,7 +2782,7 @@ impl App {
 
         menu.append(&ContextMenuItem::from_stock_action_with_label(
             ContextMenuAction::InspectElement,
-            "Inspect Element  (F12 / Ctrl+Shift+I)",
+            "Inspect Element  (F12 / Alt+Shift+I)",
         ));
     }
 
@@ -3885,7 +3885,7 @@ impl App {
         new_ws_box.add_css_class("btn-new-workspace");
         new_ws_box.set_halign(gtk::Align::Fill);
         let new_ws_icon = gtk::Image::from_icon_name("list-add-symbolic");
-        let new_ws_lbl = gtk::Label::new(Some("+ New Workspace (Ctrl+Shift+V)"));
+        let new_ws_lbl = gtk::Label::new(Some("+ New Workspace (Alt+Shift+V)"));
         new_ws_lbl.set_xalign(0.0);
         new_ws_lbl.set_hexpand(true);
         new_ws_box.append(&new_ws_icon);
@@ -4084,7 +4084,7 @@ impl App {
         manage_btn.add_css_class("profile-item-btn");
         let manage_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let manage_icon = gtk::Image::from_icon_name("preferences-system-symbolic");
-        let manage_lbl = gtk::Label::new(Some("Manage Profiles in Settings (Ctrl+P)"));
+        let manage_lbl = gtk::Label::new(Some("Manage Profiles in Settings (Alt+P)"));
         manage_lbl.add_css_class("profile-item-name");
         manage_lbl.set_xalign(0.0);
         manage_box.append(&manage_icon);
@@ -4462,7 +4462,7 @@ impl App {
         self.hide_palette();
     }
 
-    // ---- floating settings modal (Ctrl+Shift+S / Ctrl+P / Ctrl+I) --------
+    // ---- floating settings modal (Alt+Shift+S / Alt+P / Alt+I) --------
 
     fn settings_modal_open(&self) -> bool {
         self.settings_modal.is_visible()
@@ -4652,7 +4652,7 @@ impl App {
         }
     }
 
-    // ---- Minimap / Roadmap (Ctrl+M) ----
+    // ---- Minimap / Roadmap (Alt+M) ----
 
     fn map_open(&self) -> bool {
         self.map_container.is_visible()
@@ -5397,7 +5397,7 @@ impl App {
     fn ov_key(self: &Rc<Self>, k: gdk::Key, m: gdk::ModifierType) -> bool {
         use gdk::ModifierType as M;
         let plain = m.is_empty();
-        if plain || m == M::CONTROL_MASK {
+        if plain || m == M::ALT_MASK {
             match k {
                 gdk::Key::h | gdk::Key::Left => {
                     self.focus_column_left();
@@ -5446,11 +5446,11 @@ impl App {
                 self.hide_settings_modal();
                 return true;
             }
-            if ctrl && shift && !alt && (k == gdk::Key::s || k == gdk::Key::S || keycode == 39) {
+            if alt && shift && !ctrl && (k == gdk::Key::s || k == gdk::Key::S || keycode == 39) {
                 self.hide_settings_modal();
                 return true;
             }
-            if ctrl && !shift && !alt && (k == gdk::Key::p || k == gdk::Key::P) {
+            if alt && !shift && !ctrl && (k == gdk::Key::p || k == gdk::Key::P) {
                 if self.current_settings_tab.get() == SettingsTab::Profiles {
                     self.hide_settings_modal();
                 } else {
@@ -5458,7 +5458,7 @@ impl App {
                 }
                 return true;
             }
-            if ctrl && !shift && !alt && (k == gdk::Key::i || k == gdk::Key::I) {
+            if alt && !shift && !ctrl && (k == gdk::Key::i || k == gdk::Key::I) {
                 if self.current_settings_tab.get() == SettingsTab::Data {
                     self.hide_settings_modal();
                 } else {
@@ -5475,7 +5475,7 @@ impl App {
                 self.hide_map();
                 return true;
             }
-            if ctrl && !shift && !alt && (k == gdk::Key::m || k == gdk::Key::M) {
+            if alt && !shift && !ctrl && (k == gdk::Key::m || k == gdk::Key::M) {
                 self.hide_map();
                 return true;
             }
@@ -5490,13 +5490,13 @@ impl App {
                 self.hide_devtools();
                 return true;
             }
-            if ctrl && shift && !alt && (k == gdk::Key::i || k == gdk::Key::I) {
+            if alt && shift && !ctrl && (k == gdk::Key::i || k == gdk::Key::I) {
                 self.hide_devtools();
                 return true;
             }
         }
 
-        if ctrl && shift && !alt && (k == gdk::Key::d || k == gdk::Key::D) {
+        if alt && shift && !ctrl && (k == gdk::Key::d || k == gdk::Key::D) {
             self.cycle_devtools_dock();
             return true;
         }
@@ -5505,7 +5505,7 @@ impl App {
             self.toggle_devtools();
             return true;
         }
-        if ctrl && shift && !alt && (k == gdk::Key::i || k == gdk::Key::I) {
+        if alt && shift && !ctrl && (k == gdk::Key::i || k == gdk::Key::I) {
             self.toggle_devtools();
             return true;
         }
@@ -5521,7 +5521,7 @@ impl App {
             }
             return false;
         }
-        let global = ctrl && !alt && (matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::T | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I | gdk::Key::s | gdk::Key::S | gdk::Key::d | gdk::Key::D) || keycode == 28 || keycode == 39);
+        let global = alt && !ctrl && (matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::T | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I | gdk::Key::s | gdk::Key::S | gdk::Key::d | gdk::Key::D) || keycode == 28 || keycode == 39);
         if self.overview_open() && !global && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
             return true;
         }
@@ -5529,48 +5529,38 @@ impl App {
             self.win.set_fullscreened(!self.win.is_fullscreen());
             return true;
         }
-        if alt && !ctrl && !shift {
-            let v = self.focused_view();
-            match k {
-                gdk::Key::Left => v.map(|v| v.go_back()),
-                gdk::Key::Right => v.map(|v| v.go_forward()),
-                _ => return false,
-            };
-            return true;
-        }
 
-        if ctrl && !shift && !alt {
+        if alt && !shift && !ctrl {
             match k {
-                gdk::Key::p | gdk::Key::P => self.toggle_profiles_modal(),
+                gdk::Key::Left => {
+                    if let Some(v) = self.focused_view() {
+                        v.go_back();
+                    }
+                }
+                gdk::Key::Right => {
+                    if let Some(v) = self.focused_view() {
+                        v.go_forward();
+                    }
+                }
+                gdk::Key::p | gdk::Key::P => {
+                    if self.palette_open() {
+                        if self.profile_popover.is_visible() {
+                            self.profile_popover.popdown();
+                        } else {
+                            self.profile_popover.popup();
+                        }
+                    } else {
+                        self.toggle_profiles_modal();
+                    }
+                }
                 gdk::Key::i | gdk::Key::I => self.toggle_data_modal(),
                 gdk::Key::t | gdk::Key::T => self.open_new_tab_palette(),
                 gdk::Key::n => self.split_vertical(),
                 gdk::Key::f => self.toggle_full(),
-                gdk::Key::h | gdk::Key::Left => self.focus_column_left(),
-                gdk::Key::l | gdk::Key::Right => self.focus_column_right(),
+                gdk::Key::h => self.focus_column_left(),
+                gdk::Key::l => self.focus_column_right(),
                 gdk::Key::j | gdk::Key::Down => self.focus_row_down(),
                 gdk::Key::k | gdk::Key::Up => self.focus_row_up(),
-                gdk::Key::v | gdk::Key::V => {
-                    if self.palette_open() {
-                        let clipboard = self.entry.clipboard();
-                        let ent = self.entry.clone();
-                        clipboard.read_text_async(gio::Cancellable::NONE, move |res| {
-                            if let Ok(Some(text)) = res {
-                                let text = text.to_string();
-                                let (start, end) = ent.selection_bounds().unwrap_or_else(|| {
-                                    let pos = ent.position();
-                                    (pos, pos)
-                                });
-                                ent.delete_text(start, end);
-                                let mut insert_pos = start;
-                                ent.insert_text(&text, &mut insert_pos);
-                                ent.set_position(insert_pos);
-                            }
-                        });
-                        return true;
-                    }
-                    return false;
-                }
                 gdk::Key::w => {
                     if !self.palette_open() {
                         if let Some(v) = self.focused_view() {
@@ -5603,25 +5593,7 @@ impl App {
                         self.show_palette();
                         return true;
                     }
-                    if keycode == 55 && self.palette_open() {
-                        let clipboard = self.entry.clipboard();
-                        let ent = self.entry.clone();
-                        clipboard.read_text_async(gio::Cancellable::NONE, move |res| {
-                            if let Ok(Some(text)) = res {
-                                let text = text.to_string();
-                                let (start, end) = ent.selection_bounds().unwrap_or_else(|| {
-                                    let pos = ent.position();
-                                    (pos, pos)
-                                });
-                                ent.delete_text(start, end);
-                                let mut insert_pos = start;
-                                ent.insert_text(&text, &mut insert_pos);
-                                ent.set_position(insert_pos);
-                            }
-                        });
-                        return true;
-                    }
-                    // Vertical workspace selection (Ctrl+1..9)
+                    // Vertical workspace selection (Alt+1..9)
                     if keycode == 10 || keycode == 87 || k == gdk::Key::_1 || k == gdk::Key::KP_1 || key.to_unicode() == Some('1') {
                         self.focus_row(0);
                         return true;
@@ -5664,7 +5636,7 @@ impl App {
             return true;
         }
 
-        if ctrl && shift && !alt {
+        if alt && shift && !ctrl {
             match k {
                 gdk::Key::s | gdk::Key::S => {
                     self.toggle_settings_modal();
@@ -5675,6 +5647,10 @@ impl App {
                     return true;
                 }
                 gdk::Key::i | gdk::Key::I => self.toggle_devtools(),
+                gdk::Key::d | gdk::Key::D => {
+                    self.cycle_devtools_dock();
+                    return true;
+                }
                 gdk::Key::t | gdk::Key::T => self.toggle_touchpad_mode(),
                 gdk::Key::v | gdk::Key::V | gdk::Key::n | gdk::Key::N => self.split_vertical(),
                 gdk::Key::h | gdk::Key::Left => self.move_column(-1),
@@ -5690,7 +5666,7 @@ impl App {
                         self.toggle_settings_modal();
                         return true;
                     }
-                    // Ctrl+Shift+1 -> move to workspace/row 1
+                    // Alt+Shift+1 -> move to workspace/row 1
                     if keycode == 10 || keycode == 87
                         || k == gdk::Key::_1 || k == gdk::Key::exclam || k == gdk::Key::KP_1
                         || key == gdk::Key::_1 || key == gdk::Key::exclam || key == gdk::Key::KP_1
@@ -5699,7 +5675,7 @@ impl App {
                         self.move_tab_to_row(0);
                         return true;
                     }
-                    // Ctrl+Shift+2 -> move to workspace/row 2
+                    // Alt+Shift+2 -> move to workspace/row 2
                     if keycode == 11 || keycode == 88
                         || k == gdk::Key::_2 || k == gdk::Key::at || k == gdk::Key::quotedbl || k == gdk::Key::KP_2
                         || key == gdk::Key::_2 || key == gdk::Key::at || key == gdk::Key::quotedbl || key == gdk::Key::KP_2
@@ -5708,7 +5684,7 @@ impl App {
                         self.move_tab_to_row(1);
                         return true;
                     }
-                    // Ctrl+Shift+3 -> move to workspace/row 3
+                    // Alt+Shift+3 -> move to workspace/row 3
                     if keycode == 12 || keycode == 89
                         || k == gdk::Key::_3 || k == gdk::Key::numbersign || k == gdk::Key::KP_3
                         || key == gdk::Key::_3 || key == gdk::Key::numbersign || key == gdk::Key::KP_3
@@ -5717,12 +5693,12 @@ impl App {
                         self.move_tab_to_row(2);
                         return true;
                     }
-                    // Ctrl+Shift+4 -> move to workspace/row 4
+                    // Alt+Shift+4 -> move to workspace/row 4
                     if keycode == 13 || keycode == 90 || k == gdk::Key::_4 || k == gdk::Key::KP_4 || key.to_unicode() == Some('4') {
                         self.move_tab_to_row(3);
                         return true;
                     }
-                    // Ctrl+Shift+5 -> move to workspace/row 5
+                    // Alt+Shift+5 -> move to workspace/row 5
                     if keycode == 14 || keycode == 91 || k == gdk::Key::_5 || k == gdk::Key::KP_5 || key.to_unicode() == Some('5') {
                         self.move_tab_to_row(4);
                         return true;
@@ -5759,7 +5735,7 @@ fn build(gapp: &gtk::Application) {
     brand.set_xalign(0.0);
     let add = gtk::Button::from_icon_name("list-add-symbolic");
     add.add_css_class("btn-add-tab");
-    add.set_tooltip_text(Some("New tab  (Ctrl+T)"));
+    add.set_tooltip_text(Some("New tab  (Alt+T)"));
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     head.set_margin_start(4);
     head.append(&brand);
@@ -5775,13 +5751,13 @@ fn build(gapp: &gtk::Application) {
     s_icon.add_css_class("pill-icon");
     pill_inner.append(&s_icon);
     pill_inner.append(&pill_label);
-    let pill_chip = gtk::Label::new(Some("Ctrl+G"));
+    let pill_chip = gtk::Label::new(Some("Alt+G"));
     pill_chip.add_css_class("pill-chip");
     pill_inner.append(&pill_chip);
     let pill = gtk::Button::new();
     pill.add_css_class("pill");
     pill.set_child(Some(&pill_inner));
-    pill.set_tooltip_text(Some("Go to address  (Ctrl+G)"));
+    pill.set_tooltip_text(Some("Go to address  (Alt+G)"));
 
     let list = gtk::ListBox::new();
     list.add_css_class("tablist");
@@ -5858,7 +5834,7 @@ fn build(gapp: &gtk::Application) {
     palette_suggestions_box.add_css_class("palette-suggestions-box");
     palette_suggestions_box.set_visible(false);
 
-    let phint = gtk::Label::new(Some("Enter  go      Esc  cancel      Ctrl+P  profiles"));
+    let phint = gtk::Label::new(Some("Enter  go      Esc  cancel      Alt+P  profiles"));
     phint.add_css_class("palette-hint");
     phint.set_xalign(0.0);
     let palette = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -5878,7 +5854,7 @@ fn build(gapp: &gtk::Application) {
         pop_c.popup();
     });
 
-    // ---- floating settings panel (Ctrl+Shift+S / Ctrl+P / Ctrl+I) ----
+    // ---- floating settings panel (Alt+Shift+S / Alt+P / Alt+I) ----
     let settings_modal = gtk::Box::new(gtk::Orientation::Vertical, 0);
     settings_modal.add_css_class("settings-modal");
     settings_modal.set_halign(gtk::Align::Center);
@@ -5988,7 +5964,7 @@ fn build(gapp: &gtk::Application) {
     let engine_title = gtk::Label::new(Some("Default Search Engine"));
     engine_title.add_css_class("settings-card-title");
     engine_title.set_xalign(0.0);
-    let engine_desc = gtk::Label::new(Some("Applied when searching via the Omnibar (Ctrl+T / Ctrl+G)"));
+    let engine_desc = gtk::Label::new(Some("Applied when searching via the Omnibar (Alt+T / Alt+G)"));
     engine_desc.add_css_class("settings-card-desc");
     engine_desc.set_xalign(0.0);
     engine_card.append(&engine_title);
@@ -5996,11 +5972,11 @@ fn build(gapp: &gtk::Application) {
 
     let engines_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     let engine_choices = [
-        ("google", "🔍 Google"),
-        ("duckduckgo", "🦆 DuckDuckGo"),
-        ("brave", "🦁 Brave"),
-        ("bing", "🟦 Bing"),
-        ("ecosia", "🌳 Ecosia"),
+        ("google", "Google"),
+        ("duckduckgo", "DuckDuckGo"),
+        ("brave", "Brave"),
+        ("bing", "Bing"),
+        ("ecosia", "Ecosia"),
     ];
     let mut engine_buttons: Vec<(String, gtk::Button)> = Vec::new();
     for (id, label) in engine_choices {
@@ -6125,7 +6101,7 @@ fn build(gapp: &gtk::Application) {
     let prof_page_title = gtk::Label::new(Some("Profiles & Workspaces"));
     prof_page_title.add_css_class("settings-page-title");
     prof_page_title.set_xalign(0.0);
-    let prof_page_subtitle = gtk::Label::new(Some("Isolated workspaces, sessions & cookie storage  (Ctrl+P)"));
+    let prof_page_subtitle = gtk::Label::new(Some("Isolated workspaces, sessions & cookie storage  (Alt+P)"));
     prof_page_subtitle.add_css_class("settings-page-subtitle");
     prof_page_subtitle.set_xalign(0.0);
 
@@ -6244,7 +6220,7 @@ fn build(gapp: &gtk::Application) {
     let data_page_title = gtk::Label::new(Some("Data Backup & Migration"));
     data_page_title.add_css_class("settings-page-title");
     data_page_title.set_xalign(0.0);
-    let data_page_subtitle = gtk::Label::new(Some("Export or import all workspaces, profiles, logins & cookies  (Ctrl+I)"));
+    let data_page_subtitle = gtk::Label::new(Some("Export or import all workspaces, profiles, logins & cookies  (Alt+I)"));
     data_page_subtitle.add_css_class("settings-page-subtitle");
     data_page_subtitle.set_xalign(0.0);
 
@@ -6367,16 +6343,18 @@ fn build(gapp: &gtk::Application) {
     sc_card1.append(&sc_sec1);
 
     let sc_list1 = [
-        ("Open Omnibar / New tab", "Ctrl + T"),
-        ("Focus URL / Address bar in tab", "Ctrl + G"),
-        ("Close focused tab", "Ctrl + W  or  x"),
-        ("Switch to workspace 1..9", "Ctrl + 1..9"),
-        ("Move tab to workspace 1..9", "Ctrl + Shift + 1..9"),
-        ("Split column vertically", "Ctrl + N  or  Ctrl + Shift + V"),
-        ("Focus column Left / Right", "Ctrl + H  /  Ctrl + L"),
-        ("Focus row Down / Up", "Ctrl + J  /  Ctrl + K"),
-        ("Move tab column Left / Right", "Ctrl + Shift + H  /  L"),
-        ("Move tab row Down / Up", "Ctrl + Shift + J  /  K"),
+        ("Open Omnibar / New tab", "Alt + T"),
+        ("Focus URL / Address bar in tab", "Alt + G"),
+        ("Close focused tab", "Alt + W  or  x"),
+        ("Reload active tab", "Alt + R"),
+        ("Toggle Full Tab View", "Alt + F"),
+        ("Switch to workspace 1..9", "Alt + 1..9"),
+        ("Move tab to workspace 1..9", "Alt + Shift + 1..9"),
+        ("Split column vertically", "Alt + N  or  Alt + Shift + V"),
+        ("Focus column Left / Right", "Alt + H  /  Alt + L"),
+        ("Focus row Down / Up", "Alt + J  /  Alt + K"),
+        ("Move tab column Left / Right", "Alt + Shift + H  /  L"),
+        ("Move tab row Down / Up", "Alt + Shift + J  /  K"),
     ];
     for (desc, kbd) in sc_list1 {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -6401,15 +6379,19 @@ fn build(gapp: &gtk::Application) {
     sc_card2.append(&sc_sec2);
 
     let sc_list2 = [
-        ("Toggle Floating Settings Panel", "Ctrl + Shift + S"),
-        ("Open Settings → Profiles Tab", "Ctrl + P"),
-        ("Open Settings → Data Backup Tab", "Ctrl + I"),
-        ("Toggle WebKit DevTools Console", "F12  or  Ctrl + Shift + I"),
-        ("Toggle Roadmap / Minimap", "Ctrl + M"),
-        ("Toggle Fullscreen", "F11"),
-        ("Toggle Touchpad Canvas Navigation", "Ctrl + Shift + T"),
+        ("Toggle Floating Settings Panel", "Alt + Shift + S"),
+        ("Open Settings → Profiles Tab", "Alt + P"),
+        ("Open Settings → Data Backup Tab", "Alt + I"),
+        ("Toggle WebKit DevTools Console", "F12  or  Alt + Shift + I"),
+        ("Cycle DevTools Dock Position", "Alt + Shift + D"),
+        ("Toggle Roadmap / Minimap", "Alt + M"),
+        ("Toggle Spatial Overview (Zoom)", "Alt + O"),
+        ("Toggle Sidebar", "Alt + B"),
+        ("Toggle Touchpad Canvas Navigation", "Alt + Shift + T"),
         ("Browser Back / Forward", "Alt + Left  /  Alt + Right"),
+        ("Toggle Fullscreen", "F11"),
         ("Close modal / Dismiss overlay", "Esc"),
+        ("Quit Rail", "Alt + Q"),
     ];
     for (desc, kbd) in sc_list2 {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -6500,7 +6482,7 @@ fn build(gapp: &gtk::Application) {
     load_bar.set_can_target(false);
     load_bar.set_visible(false);
 
-    // ---- Minimap / Roadmap (Ctrl+M) ----
+    // ---- Minimap / Roadmap (Alt+M) ----
     let map_header_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     map_header_row.add_css_class("minimap-header");
     map_header_row.set_cursor_from_name(Some("grab"));
@@ -6514,7 +6496,7 @@ fn build(gapp: &gtk::Application) {
     map_title.set_hexpand(true);
     map_title.set_xalign(0.0);
 
-    let map_badge = gtk::Label::new(Some("Ctrl+M"));
+    let map_badge = gtk::Label::new(Some("Alt+M"));
     map_badge.add_css_class("minimap-badge");
 
     let map_hint = gtk::Label::new(Some("Drag header"));
@@ -6523,7 +6505,7 @@ fn build(gapp: &gtk::Application) {
 
     let map_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
     map_close_btn.add_css_class("flat-icon");
-    map_close_btn.set_tooltip_text(Some("Close Map (Ctrl+M / Esc)"));
+    map_close_btn.set_tooltip_text(Some("Close Map (Alt+M / Esc)"));
     map_close_btn.set_cursor_from_name(Some("pointer"));
 
     map_header_row.append(&map_icon);
@@ -6565,7 +6547,7 @@ fn build(gapp: &gtk::Application) {
     map_container.append(&map_header_row);
     map_container.append(&map_overlay);
 
-    // ---- Native Rail Developer Console (F12 / Ctrl+Shift+I) ----
+    // ---- Native Rail Developer Console (F12 / Alt+Shift+I) ----
     let devtools_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     devtools_header.add_css_class("devtools-header");
 
