@@ -2157,6 +2157,10 @@ enum ScResolve {
 thread_local! {
     static SHORTCUTS: RefCell<ShortcutConfig> = RefCell::new(ShortcutConfig::default());
     static KEY_CTL: RefCell<Option<gtk::EventControllerKey>> = RefCell::new(None);
+    /// Re-entrancy guard: Inspector::show() emits bring-to-front, which called show_devtools() again (stack overflow).
+    static IN_SHOW_DEVTOOLS: Cell<bool> = Cell::new(false);
+    /// Toolbar slot (0-based, 24px pitch) last clicked in the inspector toolbar; -1 = none.
+    static LAST_DT_SLOT: Cell<i32> = Cell::new(-1);
 }
 
 fn shortcuts_path() -> PathBuf {
@@ -2876,6 +2880,51 @@ impl App {
             .map(|t| t.view.clone())
     }
 
+    /// True when the clipboard offers an image but no text. WebKitGTK does not expose
+    /// clipboard images through DataTransfer (WebKit bug 218519), so such a paste must be
+    /// replayed into the page by Rail.
+    fn clipboard_is_image_only(&self) -> bool {
+        let f = self.win.clipboard().formats();
+        f.contains_type(<gdk::Texture as glib::prelude::StaticType>::static_type())
+            && !f.contain_mime_type("text/plain")
+            && !f.contain_mime_type("text/plain;charset=utf-8")
+    }
+
+    /// Reads the clipboard image natively and dispatches a synthetic `paste` event
+    /// carrying it as a File, so pages (Gemini etc.) see it in clipboardData.files.
+    fn paste_clipboard_image(self: &Rc<Self>, view: WebView) {
+        self.win.clipboard().read_texture_async(gio::Cancellable::NONE, move |res| {
+            let Ok(Some(tex)) = res else { return };
+            let png = tex.save_to_png_bytes();
+            let b64 = glib::base64_encode(&png[..]);
+            let js = format!(
+                "(function(){{try{{var b=atob('{}');var u=new Uint8Array(b.length);\
+                 for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);\
+                 var f=new File([u],'image.png',{{type:'image/png'}});\
+                 var dt=new DataTransfer();dt.items.add(f);\
+                 var t=document.activeElement||document.body;\
+                 t.dispatchEvent(new ClipboardEvent('paste',{{clipboardData:dt,bubbles:true,cancelable:true,composed:true}}));\
+                 }}catch(e){{}}}})();",
+                b64
+            );
+            view.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
+        });
+    }
+
+    /// Ctrl+V with an image-only clipboard while a page has focus: handled by Rail.
+    fn try_paste_image(self: &Rc<Self>) -> bool {
+        let Some(view) = self.focused_view() else { return false };
+        let page_focused = match gtk::prelude::GtkWindowExt::focus(&self.win) {
+            Some(w) => w == *view.upcast_ref::<gtk::Widget>() || w.is_ancestor(&view),
+            None => false,
+        };
+        if !page_focused || !self.clipboard_is_image_only() {
+            return false;
+        }
+        self.paste_clipboard_image(view);
+        true
+    }
+
     fn palette_open(&self) -> bool {
         gtk::prelude::WidgetExt::is_visible(&self.palette)
     }
@@ -3395,32 +3444,12 @@ impl App {
                     widget.set_hexpand(true);
                     win_box.append(&widget);
 
-                    let dt_win_click = gtk::GestureClick::new();
-                    dt_win_click.set_propagation_phase(gtk::PropagationPhase::Capture);
-                    let app_win_click = self.clone();
-                    let win_child_ref = win_box.clone();
-                    dt_win_click.connect_pressed(move |_, _, x, y| {
-                        let w = win_child_ref.width() as f64;
-                        if y >= 0.0 && y <= 36.0 && w > 200.0 && x >= (w - 180.0) {
-                            let dist = w - x;
-                            if dist <= 36.0 {
-                                app_win_click.hide_devtools();
-                            } else if dist > 72.0 && dist <= 108.0 {
-                                app_win_click.set_devtools_dock_side(DevToolsDockSide::Right);
-                            } else if dist > 108.0 && dist <= 144.0 {
-                                app_win_click.set_devtools_dock_side(DevToolsDockSide::Bottom);
-                            } else if dist > 144.0 && dist <= 180.0 {
-                                app_win_click.set_devtools_dock_side(DevToolsDockSide::Left);
-                            }
-                        }
-                    });
-                    win_box.add_controller(dt_win_click);
 
                     let win = gtk::Window::builder()
                         .title(&trf("Rail DevTools - {}", &[&host]))
                         .default_width(1050)
                         .default_height(720)
-                        .transient_for(&self.win)
+                        // no transient_for: niri opens windows that have a parent as floating
                         .child(&win_box)
                         .build();
                     win.add_css_class("devtools-window");
@@ -3449,6 +3478,9 @@ impl App {
         let Some(view) = self.focused_view() else { return };
         let Some(insp) = view.inspector() else { return };
 
+        if IN_SHOW_DEVTOOLS.with(|f| f.replace(true)) {
+            return;
+        }
         insp.show();
 
         // Update URL and host badge in devtools header if ever needed
@@ -3458,6 +3490,7 @@ impl App {
 
         let side = self.devtools_dock_side.get();
         self.set_devtools_dock_side(side);
+        IN_SHOW_DEVTOOLS.with(|f| f.set(false));
     }
 
     fn hide_devtools(&self) {
@@ -3752,7 +3785,16 @@ impl App {
         if is_editable {
             menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Cut, tr("Cut")));
             menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Copy, tr("Copy")));
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Paste, tr("Paste")));
+            if self.clipboard_is_image_only() {
+                let app_p = self.clone();
+                let v_p = view.clone();
+                let act_paste = gio::SimpleAction::new("ctx-paste-image", None);
+                act_paste.connect_activate(move |_, _| app_p.paste_clipboard_image(v_p.clone()));
+                self.win.add_action(&act_paste);
+                menu.append(&ContextMenuItem::from_gaction(&act_paste, tr("Paste"), None));
+            } else {
+                menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Paste, tr("Paste")));
+            }
             menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::PasteAsPlainText, tr("Paste as Plain Text")));
             menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::SelectAll, tr("Select All")));
             menu.append(&ContextMenuItem::new_separator());
@@ -3848,11 +3890,20 @@ impl App {
             let app_attach = self.clone();
             insp.connect_attach(move |_| {
                 let cur = app_attach.devtools_dock_side.get();
-                let target = if cur == DevToolsDockSide::Undocked {
+                let slot = LAST_DT_SLOT.with(|c| c.replace(-1));
+                // Visible dock buttons sit after the close button, in order Left, Bottom, Right, minus the current side.
+                let visible: Vec<DevToolsDockSide> = [DevToolsDockSide::Left, DevToolsDockSide::Bottom, DevToolsDockSide::Right]
+                    .into_iter()
+                    .filter(|d| *d != cur)
+                    .collect();
+                let target = if slot >= 1 && ((slot - 1) as usize) < visible.len() && cur != DevToolsDockSide::Undocked {
+                    visible[(slot - 1) as usize]
+                } else if cur == DevToolsDockSide::Undocked {
                     DevToolsDockSide::Bottom
                 } else {
                     cur
                 };
+                eprintln!("[rail] inspector attach: slot={} cur={:?} -> {:?}", slot, cur, target);
                 app_attach.set_devtools_dock_side(target);
                 true
             });
@@ -9206,26 +9257,16 @@ fn build(gapp: &gtk::Application) {
         }
     });
 
-    // DevTools toolbar click interceptor for docking & close buttons
+    // WebKit's own inspector toolbar handles close/dock/undock via closed/attach/detach signals.
+    // The attach signal carries no side, so remember which toolbar slot was clicked (never claims the click).
     let dt_click = gtk::GestureClick::new();
     dt_click.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let app_dt_click = app.clone();
-    let box_ref = devtools_content_box.clone();
-    dt_click.connect_pressed(move |_, _, x, y| {
-        let w = box_ref.width() as f64;
-        if y >= 0.0 && y <= 36.0 && w > 200.0 && x >= (w - 180.0) {
-            let dist = w - x;
-            if dist <= 36.0 {
-                app_dt_click.hide_devtools();
-            } else if dist <= 72.0 {
-                app_dt_click.set_devtools_dock_side(DevToolsDockSide::Undocked);
-            } else if dist <= 108.0 {
-                app_dt_click.set_devtools_dock_side(DevToolsDockSide::Right);
-            } else if dist <= 144.0 {
-                app_dt_click.set_devtools_dock_side(DevToolsDockSide::Bottom);
-            } else if dist <= 180.0 {
-                app_dt_click.set_devtools_dock_side(DevToolsDockSide::Left);
-            }
+    dt_click.connect_pressed(move |g, _, x, y| {
+        g.set_state(gtk::EventSequenceState::None);
+        if (0.0..=36.0).contains(&y) {
+            LAST_DT_SLOT.with(|c| c.set((x / 24.0).floor() as i32));
+        } else {
+            LAST_DT_SLOT.with(|c| c.set(-1));
         }
     });
     devtools_content_box.add_controller(dt_click);
@@ -9515,6 +9556,14 @@ fn build(gapp: &gtk::Application) {
         let ctrl = state.contains(M::CONTROL_MASK);
         let alt = state.contains(M::ALT_MASK);
         let super_key = state.contains(M::SUPER_MASK);
+
+        // Image paste: WebKitGTK gives pages an empty clipboardData for images
+        if ctrl && !alt && !state.contains(M::SHIFT_MASK)
+            && (key == gdk::Key::v || key == gdk::Key::V || keycode == 55)
+            && a.try_paste_image()
+        {
+            return glib::Propagation::Stop;
+        }
 
         // Autorepeat loop suppressor: block machine-gun repeat when shortcut is held down
         if ctrl || alt || super_key {
