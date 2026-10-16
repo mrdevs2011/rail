@@ -652,6 +652,12 @@ button.pill:hover .pill-chip {
     font-size: 10px;
     color: #535353;
     margin-right: 4px;
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+/* Tab soni va + tugmasi faqat sarlavha ustiga hover qilinganda ko'rinadi (kenglik o'zgarmaydi) */
+.workspace-header:hover .workspace-tab-count {
+    opacity: 1;
 }
 .btn-ws-add {
     min-width: 22px;
@@ -661,7 +667,12 @@ button.pill:hover .pill-chip {
     background: transparent;
     border: none;
     color: #727272;
+    opacity: 0;
     transition: all 100ms ease;
+}
+.workspace-header:hover .btn-ws-add,
+.btn-ws-add:focus {
+    opacity: 1;
 }
 .btn-ws-add:hover {
     background: rgba(255, 255, 255, 0.07);
