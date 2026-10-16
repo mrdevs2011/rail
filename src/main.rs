@@ -1871,11 +1871,29 @@ button.update-close:hover {
 /// How far the strip zooms out in overview (niri uses a similar factor).
 const OV_ZOOM: f64 = 0.4;
 
+/// Fon tab shuncha soniyadan keyin RAM tejash uchun to'xtatiladi (suspend)
+const SUSPEND_AFTER_SECS: u64 = 120;
+
 struct Tab {
     container: gtk::Box,
     view: WebView,
     profile_id: String,
     custom_width: Cell<Option<f64>>,
+    /// Oxirgi ma'lum http(s) manzil. WebKit web process to'xtatilganda uri() ni tozalab yuboradi,
+    /// shuning uchun uyg'otish va sessiyani saqlash shu nusxadan foydalanadi.
+    saved_uri: RefCell<String>,
+    suspended: Cell<bool>,
+    /// Popup (window.open) bilan bog'langan tablar bitta web process'ni bo'lishadi: ularni to'xtatib bo'lmaydi
+    keep_alive: Cell<bool>,
+    last_active: Cell<std::time::Instant>,
+}
+
+impl Tab {
+    /// Haqiqiy manzil: jonli uri bo'sh bo'lsa (to'xtatilgan tab) saqlangan nusxa
+    fn real_uri(&self) -> String {
+        let live = self.view.uri().map(|s| s.to_string()).unwrap_or_default();
+        if live.is_empty() { self.saved_uri.borrow().clone() } else { live }
+    }
 }
 
 struct Row {
@@ -3909,6 +3927,7 @@ impl App {
         });
         let app = self.clone();
         view.connect_uri_notify(move |v| {
+            app.remember_uri(v);
             app.refresh_sidebar();
             app.update_window_title();
             app.schedule_save_session();
@@ -3931,6 +3950,8 @@ impl App {
             let parent_prof = app.find_view_profile(v).unwrap_or_else(|| app.profiles.borrow().active_profile().id);
             let nv = WebView::builder().related_view(v).build();
             app.add_view(nv.clone(), parent_prof, false);
+            app.mark_keep_alive(v);
+            app.mark_keep_alive(&nv);
             Some(nv.upcast())
         });
         let app = self.clone();
@@ -3940,7 +3961,12 @@ impl App {
             // Background tabs are intentionally suspended (terminate) to free RAM.
             // Only the focused tab auto-reloads so the user keeps browsing.
             if app_term.focused_view().as_ref() == Some(v) {
-                v.reload();
+                let saved = app_term.saved_uri_of(v);
+                if saved.is_empty() {
+                    v.reload();
+                } else {
+                    v.load_uri(&saved);
+                }
             }
         });
     }
@@ -4096,7 +4122,7 @@ impl App {
                 while rows.len() <= next_r {
                     rows.push(Row { tabs: Vec::new() });
                 }
-                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), profile_id, custom_width: Cell::new(None) });
+                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), profile_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
                 let c_idx = rows[next_r].tabs.len() - 1;
                 (next_r, c_idx)
             } else {
@@ -4107,7 +4133,7 @@ impl App {
                 } else {
                     (cur_c + 1).min(rows[cur_r].tabs.len())
                 };
-                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), profile_id, custom_width: Cell::new(None) });
+                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), profile_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
                 (cur_r, col_idx)
             }
         };
@@ -4115,6 +4141,79 @@ impl App {
         self.setup_tab_signals(&container, &view, &resize_handle);
         self.sync_strip();
         self.focus_coords(target_r, target_c);
+    }
+
+    fn saved_uri_of(&self, view: &WebView) -> String {
+        let Ok(rows) = self.rows.try_borrow() else { return String::new() };
+        for row in rows.iter() {
+            for tab in &row.tabs {
+                if &tab.view == view {
+                    return tab.saved_uri.borrow().clone();
+                }
+            }
+        }
+        String::new()
+    }
+
+    /// Joriy http(s) manzilni eslab qoladi (web process to'xtatilganda uri() tozalanadi)
+    fn remember_uri(&self, view: &WebView) {
+        let Some(u) = view.uri() else { return };
+        let u = u.to_string();
+        if !(u.starts_with("http://") || u.starts_with("https://")) {
+            return;
+        }
+        let Ok(rows) = self.rows.try_borrow() else { return };
+        for row in rows.iter() {
+            for tab in &row.tabs {
+                if &tab.view == view {
+                    *tab.saved_uri.borrow_mut() = u;
+                    return;
+                }
+            }
+        }
+    }
+
+    fn mark_keep_alive(&self, view: &WebView) {
+        let Ok(rows) = self.rows.try_borrow() else { return };
+        for row in rows.iter() {
+            for tab in &row.tabs {
+                if &tab.view == view {
+                    tab.keep_alive.set(true);
+                }
+            }
+        }
+    }
+
+    fn schedule_suspend(self: &Rc<Self>, view: &WebView) {
+        let app = self.clone();
+        let v = view.clone();
+        glib::timeout_add_local_once(Duration::from_secs(SUSPEND_AFTER_SECS), move || {
+            let Ok(rows) = app.rows.try_borrow() else { return };
+            for (ri, row) in rows.iter().enumerate() {
+                for (ci, tab) in row.tabs.iter().enumerate() {
+                    if tab.view != v {
+                        continue;
+                    }
+                    let is_focused = ri == app.focus_row.get() && ci == app.focus_col.get();
+                    if is_focused
+                        || tab.suspended.get()
+                        || tab.keep_alive.get()
+                        || tab.last_active.get().elapsed() < Duration::from_secs(SUSPEND_AFTER_SECS)
+                        || tab.view.is_loading()
+                        || tab.view.is_playing_audio()
+                    {
+                        return;
+                    }
+                    let uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
+                    if uri.starts_with("http://") || uri.starts_with("https://") {
+                        *tab.saved_uri.borrow_mut() = uri;
+                        tab.suspended.set(true);
+                        tab.view.terminate_web_process();
+                    }
+                    return;
+                }
+            }
+        });
     }
 
     fn find_view_coords(&self, view: &WebView) -> Option<(usize, usize)> {
@@ -4222,18 +4321,23 @@ impl App {
             for (ci, tab) in row.tabs.iter().enumerate() {
                 if ri == r_clamped && ci == c_clamped {
                     tab.view.add_css_class("focused");
-                    // Wake focused tab if it was suspended
-                    if !tab.view.is_web_process_responsive() {
-                        let uri = tab.view.uri().unwrap_or_default();
-                        if !uri.is_empty() && !uri.starts_with("about:") && !uri.starts_with("rail:") {
-                            tab.view.reload();
+                    tab.last_active.set(std::time::Instant::now());
+                    // Uyg'otish: to'xtatilgan tab saqlangan manzildan qayta yuklanadi
+                    if tab.suspended.get() {
+                        tab.suspended.set(false);
+                        let uri = tab.saved_uri.borrow().clone();
+                        if !uri.is_empty() {
+                            tab.view.load_uri(&uri);
                         }
                     }
                 } else {
+                    if tab.view.has_css_class("focused") {
+                        tab.last_active.set(std::time::Instant::now());
+                    }
                     tab.view.remove_css_class("focused");
-                    // Suspend background tab web process — biggest RAM win with many tabs
-                    if tab.view.is_web_process_responsive() {
-                        tab.view.terminate_web_process();
+                    // Fon tabni darhol emas, SUSPEND_AFTER_SECS dan keyin to'xtatamiz
+                    if !tab.suspended.get() && !tab.keep_alive.get() {
+                        self.schedule_suspend(&tab.view);
                     }
                 }
             }
@@ -4412,7 +4516,7 @@ impl App {
             self.setup_tab_signals(&container, &view, &resize_handle);
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, profile_id: prof_id, custom_width: Cell::new(None) });
+            rows[0].tabs.push(Tab { container, view, profile_id: prof_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
             drop(rows);
         } else if cur_row_empty && cur_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -4459,7 +4563,7 @@ impl App {
             self.setup_tab_signals(&container, &view, &resize_handle);
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, profile_id: prof_id, custom_width: Cell::new(None) });
+            rows[0].tabs.push(Tab { container, view, profile_id: prof_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
             drop(rows);
         } else if cur_row_empty && from_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -4523,7 +4627,7 @@ impl App {
         for (ri, row) in rows.iter().enumerate() {
             for (ci, tab) in row.tabs.iter().enumerate() {
                 let is_full = if tab.container.has_css_class("full") { 1 } else { 0 };
-                let uri = tab.view.uri().unwrap_or_default();
+                let uri = tab.real_uri();
                 if let Some(cw) = tab.custom_width.get() {
                     out.push_str(&format!("tab\t{}\t{}\t{}\t{}\t{}\t{:.1}\n", ri, ci, is_full, tab.profile_id, uri, cw));
                 } else {
@@ -4642,7 +4746,7 @@ impl App {
                 container.remove_css_class("full");
             }
             self.setup_tab_signals(&container, &view, &resize_handle);
-            loaded_tabs.push((item.row, Tab { container, view, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width) }));
+            loaded_tabs.push((item.row, Tab { container, view, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), saved_uri: RefCell::new(if item.url.starts_with("http") { item.url.clone() } else { String::new() }), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) }));
         }
 
         let mut rows = self.rows.borrow_mut();
@@ -4682,11 +4786,14 @@ impl App {
     fn tab_label(t: &Tab) -> String {
         match t.view.title().filter(|s| !s.is_empty()) {
             Some(s) => s.to_string(),
-            None => t
-                .view
-                .uri()
-                .filter(|u| !u.starts_with("about:"))
-                .map_or(tr("New tab").into(), |u| host_of(&u).unwrap_or(u.to_string())),
+            None => {
+                let u = t.real_uri();
+                if u.is_empty() || u.starts_with("about:") {
+                    tr("New tab").into()
+                } else {
+                    host_of(&u).unwrap_or_else(|| u.clone())
+                }
+            }
         }
     }
 
