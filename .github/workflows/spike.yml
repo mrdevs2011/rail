@@ -1,0 +1,25 @@
+name: Spike (tao+wry)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'examples/spike-tao-wry/**'
+      - '.github/workflows/spike.yml'
+  pull_request:
+
+jobs:
+  spike:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build spike
+        working-directory: examples/spike-tao-wry
+        run: cargo build --release

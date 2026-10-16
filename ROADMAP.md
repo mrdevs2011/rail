@@ -100,18 +100,20 @@ Tartib qat'iy: 3-bosqich natijasi chiqmaguncha 5-bosqichga o'tilmaydi.
 
 ---
 
-## 6. Bosqich 3: Tao + wry spike — [ ] ENG MUHIM
+## 6. Bosqich 3: Tao + wry spike — [~] BOSHLANDI
 
 Yadro Rustda qoladi. Oyna/webview: tao + wry.
 
 Tekshiriladigan savollar:
-- [?] Ko'p webview yonma-yon (lenta)
-- [?] Linux Wayland child webview
+- [x] Bitta webview (Linux Wayland) — `examples/spike-tao-wry`
+- [~] Ko'p webview yonma-yon (lenta) — 3 ustun kodi yozildi, sinov kerak
 - [?] Profil izolyatsiyasi (cookie/storage)
 - [?] HTML UI ustida
 - [?] Shortcutlar, html.css, F12, silliq scroll
 
 **Chiqish mezoni:** 3 ustun, 2 profil, F12 demo. Uchala tizimda CI bilan yig'iladi.
+
+**Hozirgi holat (2026-10-16):** Linuxda tao+wry oyna + WebView ishladi. Multi-webview kodi tayyor.
 
 **Zaxira reja:** Linux GTK4 qoladi, mac/win uchun alohida wry qobiq, umumiy rail-core.
 
