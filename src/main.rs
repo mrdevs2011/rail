@@ -725,15 +725,6 @@ button.pill:hover .pill-chip {
     font-weight: 500;
     color: #a1a1a1;
 }
-.tab-full-badge {
-    font-size: 8.5px;
-    font-weight: 700;
-    color: #999999;
-    background: rgba(153, 153, 153, 0.12);
-    border: 1px solid rgba(153, 153, 153, 0.3);
-    border-radius: 1px;
-    padding: 0 4px;
-}
 .tabrow image {
     color: #727272;
 }
@@ -4932,13 +4923,6 @@ impl App {
                 title_lbl.set_width_chars(1);
                 title_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
                 content_box.append(&title_lbl);
-
-                if t.container.has_css_class("full") {
-                    let full_tag = gtk::Label::new(Some(tr("FULL")));
-                    full_tag.add_css_class("tab-full-badge");
-                    full_tag.set_valign(gtk::Align::Center);
-                    content_box.append(&full_tag);
-                }
 
                 let app = self.clone();
                 let drag = gtk::GestureDrag::new();
