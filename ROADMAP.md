@@ -113,7 +113,10 @@ Tekshiriladigan savollar:
 
 **Chiqish mezoni:** 3 ustun, 2 profil, F12 demo. Uchala tizimda CI bilan yig'iladi.
 
-**Hozirgi holat (2026-10-16):** Linuxda tao+wry oyna + WebView ishladi. Multi-webview kodi tayyor.
+**Hozirgi holat (2026-10-16):**
+- Linux: tao+wry oyna + WebView ishladi. 3-webview kodi tayyor (`cargo run`).
+- CI: `.github/workflows/spike.yml` — Linux/macOS/Windows da spike build (Linuxda webkit deps o'rnatiladi).
+- Keyingi: profil izolyatsiyasi, keyin asosiy Rail'ni ko'chirish.
 
 **Zaxira reja:** Linux GTK4 qoladi, mac/win uchun alohida wry qobiq, umumiy rail-core.
 
