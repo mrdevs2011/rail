@@ -75,7 +75,7 @@ footer{position:fixed;bottom:0;left:0;right:0;height:54px;border-top:1px solid v
 <header>
   <div class="logo">r</div>
   <b>rail</b>
-  <span class="pill" id="ver">v0.5.5</span>
+  <span class="pill" id="ver">v0.5.9</span>
   <span class="pill made" data-t="made_s">Muhammdrasul</span>
   <a href="docs/index.html" class="pill docs-link" id="navDocs">
     <i class="dot" style="display:inline-block"></i>
@@ -290,7 +290,7 @@ window.addEventListener('storage',function(ev){
 function t(k){var d=T[lang];return d&&d[k]!=null?d[k]:T.uz[k]}
 function fm(s,o){return s.replace(/\{(\w+)\}/g,function(_,k){return o[k]})}
 var $=function(i){return document.getElementById(i)};
-var R=$('rail'),cols=[].slice.call(R.children),cur=0,VER='0.5.5',lock=0;
+var R=$('rail'),cols=[].slice.call(R.children),cur=0,VER='0.5.9',lock=0;
 for(var bi0=0;bi0<5;bi0++)(function(i){var b=document.createElement('button');b.className='mm';b.onclick=function(){go(i)};$('mm').appendChild(b)})(bi0);
 function setCur(i){cur=i;cols.forEach(function(c,k){c.classList.toggle('on',k==i)});[].forEach.call($('mm').children,function(b,k){b.classList.toggle('on',k==i)})}
 function go(i){i=Math.max(0,Math.min(cols.length-1,i));R.scrollTo({left:cols[i].offsetLeft,behavior:'smooth'})}

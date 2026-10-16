@@ -5,37 +5,101 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
-  build:
+  linux:
+    name: Build & release (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libwebkitgtk-6.0-dev \
+            libx11-dev \
+            pkg-config
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Prepare asset
+        run: |
+          cp target/release/rail target/release/rail-linux-x86_64
+          sha256sum target/release/rail-linux-x86_64 | tee SHA256SUMS
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/release/rail-linux-x86_64
+            SHA256SUMS
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  spike-matrix:
+    name: Spike (${{ matrix.label }})
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            asset: rail-linux-x86_64
           - os: macos-latest
-            target: aarch64-apple-darwin
-            asset: rail-macos-arm64
+            label: macos-arm64
+            bin: spike-tao-wry
+            asset: rail-spike-macos-arm64
           - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            asset: rail-windows-x86_64.exe
-
+            label: windows-x86_64
+            bin: spike-tao-wry.exe
+            asset: rail-spike-windows-x86_64.exe
+          - os: ubuntu-latest
+            label: linux-x86_64
+            bin: spike-tao-wry
+            asset: rail-spike-linux-x86_64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Linux deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
 
-      - name: Build
-        continue-on-error: ${{ matrix.os != 'ubuntu-latest' }}
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build spike
+        working-directory: examples/spike-tao-wry
+        run: cargo build --release
 
-      - name: Upload asset
+      - name: Rename asset
+        shell: bash
+        run: |
+          SRC="examples/spike-tao-wry/target/release/${{ matrix.bin }}"
+          DST="examples/spike-tao-wry/target/release/${{ matrix.asset }}"
+          if [ -f "$SRC" ]; then
+            cp "$SRC" "$DST"
+            echo "Prepared $DST"
+          else
+            echo "Binary not found: $SRC"
+            ls -la examples/spike-tao-wry/target/release/ || true
+            exit 1
+          fi
+
+      - name: Upload spike asset to release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/${{ matrix.target }}/release/${{ matrix.asset }}
+          files: examples/spike-tao-wry/target/release/${{ matrix.asset }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

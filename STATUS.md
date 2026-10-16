@@ -26,3 +26,9 @@
 - Qilindi: v0.5.9 release: rasm paste (WebKitGTK bug 218519 aylanma yo'li), DevTools F12 stack overflow guard, DevTools alohida oyna floating emas (transient_for olib tashlandi), eskirgan koordinata ushlagichlar o'chirildi, Left/Right dock slot orqali
 - Keyingi qadam: Foydalanuvchi Left/Right dock va Gemini paste ni real sinab ko'rsin; noto'g'ri bo'lsa logdagi [rail] inspector attach qatori bo'yicha mapping tuzatish; undock'dan dock hozir faqat Bottom
 - Git holati: 18d6084 fix: rasm paste (WebKitGTK), DevTools F12 stack overflow, alohida oyna, Left/Right dock (v0.5.9)
+
+---
+### 2026-10-16 22:45
+- Qilindi: CI to'liq — main push da avtomatik 3 OS build (Rail Linux + spike Linux/macOS/Windows). release.yml tuzatildi (to'g'ri asset nomi + SHA256SUMS). index.html/package.json versiya 0.5.9. Mac/Win asosiy binary hali GTK4 sabab chiqmaydi — spike orqali yo'l ochiq.
+- Keyingi qadam: tao+wry spike da ko'p webview + profil izolyatsiyasini yakunlash, keyin asosiy Rail ni ko'chirish.
+- Git holati: CI workflows + index.html yangilandi

@@ -40,6 +40,7 @@ Belgilar: [x] tayyor, [ ] qilinadi, [?] tajribada tekshiriladi, [~] boshlangan /
 - [x] To'liq i18n: o'zbekcha (default), English, Русский — Settings > Interface Language + sayt
 - [x] Ko'p sahifali docs/ (architecture, shortcuts, profiles, installation, configuration) + real-time i18n sync
 - [x] **Sayt jonli:** https://rail-browser.vercel.app
+- [x] **CI:** `main` ga push → Linux rail build + spike (Linux/macOS/Windows). Tag `v*` → release + SHA256SUMS
 
 **Cheklov:** UI qatlami GTK4 ga bog'langan. macOS/Windows uchun 3-bosqich (tao + wry) hal qiladi.
 
@@ -67,7 +68,7 @@ Belgilar: [x] tayyor, [ ] qilinadi, [?] tajribada tekshiriladi, [~] boshlangan /
 | 1 | Sayt | 1 kun | [x] tayyor (qo'lda tekshiruv qoldi) |
 | 2 | Tizimga qarab yangilash | 1 kun | [~] OS/ARCH + SHA256 hisoblash + temp fayl tayyor |
 | 3 | Tajriba (spike): tao + wry | 1 hafta | [ ] eng muhim qaror |
-| 4 | CI: bitta tag, uch build | 1 kun | [~] skeleton + continue-on-error (Linux doim ishlaydi) |
+| 4 | CI: bitta tag, uch build | 1 kun | [x] ci.yml (main push) + release.yml (v* tag, Linux + spike 3 OS) |
 | 5 | Funksiyalarni ko'chirish | 2-4 hafta | [ ] spike'dan keyin |
 | 6 | Tarqatish | 1 hafta | [ ] |
 
@@ -126,7 +127,7 @@ Tekshiriladigan savollar:
 
 ## 7–9. Keyingi bosqichlar
 
-- **4. CI:** `.github/workflows/release.yml` — v* tegida uch build + SHA256SUMS
+- **4. CI:** `.github/workflows/ci.yml` — main push da Linux rail + spike 3 OS; `release.yml` — v* tegida Linux asset + SHA256SUMS + spike 3 OS
 - **5. Funksiyalar ko'chirish:** rail-core → lenta → profillar → omnibar → ... (spike muvaffaqiyatli bo'lsa)
 - **6. Tarqatish:** .dmg, .exe, Homebrew, Scoop, winget, SignPath
 

@@ -2159,6 +2159,10 @@ thread_local! {
     static KEY_CTL: RefCell<Option<gtk::EventControllerKey>> = RefCell::new(None);
     /// Re-entrancy guard: Inspector::show() emits bring-to-front, which called show_devtools() again (stack overflow).
     static IN_SHOW_DEVTOOLS: Cell<bool> = Cell::new(false);
+    /// The view whose inspector is currently shown in the Rail panel/window (may differ from the focused view after Ctrl+Tab).
+    static DT_VIEW: RefCell<Option<WebView>> = RefCell::new(None);
+    /// True while Rail itself closes the undocked DevTools window (so close-request must not tear DevTools down).
+    static DT_CLOSING_WIN: Cell<bool> = Cell::new(false);
     /// Toolbar slot (0-based, 24px pitch) last clicked in the inspector toolbar; -1 = none.
     static LAST_DT_SLOT: Cell<i32> = Cell::new(-1);
 }
@@ -3278,9 +3282,32 @@ impl App {
         self.devtools_open.get()
     }
 
+    fn dt_view(&self) -> Option<WebView> {
+        DT_VIEW.with(|v| v.borrow().clone()).or_else(|| self.focused_view())
+    }
+
+    /// Close the undocked DevTools window without holding the RefCell borrow (close-request re-enters it).
+    fn dt_close_window(&self) {
+        let win = self.devtools_window.borrow_mut().take();
+        if let Some(win) = win {
+            DT_CLOSING_WIN.with(|f| f.set(true));
+            win.set_child(None::<&gtk::Widget>);
+            win.close();
+            DT_CLOSING_WIN.with(|f| f.set(false));
+        }
+    }
+
     fn toggle_devtools(self: &Rc<Self>) {
         if self.devtools_open() {
+            // F12 on another tab than the one being inspected: move DevTools to this tab instead of closing the wrong inspector.
+            let other_tab = match (DT_VIEW.with(|v| v.borrow().clone()), self.focused_view()) {
+                (Some(a), Some(b)) => a != b,
+                _ => false,
+            };
             self.hide_devtools();
+            if other_tab {
+                self.show_devtools();
+            }
         } else {
             self.show_devtools();
         }
@@ -3302,17 +3329,14 @@ impl App {
 
     fn set_devtools_dock_side(self: &Rc<Self>, side: DevToolsDockSide) {
         self.devtools_dock_side.set(side);
-        let Some(view) = self.focused_view() else { return };
+        let Some(view) = self.dt_view() else { return };
         let Some(insp) = view.inspector() else { return };
         let Some(w) = insp.web_view() else { return };
         let widget: gtk::Widget = w.upcast();
 
         match side {
             DevToolsDockSide::Bottom => {
-                if let Some(win) = self.devtools_window.borrow_mut().take() {
-                    win.set_child(None::<&gtk::Widget>);
-                    win.close();
-                }
+                self.dt_close_window();
                 while let Some(c) = self.devtools_content_box.first_child() {
                     self.devtools_content_box.remove(&c);
                 }
@@ -3342,10 +3366,7 @@ impl App {
                 self.devtools_open.set(true);
             }
             DevToolsDockSide::Left => {
-                if let Some(win) = self.devtools_window.borrow_mut().take() {
-                    win.set_child(None::<&gtk::Widget>);
-                    win.close();
-                }
+                self.dt_close_window();
                 while let Some(c) = self.devtools_content_box.first_child() {
                     self.devtools_content_box.remove(&c);
                 }
@@ -3375,10 +3396,7 @@ impl App {
                 self.devtools_open.set(true);
             }
             DevToolsDockSide::Right => {
-                if let Some(win) = self.devtools_window.borrow_mut().take() {
-                    win.set_child(None::<&gtk::Widget>);
-                    win.close();
-                }
+                self.dt_close_window();
                 while let Some(c) = self.devtools_content_box.first_child() {
                     self.devtools_content_box.remove(&c);
                 }
@@ -3457,6 +3475,9 @@ impl App {
                     let app_win = self.clone();
                     let win_box_ref = win_box.clone();
                     win.connect_close_request(move |w| {
+                        if DT_CLOSING_WIN.with(|f| f.get()) {
+                            return glib::Propagation::Proceed;
+                        }
                         while let Some(c) = win_box_ref.first_child() {
                             win_box_ref.remove(&c);
                         }
@@ -3481,6 +3502,7 @@ impl App {
         if IN_SHOW_DEVTOOLS.with(|f| f.replace(true)) {
             return;
         }
+        DT_VIEW.with(|v| *v.borrow_mut() = Some(view.clone()));
         insp.show();
 
         // Update URL and host badge in devtools header if ever needed
@@ -3494,26 +3516,31 @@ impl App {
     }
 
     fn hide_devtools(&self) {
+        self.hide_devtools_impl(true);
+    }
+
+    /// `close_inspector=false` is used from the inspector's own `closed` signal: it is already closing, don't re-enter WebKit.
+    fn hide_devtools_impl(&self, close_inspector: bool) {
         if !self.devtools_open.get() {
             return;
         }
         self.devtools_open.set(false);
 
-        if let Some(view) = self.focused_view() {
-            if let Some(insp) = view.inspector() {
-                if let Some(w) = insp.web_view() {
-                    let widget: gtk::Widget = w.upcast();
-                    if widget.parent().is_some() {
-                        widget.unparent();
+        let dt_view = DT_VIEW.with(|v| v.borrow_mut().take()).or_else(|| self.focused_view());
+        if close_inspector {
+            if let Some(view) = dt_view {
+                if let Some(insp) = view.inspector() {
+                    if let Some(w) = insp.web_view() {
+                        let widget: gtk::Widget = w.upcast();
+                        if widget.parent().is_some() {
+                            widget.unparent();
+                        }
                     }
+                    insp.close();
                 }
-                insp.close();
             }
         }
-        if let Some(win) = self.devtools_window.borrow_mut().take() {
-            win.set_child(None::<&gtk::Widget>);
-            win.close();
-        }
+        self.dt_close_window();
         while let Some(c) = self.devtools_content_box.first_child() {
             self.devtools_content_box.remove(&c);
         }
@@ -3909,7 +3936,7 @@ impl App {
             });
             let a_closed = self.clone();
             insp.connect_closed(move |_| {
-                a_closed.hide_devtools();
+                a_closed.hide_devtools_impl(false);
             });
             let app_front = self.clone();
             insp.connect_bring_to_front(move |_| {
@@ -4504,6 +4531,23 @@ impl App {
             drop(rows);
             self.focus_coords(cur_r, last_c);
         }
+    }
+
+    /// Ctrl+Tab / Ctrl+Shift+Tab: cycle tabs inside the current workspace (row), wrapping around.
+    fn cycle_tab(self: &Rc<Self>, dir: isize) {
+        if self.overview_open() {
+            self.exit_overview();
+        }
+        let cur_r = self.focus_row.get();
+        let cur_c = self.focus_col.get();
+        let n = {
+            let rows = self.rows.borrow();
+            if cur_r >= rows.len() { return; }
+            rows[cur_r].tabs.len()
+        };
+        if n < 2 { return; }
+        let next = (cur_c as isize + dir).rem_euclid(n as isize) as usize;
+        self.focus_coords(cur_r, next);
     }
 
     fn move_column(self: &Rc<Self>, dir: isize) {
@@ -7093,7 +7137,7 @@ impl App {
             }
             return false;
         }
-        let global = (alt && !ctrl && (matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::T | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I | gdk::Key::s | gdk::Key::S | gdk::Key::d | gdk::Key::D) || keycode == 28 || keycode == 39))
+        let global = (ctrl && !alt && (k == gdk::Key::Tab || k == gdk::Key::ISO_Left_Tab || keycode == 23)) || (alt && !ctrl && (matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::T | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I | gdk::Key::s | gdk::Key::S | gdk::Key::d | gdk::Key::D) || keycode == 28 || keycode == 39))
             || (ctrl && shift && !alt && matches!(k, gdk::Key::t | gdk::Key::T))
             || (ctrl && !shift && !alt && (matches!(k, gdk::Key::_1 | gdk::Key::_2 | gdk::Key::_3 | gdk::Key::_4 | gdk::Key::_5 | gdk::Key::_6 | gdk::Key::_7 | gdk::Key::_8 | gdk::Key::_9 | gdk::Key::KP_1 | gdk::Key::KP_2 | gdk::Key::KP_3 | gdk::Key::KP_4 | gdk::Key::KP_5 | gdk::Key::KP_6 | gdk::Key::KP_7 | gdk::Key::KP_8 | gdk::Key::KP_9) || (keycode >= 10 && keycode <= 18) || (keycode >= 87 && keycode <= 95)));
         if self.overview_open() && !global && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
@@ -7128,6 +7172,10 @@ impl App {
                 _ => {}
             }
 
+            if k == gdk::Key::Tab || k == gdk::Key::ISO_Left_Tab || keycode == 23 {
+                self.cycle_tab(1);
+                return true;
+            }
             // Tab switching within active workspace (Ctrl+1..8 to tabs 1..8, Ctrl+9 to last tab)
             if keycode == 10 || keycode == 87 || k == gdk::Key::_1 || k == gdk::Key::KP_1 || key.to_unicode() == Some('1') {
                 self.focus_tab_index(0);
@@ -7170,6 +7218,11 @@ impl App {
             if let Some(v) = self.focused_view() {
                 v.reload();
             }
+            return true;
+        }
+
+        if ctrl && shift && !alt && (k == gdk::Key::ISO_Left_Tab || k == gdk::Key::Tab || keycode == 23) {
+            self.cycle_tab(-1);
             return true;
         }
 
