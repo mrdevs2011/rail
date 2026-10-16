@@ -1,7 +1,7 @@
 # Rail Roadmap
 
 > **Maqsad:** bitta kod, uch tizim (Linux, macOS, Windows), hammasi **bepul**. Toza qora-oq dasturchi brauzeri. O'rnatish va yangilash foydalanuvchi uchun 1 bosish.
-> Oxirgi yangilanish: 2026-10-15 (v0.5.7). Sayt: https://rail-browser.vercel.app
+> Oxirgi yangilanish: 2026-10-16 (v0.5.8). Sayt: https://rail-browser.vercel.app
 >
 > **Qaror:** rail.uz domeni olinmaydi. Sayt Vercel'da (rail-browser.vercel.app) turaveradi. Butun yo'l 100% bepul.
 
@@ -20,7 +20,7 @@ Belgilar: [x] tayyor, [ ] qilinadi, [?] tajribada tekshiriladi, [~] boshlangan /
 
 ---
 
-## 1. Hozirgi holat (v0.5.7) — Linux to'liq ishlaydi
+## 1. Hozirgi holat (v0.5.8) — Linux to'liq ishlaydi
 
 - [x] End-to-end shifrlangan Cloud Sync (Vercel + Supabase, majburiy parol, zero-knowledge)
 - [x] Soddalashtirilgan, o'ta toza Cloud Sync & Data sozlamalar sahifasi
@@ -179,4 +179,4 @@ Tekshiriladigan savollar:
 
 ---
 
-**Hozirgi aniq holat (2026-10-15):** Linuxda to'liq ishlaydi (v0.5.7). Settings > Updates tabi va OS/ARCH-aware updater tayyor. Keyingi katta qadam — tao + wry spike.
+**Hozirgi aniq holat (2026-10-15):** Linuxda to'liq ishlaydi (v0.5.8). Settings > Updates tabi va OS/ARCH-aware updater tayyor. Keyingi katta qadam — tao + wry spike.
