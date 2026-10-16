@@ -20,3 +20,9 @@
 - Qilindi: v0.5.8 release: suspend (bo'sh tab) xatosi, omnibar inline to'ldirish xatosi tuzatildi, sidebar'dan TO'LIQ belgisi olib tashlandi, workspace tab soni va + hover'da
 - Keyingi qadam: Foydalanuvchi Rail'ni qayta ochib tab almashtirish va omnibar to'ldirishni sinasin
 - Git holati: 461222f fix(omnibar): inline to'ldirish har ikkinchi harfda ishlamasligi tuzatildi (v0.5.8)
+
+---
+### 2026-10-16 15:00
+- Qilindi: v0.5.9 release: rasm paste (WebKitGTK bug 218519 aylanma yo'li), DevTools F12 stack overflow guard, DevTools alohida oyna floating emas (transient_for olib tashlandi), eskirgan koordinata ushlagichlar o'chirildi, Left/Right dock slot orqali
+- Keyingi qadam: Foydalanuvchi Left/Right dock va Gemini paste ni real sinab ko'rsin; noto'g'ri bo'lsa logdagi [rail] inspector attach qatori bo'yicha mapping tuzatish; undock'dan dock hozir faqat Bottom
+- Git holati: 18d6084 fix: rasm paste (WebKitGTK), DevTools F12 stack overflow, alohida oyna, Left/Right dock (v0.5.9)
