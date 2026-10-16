@@ -1975,6 +1975,8 @@ struct App {
     selected_suggestion_idx: Cell<Option<usize>>,
     is_autofilling: Cell<bool>,
     last_entry_len: Cell<usize>,
+    /// Oxirgi bosilgan tugma o'chirish (Backspace/Delete/Ctrl+X...) bo'lganmi: shunda inline to'ldirish ishlamaydi
+    delete_key: Cell<bool>,
     ov_hint: gtk::Label,
     /// Overview is active: the strip is zoomed out and tabs ignore the pointer.
     ov: Cell<bool>,
@@ -5461,7 +5463,7 @@ impl App {
         let prev_len = self.last_entry_len.get();
         self.last_entry_len.set(cur_len);
 
-        let is_typing_forward = cur_len > prev_len;
+        let is_typing_forward = cur_len > prev_len && !self.delete_key.get();
         self.selected_suggestion_idx.set(None);
 
         if text.trim().is_empty() {
@@ -5491,7 +5493,9 @@ impl App {
                         self.entry.set_text(autofill);
                         self.entry.select_region(cur_len as i32, -1);
                         self.is_autofilling.set(false);
-                        self.last_entry_len.set(autofill.chars().count());
+                        // Foydalanuvchi yozgan uzunlikni eslaymiz (to'ldirilgan uzunlikni emas),
+                        // aks holda keyingi harf "o'chirish" deb hisoblanib to'ldirish bir harf oralatib ishlardi.
+                        self.last_entry_len.set(cur_len);
                     }
                 }
             }
@@ -8767,6 +8771,7 @@ fn build(gapp: &gtk::Application) {
         selected_suggestion_idx: Cell::new(None),
         is_autofilling: Cell::new(false),
         last_entry_len: Cell::new(0),
+        delete_key: Cell::new(false),
         ov_hint,
         ov: Cell::new(false),
         ov_return: Cell::new((0, 0)),
@@ -9292,6 +9297,11 @@ fn build(gapp: &gtk::Application) {
         let shift = state.contains(M::SHIFT_MASK);
         let alt = state.contains(M::ALT_MASK);
         let k = key.to_lower();
+
+        a.delete_key.set(
+            matches!(key, gdk::Key::BackSpace | gdk::Key::Delete)
+                || (ctrl && !alt && (k == gdk::Key::x || k == gdk::Key::w || k == gdk::Key::u || k == gdk::Key::k || k == gdk::Key::h)),
+        );
 
         if ctrl && !shift && !alt && (k == gdk::Key::v || k == gdk::Key::V || keycode == 55) {
             let clipboard = ent.clipboard();
