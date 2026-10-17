@@ -83,7 +83,7 @@ pub fn devtools_dock_from_str(s: &str) -> DevToolsDockSide {
     match s {
         "left" => DevToolsDockSide::Left,
         "right" => DevToolsDockSide::Right,
-        "undocked" => DevToolsDockSide::Undocked,
+        // "undocked" ataylab tiklanmaydi: niri'da alohida oyna butun ekranga ochiladi.
         _ => DevToolsDockSide::Bottom,
     }
 }
@@ -3760,7 +3760,8 @@ impl App {
         let prev = self.devtools_dock_side.get();
         self.devtools_dock_side.set(side);
         // Oxirgi dock holatini eslab qolamiz: keyingi safar DevTools shu joyda ochiladi.
-        if prev != side {
+        // Undocked saqlanmaydi (alohida oyna butun ekran bo'lib ochilib qoladi), faqat Bottom/Left/Right.
+        if prev != side && side != DevToolsDockSide::Undocked {
             let mut st = load_app_settings();
             let name = devtools_dock_to_str(side);
             if st.devtools_dock != name {
