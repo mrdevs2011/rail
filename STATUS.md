@@ -44,3 +44,9 @@
 - Qilindi: v0.5.11: tab freeze 10m, uyg'onganda reload; release
 - Keyingi qadam: Foydalanuvchi Rail ni qayta ochsin
 - Git holati: ffa2b09 feat: tab freeze (10 daqiqa uxlash) + uyg'onganda yangilash (v0.5.11)
+
+---
+### 2026-10-17 06:54
+- Qilindi: v0.5.12: smooth scroll/slide, GPU Always, frame pan, WebGL; release
+- Keyingi qadam: Foydalanuvchi Rail ni qayta ochsin
+- Git holati: 5bf89d2 fix: scroll/slide silliqligi — GPU, frame pan, WebGL (v0.5.12)
