@@ -2,99 +2,165 @@
 <html lang="uz">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>rail — Linux brauzer</title>
-<meta name="description" content="Rail — klaviatura bilan boshqariladigan Linux brauzer. Lenta, izolyatsiyalangan profillar.">
+<meta name="description" id="md" content="Rail — klaviatura bilan boshqariladigan Linux brauzer. Lenta, izolyatsiyalangan profillar.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='8' y='23' font-size='22' font-family='monospace' fill='%23fff'%3Er%3C/text%3E%3Ccircle cx='25' cy='25' r='3' fill='%232f6bff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="docs/docs.css">
 <style>
-:root{--blue:#2f6bff;--line:#2a2a2a;--dim:#8a8a8a;--fg:#cfcfcf}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#000;color:#fff;font:15px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;min-height:100vh}
-body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(#111 1px,transparent 1px),linear-gradient(90deg,#111 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
-.wrap{position:relative;z-index:1;max-width:720px;margin:0 auto;padding:0 20px 80px}
-header{position:sticky;top:0;display:flex;align-items:center;gap:12px;height:52px;border-bottom:1px solid var(--line);background:#000c;backdrop-filter:blur(8px);margin:0 -20px;padding:0 20px;z-index:10}
-.logo{width:24px;height:24px;border:1px solid #fff;display:grid;place-items:center;font-weight:700;position:relative}
-.logo::after{content:"";position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-radius:50%;background:var(--blue)}
-.pill{border:1px solid var(--line);padding:2px 8px;color:var(--dim);font-size:12px;text-decoration:none}
-.pill:hover{border-color:#fff;color:#fff}
-.pill.blue{border-color:var(--blue);color:#fff}
-.sp{flex:1}
-.lang button{font:inherit;font-size:12px;color:#fff;background:#000;border:1px solid #444;padding:2px 8px;cursor:pointer;margin-left:4px}
-.lang button.on{background:#fff;color:#000;border-color:#fff}
-main{padding-top:48px}
-.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--blue);margin-right:6px}
-h1{font-size:clamp(36px,8vw,56px);line-height:1.05;letter-spacing:-2px;margin:12px 0 20px}
-h2{font-size:18px;margin:40px 0 14px}
-p{color:var(--fg);margin-bottom:14px}
-.actions{display:flex;flex-wrap:wrap;gap:10px;margin:28px 0 8px}
-a.btn{font:inherit;color:#fff;background:#000;border:1px solid #fff;padding:12px 18px;text-decoration:none;transition:.15s}
-a.btn:hover{background:#fff;color:#000}
-a.btn.primary{background:#fff;color:#000}
-a.btn.primary:hover{background:var(--blue);border-color:var(--blue);color:#fff}
-.cmd{background:#080808;border:1px solid var(--line);padding:12px 14px;margin:16px 0;position:relative;font-size:13px;color:#eee;word-break:break-all}
+/* Root landing tweaks on top of docs.css */
+.home-actions{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 8px}
+.home-actions a.btn{font:inherit;color:#fff;background:#000;border:1px solid #fff;padding:10px 16px;text-decoration:none;transition:.15s}
+.home-actions a.btn:hover{background:#fff;color:#000}
+.home-actions a.btn.primary{background:#fff;color:#000}
+.home-actions a.btn.primary:hover{background:var(--blue);border-color:var(--blue);color:#fff}
+.cmd{background:var(--code-bg);border:1px solid var(--line);padding:12px 14px;margin:14px 0;position:relative;font-size:13px;color:#eee;word-break:break-all}
 .cmd button{position:absolute;right:8px;top:8px;font:inherit;font-size:11px;color:#fff;background:#000;border:1px solid #555;padding:2px 8px;cursor:pointer}
-ol{padding-left:22px;color:var(--fg)}ol li{margin-bottom:8px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
-@media(max-width:560px){.grid{grid-template-columns:1fr}}
-.card{border:1px solid var(--line);padding:14px 16px}
-.card h3{font-size:14px;margin-bottom:6px}
-.card p{font-size:13px;margin:0;color:var(--dim)}
-table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
-td,th{border:1px solid var(--line);padding:8px 10px;text-align:left}
-th{color:var(--dim);font-weight:500}
+.cmd button:hover{border-color:#fff}
+.home-steps{padding-left:22px;color:var(--dim);margin:8px 0 0}
+.home-steps li{margin-bottom:8px;color:var(--text)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+@media(max-width:700px){.grid-2{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);padding:14px 16px;background:var(--surface);text-decoration:none;color:inherit;display:block;transition:border-color .15s}
+.card:hover{border-color:#fff}
+.card-title{font-size:14px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.card-desc{font-size:13px;color:var(--dim);margin:0}
+table.keys{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+table.keys td,table.keys th{border:1px solid var(--line);padding:8px 10px;text-align:left}
+table.keys th{color:var(--dim);font-weight:500}
 kbd{border:1px solid #444;padding:1px 6px;font-size:12px}
-footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--dim);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
-footer a{color:var(--dim);text-decoration:none}footer a:hover{color:#fff}
+.docs-sidebar .nav-item.home-active{border-color:var(--blue);background:var(--blue-soft)}
 </style>
 </head>
 <body>
-<div class="wrap">
-<header>
-  <div class="logo">r</div>
-  <b>rail</b>
-  <span class="pill" id="ver">v0.5.10</span>
-  <span class="sp"></span>
-  <a class="pill blue" href="docs/index.html">Hujjatlar</a>
-</header>
-<main>
-  <p style="color:var(--dim);font-size:12px"><span class="dot"></span>Linux · klaviatura · lenta</p>
-  <h1>Lenta shaklidagi<br>brauzer</h1>
-  <p>Ustunlar chap-'o'ngga, steklar yuqori-pastga. Har profil alohida dunyo.</p>
-  <div class="actions">
-    <a class="btn primary" href="https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64">Linux yuklab olish</a>
-    <a class="btn" href="docs/index.html">Hujjatlar</a>
-    <a class="btn" href="https://github.com/mrdevs2011/rail" target="_blank">GitHub</a>
-  </div>
-  <h2><span class="dot"></span>O'rnatish</h2>
-  <p>Bir qator — tavsiya etiladi.</p>
-  <div class="cmd" id="cmdbox">curl -fsSL https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh | bash<button type="button" id="copybtn">nusxa</button></div>
-  <ol>
-    <li>Buyruqni terminalga qo'ying yoki binar yuklab oling.</li>
-    <li>rail deb ishga tushiring.</li>
-    <li>Yangilash: rail --update.</li>
-  </ol>
-  <h2><span class="dot"></span>Imkoniyatlar</h2>
-  <div class="grid">
-    <div class="card"><h3><span class="dot"></span>2D lenta</h3><p>Cheksiz gorizontal ustunlar, vertikal stek.</p></div>
-    <div class="card"><h3><span class="dot"></span>Profillar</h3><p>Alohida cookie va sessiya.</p></div>
-    <div class="card"><h3><span class="dot"></span>Klaviatura</h3><p>Barcha amallar qisqa klavish bilan.</p></div>
-    <div class="card"><h3><span class="dot"></span>Yengil</h3><p>Rust + GTK4 + WebKitGTK. ~500 KB. Faqat Linux.</p></div>
-  </div>
-  <h2><span class="dot"></span>Qisqa klavishlar</h2>
-  <table>
-    <tr><th>Klavish</th><th>Vazifa</th></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td>URL satri</td></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Yangi ustun</td></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Vertikal stek</td></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>H</kbd>/<kbd>L</kbd></td><td>Chap/o'ng ustun</td></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>J</kbd>/<kbd>K</kbd></td><td>Past/yuqori oyna</td></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>P</kbd></td><td>Profillar</td></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Oynani yopish</td></tr>
-  </table>
-  <p style="color:var(--dim);font-size:13px">To'liq ro'yxat — Hujjatlarda.</p>
-</main>
+<div id="cur"></div>
 
-<footer><span>Muhammdrasul · Linux</span><span><a href="https://github.com/mrdevs2011/rail">GitHub</a> · <a href="docs/index.html">Hujjatlar</a></span></footer>
+<header class="docs-header">
+  <button class="hamburger" aria-label="Toggle Navigation" type="button">
+    <span>☰</span> <span data-t="menu_open">Menyu</span>
+  </button>
+  <a href="index.html" class="brand-link">
+    <div class="logo">r</div>
+    <b>rail</b>
+    <span class="pill" data-t="brand_sub">uy</span>
+  </a>
+  <span class="pill" id="ver" style="border-color:#333;font-size:11px">v0.5.10</span>
+  <div class="sp"></div>
+  <a href="docs/index.html" class="back-root" data-t="nav_docs">Hujjatlar →</a>
+  <div class="lang" role="group" aria-label="Language">
+    <button type="button" data-l="uz">UZ</button>
+    <button type="button" data-l="en">EN</button>
+    <button type="button" data-l="ru">RU</button>
+  </div>
+</header>
+<div class="sidebar-overlay"></div>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+  <div class="sidebar-group">
+    <div class="sidebar-title" data-t="sb_home">Bosh sahifa</div>
+    <a href="#intro" class="nav-item home-active">
+      <span class="nav-idx">01</span>
+      <span data-t="nav_intro">Kirish</span>
+      <span class="nav-dot"></span>
+    </a>
+    <a href="#install" class="nav-item">
+      <span class="nav-idx">02</span>
+      <span data-t="nav_install">O'rnatish</span>
+      <span class="nav-dot"></span>
+    </a>
+    <a href="#features" class="nav-item">
+      <span class="nav-idx">03</span>
+      <span data-t="nav_feat">Imkoniyatlar</span>
+      <span class="nav-dot"></span>
+    </a>
+    <a href="#keys" class="nav-item">
+      <span class="nav-idx">04</span>
+      <span data-t="nav_keys">Klavishlar</span>
+      <span class="nav-dot"></span>
+    </a>
+  </div>
+  <div class="sidebar-group">
+    <div class="sidebar-title" data-t="sb_docs">Hujjatlar</div>
+    <a href="docs/index.html" class="nav-item">
+      <span class="nav-idx">D1</span>
+      <span data-t="d_intro">Kirish</span>
+      <span class="nav-dot"></span>
+    </a>
+    <a href="docs/installation.html" class="nav-item">
+      <span class="nav-idx">D2</span>
+      <span data-t="d_inst">O'rnatish</span>
+      <span class="nav-dot"></span>
+    </a>
+    <a href="docs/shortcuts.html" class="nav-item">
+      <span class="nav-idx">D3</span>
+      <span data-t="d_keys">Klavishlar</span>
+      <span class="nav-dot"></span>
+    </a>
+    <a href="https://github.com/mrdevs2011/rail" class="nav-item" target="_blank" rel="noopener">
+      <span class="nav-idx">GH</span>
+      <span>GitHub</span>
+      <span class="nav-dot"></span>
+    </a>
+  </div>
+</aside>
+
+<main class="docs-content">
+  <div class="breadcrumbs">
+    <a href="index.html">rail</a>
+    <span class="sep">/</span>
+    <span data-t="brand_sub">uy</span>
+  </div>
+  <section id="intro">
+    <h1 class="doc-title" data-t="title">Lenta shaklidagi brauzer</h1>
+    <p class="doc-lead" data-t="lead">Linux uchun klaviatura bilan boshqariladigan brauzer. Cheksiz gorizontal lenta, vertikal steklar, 100% izolyatsiyalangan profillar.</p>
+    <div class="callout tip">
+      <div class="callout-title"><span class="dot"></span> <span data-t="made">Muhammdrasul</span></div>
+      <p data-t="only_linux" style="margin-bottom:0">Hozir faqat Linux.</p>
+    </div>
+    <div class="home-actions">
+      <a class="btn primary" href="https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64" data-t="btn_dl">Linux yuklab olish</a>
+      <a class="btn" href="docs/index.html" data-t="btn_docs">Hujjatlar</a>
+      <a class="btn" href="https://github.com/mrdevs2011/rail" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </section>
+  <section id="install">
+    <h2 class="doc-h2" data-t="sec_install">02 / Ornatish</h2>
+    <p data-t="install_p">Bir qatorli ornatish tavsiya etiladi.</p>
+    <div class="cmd" id="cmdbox">curl -fsSL https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh | bash<button type=button id="copybtn" data-t="copy">nusxa</button></div>
+    <ol class="home-steps">
+      <li data-t="step1">Buyruqni terminalga qoying yoki binar yuklab oling.</li>
+      <li data-t="step2">rail deb ishga tushiring.</li>
+      <li data-t="step3">Yangilash: rail --update.</li>
+    </ol>
+  </section>
+  <section id="features">
+    <h2 class="doc-h2" data-t="sec_feat">03 / Imkoniyatlar</h2>
+    <div class="grid-2">
+      <div class="card"><div class="card-title"><span class="dot"></span><span data-t="f1_t">2D lenta</span></div><p class="card-desc" data-t="f1_p">Cheksiz gorizontal ustunlar, vertikal stek.</p></div>
+      <div class="card"><div class="card-title"><span class="dot"></span><span data-t="f2_t">Profillar</span></div><p class="card-desc" data-t="f2_p">Alohida cookie va sessiya.</p></div>
+      <div class="card"><div class="card-title"><span class="dot"></span><span data-t="f3_t">Klaviatura</span></div><p class="card-desc" data-t="f3_p">Barcha amallar qisqa klavish bilan.</p></div>
+      <div class="card"><div class="card-title"><span class="dot"></span><span data-t="f4_t">Yengil</span></div><p class="card-desc" data-t="f4_p">Rust + GTK4 + WebKitGTK. Faqat Linux.</p></div>
+    </div>
+  </section>
+  <section id="keys">
+    <h2 class="doc-h2" data-t="sec_keys">04 / Qisqa klavishlar</h2>
+    <table class="keys">
+      <tr><th data-t="th_key">Klavish</th><th data-t="th_act">Vazifa</th></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td data-t="k_g">URL satri</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td data-t="k_t">Yangi ustun</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td data-t="k_v">Vertikal stek</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>H</kbd>/<kbd>L</kbd></td><td data-t="k_hl">Chap/ong</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>J</kbd>/<kbd>K</kbd></td><td data-t="k_jk">Past/yuqori</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>P</kbd></td><td data-t="k_p">Profillar</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td data-t="k_w">Yopish</td></tr>
+    </table>
+    <p style="color:var(--dim);font-size:13px" data-t="keys_more">Toliq royxat — Hujjatlarda.</p>
+  </section>
+  <div class="docs-nav-footer" style="margin-top:40px"><div></div>
+    <a href="docs/index.html" class="docs-nav-btn"><span class="label" data-t="lbl_next">Keyingi</span> <span class="name" data-t="btn_docs">Hujjatlar</span></a>
+  </div>
+</main>
 </div>
-<script>var C="curl -fsSL https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh | bash";var b=document.getElementById("copybtn");if(b)b.onclick=function(){navigator.clipboard&&navigator.clipboard.writeText(C);b.textContent="ok";setTimeout(function(){b.textContent="nusxa"},1000)};fetch("https://api.github.com/repos/mrdevs2011/rail/releases/latest").then(r=>r.json()).then(j=>{if(j.tag_name)document.getElementById("ver").textContent="v"+j.tag_name.replace(/^v/,"")}).catch(()=>{});</script>
+<script src="home-i18n.js"></script>
 </body>
 </html>

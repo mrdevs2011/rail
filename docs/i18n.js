@@ -409,11 +409,21 @@ function setDocsLang(lang) {
   applyI18n(true);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function bootDocsI18n() {
   document.querySelectorAll('.lang button').forEach(btn => {
-    btn.addEventListener('click', () => {
+    if (btn.dataset.i18nBound === '1') return;
+    btn.dataset.i18nBound = '1';
+    btn.type = 'button';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       setDocsLang(btn.getAttribute('data-l'));
     });
   });
   applyI18n(false);
-});
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootDocsI18n);
+} else {
+  bootDocsI18n();
+}

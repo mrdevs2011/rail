@@ -3162,6 +3162,72 @@ impl App {
         });
     }
 
+
+    /// Live 1:1 horizontal pan (finger tracks content). Used by touchpad slide mode.
+    fn pan_canvas_x(self: &Rc<Self>, dx: f64) {
+        let vw = self.strip.width() as f64;
+        if vw <= 0.0 {
+            return;
+        }
+        let g = gap(self.target_zoom.get());
+        let cur_r = self.focus_row.get();
+        let rows = self.rows.borrow();
+        if cur_r >= rows.len() {
+            return;
+        }
+        let mut row_w = 0.0;
+        for (ci, tab) in rows[cur_r].tabs.iter().enumerate() {
+            let w = tab.custom_width.get().unwrap_or_else(|| col_width(tab.container.has_css_class("full"), vw));
+            row_w += w;
+            if ci + 1 < rows[cur_r].tabs.len() {
+                row_w += g;
+            }
+        }
+        drop(rows);
+        let max_x = (row_w - vw).max(0.0);
+        // GTK: positive dx = fingers right / content should move with hand (offset increases → next columns)
+        let nx = (self.layout.offset_x() + dx).clamp(0.0, max_x);
+        self.layout.set_offset_x(nx);
+        self.target_x.set(nx);
+        self.strip.queue_allocate();
+    }
+
+    /// After a finger swipe ends, snap focus to the column under the viewport center.
+    fn snap_canvas_to_nearest_column(self: &Rc<Self>) {
+        let vw = self.strip.width() as f64;
+        if vw <= 0.0 {
+            return;
+        }
+        let g = gap(self.target_zoom.get());
+        let cur_r = self.focus_row.get();
+        let ox = self.layout.offset_x();
+        let center = ox + vw / 2.0;
+        let rows = self.rows.borrow();
+        if cur_r >= rows.len() || rows[cur_r].tabs.is_empty() {
+            return;
+        }
+        let mut best_c = 0usize;
+        let mut best_d = f64::MAX;
+        let mut x = 0.0;
+        for (ci, tab) in rows[cur_r].tabs.iter().enumerate() {
+            let w = tab.custom_width.get().unwrap_or_else(|| col_width(tab.container.has_css_class("full"), vw));
+            let mid = x + w / 2.0;
+            let d = (mid - center).abs();
+            if d < best_d {
+                best_d = d;
+                best_c = ci;
+            }
+            x += w + g;
+        }
+        drop(rows);
+        if best_c != self.focus_col.get() {
+            self.focus_coords(cur_r, best_c);
+        } else {
+            // Same tab: still settle so edges align cleanly
+            self.reveal_focus();
+        }
+    }
+
     // ---- tabs & workspaces -----------------------------------------------
 
     #[allow(dead_code)]
@@ -3328,11 +3394,29 @@ impl App {
     }
 
     fn set_devtools_dock_side(self: &Rc<Self>, side: DevToolsDockSide) {
+        let prev = self.devtools_dock_side.get();
         self.devtools_dock_side.set(side);
         let Some(view) = self.dt_view() else { return };
         let Some(insp) = view.inspector() else { return };
         let Some(w) = insp.web_view() else { return };
         let widget: gtk::Widget = w.upcast();
+
+        // Already docked on this side with the inspector widget in place: do not reparent.
+        // Reparenting on every WebKit attach signal steals clicks and makes the panel feel "closed".
+        if prev == side && self.devtools_open.get() {
+            let already_in_panel = matches!(
+                side,
+                DevToolsDockSide::Bottom | DevToolsDockSide::Left | DevToolsDockSide::Right
+            ) && widget
+                .parent()
+                .map(|p| p == self.devtools_content_box.upcast_ref::<gtk::Widget>().clone())
+                .unwrap_or(false);
+            let already_undocked = side == DevToolsDockSide::Undocked
+                && self.devtools_window.borrow().is_some();
+            if already_in_panel || already_undocked {
+                return;
+            }
+        }
 
         match side {
             DevToolsDockSide::Bottom => {
@@ -3911,7 +3995,9 @@ impl App {
             });
             let app_detach = self.clone();
             insp.connect_detach(move |_| {
-                app_detach.set_devtools_dock_side(DevToolsDockSide::Undocked);
+                if app_detach.devtools_dock_side.get() != DevToolsDockSide::Undocked {
+                    app_detach.set_devtools_dock_side(DevToolsDockSide::Undocked);
+                }
                 true
             });
             let app_attach = self.clone();
@@ -3931,7 +4017,10 @@ impl App {
                     cur
                 };
                 eprintln!("[rail] inspector attach: slot={} cur={:?} -> {:?}", slot, cur, target);
-                app_attach.set_devtools_dock_side(target);
+                // Same side: WebKit still emits attach; re-docking would unparent the webview and drop the click.
+                if target != cur || !app_attach.devtools_open.get() {
+                    app_attach.set_devtools_dock_side(target);
+                }
                 true
             });
             let a_closed = self.clone();
@@ -9485,6 +9574,7 @@ fn build(gapp: &gtk::Application) {
     let last_scroll = Rc::new(Cell::new(0i64));
     let last_swipe = Rc::new(Cell::new(0i64));
     let a = app.clone();
+    let a_dec = app.clone();
     let ax = accum_x.clone();
     let ay = accum_y.clone();
     let ls = last_scroll.clone();
@@ -9544,54 +9634,32 @@ fn build(gapp: &gtk::Application) {
             return glib::Propagation::Proceed;
         }
 
-        // 3. Normal browsing mode:
-        // NEVER hijack scrolling when touchpad navigation mode is disabled.
+        // 3. Touchpad slide mode (Alt+Shift+T): 1:1 finger tracking, not discrete tab jumps
         if !a.touchpad_mode.get() {
             return glib::Propagation::Proceed;
         }
 
-        // If a swipe just triggered, absorb trailing kinetic momentum from the same physical stroke
-        if now - l_swipe.get() < 350_000 {
-            ax.set(0.0);
-            return glib::Propagation::Stop;
-        }
-
-        // Only handle intentional horizontal two-finger canvas navigation (dx)
-        if dx.abs() > 0.8 && dx.abs() > 1.3 * dy.abs() {
-            if now - ls.get() > 250_000 {
-                ax.set(0.0);
-            }
+        // Horizontal-dominant: content moves with the fingers
+        if dx.abs() > 0.35 && dx.abs() > 1.1 * dy.abs() {
             ls.set(now);
-
-            let nx = ax.get() + dx;
-            ax.set(nx);
-
-            const SWIPE_THRESHOLD: f64 = 8.0;
-            if nx > SWIPE_THRESHOLD {
-                ax.set(0.0);
-                l_swipe.set(now);
-                a.focus_column_right();
-                return glib::Propagation::Stop;
-            } else if nx < -SWIPE_THRESHOLD {
-                ax.set(0.0);
-                l_swipe.set(now);
-                a.focus_column_left();
-                return glib::Propagation::Stop;
-            }
-            // Block horizontal swipe event from bleeding into page horizontal scroll while gesture is in flight
+            l_swipe.set(now);
+            a.pan_canvas_x(dx);
             return glib::Propagation::Stop;
         }
 
-        // All vertical scrolling proceeds 100% smoothly to the web page for reading documents!
+        // Vertical: leave to the web page for reading
         glib::Propagation::Proceed
     });
     let ax2 = accum_x.clone();
     let ay2 = accum_y.clone();
     let l_swipe2 = last_swipe.clone();
-    scroll.connect_decelerate(move |_, _, _| {
+    scroll.connect_decelerate(move |_, _vx, _vy| {
+        if a_dec.touchpad_mode.get() && !a_dec.ov.get() {
+            a_dec.snap_canvas_to_nearest_column();
+        }
         ax2.set(0.0);
         ay2.set(0.0);
-        l_swipe2.set(0); // Gesture finished, ready for next swipe
+        l_swipe2.set(0);
     });
     win.add_controller(scroll);
 
