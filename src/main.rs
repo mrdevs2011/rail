@@ -10484,10 +10484,14 @@ fn print_data_info() {
 fn main() -> glib::ExitCode {
     // RAM: constrain WebKit early (before any NetworkSession / WebView)
     // DocumentViewer cache model uses far less memory than full WebBrowser.
-    unsafe {
-        // Prefer software path / less compositor memory when many processes spawn
-        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    // GPU compositing va DMABUF renderer yoqilgan holda qoldiriladi: ilgari ikkalasi majburan
+    // o'chirilgan edi, bu sahifalarni CPU'da chizishga olib kelib scroll'ni qotirardi/dagal qilardi.
+    // Muammo bo'lsa (bo'sh ekran, miltillash) eski rejim: `RAIL_SOFTWARE_RENDER=1 rail`.
+    if std::env::var_os("RAIL_SOFTWARE_RENDER").is_some_and(|v| v != "0") {
+        unsafe {
+            std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
     }
     {
         let mut mps = webkit6::MemoryPressureSettings::new();
