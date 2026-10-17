@@ -32,3 +32,9 @@
 - Qilindi: CI to'liq — main push da avtomatik 3 OS build (Rail Linux + spike Linux/macOS/Windows). release.yml tuzatildi (to'g'ri asset nomi + SHA256SUMS). index.html/package.json versiya 0.5.9. Mac/Win asosiy binary hali GTK4 sabab chiqmaydi — spike orqali yo'l ochiq.
 - Keyingi qadam: tao+wry spike da ko'p webview + profil izolyatsiyasini yakunlash, keyin asosiy Rail ni ko'chirish.
 - Git holati: CI workflows + index.html yangilandi
+
+---
+### 2026-10-17 06:19
+- Qilindi: v0.5.10: klassik bir sahifalik index.html (faqat Linux), release + o'rnatish
+- Keyingi qadam: Foydalanuvchi Rail ni qayta ochsin; sayt Vercel da yangilanishi mumkin
+- Git holati: 032827f site: klassik bir sahifalik index.html, faqat Linux (v0.5.10)
