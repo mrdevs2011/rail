@@ -350,9 +350,8 @@ fn create_google_icon(size: i32) -> gtk::Image {
 }
 
 /// Rail-style settings gear (SVG, not emoji / theme icon)
-const GEAR_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
-  <path stroke="#e2e8f0" stroke-width="1.75" stroke-linejoin="round" d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
-  <path stroke="#e2e8f0" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M19.4 13.2a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V19a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H5a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9.5a1.65 1.65 0 0 0 1-1.51V5a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9.5c.2.64.83 1.1 1.51 1.1H19a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.1z"/>
+const GEAR_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#FFFFFF">
+  <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .43-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
 </svg>"##;
 
 fn create_gear_icon(size: i32) -> gtk::Image {
@@ -1465,6 +1464,22 @@ button.color-choice.selected {
     font-weight: 700;
     color: #fafafa;
     letter-spacing: -0.02em;
+}
+.settings-update-chip {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid #2f6bff;
+    background: rgba(47, 107, 255, 0.18);
+    color: #93b4ff;
+    margin-left: 6px;
+}
+.settings-update-chip:hover {
+    background: #2f6bff;
+    color: #fff;
+    border-color: #2f6bff;
 }
 .settings-badge {
     background: rgba(255, 255, 255, 0.07);
@@ -7797,6 +7812,12 @@ fn build(gapp: &gtk::Application) {
     let settings_badge = gtk::Label::new(Some(tr("rail.preferences")));
     settings_badge.add_css_class("settings-badge");
 
+    // Ads-style chip: visible only when a newer release exists
+    let settings_update_chip = gtk::Button::with_label(tr("New version"));
+    settings_update_chip.add_css_class("settings-update-chip");
+    settings_update_chip.set_visible(false);
+    settings_update_chip.set_tooltip_text(Some(tr("Open Updates")));
+
     let header_spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     header_spacer.set_hexpand(true);
 
@@ -7807,6 +7828,7 @@ fn build(gapp: &gtk::Application) {
     settings_header.append(&settings_icon);
     settings_header.append(&settings_title);
     settings_header.append(&settings_badge);
+    settings_header.append(&settings_update_chip);
     settings_header.append(&header_spacer);
     settings_header.append(&settings_close_btn);
     settings_modal.append(&settings_header);
@@ -9403,6 +9425,25 @@ fn build(gapp: &gtk::Application) {
 
     let a = app.clone();
     settings_close_btn.connect_clicked(move |_| a.hide_settings_modal());
+
+    {
+        let a = app.clone();
+        settings_update_chip.connect_clicked(move |_| {
+            a.open_settings_tab(SettingsTab::Update);
+        });
+    }
+
+    // Populate header "New version" chip from GitHub (same source as Updates page)
+    {
+        let chip = settings_update_chip.clone();
+        glib::spawn_future_local(async move {
+            let res = gio::spawn_blocking(update::fetch_update).await;
+            if let Ok(Some(inf)) = res {
+                chip.set_label(&trf("New: {}", &[&inf.latest_tag]));
+                chip.set_visible(true);
+            }
+        });
+    }
 
     for (tab_type, btn) in tab_buttons_vec.iter() {
         let a = app.clone();

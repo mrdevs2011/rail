@@ -212,6 +212,10 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Update now", "Hozir yangilash", "Обновить сейчас"),
     ("Install this version", "Shu versiyani o'rnatish", "Установить эту версию"),
     ("Automatic updates", "Avtomatik yangilash", "Автообновление"),
+    ("New version", "Yangi versiya", "Новая версия"),
+    ("Open Updates", "Yangilanishlarga o'tish", "Открыть обновления"),
+    ("New: {}", "Yangi: {}", "Новое: {}"),
+
     ("When enabled, Rail checks for a new version every launch and installs it", "Yoqilsa, Rail har ochilishda yangi versiyani tekshiradi va o'rnatadi", "Если включено, Rail при каждом запуске проверяет и устанавливает новую версию"),
     ("Downloading update...", "Yangilanish yuklanmoqda...", "Загрузка обновления..."),
     ("Up to date", "Yangilangan", "Актуально"),

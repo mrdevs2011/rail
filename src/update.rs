@@ -137,7 +137,7 @@ pub fn fetch_releases() -> Option<(Vec<String>, Option<UpdateInfo>)> {
     Some((seen, info))
 }
 
-fn fetch_update() -> Option<UpdateInfo> {
+pub fn fetch_update() -> Option<UpdateInfo> {
     // The public releases feed has no API rate limit (the REST API allows only 60 calls/hour per IP).
     let feed_url = format!("https://github.com/{}/releases.atom", REPO);
     let out = Command::new("curl")
