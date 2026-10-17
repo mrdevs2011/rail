@@ -1958,6 +1958,10 @@ impl Tab {
     /// Haqiqiy manzil: jonli uri bo'sh bo'lsa (to'xtatilgan tab) saqlangan nusxa
     fn real_uri(&self) -> String {
         let live = self.view.uri().map(|s| s.to_string()).unwrap_or_default();
+        // Rail'ning ichki start sahifasi (rail://start/) haqiqiy manzil emas: sessiyaga yozilmaydi
+        if is_internal_uri(&live) {
+            return String::new();
+        }
         if live.is_empty() { self.saved_uri.borrow().clone() } else { live }
     }
 }
@@ -2965,6 +2969,21 @@ fn host_of(uri: &str) -> Option<String> {
     let u = glib::Uri::parse(uri, glib::UriFlags::NONE).ok()?;
     let h = u.host()?;
     Some(h.trim_start_matches("www.").to_string())
+}
+
+/// Rail'ning ichki sahifalari (rail://start/ ...): WebKit ularni load_uri/reload bilan ocholmaydi.
+fn is_internal_uri(u: &str) -> bool {
+    u.starts_with("rail://")
+}
+
+/// Start sahifada reload() "The URL can't be shown" xatosini beradi: uni HTML'dan qayta yuklaymiz.
+fn reload_or_start(v: &WebView) {
+    let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
+    if is_internal_uri(&uri) {
+        v.load_html(&start_page(), Some("rail://start/"));
+    } else {
+        v.reload();
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -4337,7 +4356,8 @@ impl App {
             if app_term.focused_view().as_ref() == Some(v) {
                 let saved = app_term.saved_uri_of(v);
                 if saved.is_empty() {
-                    v.reload();
+                    // http(s) tabda saved doim bor; bo'sh bo'lsa bu start sahifa
+                    v.load_html(&start_page(), Some("rail://start/"));
                 } else {
                     v.load_uri(&saved);
                 }
@@ -5331,7 +5351,7 @@ impl App {
         for item in tab_items {
             let session = self.profiles.borrow_mut().get_or_create_session(&item.profile_id);
             let view = Self::create_web_view(&session, &item.profile_id);
-            if item.url.is_empty() || item.url.starts_with("about:") {
+            if item.url.is_empty() || item.url.starts_with("about:") || is_internal_uri(&item.url) {
                 view.load_html(&start_page(), Some("rail://start/"));
             } else {
                 view.load_uri(&item.url);
@@ -5952,7 +5972,7 @@ impl App {
 
     fn show_palette(self: &Rc<Self>) {
         self.palette_for_new_tab.set(false);
-        let uri = self.focused_view().and_then(|v| v.uri()).filter(|u| !u.starts_with("about:"));
+        let uri = self.focused_view().and_then(|v| v.uri()).filter(|u| !u.starts_with("about:") && !is_internal_uri(u));
         self.entry.set_text(uri.as_deref().unwrap_or(""));
 
         let prof_id = self.profiles.borrow().active_id().to_string();
@@ -7652,7 +7672,7 @@ impl App {
             }
             if k == gdk::Key::r || keycode == 27 {
                 if let Some(v) = self.focused_view() {
-                    v.reload();
+                    reload_or_start(&v);
                 }
                 return true;
             }
@@ -10634,6 +10654,13 @@ mod tests {
         assert_eq!(state.tabs.len(), 2);
         assert_eq!(state.stacked, vec![(0, 1)]);
         assert!(parse_session_content("tab\t0\t0\t1\tdefault\thttps://a.com\n").stacked.is_empty());
+    }
+
+    #[test]
+    fn test_internal_uris_are_not_loadable() {
+        assert!(is_internal_uri("rail://start/"));
+        assert!(!is_internal_uri("https://example.com"));
+        assert!(!is_internal_uri(""));
     }
 
     #[test]
