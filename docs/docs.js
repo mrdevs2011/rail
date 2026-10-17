@@ -328,23 +328,24 @@ function initKeyboardTester() {
   if (!input || !output) return;
 
   const keyMap = {
-    'alt+t': 'Omnibar ochildi (yangi tab)',
-    'alt+g': 'Manzil qatori (Omnibar) ochildi',
+    'ctrl+t': 'Omnibar ochildi (yangi tab)',
+    'ctrl+l': 'Manzil qatori (Omnibar) ochildi',
     'alt+shift+v': 'Yangi ish maydoni ochildi',
-    'alt+w': 'Fokusdagi tab yopildi',
-    'alt+r': 'Sahifa qayta yuklandi (Reload)',
+    'ctrl+w': 'Fokusdagi tab yopildi',
+    'ctrl+r': 'Sahifa qayta yuklandi (Reload)',
     'alt+f': 'To\'liq eni / Standart eni rejimi',
     'alt+h': 'Chap ustunga fokus o\'tdi',
     'alt+l': 'O\'ng ustunga fokus o\'tdi',
-    'alt+j': 'Pastki qatorga fokus o\'tdi',
-    'alt+k': 'Yuqori qatorga fokus o\'tdi',
-    'alt+shift+h': 'Tab chapga ko\'chdi',
-    'alt+shift+l': 'Tab o\'ngga ko\'chdi',
-    'alt+shift+j': 'Tab pastki qatorga ko\'chdi',
-    'alt+shift+k': 'Tab yuqori qatorga ko\'chdi',
+    'alt+j': 'Ustun ichida pastdagi oynaga fokus o\'tdi',
+    'alt+k': 'Ustun ichida yuqoridagi oynaga fokus o\'tdi',
+    'alt+[': 'Oyna chap ustunga yig\'ildi / chapga ajratildi',
+    'alt+]': 'Oyna o\'ng ustunga yig\'ildi / o\'ngga ajratildi',
+    'alt+shift+h': 'Ustun chapga ko\'chdi',
+    'alt+shift+l': 'Ustun o\'ngga ko\'chdi',
+    'alt+shift+j': 'Oyna pastga surildi',
+    'alt+shift+k': 'Oyna yuqoriga surildi',
     'ctrl+tab': 'Keyingi tabga o\'tildi',
     'ctrl+shift+tab': 'Oldingi tabga o\'tildi',
-    'alt+e': 'Tab setka ko\'rinishi almashtirildi',
     'alt+o': 'Fazoviy Overview almashtirildi',
     'alt+b': 'Yon panel almashtirildi',
     'alt+m': 'Roadmap / Minimap almashtirildi',
@@ -356,7 +357,7 @@ function initKeyboardTester() {
     'f11': 'To\'liq ekran almashtirildi',
     'alt+arrowleft': 'Orqaga',
     'alt+arrowright': 'Oldinga',
-    'alt+q': 'Rail yopiladi'
+    'ctrl+q': 'Rail yopiladi'
   };
 
   input.addEventListener('keydown', (e) => {

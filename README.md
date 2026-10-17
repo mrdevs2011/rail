@@ -79,14 +79,14 @@ Yoki ilovalar ro‘yxatidan (Rofi / Wofi / GNOME / KDE) **Rail** deb qidirib och
 | `Ctrl + R` | Sahifani yangilash (Reload) |
 | `Alt + F` | To‘liq kenglik / standart kenglik |
 | `Alt + Shift + V` | Yangi ish maydoni (workspace) |
-| `Alt + H` / `Alt + L` | Chap / o‘ng tabga fokus |
-| `Alt + J` / `Alt + K` | Pastki / yuqori qatorga fokus |
-| `Alt + Shift + H` / `L` | Tabni chapga / o‘ngga ko‘chirish |
-| `Alt + Shift + J` / `K` | Tabni pastki / yuqori qatorga ko‘chirish |
+| `Alt + H` / `Alt + L` | Chap / o‘ng ustunga fokus |
+| `Alt + J` / `Alt + K` | Ustun ichida pastdagi / yuqoridagi oynaga fokus (ustun chetida — pastki / yuqori workspace) |
+| `Alt + [` / `Alt + ]` | **Stack:** oynani chap / o‘ng ustunga yig‘ish, stackdagi oynani chapga / o‘ngga ajratish (niri'dagi `consume-or-expel-window`) |
+| `Alt + Shift + H` / `L` | Butun ustunni chapga / o‘ngga ko‘chirish |
+| `Alt + Shift + J` / `K` | Oynani stack ichida pastga / yuqoriga surish (stack bo‘lmasa — pastki / yuqori workspace'ga) |
 | `Ctrl + Tab` / `Ctrl + Shift + Tab` | Keyingi / oldingi tab (aylanma) |
 | `Ctrl + 1…9` | Joriy qatordagi N-tabga o‘tish (`Ctrl + 9` — oxirgi) |
 | `Alt + 1…9` / `Alt + Shift + 1…9` | N-ish maydoniga o‘tish / tabni shu yerga ko‘chirish |
-| `Alt + E` | **Tab setka ko‘rinishi** — barcha tablar teng kataklarda (masalan 3×2) |
 | `Alt + O` | Fazoviy Overview (zoom-out) |
 | `Alt + B` | Yon panelni (Sidebar) yashirish/ko‘rsatish |
 | `Alt + M` | Roadmap / Minimap |
@@ -97,7 +97,7 @@ Yoki ilovalar ro‘yxatidan (Rofi / Wofi / GNOME / KDE) **Rail** deb qidirib och
 | `Alt + Left` / `Alt + Right` | Orqaga / Oldinga |
 | `Ctrl + Q` | Rail'dan chiqish |
 
-Tab setka va Overview ichida: `h` `j` `k` `l` — harakat, `Enter` — ochish, `x` — yopish, `Esc` — bekor qilish.
+Overview ichida: `h` `j` `k` `l` — harakat, `Enter` — ochish, `x` — yopish, `Esc` — bekor qilish.
 Har bir amalga **bitta** shortcut biriktirilgan; xohlasangiz Sozlamalar → Customize → Shortcuts orqali o‘zgartirishingiz mumkin.
 ---
 
