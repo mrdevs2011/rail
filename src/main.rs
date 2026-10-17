@@ -4362,8 +4362,16 @@ impl App {
         // Track developer tools window state & auto-dock to Rail panel
         if let Some(insp) = view.inspector() {
             let app_insp = self.clone();
+            let view_weak = view.downgrade();
             insp.connect_open_window(move |_| {
-                app_insp.set_devtools_dock_side(DevToolsDockSide::Undocked);
+                // Menyudan "Inspect Element" ham F12 / Alt+Shift+D bilan bir xil ochilsin:
+                // WebKit alohida oyna so'raganda majburan Undocked qilmaymiz, balki eslab qolingan
+                // dock tomoniga (pastda/chapda/o'ngda) darhol joylaymiz.
+                if let Some(v) = view_weak.upgrade() {
+                    DT_VIEW.with(|c| *c.borrow_mut() = Some(v));
+                }
+                let side = app_insp.devtools_dock_side.get();
+                app_insp.set_devtools_dock_side(side);
                 true
             });
             let app_detach = self.clone();
