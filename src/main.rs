@@ -1997,6 +1997,8 @@ struct App {
     target_x: Cell<f64>,
     target_y: Cell<f64>,
     animating: Cell<bool>,
+    /// Touchpad slide: at most one strip allocate per frame (avoids jank)
+    pan_alloc_pending: Cell<bool>,
     side_open: Cell<bool>,
     side_gen: Cell<u32>,
     /// A just-created tab that has never navigated; Esc discards it.
@@ -3151,7 +3153,7 @@ impl App {
         self.strip.add_tick_callback(move |strip, clock| {
             let now = clock.frame_time();
             let dt = last.replace(Some(now)).map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
-            let k = 1.0 - (-dt / 0.08).exp();
+            let k = 1.0 - (-dt / 0.05).exp();
 
             let (oxc, oxt) = (app.layout.offset_x(), app.target_x.get());
             let (oyc, oyt) = (app.layout.offset_y(), app.target_y.get());
@@ -3183,9 +3185,10 @@ impl App {
 
 
     /// Live 1:1 horizontal pan (finger tracks content). Used by touchpad slide mode.
+    /// Offsets update every event; strip allocate is coalesced to one per frame.
     fn pan_canvas_x(self: &Rc<Self>, dx: f64) {
         let vw = self.strip.width() as f64;
-        if vw <= 0.0 {
+        if vw <= 0.0 || dx == 0.0 {
             return;
         }
         let g = gap(self.target_zoom.get());
@@ -3195,20 +3198,29 @@ impl App {
             return;
         }
         let mut row_w = 0.0;
+        let n = rows[cur_r].tabs.len();
         for (ci, tab) in rows[cur_r].tabs.iter().enumerate() {
             let w = tab.custom_width.get().unwrap_or_else(|| col_width(tab.container.has_css_class("full"), vw));
             row_w += w;
-            if ci + 1 < rows[cur_r].tabs.len() {
+            if ci + 1 < n {
                 row_w += g;
             }
         }
         drop(rows);
         let max_x = (row_w - vw).max(0.0);
-        // GTK: positive dx = fingers right / content should move with hand (offset increases → next columns)
         let nx = (self.layout.offset_x() + dx).clamp(0.0, max_x);
         self.layout.set_offset_x(nx);
         self.target_x.set(nx);
-        self.strip.queue_allocate();
+        // One allocate per display frame — per-event allocate freezes WebKit tabs
+        if !self.pan_alloc_pending.get() {
+            self.pan_alloc_pending.set(true);
+            let app = self.clone();
+            self.strip.add_tick_callback(move |strip, _clock| {
+                app.pan_alloc_pending.set(false);
+                strip.queue_allocate();
+                glib::ControlFlow::Break
+            });
+        }
     }
 
     /// After a finger swipe ends, snap focus to the column under the viewport center.
@@ -3280,7 +3292,7 @@ impl App {
         settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_dns_prefetching(false);
         settings.set_enable_smooth_scrolling(true);
-        settings.set_enable_webgl(false); // RAM: WebGL processes are heavy
+        settings.set_enable_webgl(true); // needed for smooth compositing on many sites
         settings.set_enable_developer_extras(true);
         settings.set_enable_back_forward_navigation_gestures(true);
         settings.set_enable_webaudio(false);
@@ -3288,9 +3300,10 @@ impl App {
         settings.set_enable_html5_database(true);
         settings.set_enable_site_specific_quirks(true);
         settings.set_javascript_can_access_clipboard(true);
-        // Never: less GPU/VRAM; CPU software path uses less peak RAM on multi-tab
-        settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Never);
-        settings.set_enable_page_cache(false);
+        // Always: smooth page scroll/compositing; falls back when GPU unavailable
+        settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
+        // Page cache helps back/forward; modest RAM cost
+        settings.set_enable_page_cache(true);
 
         let stealth_js = persona.stealth_script();
         let script = webkit6::UserScript::new(
@@ -9021,6 +9034,7 @@ fn build(gapp: &gtk::Application) {
         target_x: Cell::new(0.0),
         target_y: Cell::new(0.0),
         animating: Cell::new(false),
+        pan_alloc_pending: Cell::new(false),
         side_open: Cell::new(true),
         side_gen: Cell::new(0),
         fresh: RefCell::new(None),
@@ -9607,11 +9621,9 @@ fn build(gapp: &gtk::Application) {
     });
     shell.add_controller(click);
 
-    let scroll = gtk::EventControllerScroll::new(
-        gtk::EventControllerScrollFlags::BOTH_AXES
-            | gtk::EventControllerScrollFlags::KINETIC
-            | gtk::EventControllerScrollFlags::DISCRETE,
-    );
+    // BOTH_AXES only: KINETIC+DISCRETE on a Capture window controller makes page scroll sticky/janky
+    // (steals momentum from WebKit). Overview + touchpad slide still work via dx/dy deltas.
+    let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
     scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
     let accum_x = Rc::new(Cell::new(0.0f64));
     let accum_y = Rc::new(Cell::new(0.0f64));
@@ -9624,7 +9636,10 @@ fn build(gapp: &gtk::Application) {
     let ls = last_scroll.clone();
     let l_swipe = last_swipe.clone();
     scroll.connect_scroll(move |_, dx, dy| {
-        // 1. Modals, dialogs, and popovers must ALWAYS receive raw scroll events without interference
+        // Fast path: normal browsing — do not touch scroll at all (WebKit keeps smooth kinetic scroll)
+        if !a.ov.get() && !a.touchpad_mode.get() {
+            return glib::Propagation::Proceed;
+        }
         if a.settings_modal_open() || a.palette_open() || a.map_open() {
             return glib::Propagation::Proceed;
         }
@@ -9683,15 +9698,15 @@ fn build(gapp: &gtk::Application) {
             return glib::Propagation::Proceed;
         }
 
-        // Horizontal-dominant: content moves with the fingers
-        if dx.abs() > 0.35 && dx.abs() > 1.1 * dy.abs() {
+        // Only clearly horizontal gestures pan the ribbon; everything else (incl. diagonal
+        // reading scroll) must reach WebKit or the page feels sticky.
+        if dx.abs() > 0.8 && dx.abs() > 2.0 * dy.abs() {
             ls.set(now);
             l_swipe.set(now);
             a.pan_canvas_x(dx);
             return glib::Propagation::Stop;
         }
 
-        // Vertical: leave to the web page for reading
         glib::Propagation::Proceed
     });
     let ax2 = accum_x.clone();
