@@ -8,6 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='8' y='23' font-size='22' font-family='monospace' fill='%23fff'%3Er%3C/text%3E%3Ccircle cx='25' cy='25' r='3' fill='%232f6bff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="docs/docs.css">
 <style>
+html{scroll-behavior:smooth}
 /* Root landing tweaks on top of docs.css */
 .home-actions{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 8px}
 .home-actions a.btn{font:inherit;color:#fff;background:#000;border:1px solid #fff;padding:10px 16px;text-decoration:none;transition:.15s}
@@ -39,14 +40,14 @@ kbd{border:1px solid #444;padding:1px 6px;font-size:12px}
   <button class="hamburger" aria-label="Toggle Navigation" type="button">
     <span>☰</span> <span data-t="menu_open">Menyu</span>
   </button>
-  <a href="index.html" class="brand-link">
+  <a href="./" class="brand-link">
     <div class="logo">r</div>
     <b>rail</b>
     <span class="pill" data-t="brand_sub">uy</span>
   </a>
-  <span class="pill" id="ver" style="border-color:#333;font-size:11px">v0.5.12</span>
+  <span class="pill" id="ver" style="border-color:#333;font-size:11px">v0.5.13</span>
   <div class="sp"></div>
-  <a href="docs/index.html" class="back-root" data-t="nav_docs">Hujjatlar →</a>
+  <a href="docs/" class="back-root" data-t="nav_docs">Hujjatlar →</a>
   <div class="lang" role="group" aria-label="Language">
     <button type="button" data-l="uz">UZ</button>
     <button type="button" data-l="en">EN</button>
@@ -81,17 +82,17 @@ kbd{border:1px solid #444;padding:1px 6px;font-size:12px}
   </div>
   <div class="sidebar-group">
     <div class="sidebar-title" data-t="sb_docs">Hujjatlar</div>
-    <a href="docs/index.html" class="nav-item">
+    <a href="docs/" class="nav-item">
       <span class="nav-idx">D1</span>
       <span data-t="d_intro">Kirish</span>
       <span class="nav-dot"></span>
     </a>
-    <a href="docs/installation.html" class="nav-item">
+    <a href="docs/installation/" class="nav-item">
       <span class="nav-idx">D2</span>
       <span data-t="d_inst">O'rnatish</span>
       <span class="nav-dot"></span>
     </a>
-    <a href="docs/shortcuts.html" class="nav-item">
+    <a href="docs/shortcuts/" class="nav-item">
       <span class="nav-idx">D3</span>
       <span data-t="d_keys">Klavishlar</span>
       <span class="nav-dot"></span>
@@ -106,7 +107,7 @@ kbd{border:1px solid #444;padding:1px 6px;font-size:12px}
 
 <main class="docs-content">
   <div class="breadcrumbs">
-    <a href="index.html">rail</a>
+    <a href="./">rail</a>
     <span class="sep">/</span>
     <span data-t="brand_sub">uy</span>
   </div>
@@ -119,7 +120,7 @@ kbd{border:1px solid #444;padding:1px 6px;font-size:12px}
     </div>
     <div class="home-actions">
       <a class="btn primary" href="https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64" data-t="btn_dl">Linux yuklab olish</a>
-      <a class="btn" href="docs/index.html" data-t="btn_docs">Hujjatlar</a>
+      <a class="btn" href="docs/" data-t="btn_docs">Hujjatlar</a>
       <a class="btn" href="https://github.com/mrdevs2011/rail" target="_blank" rel="noopener">GitHub</a>
     </div>
   </section>
@@ -157,10 +158,27 @@ kbd{border:1px solid #444;padding:1px 6px;font-size:12px}
     <p style="color:var(--dim);font-size:13px" data-t="keys_more">Toliq royxat — Hujjatlarda.</p>
   </section>
   <div class="docs-nav-footer" style="margin-top:40px"><div></div>
-    <a href="docs/index.html" class="docs-nav-btn"><span class="label" data-t="lbl_next">Keyingi</span> <span class="name" data-t="btn_docs">Hujjatlar</span></a>
+    <a href="docs/" class="docs-nav-btn"><span class="label" data-t="lbl_next">Keyingi</span> <span class="name" data-t="btn_docs">Hujjatlar</span></a>
   </div>
 </main>
 </div>
 <script src="home-i18n.js"></script>
+
+<script>
+(function(){
+  document.querySelectorAll('.docs-sidebar a[href^="#"]').forEach(function(a){
+    a.addEventListener('click', function(e){
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if(!el) return;
+      e.preventDefault();
+      el.scrollIntoView({behavior:'smooth', block:'start'});
+      history.replaceState(null,'','#'+id);
+      document.querySelectorAll('.docs-sidebar a[href^="#"]').forEach(function(x){x.classList.remove('home-active');});
+      a.classList.add('home-active');
+    });
+  });
+})();
+</script>
 </body>
 </html>

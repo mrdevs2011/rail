@@ -51,6 +51,8 @@ pub struct AppSettings {
     pub touchpad_mode: bool,
     pub smooth_scrolling: bool,
     pub webrtc_enabled: bool,
+    /// Launchda yangi versiyani tekshirib o'rnatish
+    pub auto_update: bool,
 }
 
 impl Default for AppSettings {
@@ -60,6 +62,7 @@ impl Default for AppSettings {
             touchpad_mode: false,
             smooth_scrolling: true,
             webrtc_enabled: true,
+            auto_update: false,
         }
     }
 }
@@ -82,17 +85,28 @@ pub fn load_app_settings() -> AppSettings {
         if let Some(wr) = root.get("webrtc_enabled").and_then(|v| v.as_bool()) {
             s.webrtc_enabled = wr;
         }
+        if let Some(au) = root.get("auto_update").and_then(|v| v.as_bool()) {
+            s.auto_update = au;
+        }
     }
     s
 }
 
 pub fn save_app_settings(s: &AppSettings) -> bool {
-    let mut out = String::from("{\n");
-    out.push_str(&format!("  \"search_engine\": \"{}\",\n", minijson::escape(&s.search_engine)));
-    out.push_str(&format!("  \"touchpad_navigation\": {},\n", s.touchpad_mode));
-    out.push_str(&format!("  \"smooth_scrolling\": {},\n", s.smooth_scrolling));
-    out.push_str(&format!("  \"webrtc_enabled\": {}\n", s.webrtc_enabled));
-    out.push_str("}\n");
+    let mut out = String::from("{
+");
+    out.push_str(&format!("  \"search_engine\": \"{}\",
+", minijson::escape(&s.search_engine)));
+    out.push_str(&format!("  \"touchpad_navigation\": {},
+", s.touchpad_mode));
+    out.push_str(&format!("  \"smooth_scrolling\": {},
+", s.smooth_scrolling));
+    out.push_str(&format!("  \"webrtc_enabled\": {},
+", s.webrtc_enabled));
+    out.push_str(&format!("  \"auto_update\": {}
+", s.auto_update));
+    out.push_str("}
+");
     let path = settings_json_path();
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
@@ -329,6 +343,28 @@ fn create_google_icon(size: i32) -> gtk::Image {
         }
         Err(_) => {
             let img = gtk::Image::from_icon_name("system-search-symbolic");
+            img.set_pixel_size(size);
+            img
+        }
+    }
+}
+
+/// Rail-style settings gear (SVG, not emoji / theme icon)
+const GEAR_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  <path stroke="#e2e8f0" stroke-width="1.75" stroke-linejoin="round" d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
+  <path stroke="#e2e8f0" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M19.4 13.2a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V19a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H5a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9.5a1.65 1.65 0 0 0 1-1.51V5a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9.5c.2.64.83 1.1 1.51 1.1H19a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.1z"/>
+</svg>"##;
+
+fn create_gear_icon(size: i32) -> gtk::Image {
+    let bytes = glib::Bytes::from_static(GEAR_SVG.as_bytes());
+    match gdk::Texture::from_bytes(&bytes) {
+        Ok(t) => {
+            let img = gtk::Image::from_paintable(Some(&t));
+            img.set_pixel_size(size);
+            img
+        }
+        Err(_) => {
+            let img = gtk::Image::from_icon_name("preferences-system-symbolic");
             img.set_pixel_size(size);
             img
         }
@@ -7614,9 +7650,10 @@ fn build(gapp: &gtk::Application) {
     brand.set_markup("<span weight='bold' font_family='monospace' size='large' foreground='#f8fafc'>rail</span><span weight='bold' size='large' foreground='#38bdf8'>.</span>");
     brand.set_hexpand(true);
     brand.set_xalign(0.0);
-    let add = gtk::Button::from_icon_name("list-add-symbolic");
+    let add = gtk::Button::new();
+    add.set_child(Some(&create_gear_icon(18)));
     add.add_css_class("btn-add-tab");
-    add.set_tooltip_text(Some(tr("New tab  (Alt+T)")));
+    add.set_tooltip_text(Some(tr("Settings")));
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     head.set_margin_start(4);
     head.append(&brand);
@@ -8604,6 +8641,37 @@ fn build(gapp: &gtk::Application) {
     page_update.append(&update_title);
     page_update.append(&update_subtitle);
 
+    let auto_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    auto_card.add_css_class("settings-card");
+    let auto_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    let auto_lbl_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    auto_lbl_box.set_hexpand(true);
+    let auto_title = gtk::Label::new(Some(tr("Automatic updates")));
+    auto_title.add_css_class("settings-card-title");
+    auto_title.set_xalign(0.0);
+    let auto_desc = gtk::Label::new(Some(tr("When enabled, Rail checks for a new version every launch and installs it")));
+    auto_desc.add_css_class("settings-card-desc");
+    auto_desc.set_xalign(0.0);
+    auto_desc.set_wrap(true);
+    auto_lbl_box.append(&auto_title);
+    auto_lbl_box.append(&auto_desc);
+    let auto_switch = gtk::Switch::new();
+    auto_switch.set_active(load_app_settings().auto_update);
+    auto_switch.set_valign(gtk::Align::Center);
+    auto_row.append(&auto_lbl_box);
+    auto_row.append(&auto_switch);
+    auto_card.append(&auto_row);
+    page_update.append(&auto_card);
+
+    {
+        auto_switch.connect_state_set(move |_, state| {
+            let mut s = load_app_settings();
+            s.auto_update = state;
+            save_app_settings(&s);
+            glib::Propagation::Proceed
+        });
+    }
+
     let update_card = gtk::Box::new(gtk::Orientation::Vertical, 8);
     update_card.add_css_class("settings-card");
 
@@ -8767,6 +8835,16 @@ fn build(gapp: &gtk::Application) {
                     update_btn.set_sensitive(false);
                     update_btn.set_label(tr("Up to date"));
                     *update_info.borrow_mut() = None;
+                }
+                (Some(s), Some(c)) if s < c => {
+                    update_btn.set_sensitive(true);
+                    update_btn.set_label(tr("Install this version"));
+                    *update_info.borrow_mut() = Some(update::UpdateInfo {
+                        latest_tag: tag.clone(),
+                        newer_count: 0,
+                        more: false,
+                        url: update::asset_url_for_tag(&tag),
+                    });
                 }
                 _ => {
                     update_btn.set_sensitive(true);
@@ -9519,7 +9597,7 @@ fn build(gapp: &gtk::Application) {
 
 
     let a = app.clone();
-    add.connect_clicked(move |_| a.open_new_tab_palette());
+    add.connect_clicked(move |_| a.open_settings_tab(SettingsTab::General));
     let a = app.clone();
     pill.connect_clicked(move |_| a.show_palette());
 
@@ -10194,6 +10272,7 @@ mod tests {
             touchpad_mode: true,
             smooth_scrolling: false,
             webrtc_enabled: true,
+            auto_update: false,
         };
         let mut out = String::from("{\n");
         out.push_str(&format!("  \"search_engine\": \"{}\",\n", minijson::escape(&s.search_engine)));

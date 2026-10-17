@@ -106,6 +106,16 @@ pub fn fetch_releases() -> Option<(Vec<String>, Option<UpdateInfo>)> {
         return None;
     }
 
+    // Newest first in the dropdown
+    seen.sort_by(|a, b| {
+        match (parse_ver(a), parse_ver(b)) {
+            (Some(va), Some(vb)) => vb.cmp(&va),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            _ => b.cmp(a),
+        }
+    });
+
     let mut count = 0usize;
     let mut best: Option<([u32; 3], String)> = None;
     for tag in &seen {
@@ -192,16 +202,27 @@ pub fn download_and_install(url: &str) -> Result<(), String> {
     let dir = dest.parent().ok_or_else(|| tr("Bad install path").to_string())?.to_path_buf();
     std::fs::create_dir_all(&dir).map_err(|e| trf("Cannot write to {}: {}", &[&dir.display().to_string(), &e.to_string()]))?;
     let tmp = dir.join(".rail-update.tmp");
-    let status = Command::new("curl")
-        .args(["-fsSL", "-m", "240", "-o"])
+    // Capture HTTP code so 404 (no asset for this tag) is not reported as "no internet"
+    let out = Command::new("curl")
+        .args(["-sSL", "-m", "240", "-w", "\n%{http_code}", "-o"])
         .arg(&tmp)
         .arg(url)
         .stdin(Stdio::null())
-        .status()
+        .output()
         .map_err(|e| trf("curl failed: {}", &[&e.to_string()]))?;
-    if !status.success() {
+    let tail = String::from_utf8_lossy(&out.stdout);
+    let code = tail.trim().lines().last().unwrap_or("0").parse::<u32>().unwrap_or(0);
+    if !out.status.success() || code == 0 {
         let _ = std::fs::remove_file(&tmp);
         return Err(tr("Download failed. Check your connection.").to_string());
+    }
+    if code == 404 {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(tr("This release has no Linux binary (asset missing).").to_string());
+    }
+    if code < 200 || code >= 300 {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(trf("Download failed (HTTP {}).", &[&code.to_string()]));
     }
     let size = std::fs::metadata(&tmp).map(|m| m.len()).unwrap_or(0);
     if size < 200_000 {
@@ -367,6 +388,10 @@ pub fn build_card(win: &gtk::ApplicationWindow) -> gtk::Revealer {
 
     {
         let rev = rev.clone();
+        let win = win.clone();
+        let get = get.clone();
+        let info = info.clone();
+        let installed = installed.clone();
         glib::spawn_future_local(async move {
             let res = gio::spawn_blocking(fetch_update).await;
             if let Ok(Some(inf)) = res {
@@ -377,8 +402,41 @@ pub fn build_card(win: &gtk::ApplicationWindow) -> gtk::Revealer {
                     if n == 1 { "You are on v{}, {} version behind." } else { "You are on v{}, {} versions behind." },
                     &[&current_version(), &behind],
                 ));
+                let url = inf.url.clone();
+                let tag = inf.latest_tag.clone();
                 *info.borrow_mut() = Some(inf);
                 rev.set_reveal_child(true);
+
+                // Auto-update: download + install + restart on every launch when enabled
+                if crate::load_app_settings().auto_update {
+                    get.set_sensitive(false);
+                    get.set_label(tr("Updating..."));
+                    sub.set_text(tr("Downloading update..."));
+                    err.set_visible(false);
+                    let res = gio::spawn_blocking(move || download_and_install(&url)).await;
+                    match res {
+                        Ok(Ok(())) => {
+                            installed.set(true);
+                            ver.set_text(&trf("{} installed", &[&tag]));
+                            sub.set_text(tr("Restarting. Your tabs come back."));
+                            get.set_label(tr("Restarting..."));
+                            let win = win.clone();
+                            glib::timeout_add_local_once(std::time::Duration::from_millis(700), move || restart(&win));
+                        }
+                        Ok(Err(e)) => {
+                            err.set_text(&e);
+                            err.set_visible(true);
+                            get.set_sensitive(true);
+                            get.set_label(tr("Retry"));
+                        }
+                        Err(_) => {
+                            err.set_text(tr("Update failed unexpectedly."));
+                            err.set_visible(true);
+                            get.set_sensitive(true);
+                            get.set_label(tr("Retry"));
+                        }
+                    }
+                }
             }
         });
     }

@@ -363,3 +363,17 @@ function initKeyboardTester() {
     });
   });
 }
+
+/* sidebar smooth scroll for same-page anchors */
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.docs-sidebar a[href^="#"]').forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (!el) return;
+      e.preventDefault();
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      history.replaceState(null, '', '#' + id);
+    });
+  });
+});
