@@ -44,13 +44,13 @@ jobs:
             sed -i "s/\"version\": \"${OLD}\"/\"version\": \"${NEW}\"/" package.json || true
             # ba'zi package.json da version boshqa formatda bo'lishi mumkin
             python3 - <<PY
-import json, pathlib
-p = pathlib.Path("package.json")
-if p.exists():
-    data = json.loads(p.read_text())
-    data["version"] = "${NEW}"
-    p.write_text(json.dumps(data, indent=2) + "\n")
-PY
+          import json, pathlib
+          p = pathlib.Path("package.json")
+          if p.exists():
+              data = json.loads(p.read_text())
+              data["version"] = "${NEW}"
+              p.write_text(json.dumps(data, indent=2) + "\n")
+          PY
           fi
 
           # sayt badge lari
