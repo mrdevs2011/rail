@@ -106,3 +106,5 @@ cargo build --release
 ```
 
 Yig‘ilgan binar fayl: `target/release/rail`
+
+Qo‘llanma: batafsil holat uchun `STATUS.md` va `ROADMAP.md` fayllariga qarang.
