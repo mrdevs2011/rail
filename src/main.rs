@@ -324,6 +324,7 @@ fn start_page() -> String {
         .replacen("<html lang=\"en\">", &format!("<html lang=\"{}\">", i18n::current().code()), 1)
         .replacen("keyboard-first browser for developers", tr("keyboard-first browser for developers"), 1)
         .replacen("placeholder=\"search or enter url\"", &format!("placeholder=\"{}\"", tr("search or enter url")), 1)
+        .replacen("<span class=\"search-hint\">Ctrl+L</span>", &format!("<span class=\"search-hint\">{}</span>", glib::markup_escape_text(&sc_display("focus_url"))), 1)
 }
 
 const GOOGLE_G_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
@@ -625,8 +626,11 @@ button.pill:hover .pill-icon {
     border: 1px solid #1b1b1b;
     border-radius: 2px;
     padding: 1px 5px;
+    opacity: 0;
+    transition: opacity 120ms ease;
 }
 button.pill:hover .pill-chip {
+    opacity: 1;
     color: #ededed;
     border-color: rgba(255, 255, 255, 0.18);
 }
@@ -2339,6 +2343,7 @@ fn shortcuts_path() -> PathBuf {
 fn reload_customize_from_disk() {
     SHORTCUTS.with(|c| *c.borrow_mut() = load_shortcuts_config());
     apply_shortcut_priority();
+    sc_refresh_bound();
     apply_html_css(&load_html_css());
 }
 
@@ -2628,6 +2633,119 @@ fn sc_resolve(combo: &str) -> ScResolve {
     })
 }
 
+// ---- UI'da ko'rsatiladigan shortcut yozuvlari ---------------------------------------------
+// Tooltip, badge va hint'lardagi shortcut matnlari qotirilmaydi: Settings > Customize > Shortcuts
+// dagi joriy qiymat ko'rsatiladi va u o'zgarganda barcha yozuvlar darhol yangilanadi.
+
+thread_local! {
+    /// Shortcut matni ko'rsatadigan vidjetlarni yangilovchi closure'lar (false qaytarsa vidjet o'lgan, olib tashlanadi).
+    static SC_BOUND: RefCell<Vec<Box<dyn Fn() -> bool>>> = RefCell::new(Vec::new());
+}
+
+/// `id` shortcut'ining hozir amalda bo'lgan birinchi kombinatsiyasi. O'chirilgan yoki bo'sh bo'lsa "".
+fn sc_display(id: &str) -> String {
+    SHORTCUTS.with(|c| {
+        let cfg = c.borrow();
+        let Some(def) = SHORTCUT_DEFS.iter().find(|d| d.id == id) else { return String::new() };
+        if !sc_enabled(&cfg, id) {
+            return String::new();
+        }
+        sc_effective(def, &cfg).into_iter().find(|s| !s.is_empty()).unwrap_or_default()
+    })
+}
+
+/// O'chirilgan shortcut belgisini matndan chiroyli olib tashlaydi: "(Alt+P)", " / F12", "F12 / ".
+fn sc_strip_token(mut s: String, tok: &str) -> String {
+    let paren = format!("({})", tok);
+    if let Some(i) = s.find(&paren) {
+        let head = s[..i].trim_end().to_string();
+        let tail = s[i + paren.len()..].to_string();
+        return format!("{}{}", head, tail);
+    }
+    for pat in [format!(" / {}", tok), format!("{} / ", tok)] {
+        if s.contains(&pat) {
+            return s.replacen(&pat, "", 1);
+        }
+    }
+    s = s.replace(tok, "");
+    s.trim().to_string()
+}
+
+/// `text` tarjima qilingan matn bo'lib, ichida standart kombinatsiyalar (masalan "Alt+Shift+V") bor.
+/// Har bir `ids[i]` uchun uning standart kombinatsiyasi joriy kombinatsiyaga almashtiriladi.
+/// Ikki bosqichli (belgi orqali): "Ctrl+T / Ctrl+L" da ikkalasi o'rin almashtirilsa ham to'qnashmaydi.
+fn sc_apply(text: &str, ids: &[&str]) -> String {
+    let tok = |i: usize| format!("\u{1}{}\u{2}", i);
+    let mut out = text.to_string();
+    for (i, id) in ids.iter().enumerate() {
+        if let Some(def) = SHORTCUT_DEFS.iter().find(|d| d.id == *id) {
+            out = out.replace(def.defaults[0], &tok(i));
+        }
+    }
+    for (i, id) in ids.iter().enumerate() {
+        let t = tok(i);
+        let cur = sc_display(id);
+        out = if cur.is_empty() { sc_strip_token(out, &t) } else { out.replace(&t, &cur) };
+    }
+    out
+}
+
+fn sc_bind(f: impl Fn() -> bool + 'static) {
+    if !f() {
+        return;
+    }
+    SC_BOUND.with(|b| {
+        let mut v = b.borrow_mut();
+        v.push(Box::new(f));
+        // Qayta-qayta yaratiladigan vidjetlar (sidebar) ro'yxatni shishirmasin
+        if v.len() > 128 {
+            v.retain(|f| f());
+        }
+    });
+}
+
+/// Config o'zgarganda (Settings'da saqlash, import, ishga tushirish) hamma yozuvni yangilaydi.
+fn sc_refresh_bound() {
+    SC_BOUND.with(|b| b.borrow_mut().retain(|f| f()));
+}
+
+/// Label matni: ingliz kalit -> tarjima -> standart shortcutlar joriylari bilan almashtiriladi.
+fn sc_bind_text(lbl: &gtk::Label, key: &'static str, ids: &'static [&'static str]) {
+    let weak = lbl.downgrade();
+    sc_bind(move || match weak.upgrade() {
+        Some(l) => {
+            l.set_text(&sc_apply(tr(key), ids));
+            true
+        }
+        None => false,
+    });
+}
+
+/// Faqat shortcut ko'rsatadigan chip/badge: shortcut o'chirilgan bo'lsa yashiriladi.
+fn sc_bind_chip(lbl: &gtk::Label, id: &'static str) {
+    let weak = lbl.downgrade();
+    sc_bind(move || match weak.upgrade() {
+        Some(l) => {
+            let t = sc_display(id);
+            l.set_visible(!t.is_empty());
+            l.set_text(&t);
+            true
+        }
+        None => false,
+    });
+}
+
+fn sc_bind_tooltip<W: gtk::prelude::IsA<gtk::Widget>>(w: &W, key: &'static str, ids: &'static [&'static str]) {
+    let weak = w.upcast_ref::<gtk::Widget>().downgrade();
+    sc_bind(move || match weak.upgrade() {
+        Some(w) => {
+            w.set_tooltip_text(Some(&sc_apply(tr(key), ids)));
+            true
+        }
+        None => false,
+    });
+}
+
 /// Rail intercepts keys in capture phase, respecting each shortcut's priority (Rail vs Website).
 fn apply_shortcut_priority() {
     KEY_CTL.with(|k| {
@@ -2766,6 +2884,7 @@ fn sc_commit(ui: &ScUi) {
     if save_shortcuts_config(&cfg) {
         SHORTCUTS.with(|c| *c.borrow_mut() = cfg);
         apply_shortcut_priority();
+        sc_refresh_bound();
     } else {
         ui.status.set_text(tr("Could not write shortcuts-customize.json"));
     }
@@ -4178,12 +4297,12 @@ impl App {
                 app_src.show_devtools();
             });
             self.win.add_action(&act_src);
-            menu.append(&ContextMenuItem::from_gaction(&act_src, tr("View Page Source  (F12)"), None));
+            menu.append(&ContextMenuItem::from_gaction(&act_src, &sc_apply(tr("View Page Source  (F12)"), &["devtools"]), None));
         }
 
         menu.append(&ContextMenuItem::from_stock_action_with_label(
             ContextMenuAction::InspectElement,
-            tr("Inspect Element  (F12)"),
+            &sc_apply(tr("Inspect Element  (F12)"), &["devtools"]),
         ));
     }
 
@@ -5478,12 +5597,6 @@ impl App {
             ws_title.set_ellipsize(gtk::pango::EllipsizeMode::End);
             ws_box.append(&ws_title);
 
-            if ri == cur_r {
-                let active_badge = gtk::Label::new(Some(tr("ACTIVE")));
-                active_badge.add_css_class("workspace-badge");
-                ws_box.append(&active_badge);
-            }
-
             let count_text = if row.tabs.len() == 1 {
                 tr("1 tab").to_string()
             } else {
@@ -5719,7 +5832,8 @@ impl App {
         new_ws_box.add_css_class("btn-new-workspace");
         new_ws_box.set_halign(gtk::Align::Fill);
         new_ws_box.set_overflow(gtk::Overflow::Hidden);
-        let new_ws_lbl = gtk::Label::new(Some(tr("+ New Workspace (Alt+Shift+V)")));
+        let new_ws_lbl = gtk::Label::new(None);
+        sc_bind_text(&new_ws_lbl, "+ New Workspace (Alt+Shift+V)", &["new_workspace"]);
         new_ws_lbl.set_xalign(0.0);
         new_ws_lbl.set_hexpand(true);
         new_ws_lbl.set_width_chars(1);
@@ -5919,7 +6033,8 @@ impl App {
         manage_btn.add_css_class("profile-item-btn");
         let manage_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let manage_icon = gtk::Image::from_icon_name("preferences-system-symbolic");
-        let manage_lbl = gtk::Label::new(Some(tr("Manage Profiles in Settings (Alt+P)")));
+        let manage_lbl = gtk::Label::new(None);
+        sc_bind_text(&manage_lbl, "Manage Profiles in Settings (Alt+P)", &["profiles"]);
         manage_lbl.add_css_class("profile-item-name");
         manage_lbl.set_xalign(0.0);
         manage_box.append(&manage_icon);
@@ -7942,13 +8057,14 @@ fn build(gapp: &gtk::Application) {
     s_icon.add_css_class("pill-icon");
     pill_inner.append(&s_icon);
     pill_inner.append(&pill_label);
-    let pill_chip = gtk::Label::new(Some(tr("Ctrl+L")));
+    let pill_chip = gtk::Label::new(None);
+    sc_bind_chip(&pill_chip, "focus_url");
     pill_chip.add_css_class("pill-chip");
     pill_inner.append(&pill_chip);
     let pill = gtk::Button::new();
     pill.add_css_class("pill");
     pill.set_child(Some(&pill_inner));
-    pill.set_tooltip_text(Some(tr("Go to address  (Ctrl+L)")));
+    sc_bind_tooltip(&pill, "Go to address  (Ctrl+L)", &["focus_url"]);
 
     let list = gtk::ListBox::new();
     list.add_css_class("tablist");
@@ -8029,7 +8145,8 @@ fn build(gapp: &gtk::Application) {
     palette_suggestions_box.add_css_class("palette-suggestions-box");
     palette_suggestions_box.set_visible(false);
 
-    let phint = gtk::Label::new(Some(tr("Enter  go      Esc  cancel      Alt+P  profiles")));
+    let phint = gtk::Label::new(None);
+    sc_bind_text(&phint, "Enter  go      Esc  cancel      Alt+P  profiles", &["profiles"]);
     phint.add_css_class("palette-hint");
     phint.set_xalign(0.0);
     let palette = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -8167,7 +8284,8 @@ fn build(gapp: &gtk::Application) {
     let engine_title = gtk::Label::new(Some(tr("Default Search Engine")));
     engine_title.add_css_class("settings-card-title");
     engine_title.set_xalign(0.0);
-    let engine_desc = gtk::Label::new(Some(tr("Applied when searching via the Omnibar (Ctrl+T / Ctrl+L)")));
+    let engine_desc = gtk::Label::new(None);
+    sc_bind_text(&engine_desc, "Applied when searching via the Omnibar (Ctrl+T / Ctrl+L)", &["new_tab", "focus_url"]);
     engine_desc.add_css_class("settings-card-desc");
     engine_desc.set_xalign(0.0);
     engine_card.append(&engine_title);
@@ -8557,7 +8675,8 @@ fn build(gapp: &gtk::Application) {
     let prof_page_title = gtk::Label::new(Some(tr("Profiles & Workspaces")));
     prof_page_title.add_css_class("settings-page-title");
     prof_page_title.set_xalign(0.0);
-    let prof_page_subtitle = gtk::Label::new(Some(tr("Isolated workspaces, sessions & cookie storage  (Alt+P)")));
+    let prof_page_subtitle = gtk::Label::new(None);
+    sc_bind_text(&prof_page_subtitle, "Isolated workspaces, sessions & cookie storage  (Alt+P)", &["profiles"]);
     prof_page_subtitle.add_css_class("settings-page-subtitle");
     prof_page_subtitle.set_xalign(0.0);
 
@@ -8806,7 +8925,8 @@ fn build(gapp: &gtk::Application) {
     let data_page_title = gtk::Label::new(Some(tr("Data")));
     data_page_title.add_css_class("settings-page-title");
     data_page_title.set_xalign(0.0);
-    let data_page_subtitle = gtk::Label::new(Some(tr("End-to-end encrypted backup and instant cloud synchronization across devices  (Alt+I)")));
+    let data_page_subtitle = gtk::Label::new(None);
+    sc_bind_text(&data_page_subtitle, "End-to-end encrypted backup and instant cloud synchronization across devices  (Alt+I)", &["data"]);
     data_page_subtitle.add_css_class("settings-page-subtitle");
     data_page_subtitle.set_xalign(0.0);
 
@@ -9223,7 +9343,8 @@ fn build(gapp: &gtk::Application) {
     map_title.set_hexpand(true);
     map_title.set_xalign(0.0);
 
-    let map_badge = gtk::Label::new(Some(tr("Alt+M")));
+    let map_badge = gtk::Label::new(None);
+    sc_bind_chip(&map_badge, "map");
     map_badge.add_css_class("minimap-badge");
 
     let map_hint = gtk::Label::new(Some(tr("Drag header")));
@@ -9232,7 +9353,7 @@ fn build(gapp: &gtk::Application) {
 
     let map_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
     map_close_btn.add_css_class("flat-icon");
-    map_close_btn.set_tooltip_text(Some(tr("Close Map (Alt+M / Esc)")));
+    sc_bind_tooltip(&map_close_btn, "Close Map (Alt+M / Esc)", &["map"]);
     map_close_btn.set_cursor_from_name(Some("pointer"));
 
     map_header_row.append(&map_icon);
@@ -9285,7 +9406,8 @@ fn build(gapp: &gtk::Application) {
     devtools_title.set_markup("<span font_family='ui-monospace' font_weight='800'>rail</span><span foreground='#38bdf8'>.</span><span font_family='ui-monospace' foreground='#a1a1a1'>devtools</span>");
     devtools_title.add_css_class("devtools-brand-label");
 
-    let devtools_badge = gtk::Label::new(Some("F12"));
+    let devtools_badge = gtk::Label::new(None);
+    sc_bind_chip(&devtools_badge, "devtools");
     devtools_badge.add_css_class("devtools-badge");
 
     let devtools_url_lbl = gtk::Label::new(None);
@@ -9302,7 +9424,7 @@ fn build(gapp: &gtk::Application) {
 
     let devtools_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
     devtools_close_btn.add_css_class("flat-icon");
-    devtools_close_btn.set_tooltip_text(Some(tr("Close DevTools (Esc / F12)")));
+    sc_bind_tooltip(&devtools_close_btn, "Close DevTools (Esc / F12)", &["devtools"]);
 
     devtools_header.append(&devtools_icon);
     devtools_header.append(&devtools_title);
@@ -10104,6 +10226,7 @@ fn build(gapp: &gtk::Application) {
     SHORTCUTS.with(|c| *c.borrow_mut() = load_shortcuts_config());
     KEY_CTL.with(|k| *k.borrow_mut() = Some(keys.clone()));
     apply_shortcut_priority();
+    sc_refresh_bound();
     let held_shortcut: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
 
     let a = app.clone();
@@ -10684,5 +10807,32 @@ mod tests {
             }
         }
     }
-}
 
+    #[test]
+    fn test_ui_shortcut_labels_follow_config() {
+        // Standart: matn o'zgarmaydi
+        SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
+        assert_eq!(sc_display("focus_url"), "Ctrl+L");
+        assert_eq!(sc_apply("+ New Workspace (Alt+Shift+V)", &["new_workspace"]), "+ New Workspace (Alt+Shift+V)");
+
+        // Foydalanuvchi o'zgartirgan: matn joriy qiymatni ko'rsatadi (tarjima qilingan matnda ham)
+        let mut cfg = ShortcutConfig::default();
+        cfg.overrides.insert("new_workspace".to_string(), vec!["Ctrl+Shift+N".to_string()]);
+        // ikki shortcut o'rin almashsa ham to'qnashmaydi
+        cfg.overrides.insert("new_tab".to_string(), vec!["Ctrl+L".to_string()]);
+        cfg.overrides.insert("focus_url".to_string(), vec!["Ctrl+K".to_string()]);
+        SHORTCUTS.with(|c| *c.borrow_mut() = cfg);
+        assert_eq!(sc_display("new_workspace"), "Ctrl+Shift+N");
+        assert_eq!(sc_apply("+ Yangi ish maydoni (Alt+Shift+V)", &["new_workspace"]), "+ Yangi ish maydoni (Ctrl+Shift+N)");
+        assert_eq!(sc_apply("Omnibar (Ctrl+T / Ctrl+L)", &["new_tab", "focus_url"]), "Omnibar (Ctrl+L / Ctrl+K)");
+
+        // O'chirilgan: qavs va ajratgich chiroyli olib tashlanadi
+        let mut cfg = ShortcutConfig::default();
+        cfg.disabled.insert("devtools".to_string());
+        cfg.disabled.insert("profiles".to_string());
+        SHORTCUTS.with(|c| *c.borrow_mut() = cfg);
+        assert_eq!(sc_display("devtools"), "");
+        assert_eq!(sc_apply("Close DevTools (Esc / F12)", &["devtools"]), "Close DevTools (Esc)");
+        assert_eq!(sc_apply("Manage Profiles in Settings (Alt+P)", &["profiles"]), "Manage Profiles in Settings");
+    }
+}
