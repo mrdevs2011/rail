@@ -56,3 +56,9 @@
 - Qilindi: v0.5.13: folder URLs + smooth scroll + auto-update + SVG gear; release (install skip)
 - Keyingi qadam: Deploy Vercel; user can install manually
 - Git holati: b59d86e feat: folder URLs, smooth scroll, auto-update, SVG gear (v0.5.13)
+
+---
+### 2026-10-17 07:12
+- Qilindi: v0.5.14: New version chip in settings header, filled SVG gear; release (no install)
+- Keyingi qadam: User updates via Settings or card
+- Git holati: 8837a4a feat: settings header New version chip + filled SVG gear (v0.5.14)
