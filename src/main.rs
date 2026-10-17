@@ -53,6 +53,8 @@ pub struct AppSettings {
     pub webrtc_enabled: bool,
     /// Launchda yangi versiyani tekshirib o'rnatish
     pub auto_update: bool,
+    /// DevTools oxirgi dock holati: "bottom" | "left" | "right" | "undocked"
+    pub devtools_dock: String,
 }
 
 impl Default for AppSettings {
@@ -63,7 +65,26 @@ impl Default for AppSettings {
             smooth_scrolling: true,
             webrtc_enabled: true,
             auto_update: false,
+            devtools_dock: "bottom".to_string(),
         }
+    }
+}
+
+pub fn devtools_dock_to_str(side: DevToolsDockSide) -> &'static str {
+    match side {
+        DevToolsDockSide::Bottom => "bottom",
+        DevToolsDockSide::Left => "left",
+        DevToolsDockSide::Right => "right",
+        DevToolsDockSide::Undocked => "undocked",
+    }
+}
+
+pub fn devtools_dock_from_str(s: &str) -> DevToolsDockSide {
+    match s {
+        "left" => DevToolsDockSide::Left,
+        "right" => DevToolsDockSide::Right,
+        "undocked" => DevToolsDockSide::Undocked,
+        _ => DevToolsDockSide::Bottom,
     }
 }
 
@@ -88,6 +109,9 @@ pub fn load_app_settings() -> AppSettings {
         if let Some(au) = root.get("auto_update").and_then(|v| v.as_bool()) {
             s.auto_update = au;
         }
+        if let Some(dd) = root.get("devtools_dock").and_then(|v| v.as_str()) {
+            s.devtools_dock = dd.to_string();
+        }
     }
     s
 }
@@ -103,8 +127,10 @@ pub fn save_app_settings(s: &AppSettings) -> bool {
 ", s.smooth_scrolling));
     out.push_str(&format!("  \"webrtc_enabled\": {},
 ", s.webrtc_enabled));
-    out.push_str(&format!("  \"auto_update\": {}
+    out.push_str(&format!("  \"auto_update\": {},
 ", s.auto_update));
+    out.push_str(&format!("  \"devtools_dock\": \"{}\"
+", minijson::escape(&s.devtools_dock)));
     out.push_str("}
 ");
     let path = settings_json_path();
@@ -3733,6 +3759,15 @@ impl App {
     fn set_devtools_dock_side(self: &Rc<Self>, side: DevToolsDockSide) {
         let prev = self.devtools_dock_side.get();
         self.devtools_dock_side.set(side);
+        // Oxirgi dock holatini eslab qolamiz: keyingi safar DevTools shu joyda ochiladi.
+        if prev != side {
+            let mut st = load_app_settings();
+            let name = devtools_dock_to_str(side);
+            if st.devtools_dock != name {
+                st.devtools_dock = name.to_string();
+                save_app_settings(&st);
+            }
+        }
         let Some(view) = self.dt_view() else { return };
         let Some(insp) = view.inspector() else { return };
         let Some(w) = insp.web_view() else { return };
@@ -9546,7 +9581,7 @@ fn build(gapp: &gtk::Application) {
         map_location_btn: map_location_btn.clone(),
         map_state: RefCell::new(MinimapState::default()),
         devtools_open: Cell::new(false),
-        devtools_dock_side: Cell::new(DevToolsDockSide::Bottom),
+        devtools_dock_side: Cell::new(devtools_dock_from_str(&initial_settings.devtools_dock)),
         devtools_panel: devtools_panel.clone(),
         devtools_content_box: devtools_content_box.clone(),
         devtools_resize_handle: devtools_resize_handle.clone(),
@@ -10707,6 +10742,7 @@ mod tests {
             smooth_scrolling: false,
             webrtc_enabled: true,
             auto_update: false,
+            devtools_dock: "right".to_string(),
         };
         let mut out = String::from("{\n");
         out.push_str(&format!("  \"search_engine\": \"{}\",\n", minijson::escape(&s.search_engine)));
