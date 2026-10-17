@@ -73,10 +73,10 @@ Yoki ilovalar ro‘yxatidan (Rofi / Wofi / GNOME / KDE) **Rail** deb qidirib och
 
 | Klavishlar | Vazifasi |
 | :--- | :--- |
-| `Alt + T` | Omnibar / yangi tab |
-| `Alt + G` | Manzil qatori (URL bar) |
-| `Alt + W` | Fokusdagi tabni yopish |
-| `Alt + R` | Sahifani yangilash (Reload) |
+| `Ctrl + T` | Omnibar / yangi tab |
+| `Ctrl + L` | Manzil qatori (URL bar) |
+| `Ctrl + W` | Fokusdagi tabni yopish |
+| `Ctrl + R` | Sahifani yangilash (Reload) |
 | `Alt + F` | To‘liq kenglik / standart kenglik |
 | `Alt + Shift + V` | Yangi ish maydoni (workspace) |
 | `Alt + H` / `Alt + L` | Chap / o‘ng tabga fokus |
@@ -95,7 +95,7 @@ Yoki ilovalar ro‘yxatidan (Rofi / Wofi / GNOME / KDE) **Rail** deb qidirib och
 | `F12` / `Alt + Shift + D` | DevTools / DevTools joylashuvini almashtirish |
 | `F11` | To‘liq ekran |
 | `Alt + Left` / `Alt + Right` | Orqaga / Oldinga |
-| `Alt + Q` | Rail'dan chiqish |
+| `Ctrl + Q` | Rail'dan chiqish |
 
 Tab setka va Overview ichida: `h` `j` `k` `l` — harakat, `Enter` — ochish, `x` — yopish, `Esc` — bekor qilish.
 Har bir amalga **bitta** shortcut biriktirilgan; xohlasangiz Sozlamalar → Customize → Shortcuts orqali o‘zgartirishingiz mumkin.

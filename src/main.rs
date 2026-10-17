@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::OnceLock;
 use std::time::Duration;
-use strip::{col_width, gap, tile_grid, ShellLayout, StripLayout, SIDE_W};
+use strip::{col_width, gap, group_ranges, stack_height, ShellLayout, StripLayout, SIDE_W};
 use webkit6::prelude::*;
 use webkit6::{
     ContextMenu, ContextMenuAction, ContextMenuItem, HitTestResult,
@@ -312,7 +312,7 @@ body {
       spellcheck="false"
       onkeydown="if(event.key==='Enter'){var q=this.value.trim();if(q){if(q.indexOf('://')!==-1||(q.indexOf('.')!==-1&&q.indexOf(' ')===-1)){location.href=q.indexOf('://')===-1?'https://'+q:q;}else{location.href='https://www.google.com/search?q='+encodeURIComponent(q);}}}"
     />
-    <span class="search-hint">Alt+G</span>
+    <span class="search-hint">Ctrl+L</span>
   </div>
 </div>
 </body>
@@ -1943,6 +1943,8 @@ struct Tab {
     freeze: gtk::Picture,
     profile_id: String,
     custom_width: Cell<Option<f64>>,
+    /// Consecutive tabs of a row with the same id share one column, stacked vertically (like niri)
+    col_id: Cell<u64>,
     /// Oxirgi ma'lum http(s) manzil. WebKit web process to'xtatilganda uri() ni tozalab yuboradi,
     /// shuning uchun uyg'otish va sessiyani saqlash shu nusxadan foydalanadi.
     saved_uri: RefCell<String>,
@@ -1962,6 +1964,97 @@ impl Tab {
 
 struct Row {
     tabs: Vec<Tab>,
+}
+
+static COL_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+/// A tab with a fresh id lives in a column of its own.
+fn new_col_id() -> u64 {
+    COL_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
+fn set_full_class(w: &gtk::Box, full: bool) {
+    if full {
+        w.add_css_class("full");
+    } else {
+        w.remove_css_class("full");
+    }
+}
+
+impl Tab {
+    /// Width of a brand-new tab: full width, no manual size.
+    fn reset_col_props(&self) {
+        self.custom_width.set(None);
+        set_full_class(&self.container, true);
+    }
+}
+
+impl Row {
+    fn ids(&self) -> Vec<u64> {
+        self.tabs.iter().map(|t| t.col_id.get()).collect()
+    }
+
+    /// (start, end) of the column that holds tab `c`; `end` is exclusive.
+    fn columns(&self) -> Vec<(usize, usize)> {
+        group_ranges(&self.ids())
+    }
+
+    fn col_span(&self, c: usize) -> (usize, usize) {
+        for (s, len) in self.columns() {
+            if c >= s && c < s + len {
+                return (s, s + len);
+            }
+        }
+        (c, c + 1)
+    }
+
+    /// A column's width lives on its first tab; hands it over from one tab to another.
+    fn move_col_props(&self, from: usize, to: usize) {
+        let full = self.tabs[from].container.has_css_class("full");
+        self.tabs[to].custom_width.set(self.tabs[from].custom_width.get());
+        set_full_class(&self.tabs[to].container, full);
+        self.tabs[from].reset_col_props();
+    }
+
+    /// Swaps two tabs but leaves the column width where it was (it belongs to the position).
+    fn swap_keep_props(&mut self, i: usize, j: usize) {
+        let (wi, wj) = (self.tabs[i].custom_width.get(), self.tabs[j].custom_width.get());
+        let (fi, fj) = (self.tabs[i].container.has_css_class("full"), self.tabs[j].container.has_css_class("full"));
+        self.tabs.swap(i, j);
+        self.tabs[i].custom_width.set(wi);
+        self.tabs[j].custom_width.set(wj);
+        set_full_class(&self.tabs[i].container, fi);
+        set_full_class(&self.tabs[j].container, fj);
+    }
+
+    /// Takes tab `c` out of the row. The tab ends up in a column of its own; if it was the
+    /// first tab of a stack, the rest of the stack keeps the column width.
+    fn detach(&mut self, c: usize) -> Tab {
+        let (s, e) = self.col_span(c);
+        if e - s > 1 {
+            if c == s {
+                self.move_col_props(s, s + 1);
+            } else {
+                self.tabs[c].reset_col_props();
+            }
+        }
+        let tab = self.tabs.remove(c);
+        tab.col_id.set(new_col_id());
+        tab
+    }
+}
+
+/// Columns of a row as (first tab, tab count, x, width).
+fn row_cols(row: &Row, vw: f64, g: f64) -> Vec<(usize, usize, f64, f64)> {
+    let mut out = Vec::new();
+    let mut x = 0.0;
+    for (start, len) in row.columns() {
+        let head = &row.tabs[start];
+        let w = head.custom_width.get().unwrap_or_else(|| col_width(head.container.has_css_class("full"), vw));
+        out.push((start, len, x, w));
+        x += w + g;
+    }
+    out
 }
 
 struct MinimapState {
@@ -2148,22 +2241,24 @@ const G_TABS: &str = "Tabs & Workspaces";
 const G_PANELS: &str = "Panels, Settings & Tools";
 
 const SHORTCUT_DEFS: &[ShortcutDef] = &[
-    sc!("new_tab", G_TABS, "Open Omnibar / New tab", ["Alt+T"]),
-    sc!("focus_url", G_TABS, "Focus URL / Address bar", ["Alt+G"]),
-    sc!("close_tab", G_TABS, "Close focused tab", ["Alt+W"]),
-    sc!("reload", G_TABS, "Reload active tab", ["Alt+R"]),
+    sc!("new_tab", G_TABS, "Open Omnibar / New tab", ["Ctrl+T"]),
+    sc!("focus_url", G_TABS, "Focus URL / Address bar", ["Ctrl+L"]),
+    sc!("close_tab", G_TABS, "Close focused tab", ["Ctrl+W"]),
+    sc!("reload", G_TABS, "Reload active tab", ["Ctrl+R"]),
     sc!("full_tab", G_TABS, "Toggle Full Tab View", ["Alt+F"]),
     sc!("new_workspace", G_TABS, "New Workspace", ["Alt+Shift+V"]),
     sc!("focus_left", G_TABS, "Focus column Left", ["Alt+H"]),
     sc!("focus_right", G_TABS, "Focus column Right", ["Alt+L"]),
-    sc!("focus_down", G_TABS, "Focus row Down", ["Alt+J"]),
-    sc!("focus_up", G_TABS, "Focus row Up", ["Alt+K"]),
+    sc!("focus_down", G_TABS, "Focus window Down", ["Alt+J"]),
+    sc!("focus_up", G_TABS, "Focus window Up", ["Alt+K"]),
     sc!("move_left", G_TABS, "Move tab column Left", ["Alt+Shift+H"]),
     sc!("move_right", G_TABS, "Move tab column Right", ["Alt+Shift+L"]),
-    sc!("move_down", G_TABS, "Move tab row Down", ["Alt+Shift+J"]),
-    sc!("move_up", G_TABS, "Move tab row Up", ["Alt+Shift+K"]),
+    sc!("move_down", G_TABS, "Move window Down", ["Alt+Shift+J"]),
+    sc!("move_up", G_TABS, "Move window Up", ["Alt+Shift+K"]),
     sc!("next_tab", G_TABS, "Cycle to next tab", ["Ctrl+Tab"]),
     sc!("prev_tab", G_TABS, "Cycle to previous tab", ["Ctrl+Shift+Tab"]),
+    sc!("stack_left", G_TABS, "Stack into left column / unstack left", ["Alt+["]),
+    sc!("stack_right", G_TABS, "Stack into right column / unstack right", ["Alt+]"]),
     sc!("tab_1", G_TABS, "Switch to tab 1", ["Ctrl+1"]),
     sc!("tab_2", G_TABS, "Switch to tab 2", ["Ctrl+2"]),
     sc!("tab_3", G_TABS, "Switch to tab 3", ["Ctrl+3"]),
@@ -2198,13 +2293,12 @@ const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("devtools_dock", G_PANELS, "Cycle DevTools dock position", ["Alt+Shift+D"]),
     sc!("map", G_PANELS, "Toggle Roadmap / Minimap", ["Alt+M"]),
     sc!("overview", G_PANELS, "Toggle Spatial Overview", ["Alt+O"]),
-    sc!("tab_grid", G_PANELS, "Toggle Tab Grid view", ["Alt+E"]),
     sc!("sidebar", G_PANELS, "Toggle Sidebar", ["Alt+B"]),
     sc!("touchpad", G_PANELS, "Toggle Touchpad Canvas Navigation", ["Alt+Shift+T"]),
     sc!("back", G_PANELS, "Browser Back", ["Alt+Left"]),
     sc!("forward", G_PANELS, "Browser Forward", ["Alt+Right"]),
     sc!("fullscreen", G_PANELS, "Toggle Fullscreen", ["F11"]),
-    sc!("quit", G_PANELS, "Quit Rail", ["Alt+Q"]),
+    sc!("quit", G_PANELS, "Quit Rail", ["Ctrl+Q"]),
 ];
 
 #[derive(Clone, Default)]
@@ -2253,6 +2347,10 @@ fn load_shortcuts_config() -> ShortcutConfig {
         return cfg;
     };
     cfg.site_wins = root.get("priority").and_then(|v| v.as_str()) == Some("site");
+    let version = match root.get("version") {
+        Some(minijson::Json::Num(n)) => *n,
+        _ => 1.0,
+    };
     if let Some(minijson::Json::Obj(items)) = root.get("shortcuts") {
         for (id, v) in items {
             let Some(def) = SHORTCUT_DEFS.iter().find(|d| d.id == id.as_str()) else {
@@ -2272,12 +2370,20 @@ fn load_shortcuts_config() -> ShortcutConfig {
             }
         }
     }
+    if version < 2.0 {
+        // v2: standart brauzer shortcutlari. Eski Alt+... defaultlari faylda qotib qolgan bo'lsa, yangi defaultga o'tkazamiz.
+        for (id, legacy) in [("new_tab", "Alt+T"), ("focus_url", "Alt+G"), ("close_tab", "Alt+W"), ("reload", "Alt+R"), ("quit", "Alt+Q")] {
+            if cfg.overrides.get(id).map(|l| l.len() == 1 && l[0] == legacy).unwrap_or(false) {
+                cfg.overrides.remove(id);
+            }
+        }
+    }
     sc_normalize(&mut cfg);
     cfg
 }
 
 fn save_shortcuts_config(cfg: &ShortcutConfig) -> bool {
-    let mut out = String::from("{\n  \"version\": 1,\n");
+    let mut out = String::from("{\n  \"version\": 2,\n");
     out.push_str(&format!(
         "  \"priority\": \"{}\",\n",
         if cfg.site_wins { "site" } else { "rail" }
@@ -2489,10 +2595,11 @@ fn sc_synth(combo: &str) -> Option<(gdk::Key, gdk::ModifierType)> {
             other => name = other,
         }
     }
-    let key = if name.chars().count() == 1 {
-        gdk::Key::from_name(name.to_lowercase())?
-    } else {
-        gdk::Key::from_name(name)?
+    let key = match name {
+        "[" => gdk::Key::bracketleft,
+        "]" => gdk::Key::bracketright,
+        _ if name.chars().count() == 1 => gdk::Key::from_name(name.to_lowercase())?,
+        _ => gdk::Key::from_name(name)?,
     };
     Some((key, mods))
 }
@@ -2878,6 +2985,8 @@ struct SessionState {
     search_engine: Option<String>,
     win_size: Option<(i32, i32, bool)>,
     tabs: Vec<SessionTabItem>,
+    /// (row, col) of tabs that are stacked under the tab before them in the same column
+    stacked: Vec<(usize, usize)>,
 }
 
 fn parse_session_content(content: &str) -> SessionState {
@@ -2887,6 +2996,7 @@ fn parse_session_content(content: &str) -> SessionState {
     let mut search_engine = None;
     let mut win_size = None;
     let mut tabs: Vec<SessionTabItem> = Vec::new();
+    let mut stacked: Vec<(usize, usize)> = Vec::new();
 
     for line in content.lines() {
         let parts: Vec<&str> = line.split('\t').collect();
@@ -2929,6 +3039,9 @@ fn parse_session_content(content: &str) -> SessionState {
                 let url = parts[3].to_string();
                 tabs.push(SessionTabItem { row: 0, col: c, full: true, profile_id: pid, url, custom_width: None });
             }
+            "stack" if parts.len() >= 3 => {
+                stacked.push((parts[1].parse().unwrap_or(0), parts[2].parse().unwrap_or(0)));
+            }
             _ => {}
         }
     }
@@ -2939,6 +3052,7 @@ fn parse_session_content(content: &str) -> SessionState {
         search_engine,
         win_size,
         tabs,
+        stacked,
     }
 }
 
@@ -3082,13 +3196,16 @@ impl App {
         let rows = self.rows.borrow();
         let mut grid = Vec::new();
         let mut custom_widths = Vec::new();
+        let mut col_ids = Vec::new();
         let mut prev: Option<gtk::Widget> = None;
         for row in rows.iter() {
             let mut row_grid = Vec::new();
             let mut row_widths = Vec::new();
+            let mut row_ids = Vec::new();
             for tab in row.tabs.iter() {
                 row_grid.push(tab.container.has_css_class("full"));
                 row_widths.push(tab.custom_width.get());
+                row_ids.push(tab.col_id.get());
                 if tab.container.parent().as_ref() != Some(self.strip.upcast_ref()) {
                     self.strip.append(&tab.container);
                 }
@@ -3097,10 +3214,12 @@ impl App {
             }
             grid.push(row_grid);
             custom_widths.push(row_widths);
+            col_ids.push(row_ids);
         }
         drop(rows);
         self.layout.set_grid(grid);
         self.layout.set_custom_widths(custom_widths);
+        self.layout.set_col_ids(col_ids);
         self.strip.queue_allocate();
     }
 
@@ -3132,15 +3251,14 @@ impl App {
         let mut active_row_total_w = 0.0;
 
         for (ri, row) in rows.iter().enumerate() {
-            let mut x = 0.0;
-            for (ci, tab) in row.tabs.iter().enumerate() {
-                let w = tab.custom_width.get().unwrap_or_else(|| col_width(tab.container.has_css_class("full"), vw));
-                if ri == cur_r && ci == cur_c {
-                    active_span = Some((x, x + w));
-                }
-                x += w + g;
+            let cols = row_cols(row, vw, g);
+            if ri == cur_r {
+                active_span = cols
+                    .iter()
+                    .find(|&&(st, len, _, _)| cur_c >= st && cur_c < st + len)
+                    .map(|&(_, _, x, w)| (x, x + w));
             }
-            let row_w = (x - g).max(0.0);
+            let row_w = cols.last().map_or(0.0, |&(_, _, x, w)| x + w);
             if ri == cur_r {
                 active_row_total_w = row_w;
             }
@@ -3256,15 +3374,7 @@ impl App {
         if cur_r >= rows.len() {
             return;
         }
-        let mut row_w = 0.0;
-        let n = rows[cur_r].tabs.len();
-        for (ci, tab) in rows[cur_r].tabs.iter().enumerate() {
-            let w = tab.custom_width.get().unwrap_or_else(|| col_width(tab.container.has_css_class("full"), vw));
-            row_w += w;
-            if ci + 1 < n {
-                row_w += g;
-            }
-        }
+        let row_w = row_cols(&rows[cur_r], vw, g).last().map_or(0.0, |&(_, _, x, w)| x + w);
         drop(rows);
         let max_x = (row_w - vw).max(0.0);
         let nx = (self.layout.offset_x() + dx).clamp(0.0, max_x);
@@ -3298,16 +3408,14 @@ impl App {
         }
         let mut best_c = 0usize;
         let mut best_d = f64::MAX;
-        let mut x = 0.0;
-        for (ci, tab) in rows[cur_r].tabs.iter().enumerate() {
-            let w = tab.custom_width.get().unwrap_or_else(|| col_width(tab.container.has_css_class("full"), vw));
-            let mid = x + w / 2.0;
-            let d = (mid - center).abs();
+        let cur_c = self.focus_col.get();
+        for (start, len, x, w) in row_cols(&rows[cur_r], vw, g) {
+            let d = (x + w / 2.0 - center).abs();
             if d < best_d {
                 best_d = d;
-                best_c = ci;
+                // keep the focused window if it lives in this column, else the top one
+                best_c = if cur_c >= start && cur_c < start + len { cur_c } else { start };
             }
-            x += w + g;
         }
         drop(rows);
         if best_c != self.focus_col.get() {
@@ -4280,6 +4388,7 @@ impl App {
                     }
                 }
                 if let Some((r, c)) = app.find_view_coords(&v) {
+                    let (c, next_c) = app.col_head_and_next(r, c);
                     let vw = app.strip.width() as f64;
                     let rows = app.rows.borrow();
                     if let Some(row) = rows.get(r) {
@@ -4289,7 +4398,7 @@ impl App {
                         });
                         start_w0.set(w0);
 
-                        let w1 = row.tabs.get(c + 1).map(|t| {
+                        let w1 = row.tabs.get(next_c).map(|t| {
                             t.custom_width.get().unwrap_or_else(|| {
                                 let is_full = t.container.has_css_class("full");
                                 col_width(is_full, vw)
@@ -4319,6 +4428,7 @@ impl App {
                 };
 
                 if let Some((r, c)) = app.find_view_coords(&v) {
+                    let (c, next_c) = app.col_head_and_next(r, c);
                     let vw = app.strip.width() as f64;
                     let min_w = 280.0;
                     let max_w = vw; // Fullscreen max: left edge to right edge
@@ -4331,7 +4441,7 @@ impl App {
                             let clamped_w0 = new_w0.clamp(min_w, (total_pair - min_w).min(max_w));
                             let new_w1 = (total_pair - clamped_w0).max(min_w);
                             app.set_tab_width(r, c, clamped_w0);
-                            app.set_tab_width(r, c + 1, new_w1);
+                            app.set_tab_width(r, next_c, new_w1);
                             return;
                         }
                     }
@@ -4359,7 +4469,7 @@ impl App {
             if n_press == 2 {
                 if let Some((r, c)) = app_dbl.find_view_coords(&v_dbl) {
                     let rows = app_dbl.rows.borrow();
-                    if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) {
+                    if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(row.col_span(c).0)) {
                         tab.custom_width.set(None);
                     }
                     drop(rows);
@@ -4388,7 +4498,7 @@ impl App {
                 while rows.len() <= next_r {
                     rows.push(Row { tabs: Vec::new() });
                 }
-                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), profile_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), profile_id, custom_width: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
                 let c_idx = rows[next_r].tabs.len() - 1;
                 (next_r, c_idx)
             } else {
@@ -4397,9 +4507,10 @@ impl App {
                 let col_idx = if rows[cur_r].tabs.is_empty() {
                     0
                 } else {
-                    (cur_c + 1).min(rows[cur_r].tabs.len())
+                    // a new tab opens in a column of its own, right after the focused column
+                    rows[cur_r].col_span(cur_c.min(rows[cur_r].tabs.len() - 1)).1
                 };
-                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), profile_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), profile_id, custom_width: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
                 (cur_r, col_idx)
             }
         };
@@ -4511,6 +4622,14 @@ impl App {
         }
     }
 
+    /// (first tab of the column, first tab of the next column) for tab (r, c).
+    fn col_head_and_next(&self, r: usize, c: usize) -> (usize, usize) {
+        match self.rows.borrow().get(r) {
+            Some(row) if c < row.tabs.len() => row.col_span(c),
+            _ => (c, c + 1),
+        }
+    }
+
     fn find_view_coords(&self, view: &WebView) -> Option<(usize, usize)> {
         let rows = self.rows.borrow();
         for (r_idx, row) in rows.iter().enumerate() {
@@ -4537,7 +4656,7 @@ impl App {
         if r_idx >= rows.len() || c_idx >= rows[r_idx].tabs.len() {
             return;
         }
-        let tab = rows[r_idx].tabs.remove(c_idx);
+        let tab = rows[r_idx].detach(c_idx);
         self.strip.remove(&tab.container);
 
         let row_removed = if rows[r_idx].tabs.is_empty() && rows.len() > 1 {
@@ -4666,27 +4785,64 @@ impl App {
         }
     }
 
+    /// Focus the neighbouring column, landing on the window at the same height when possible.
     fn focus_column_left(self: &Rc<Self>) {
-        let cur_c = self.focus_col.get();
-        if cur_c > 0 {
-            self.focus_coords(self.focus_row.get(), cur_c - 1);
+        let (r, c) = (self.focus_row.get(), self.focus_col.get());
+        let target = {
+            let rows = self.rows.borrow();
+            rows.get(r).and_then(|row| {
+                if c >= row.tabs.len() {
+                    return None;
+                }
+                let (s, _) = row.col_span(c);
+                if s == 0 {
+                    return None;
+                }
+                let (ls, le) = row.col_span(s - 1);
+                Some(ls + (c - s).min(le - ls - 1))
+            })
+        };
+        if let Some(t) = target {
+            self.focus_coords(r, t);
         }
     }
 
     fn focus_column_right(self: &Rc<Self>) {
-        let cur_r = self.focus_row.get();
-        let cur_c = self.focus_col.get();
-        let rows = self.rows.borrow();
-        if cur_r < rows.len() && cur_c + 1 < rows[cur_r].tabs.len() {
-            drop(rows);
-            self.focus_coords(cur_r, cur_c + 1);
+        let (r, c) = (self.focus_row.get(), self.focus_col.get());
+        let target = {
+            let rows = self.rows.borrow();
+            rows.get(r).and_then(|row| {
+                if c >= row.tabs.len() {
+                    return None;
+                }
+                let (s, e) = row.col_span(c);
+                if e >= row.tabs.len() {
+                    return None;
+                }
+                let (rs, re) = row.col_span(e);
+                Some(rs + (c - s).min(re - rs - 1))
+            })
+        };
+        if let Some(t) = target {
+            self.focus_coords(r, t);
         }
     }
 
+    /// Window above inside a stacked column; at the top of the column: the workspace above.
     fn focus_row_up(self: &Rc<Self>) {
         let cur_r = self.focus_row.get();
+        let cur_c = self.focus_col.get();
+        let above = {
+            let rows = self.rows.borrow();
+            rows.get(cur_r)
+                .filter(|row| cur_c < row.tabs.len())
+                .and_then(|row| (cur_c > row.col_span(cur_c).0).then(|| cur_c - 1))
+        };
+        if let Some(c) = above {
+            self.focus_coords(cur_r, c);
+            return;
+        }
         if cur_r > 0 {
-            let cur_c = self.focus_col.get();
             let rows = self.rows.borrow();
             let dest_c = cur_c.min(rows[cur_r - 1].tabs.len().saturating_sub(1));
             drop(rows);
@@ -4694,11 +4850,22 @@ impl App {
         }
     }
 
+    /// Window below inside a stacked column; at the bottom of the column: the workspace below.
     fn focus_row_down(self: &Rc<Self>) {
         let cur_r = self.focus_row.get();
+        let cur_c = self.focus_col.get();
+        let below = {
+            let rows = self.rows.borrow();
+            rows.get(cur_r)
+                .filter(|row| cur_c < row.tabs.len())
+                .and_then(|row| (cur_c + 1 < row.col_span(cur_c).1).then(|| cur_c + 1))
+        };
+        if let Some(c) = below {
+            self.focus_coords(cur_r, c);
+            return;
+        }
         let rows = self.rows.borrow();
         if cur_r + 1 < rows.len() {
-            let cur_c = self.focus_col.get();
             let dest_c = cur_c.min(rows[cur_r + 1].tabs.len().saturating_sub(1));
             drop(rows);
             self.focus_coords(cur_r + 1, dest_c);
@@ -4763,18 +4930,131 @@ impl App {
         self.focus_coords(cur_r, next);
     }
 
+    /// Moves the whole column (all of its stacked windows) one place left or right.
     fn move_column(self: &Rc<Self>, dir: isize) {
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
-        let mut rows = self.rows.borrow_mut();
-        if cur_r >= rows.len() || cur_c >= rows[cur_r].tabs.len() {
-            return;
+        let new_c;
+        {
+            let mut rows = self.rows.borrow_mut();
+            let Some(row) = rows.get_mut(cur_r) else { return };
+            if cur_c >= row.tabs.len() {
+                return;
+            }
+            let (s, e) = row.col_span(cur_c);
+            if dir > 0 {
+                if e >= row.tabs.len() {
+                    return;
+                }
+                let (_, e2) = row.col_span(e);
+                row.tabs[s..e2].rotate_left(e - s);
+                new_c = cur_c + (e2 - e);
+            } else {
+                if s == 0 {
+                    return;
+                }
+                let (p, _) = row.col_span(s - 1);
+                row.tabs[p..e].rotate_right(e - s);
+                new_c = cur_c - (s - p);
+            }
         }
-        let Some(target_c) = cur_c.checked_add_signed(dir).filter(|&t| t < rows[cur_r].tabs.len()) else { return };
-        rows[cur_r].tabs.swap(cur_c, target_c);
-        drop(rows);
         self.sync_strip();
-        self.focus_coords(cur_r, target_c);
+        self.focus_coords(cur_r, new_c);
+        self.schedule_save_session();
+    }
+
+    /// Alt+Shift+J/K: swap the window with its neighbour inside a stacked column; when it is
+    /// not stacked in that direction, move it to the neighbouring workspace instead.
+    fn move_window_vertical(self: &Rc<Self>, dir: isize) {
+        let r = self.focus_row.get();
+        let c = self.focus_col.get();
+        let mut swapped = None;
+        {
+            let mut rows = self.rows.borrow_mut();
+            if let Some(row) = rows.get_mut(r) {
+                if c < row.tabs.len() {
+                    let (s, e) = row.col_span(c);
+                    let t = c as isize + dir;
+                    if t >= s as isize && (t as usize) < e {
+                        row.swap_keep_props(c, t as usize);
+                        swapped = Some(t as usize);
+                    }
+                }
+            }
+        }
+        if let Some(t) = swapped {
+            self.sync_strip();
+            self.focus_coords(r, t);
+            self.schedule_save_session();
+        } else if dir > 0 {
+            self.move_tab_to_row(r + 1);
+        } else if r > 0 {
+            self.move_tab_to_row(r - 1);
+        }
+    }
+
+    /// niri's consume-or-expel-window: a window that is alone in its column joins the
+    /// neighbouring column (stacked); a stacked window leaves its column and becomes a new
+    /// column on that side.
+    fn consume_or_expel(self: &Rc<Self>, dir: isize) {
+        let r = self.focus_row.get();
+        let c = self.focus_col.get();
+        let new_c;
+        {
+            let mut rows = self.rows.borrow_mut();
+            let Some(row) = rows.get_mut(r) else { return };
+            if c >= row.tabs.len() {
+                return;
+            }
+            let (s, e) = row.col_span(c);
+            if e - s == 1 {
+                if dir < 0 {
+                    if s == 0 {
+                        return;
+                    }
+                    let left_id = row.tabs[s - 1].col_id.get();
+                    row.tabs[c].reset_col_props();
+                    row.tabs[c].col_id.set(left_id);
+                } else {
+                    if e >= row.tabs.len() {
+                        return;
+                    }
+                    // this tab becomes the top (first) window of the right column and takes its width
+                    let right_id = row.tabs[e].col_id.get();
+                    row.move_col_props(e, c);
+                    row.tabs[c].col_id.set(right_id);
+                }
+                new_c = c;
+            } else if dir < 0 {
+                if c == s {
+                    row.move_col_props(s, s + 1);
+                    row.tabs[c].col_id.set(new_col_id());
+                    new_c = c;
+                } else {
+                    let tab = row.tabs.remove(c);
+                    tab.reset_col_props();
+                    tab.col_id.set(new_col_id());
+                    row.tabs.insert(s, tab);
+                    new_c = s;
+                }
+            } else if c == e - 1 {
+                row.tabs[c].reset_col_props();
+                row.tabs[c].col_id.set(new_col_id());
+                new_c = c;
+            } else {
+                if c == s {
+                    row.move_col_props(s, s + 1);
+                }
+                let tab = row.tabs.remove(c);
+                tab.reset_col_props();
+                tab.col_id.set(new_col_id());
+                row.tabs.insert(e - 1, tab);
+                new_c = e - 1;
+            }
+        }
+        self.sync_strip();
+        self.focus_coords(r, new_c);
+        self.schedule_save_session();
     }
 
     fn reorder_tab_in_row(self: &Rc<Self>, r: usize, from_c: usize, to_c: usize) {
@@ -4785,7 +5065,7 @@ impl App {
         if r >= rows.len() || from_c >= rows[r].tabs.len() || to_c >= rows[r].tabs.len() {
             return;
         }
-        let tab = rows[r].tabs.remove(from_c);
+        let tab = rows[r].detach(from_c);
         rows[r].tabs.insert(to_c, tab);
         drop(rows);
         self.sync_strip();
@@ -4806,7 +5086,7 @@ impl App {
             return;
         }
 
-        let tab = rows[cur_r].tabs.remove(cur_c);
+        let tab = rows[cur_r].detach(cur_c);
         let cur_row_empty = rows[cur_r].tabs.is_empty();
 
         while rows.len() <= target_r {
@@ -4828,7 +5108,7 @@ impl App {
             self.setup_tab_signals(&container, &view, &resize_handle);
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, freeze, profile_id: prof_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+            rows[0].tabs.push(Tab { container, view, freeze, profile_id: prof_id, custom_width: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
             drop(rows);
         } else if cur_row_empty && cur_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -4853,7 +5133,7 @@ impl App {
             return;
         }
 
-        let tab = rows[from_r].tabs.remove(from_c);
+        let tab = rows[from_r].detach(from_c);
         let cur_row_empty = rows[from_r].tabs.is_empty();
 
         while rows.len() <= to_r {
@@ -4875,7 +5155,7 @@ impl App {
             self.setup_tab_signals(&container, &view, &resize_handle);
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, freeze, profile_id: prof_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+            rows[0].tabs.push(Tab { container, view, freeze, profile_id: prof_id, custom_width: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
             drop(rows);
         } else if cur_row_empty && from_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -4944,6 +5224,9 @@ impl App {
                     out.push_str(&format!("tab\t{}\t{}\t{}\t{}\t{}\t{:.1}\n", ri, ci, is_full, tab.profile_id, uri, cw));
                 } else {
                     out.push_str(&format!("tab\t{}\t{}\t{}\t{}\t{}\n", ri, ci, is_full, tab.profile_id, uri));
+                }
+                if ci > 0 && row.tabs[ci - 1].col_id.get() == tab.col_id.get() {
+                    out.push_str(&format!("stack\t{}\t{}\n", ri, ci));
                 }
             }
         }
@@ -5058,7 +5341,7 @@ impl App {
                 container.remove_css_class("full");
             }
             self.setup_tab_signals(&container, &view, &resize_handle);
-            loaded_tabs.push((item.row, Tab { container, view, freeze, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), saved_uri: RefCell::new(if item.url.starts_with("http") { item.url.clone() } else { String::new() }), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) }));
+            loaded_tabs.push((item.row, Tab { container, view, freeze, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(if item.url.starts_with("http") { item.url.clone() } else { String::new() }), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) }));
         }
 
         let mut rows = self.rows.borrow_mut();
@@ -5067,6 +5350,16 @@ impl App {
         }
         for (row_idx, tab) in loaded_tabs {
             rows[row_idx].tabs.push(tab);
+        }
+        let mut stacked = state.stacked.clone();
+        stacked.sort();
+        for (sr, sc) in stacked {
+            if let Some(row) = rows.get(sr) {
+                if sc > 0 && sc < row.tabs.len() {
+                    let id = row.tabs[sc - 1].col_id.get();
+                    row.tabs[sc].col_id.set(id);
+                }
+            }
         }
         drop(rows);
 
@@ -5079,7 +5372,13 @@ impl App {
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
         let rows = self.rows.borrow();
-        let Some(tab) = rows.get(cur_r).and_then(|r| r.tabs.get(cur_c)) else { return };
+        let Some(row) = rows.get(cur_r) else { return };
+        if cur_c >= row.tabs.len() {
+            return;
+        }
+        // the width belongs to the whole column: it lives on its first tab
+        let head = row.col_span(cur_c).0;
+        let tab = &row.tabs[head];
         tab.custom_width.set(None);
         if tab.container.has_css_class("full") {
             tab.container.remove_css_class("full");
@@ -5087,7 +5386,7 @@ impl App {
             tab.container.add_css_class("full");
         }
         drop(rows);
-        self.layout.set_column_width(cur_r, cur_c, None);
+        self.layout.set_column_width(cur_r, head, None);
         self.sync_strip();
         self.reveal_focus();
         self.schedule_save_session();
@@ -7133,62 +7432,14 @@ impl App {
     // ---- overview (niri-style 2D grid: zoomed out) -----------------------
 
     fn toggle_overview(self: &Rc<Self>) {
-        if self.ov.get() && !self.layout.tile_mode() {
+        if self.ov.get() {
             self.exit_overview();
         } else {
-            // From the tab grid this switches to the spatial overview.
-            self.exit_overview();
-            self.enter_overview_mode(false);
+            self.enter_overview();
         }
     }
 
-    /// Tab grid: every tab as an equal tile in an auto-fit grid (see strip::tile_grid).
-    fn toggle_tab_grid(self: &Rc<Self>) {
-        if self.ov.get() && self.layout.tile_mode() {
-            self.exit_overview();
-        } else {
-            // From the spatial overview this switches to the tab grid.
-            self.exit_overview();
-            self.enter_overview_mode(true);
-        }
-    }
-
-    fn tab_count(&self) -> usize {
-        self.rows.borrow().iter().map(|r| r.tabs.len()).sum()
-    }
-
-    /// Position of tab (row, col) in the flat, row-major tab order used by the tab grid.
-    fn flat_index(&self, r: usize, c: usize) -> usize {
-        self.rows.borrow().iter().take(r).map(|x| x.tabs.len()).sum::<usize>() + c
-    }
-
-    fn coords_of_flat(&self, idx: usize) -> Option<(usize, usize)> {
-        let rows = self.rows.borrow();
-        let mut left = idx;
-        for (r, row) in rows.iter().enumerate() {
-            if left < row.tabs.len() {
-                return Some((r, left));
-            }
-            left -= row.tabs.len();
-        }
-        None
-    }
-
-    /// Moves focus inside the tab grid by (dx, dy) tiles.
-    fn grid_move(self: &Rc<Self>, dx: isize, dy: isize) {
-        let n = self.tab_count();
-        if n == 0 {
-            return;
-        }
-        let cols = tile_grid(n, self.strip.width() as f64, self.strip.height() as f64).cols as isize;
-        let cur = self.flat_index(self.focus_row.get(), self.focus_col.get()) as isize;
-        let target = (cur + dx + dy * cols).clamp(0, n as isize - 1) as usize;
-        if let Some((r, c)) = self.coords_of_flat(target) {
-            self.focus_coords(r, c);
-        }
-    }
-
-    fn enter_overview_mode(self: &Rc<Self>, tile: bool) {
+    fn enter_overview(self: &Rc<Self>) {
         if self.ov.get() || self.rows.borrow().is_empty() {
             return;
         }
@@ -7204,12 +7455,7 @@ impl App {
                 t.view.set_can_target(false);
             }
         }
-        if tile {
-            self.layout.set_tile_mode(true);
-            self.strip.queue_allocate();
-        } else {
-            self.target_zoom.set(OV_ZOOM);
-        }
+        self.target_zoom.set(OV_ZOOM);
         self.reveal_focus();
     }
 
@@ -7218,10 +7464,6 @@ impl App {
             return;
         }
         self.ov.set(false);
-        if self.layout.tile_mode() {
-            self.layout.set_tile_mode(false);
-            self.strip.queue_allocate();
-        }
         self.strip.remove_css_class("zoomed");
         self.ov_hint.set_visible(false);
         for row in self.rows.borrow().iter() {
@@ -7246,18 +7488,6 @@ impl App {
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
 
-        if self.layout.tile_mode() {
-            let tg = tile_grid(self.tab_count(), vw, vh);
-            let hit = tg
-                .rects
-                .iter()
-                .position(|&(x, y, w, h)| click_x >= x && click_x <= x + w && click_y >= y && click_y <= y + h);
-            if let Some((r, c)) = hit.and_then(|i| self.coords_of_flat(i)) {
-                self.focus_coords(r, c);
-            }
-            self.exit_overview();
-            return;
-        }
         let z = self.layout.zoom();
         let off_x = self.layout.offset_x();
         let off_y = self.layout.offset_y();
@@ -7271,14 +7501,13 @@ impl App {
         for (r_idx, row) in rows.iter().enumerate() {
             let row_y = r_idx as f64 * (vh + g);
             if unscaled_y >= row_y && unscaled_y <= row_y + vh {
-                let mut col_x = 0.0;
-                for (c_idx, tab) in row.tabs.iter().enumerate() {
-                    let cw = tab.custom_width.get().unwrap_or_else(|| col_width(tab.container.has_css_class("full"), vw));
-                    if unscaled_x >= col_x && unscaled_x <= col_x + cw {
-                        hit = Some((r_idx, c_idx));
+                for (start, len, x, w) in row_cols(row, vw, g) {
+                    if unscaled_x >= x && unscaled_x <= x + w {
+                        let h = stack_height(vh, len, g);
+                        let j = (((unscaled_y - row_y) / (h + g)).floor().max(0.0) as usize).min(len - 1);
+                        hit = Some((r_idx, start + j));
                         break;
                     }
-                    col_x += cw + g;
                 }
                 if hit.is_some() {
                     break;
@@ -7294,41 +7523,16 @@ impl App {
     }
 
     fn ov_key(self: &Rc<Self>, k: gdk::Key, m: gdk::ModifierType) -> bool {
-        // Only bare keys act inside overview / tab grid. Modified keys fall through to the
-        // regular shortcuts (e.g. Alt+H), so nothing is bound twice here.
+        // Only bare keys act inside the overview. Modified keys fall through to the regular
+        // shortcuts (e.g. Alt+H), so nothing is bound twice here.
         if !m.is_empty() {
             return false;
         }
-        let tile = self.layout.tile_mode();
         match k {
-            gdk::Key::h => {
-                if tile {
-                    self.grid_move(-1, 0)
-                } else {
-                    self.focus_column_left()
-                }
-            }
-            gdk::Key::l => {
-                if tile {
-                    self.grid_move(1, 0)
-                } else {
-                    self.focus_column_right()
-                }
-            }
-            gdk::Key::j => {
-                if tile {
-                    self.grid_move(0, 1)
-                } else {
-                    self.focus_row_down()
-                }
-            }
-            gdk::Key::k => {
-                if tile {
-                    self.grid_move(0, -1)
-                } else {
-                    self.focus_row_up()
-                }
-            }
+            gdk::Key::h => self.focus_column_left(),
+            gdk::Key::l => self.focus_column_right(),
+            gdk::Key::j => self.focus_row_down(),
+            gdk::Key::k => self.focus_row_up(),
             gdk::Key::Return | gdk::Key::KP_Enter => self.exit_overview(),
             gdk::Key::x => {
                 if let Some(v) = self.focused_view() {
@@ -7428,6 +7632,34 @@ impl App {
 
         // Ctrl+Tab cycling and Ctrl+1..9 tab switching
         if ctrl && !shift && !alt {
+            // Standart brauzer shortcutlari: Ctrl+T / Ctrl+L / Ctrl+W / Ctrl+R / Ctrl+Q
+            // (keycode — boshqa klaviatura tartibida ham ishlashi uchun)
+            if k == gdk::Key::t || keycode == 28 {
+                self.open_new_tab_palette();
+                return true;
+            }
+            if k == gdk::Key::l || keycode == 46 {
+                self.show_palette();
+                return true;
+            }
+            if k == gdk::Key::w || keycode == 25 {
+                if !self.palette_open() {
+                    if let Some(v) = self.focused_view() {
+                        self.close_view(&v);
+                    }
+                }
+                return true;
+            }
+            if k == gdk::Key::r || keycode == 27 {
+                if let Some(v) = self.focused_view() {
+                    v.reload();
+                }
+                return true;
+            }
+            if k == gdk::Key::q || keycode == 24 {
+                self.win.close();
+                return true;
+            }
             if k == gdk::Key::Tab || k == gdk::Key::ISO_Left_Tab || keycode == 23 {
                 self.cycle_tab(1);
                 return true;
@@ -7504,49 +7736,32 @@ impl App {
                     }
                 }
                 gdk::Key::i | gdk::Key::I => self.toggle_data_modal(),
-                gdk::Key::t | gdk::Key::T => self.open_new_tab_palette(),
                 gdk::Key::f => self.toggle_full(),
                 gdk::Key::h => self.focus_column_left(),
                 gdk::Key::l => self.focus_column_right(),
                 gdk::Key::j => self.focus_row_down(),
                 gdk::Key::k => self.focus_row_up(),
-                gdk::Key::w => {
-                    if !self.palette_open() {
-                        if let Some(v) = self.focused_view() {
-                            self.close_view(&v);
-                        }
-                    }
-                }
                 gdk::Key::b => self.toggle_sidebar(),
                 gdk::Key::o => self.toggle_overview(),
-                gdk::Key::e => self.toggle_tab_grid(),
+                gdk::Key::bracketleft => self.consume_or_expel(-1),
+                gdk::Key::bracketright => self.consume_or_expel(1),
                 gdk::Key::m => self.toggle_map(),
-                gdk::Key::g | gdk::Key::G => self.show_palette(),
-                gdk::Key::r => {
-                    if let Some(v) = self.focused_view() {
-                        v.reload();
-                    }
-                }
                 gdk::Key::s | gdk::Key::S => {
                     self.toggle_settings_modal();
                     return true;
                 }
-                gdk::Key::q => self.win.close(),
                 _ => {
                     if keycode == 39 {
                         self.toggle_settings_modal();
                         return true;
                     }
-                    if keycode == 28 {
-                        self.open_new_tab_palette();
+                    // Alt+[ / Alt+] (physical keys, so they work on any keyboard layout)
+                    if keycode == 34 {
+                        self.consume_or_expel(-1);
                         return true;
                     }
-                    if keycode == 26 {
-                        self.toggle_tab_grid();
-                        return true;
-                    }
-                    if keycode == 42 {
-                        self.show_palette();
+                    if keycode == 35 {
+                        self.consume_or_expel(1);
                         return true;
                     }
                     // Vertical workspace selection (Alt+1..9)
@@ -7598,12 +7813,8 @@ impl App {
                 gdk::Key::v | gdk::Key::V => self.split_vertical(),
                 gdk::Key::h => self.move_column(-1),
                 gdk::Key::l => self.move_column(1),
-                gdk::Key::j => self.move_tab_to_row(self.focus_row.get() + 1),
-                gdk::Key::k => {
-                    if self.focus_row.get() > 0 {
-                        self.move_tab_to_row(self.focus_row.get() - 1);
-                    }
-                }
+                gdk::Key::j => self.move_window_vertical(1),
+                gdk::Key::k => self.move_window_vertical(-1),
                 _ => {
                     // Alt+Shift+1 -> move to workspace/row 1
                     if keycode == 10 || keycode == 87
@@ -7711,13 +7922,13 @@ fn build(gapp: &gtk::Application) {
     s_icon.add_css_class("pill-icon");
     pill_inner.append(&s_icon);
     pill_inner.append(&pill_label);
-    let pill_chip = gtk::Label::new(Some(tr("Alt+G")));
+    let pill_chip = gtk::Label::new(Some(tr("Ctrl+L")));
     pill_chip.add_css_class("pill-chip");
     pill_inner.append(&pill_chip);
     let pill = gtk::Button::new();
     pill.add_css_class("pill");
     pill.set_child(Some(&pill_inner));
-    pill.set_tooltip_text(Some(tr("Go to address  (Alt+G)")));
+    pill.set_tooltip_text(Some(tr("Go to address  (Ctrl+L)")));
 
     let list = gtk::ListBox::new();
     list.add_css_class("tablist");
@@ -7936,7 +8147,7 @@ fn build(gapp: &gtk::Application) {
     let engine_title = gtk::Label::new(Some(tr("Default Search Engine")));
     engine_title.add_css_class("settings-card-title");
     engine_title.set_xalign(0.0);
-    let engine_desc = gtk::Label::new(Some(tr("Applied when searching via the Omnibar (Alt+T / Alt+G)")));
+    let engine_desc = gtk::Label::new(Some(tr("Applied when searching via the Omnibar (Ctrl+T / Ctrl+L)")));
     engine_desc.add_css_class("settings-card-desc");
     engine_desc.set_xalign(0.0);
     engine_card.append(&engine_title);
@@ -10408,6 +10619,33 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_standard_browser_shortcuts() {
+        for (id, combo) in [("new_tab", "Ctrl+T"), ("focus_url", "Ctrl+L"), ("close_tab", "Ctrl+W"), ("reload", "Ctrl+R"), ("quit", "Ctrl+Q")] {
+            let def = SHORTCUT_DEFS.iter().find(|d| d.id == id).expect("shortcut exists");
+            assert_eq!(def.defaults[0], combo);
+        }
+    }
+
+    #[test]
+    fn test_parse_session_stack_lines() {
+        let sample = "tab\t0\t0\t1\tdefault\thttps://a.com\ntab\t0\t1\t1\tdefault\thttps://b.com\nstack\t0\t1\n";
+        let state = parse_session_content(sample);
+        assert_eq!(state.tabs.len(), 2);
+        assert_eq!(state.stacked, vec![(0, 1)]);
+        assert!(parse_session_content("tab\t0\t0\t1\tdefault\thttps://a.com\n").stacked.is_empty());
+    }
+
+    #[test]
+    fn test_stack_shortcuts() {
+        for (id, combo) in [("stack_left", "Alt+["), ("stack_right", "Alt+]")] {
+            let def = SHORTCUT_DEFS.iter().find(|d| d.id == id).expect("shortcut exists");
+            assert_eq!(def.defaults[0], combo);
+        }
+        assert_eq!(sc_synth("Alt+[").map(|(k, _)| k), Some(gdk::Key::bracketleft));
+        assert_eq!(sc_synth("Alt+]").map(|(k, _)| k), Some(gdk::Key::bracketright));
+    }
+
     /// One action = one shortcut, and one shortcut = one action.
     #[test]
     fn test_no_duplicate_default_shortcuts() {
@@ -10418,7 +10656,6 @@ mod tests {
                 panic!("{} is bound to both \"{}\" and \"{}\"", def.defaults[0], prev, def.id);
             }
         }
-        assert!(SHORTCUT_DEFS.iter().any(|d| d.id == "tab_grid" && d.defaults[0] == "Alt+E"));
     }
 }
 
