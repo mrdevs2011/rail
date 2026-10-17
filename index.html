@@ -1,369 +1,100 @@
 <!doctype html>
-<html lang="uz"><head><meta charset="utf-8">
+<html lang="uz">
+<head>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>rail — lenta shaklidagi brauzer</title>
-<meta name="description" id="md" content="Rail: klaviatura bilan boshqariladigan brauzer. Cheksiz gorizontal ustunlar lentasi, izolyatsiyalangan profillar. Qora, oq va bitta ko'k nuqta. Muhammdrasul.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='8' y='23' font-size='22' font-family='monospace' fill='%23fff'%3Er%3C/text%3E%3Ccircle cx='25' cy='25' r='3' fill='%232f6bff'/%3E%3C/svg%3E">
+<title>rail — Linux brauzer</title>
+<meta name="description" content="Rail — klaviatura bilan boshqariladigan Linux brauzer. Lenta, izolyatsiyalangan profillar.">
 <style>
-:root{--blue:#2f6bff;--line:#2a2a2a;--dim:#8a8a8a;--sx:0px}
+:root{--blue:#2f6bff;--line:#2a2a2a;--dim:#8a8a8a;--fg:#cfcfcf}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:#000;color:#fff;font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:hidden}
-body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(#111 1px,transparent 1px),linear-gradient(90deg,#111 1px,transparent 1px);background-size:44px 44px;background-position:var(--sx) 0;pointer-events:none}
-header{position:fixed;top:0;left:0;right:0;height:48px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:#000c;backdrop-filter:blur(6px);z-index:5}
-.logo{width:24px;height:24px;background:#000;border:1px solid #fff;display:grid;place-items:center;position:relative;font-weight:700}
-.logo::after,.dot{content:"";width:6px;height:6px;border-radius:50%;background:var(--blue)}
-.logo::after{position:absolute;right:2px;bottom:2px;width:4px;height:4px}
-.pill{border:1px solid var(--line);padding:2px 8px;color:var(--dim);font-size:12px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:.2s}
+body{background:#000;color:#fff;font:15px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;min-height:100vh}
+body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(#111 1px,transparent 1px),linear-gradient(90deg,#111 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;max-width:720px;margin:0 auto;padding:0 20px 80px}
+header{position:sticky;top:0;display:flex;align-items:center;gap:12px;height:52px;border-bottom:1px solid var(--line);background:#000c;backdrop-filter:blur(8px);margin:0 -20px;padding:0 20px;z-index:10}
+.logo{width:24px;height:24px;border:1px solid #fff;display:grid;place-items:center;font-weight:700;position:relative}
+.logo::after{content:"";position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-radius:50%;background:var(--blue)}
+.pill{border:1px solid var(--line);padding:2px 8px;color:var(--dim);font-size:12px;text-decoration:none}
 .pill:hover{border-color:#fff;color:#fff}
-.pill.docs-link{border-color:var(--blue);color:#fff;background:#2f6bff18}
-.pill.docs-link:hover{background:var(--blue);color:#fff}
-.sp{flex:1}.hint{color:var(--dim);font-size:12px}
-#rail{position:fixed;top:48px;bottom:54px;left:0;right:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;cursor:grab}
-#rail::-webkit-scrollbar{display:none}
-.col{flex:0 0 min(92vw,640px);border-right:1px solid var(--line);padding:30px 28px 40px;overflow-y:auto;scroll-snap-align:start;opacity:.35;transition:opacity .35s;scrollbar-width:none}
-.col.on{opacity:1}
-.col:last-child{flex-basis:min(92vw,760px)}
-.idx{color:var(--dim);font-size:12px;margin-bottom:18px;display:flex;gap:8px;align-items:center}
-h1{font-size:clamp(34px,7vw,60px);line-height:1.02;letter-spacing:-2px;margin:10px 0 18px}
-h2{font-size:24px;letter-spacing:-1px;margin-bottom:14px}
-p{color:#cfcfcf;margin-bottom:14px}
-.cur{display:inline-block;width:.55em;height:1em;background:var(--blue);vertical-align:-2px;animation:b 1s steps(1) infinite}
-@keyframes b{50%{opacity:0}}
-button,select,input{font:inherit;color:#fff;background:#000;border:1px solid #fff;padding:8px 14px;cursor:pointer;border-radius:0}
-select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path fill='%23fff' d='M0 0l6 8 6-8z'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
-select option{background:#0a0a0a;color:#fff}
-.os-dd{position:relative;margin-bottom:10px;user-select:none}
-.os-dd-btn{width:100%;text-align:left;background:#0a0a0a;border:1px solid #3a3a3a;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;font-size:15px;transition:border-color .15s,background .15s}
-.os-dd-btn:hover,.os-dd.open .os-dd-btn{border-color:#fff;background:#111}
-.os-dd-list{position:absolute;top:calc(100% - 1px);left:0;right:0;background:#0a0a0a;border:1px solid #fff;border-top:none;z-index:20;display:none;box-shadow:0 12px 32px rgba(0,0,0,.6)}
-.os-dd.open .os-dd-list{display:block}
-.os-dd-item{padding:12px 16px;cursor:pointer;border-bottom:1px solid #222;transition:background .1s}
-.os-dd-item:last-child{border-bottom:none}
-.os-dd-item:hover{background:#1a1a1a}
-.os-dd-item.on{background:#1a1a1a;color:#fff;font-weight:600}
-.os-dd-item.soon{color:#777}
-button:hover:not(:disabled){background:#fff;color:#000}
-button:disabled{border-color:#444;color:#555;cursor:not-allowed}
-.big{display:block;width:100%;padding:18px;font-size:18px;margin:16px 0;text-align:center;text-decoration:none;color:#fff;border:1px solid #fff}
-.big:hover{background:#fff;color:#000}.big.off{border-color:#444;color:#555;pointer-events:none}
-pre,.cmd{background:#080808;border:1px solid var(--line);padding:10px 12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin-bottom:12px;position:relative}
-.cmd button{position:absolute;right:6px;top:6px;padding:2px 8px;font-size:12px;opacity:0;transition:opacity .2s}
-.cmd:hover button{opacity:1}
-ol{padding-left:20px;color:#cfcfcf}ol li{margin-bottom:10px}
-.jars{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
-.jar{border:1px solid var(--line);padding:10px;min-height:110px;font-size:12px;word-break:break-all}
-.jar.act{border-color:#fff}.jar b{display:flex;gap:6px;align-items:center;margin-bottom:6px}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-.btn-doc{border:1px solid var(--blue);color:#fff;text-decoration:none;padding:8px 14px;display:inline-flex;align-items:center;gap:6px;font-size:14px;transition:.2s}
-.btn-doc:hover{background:var(--blue);color:#fff}
-#term{height:300px;overflow-y:auto;background:#050505;border:1px solid var(--line);padding:12px;white-space:pre-wrap}
-#term input{border:0;border-bottom:1px solid var(--blue);width:calc(100% - 20px);padding:2px 0;background:transparent}
-.st{border:1px solid var(--line);margin-bottom:10px;padding:12px 14px;cursor:pointer}
-.st:hover{border-color:#fff}.st .bar{height:3px;background:#222;margin:8px 0}.st .bar i{display:block;height:100%;background:#fff}
-.st .more{display:none;color:#bbb;margin-top:8px}.st.open .more{display:block}
-footer{position:fixed;bottom:0;left:0;right:0;height:54px;border-top:1px solid var(--line);background:#000c;display:flex;align-items:center;justify-content:center;gap:10px;z-index:5}
-.mm{width:34px;height:14px;border:1px solid #555;background:#000;padding:0;transition:.3s}
-.mm.on{width:70px;border-color:#fff;background:var(--blue)}
-#cur{position:fixed;width:18px;height:18px;border:1px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9;transform:translate(-50%,-50%);transition:width .2s,height .2s}
-@media(max-width:640px){.hint{display:none}.jars{grid-template-columns:1fr}}
-
-.lang{display:flex;gap:4px}.lang button{padding:2px 8px;font-size:12px;border-color:#444}.lang button.on{background:#fff;color:#000;border-color:#fff}
-.pill.made{border-color:var(--blue);color:#fff}
-@media(max-width:640px){.pill.made{display:none}}
-</style></head><body>
-<div id="cur"></div>
+.pill.blue{border-color:var(--blue);color:#fff}
+.sp{flex:1}
+.lang button{font:inherit;font-size:12px;color:#fff;background:#000;border:1px solid #444;padding:2px 8px;cursor:pointer;margin-left:4px}
+.lang button.on{background:#fff;color:#000;border-color:#fff}
+main{padding-top:48px}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--blue);margin-right:6px}
+h1{font-size:clamp(36px,8vw,56px);line-height:1.05;letter-spacing:-2px;margin:12px 0 20px}
+h2{font-size:18px;margin:40px 0 14px}
+p{color:var(--fg);margin-bottom:14px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin:28px 0 8px}
+a.btn{font:inherit;color:#fff;background:#000;border:1px solid #fff;padding:12px 18px;text-decoration:none;transition:.15s}
+a.btn:hover{background:#fff;color:#000}
+a.btn.primary{background:#fff;color:#000}
+a.btn.primary:hover{background:var(--blue);border-color:var(--blue);color:#fff}
+.cmd{background:#080808;border:1px solid var(--line);padding:12px 14px;margin:16px 0;position:relative;font-size:13px;color:#eee;word-break:break-all}
+.cmd button{position:absolute;right:8px;top:8px;font:inherit;font-size:11px;color:#fff;background:#000;border:1px solid #555;padding:2px 8px;cursor:pointer}
+ol{padding-left:22px;color:var(--fg)}ol li{margin-bottom:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+@media(max-width:560px){.grid{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);padding:14px 16px}
+.card h3{font-size:14px;margin-bottom:6px}
+.card p{font-size:13px;margin:0;color:var(--dim)}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+td,th{border:1px solid var(--line);padding:8px 10px;text-align:left}
+th{color:var(--dim);font-weight:500}
+kbd{border:1px solid #444;padding:1px 6px;font-size:12px}
+footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--dim);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+footer a{color:var(--dim);text-decoration:none}footer a:hover{color:#fff}
+</style>
+</head>
+<body>
+<div class="wrap">
 <header>
   <div class="logo">r</div>
   <b>rail</b>
-  <span class="pill" id="ver">v0.5.9</span>
-  <span class="pill made" data-t="made_s">Muhammdrasul</span>
-  <a href="docs/index.html" class="pill docs-link" id="navDocs">
-    <i class="dot" style="display:inline-block"></i>
-    <span data-t="nav_docs">Hujjatlar →</span>
-  </a>
+  <span class="pill" id="ver">v0.5.10</span>
   <span class="sp"></span>
-  <span class="hint" data-t="hint">← → · torting · aylantiring · 0-4</span>
-  <div class="lang" role="group" aria-label="Language / Til / Язык">
-    <button data-l="uz">UZ</button>
-    <button data-l="en">EN</button>
-    <button data-l="ru">RU</button>
-  </div>
+  <a class="pill blue" href="docs/index.html">Hujjatlar</a>
 </header>
-<main id="rail">
-<section class="col on" id="c0">
-  <div class="idx"><i class="dot"></i><span data-t="idx0">00 / boshlash</span></div>
-  <pre id="boot" style="border:0;background:none;padding:0;color:var(--dim);min-height:72px"></pre>
-  <h1 id="h"><span data-th="h1">Rail'ga<br>xush kelibsiz</span><span class="cur"></span></h1>
-  <p data-th="p1">Lenta shaklidagi brauzer. Ustunlar chapga va o'ngga suriladi, to'plamlar yuqoriga va pastga, profillar esa bir-biriga hech qachon tegmaydi. Qora, oq va bitta ko'k nuqta.</p>
-  <p data-th="p2">Bu sahifa ham xuddi shunday qurilgan. <b>→</b> ni bosing, torting yoki suring.</p>
-  <p data-th="made">Muhammdrasul</p>
-  <div class="row" style="margin-top:18px">
-    <button onclick="go(1)" data-t="b_dl">Yuklab olish →</button>
-    <button onclick="go(3)" data-t="b_shell">Terminalni sinash</button>
-    <a href="docs/index.html" class="btn-doc"><i class="dot"></i><span data-t="b_docs">Hujjatlar (Docs) →</span></a>
+<main>
+  <p style="color:var(--dim);font-size:12px"><span class="dot"></span>Linux · klaviatura · lenta</p>
+  <h1>Lenta shaklidagi<br>brauzer</h1>
+  <p>Ustunlar chap-'o'ngga, steklar yuqori-pastga. Har profil alohida dunyo.</p>
+  <div class="actions">
+    <a class="btn primary" href="https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64">Linux yuklab olish</a>
+    <a class="btn" href="docs/index.html">Hujjatlar</a>
+    <a class="btn" href="https://github.com/mrdevs2011/rail" target="_blank">GitHub</a>
   </div>
-</section>
-<section class="col" id="c1">
-  <div class="idx"><i class="dot"></i><span data-t="idx1">01 / yuklab olish</span></div>
-  <h2 data-t="os_h">Operatsion tizimni tanlang</h2>
-  <div class="os-dd" id="osdd">
-    <button class="os-dd-btn" type="button" id="osbtn">Linux <span>▼</span></button>
-    <div class="os-dd-list">
-      <div class="os-dd-item on" data-v="linux">Linux</div>
-      <div class="os-dd-item soon" data-v="macos" data-t="os_mac">macOS (tez orada)</div>
-      <div class="os-dd-item soon" data-v="windows" data-t="os_win">Windows (tez orada)</div>
-    </div>
+  <h2><span class="dot"></span>O'rnatish</h2>
+  <p>Bir qator — tavsiya etiladi.</p>
+  <div class="cmd" id="cmdbox">curl -fsSL https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh | bash<button type="button" id="copybtn">nusxa</button></div>
+  <ol>
+    <li>Buyruqni terminalga qo'ying yoki binar yuklab oling.</li>
+    <li>rail deb ishga tushiring.</li>
+    <li>Yangilash: rail --update.</li>
+  </ol>
+  <h2><span class="dot"></span>Imkoniyatlar</h2>
+  <div class="grid">
+    <div class="card"><h3><span class="dot"></span>2D lenta</h3><p>Cheksiz gorizontal ustunlar, vertikal stek.</p></div>
+    <div class="card"><h3><span class="dot"></span>Profillar</h3><p>Alohida cookie va sessiya.</p></div>
+    <div class="card"><h3><span class="dot"></span>Klaviatura</h3><p>Barcha amallar qisqa klavish bilan.</p></div>
+    <div class="card"><h3><span class="dot"></span>Yengil</h3><p>Rust + GTK4 + WebKitGTK. ~500 KB. Faqat Linux.</p></div>
   </div>
-  <select id="os" style="display:none">
-    <option value="linux">Linux</option>
-    <option value="macos">macOS</option>
-    <option value="windows">Windows</option>
-  </select>
-  <a class="big" id="dl" href="#">Linux</a>
-  <div id="steps"></div>
-</section>
-<section class="col" id="c2">
-  <div class="idx"><i class="dot"></i><span data-t="idx2">02 / profillar</span></div>
-  <h2 data-t="prof_h">100% izolyatsiya</h2>
-  <p data-t="prof_p">Profilni tanlang, tizimga kiring, so'ng almashtiring. Har bir profilning o'z cookie va xotirasi bor. Hech narsa sizib chiqmaydi.</p>
-  <div class="row">
-    <button id="p1" onclick="pick(0)"></button>
-    <button id="p2" onclick="pick(1)"></button>
-    <button onclick="signin()" data-t="signin">site.com ga kirish</button>
-    <button onclick="wipe()" data-t="clear">tozalash</button>
-  </div>
-  <div class="jars"><div class="jar" id="j0"></div><div class="jar" id="j1"></div></div>
-  <p style="color:var(--dim)" id="jmsg"></p>
-</section>
-<section class="col" id="c3">
-  <div class="idx"><i class="dot"></i><span data-t="idx3">03 / terminal</span></div>
-  <h2>rail&gt;_</h2>
-  <div id="term" onclick="q.focus()">
-    <span id="out" style="color:#cfcfcf">help yozing va Enter bosing</span>
-    <br>$ <input id="q" autocomplete="off" spellcheck="false">
-  </div>
-</section>
-<section class="col" id="c4">
-  <div class="idx"><i class="dot"></i><span data-t="idx4">04 / yo'l xaritasi</span></div>
-  <h2 data-t="road_h">Bu qayoqqa boradi</h2>
-  <div id="road"></div>
-</section>
+  <h2><span class="dot"></span>Qisqa klavishlar</h2>
+  <table>
+    <tr><th>Klavish</th><th>Vazifa</th></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td>URL satri</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Yangi ustun</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Vertikal stek</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>H</kbd>/<kbd>L</kbd></td><td>Chap/o'ng ustun</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>J</kbd>/<kbd>K</kbd></td><td>Past/yuqori oyna</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>P</kbd></td><td>Profillar</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Oynani yopish</td></tr>
+  </table>
+  <p style="color:var(--dim);font-size:13px">To'liq ro'yxat — Hujjatlarda.</p>
 </main>
-<footer id="mm"></footer>
-<style>i.dot{display:inline-block}</style>
-<script>
-var T={
-uz:{
-title:"rail — lenta shaklidagi brauzer",
-desc:"Rail: klaviatura bilan boshqariladigan brauzer. Cheksiz gorizontal ustunlar lentasi, izolyatsiyalangan profillar. Qora, oq va bitta ko'k nuqta. Muhammdrasul.",
-hint:"← → · torting · aylantiring · 0-4",
-nav_docs:"Hujjatlar →",
-b_docs:"Hujjatlar (Docs) →",
-made_s:"Muhammdrasul",
-made:"Muhammdrasul",
-h1:"Rail'ga<br>xush kelibsiz",
-p1:"Lenta shaklidagi brauzer. Ustunlar chapga va o'ngga suriladi, to'plamlar yuqoriga va pastga, profillar esa bir-biriga hech qachon tegmaydi. Qora, oq va bitta ko'k nuqta.",
-p2:"Bu sahifa ham xuddi shunday qurilgan. <b>→</b> ni bosing, torting yoki suring.",
-b_dl:"Yuklab olish →",b_shell:"Terminalni sinash",
-idx0:"00 / boshlash",idx1:"01 / yuklab olish",idx2:"02 / profillar",idx3:"03 / terminal",idx4:"04 / yo'l xaritasi",
-nav:["boshlash","yuklab olish","profillar","terminal","yo'l xaritasi"],
-os_h:"Operatsion tizimni tanlang",os_mac:"macOS (tez orada)",os_win:"Windows (tez orada)",
-dl_on:"Linux uchun rail v{v} ni yuklab olish",soon:"Tez orada",
-s_l1:"Buyruqni terminalga qo'ying yoki faylni yuklab olib, ishga tushiriladigan qiling.",
-s_l2:"rail ni ishga tushiring. U ilovalar menyusida ham paydo bo'ladi.",
-s_l3:"Yangilash: burchakdagi Yangilash kartasi yoki rail --update.",
-s_m1:"Rail'ni Applications papkasiga tashlang.",s_m2:"Birinchi ishga tushirish: o'ng tugma, so'ng Open.",
-s_w1:".exe faylni oching.",s_w2:"More info, so'ng Run anyway.",soon_dot:"Tez orada.",
-copy:"nusxa",copied:"nusxalandi",
-prof_h:"100% izolyatsiya",
-prof_p:"Profilni tanlang, tizimga kiring, so'ng almashtiring. Har bir profilning o'z cookie va xotirasi bor. Hech narsa sizib chiqmaydi.",
-profile:"profil",active:"faol",nocookie:"site.com: cookie yo'q",signin:"site.com ga kirish",clear:"tozalash",
-jmsg0:"Bitta sayt, ikkita akkaunt, aralashish yo'q.",
-signed:"{a}-profilda tizimga kirildi. {b}-profil bundan bexabar.",
-shell_init:"help yozing va Enter bosing",
-road_h:"Bu qayoqqa boradi",
-road:[["1. Sayt","shu sahifa, OT tanlash, bir bosishda yuklab olish",70,"Tayyor. Vercel'da 100% bepul turadi."],["2. OT bo'yicha yangilagich","har bir OT uchun reliz fayli, SHA256 tekshiruvi",0,"Fayl OT va ARCH bo'yicha tanlanadi. Windows: ishlayotgan exe nomini o'zgartirish. macOS: karantinni olib tashlash."],["3. Sinov: tao + wry","3 ta tizimda ko'p webview",0,"Hammasini shu hal qiladi. Bo'lmasa Linux GTK4 da qoladi, mac/win uchun yengilroq qobiq."],["4. CI","bitta teg, uchta build",0,"v* teglarida GitHub Actions, relizda SHA256SUMS."],["5. Funksiyalarni ko'chirish","lenta, profillar, omnibar, devtools",0,"Avval umumiy rail-core crate, keyin interfeys."],["6. Tarqatish","dmg, exe, brew, scoop, winget",0,"Hammasi bepul. Windows imzolash uchun SignPath."]],
-road_f:"v0.5 Linux, v0.6 sayt + yangilagich, v0.7 sinov, v0.9 beta, v1.0 barqaror.",
-boot:["$ rail --open","lenta yuklanmoqda... ok","profillar: izolyatsiyalangan","mavzu: qora, oq, bitta ko'k nuqta"],
-whoami:"zavqi bor dasturchi",upd:"relizlar tekshirilmoqda...\nrail v{v} eng so'nggi. tablar joyida qoladi.",
-nf:" +---+  rail v{v}\n | r*|  lenta: 5 ustun\n +---+  #000 #fff va bitta ko'k nuqta",
-sudo:"yaxshi urinish.",nocmd:"rail: buyruq topilmadi: ",
-docs_info:"Hujjatlar ochilmoqda: docs/index.html ga yo'naltirilmoqda..."
-},
-en:{
-title:"rail — a browser that is a ribbon",
-desc:"Rail: keyboard-driven browser. Infinite horizontal ribbon of columns, isolated profiles. Black, white, one blue dot. Muhammdrasul.",
-hint:"← → · drag · scroll · 0-4",
-nav_docs:"Documentation →",
-b_docs:"Documentation (Docs) →",
-made_s:"Muhammdrasul",
-made:"Muhammdrasul",
-h1:"Welcome<br>to rail",
-p1:"A browser that is a ribbon. Columns slide left and right, stacks go up and down, profiles never touch each other. Black, white, one blue dot.",
-p2:"This page is built the same way. Press <b>→</b>, drag, or swipe.",
-b_dl:"Download →",b_shell:"Try the shell",
-idx0:"00 / boot",idx1:"01 / get it",idx2:"02 / profiles",idx3:"03 / shell",idx4:"04 / roadmap",
-nav:["boot","get","profiles","shell","roadmap"],
-os_h:"Select your OS",os_mac:"macOS (coming soon)",os_win:"Windows (coming soon)",
-dl_on:"Download rail v{v} for Linux",soon:"Coming soon",
-s_l1:"Paste the command in a terminal, or download the file and make it executable.",
-s_l2:"Run rail. It also lands in your apps menu.",
-s_l3:"Updates: the Update card in the corner, or rail --update.",
-s_m1:"Drop Rail into Applications.",s_m2:"First launch: right click, then Open.",
-s_w1:"Open the .exe.",s_w2:"More info, then Run anyway.",soon_dot:"Coming soon.",
-copy:"copy",copied:"copied",
-prof_h:"100% isolated",
-prof_p:"Pick a profile, sign in, then switch. Each profile owns its cookies and storage. Nothing leaks.",
-profile:"profile",active:"active",nocookie:"site.com: no cookies",signin:"sign in to site.com",clear:"clear",
-jmsg0:"Same site, two accounts, zero mixing.",
-signed:"Signed in on profile {a}. Profile {b} has no idea.",
-shell_init:"type help and press Enter",
-road_h:"Where this goes",
-road:[["1. Site","this page, OS picker, one-click download",70,"Live on Vercel, 100% free."],["2. Per-OS updater","release asset per OS, SHA256 check",0,"Pick the file by OS and ARCH. Windows: rename the running exe. macOS: strip quarantine."],["3. Spike: tao + wry","many webviews on 3 systems",0,"Decides everything. If it fails, Linux stays GTK4 and mac/win get a lighter shell."],["4. CI","one tag, three builds",0,"GitHub Actions on v* tags, SHA256SUMS in the release."],["5. Port features","ribbon, profiles, omnibar, devtools",0,"Shared rail-core crate first, UI after."],["6. Distribution","dmg, exe, brew, scoop, winget",0,"All free. SignPath for Windows signing."]],
-road_f:"v0.5 Linux, v0.6 site + updater, v0.7 spike, v0.9 beta, v1.0 stable.",
-boot:["$ rail --open","loading ribbon... ok","profiles: isolated","theme: black, white, one blue dot"],
-whoami:"a developer with taste",upd:"checking releases...\nrail v{v} is the latest. tabs stay put.",
-nf:" +---+  rail v{v}\n | r*|  ribbon: 5 columns\n +---+  #000 #fff and one blue dot",
-sudo:"nice try.",nocmd:"rail: command not found: ",
-docs_info:"Opening documentation: navigating to docs/index.html..."
-},
-ru:{
-title:"rail — браузер в виде ленты",
-desc:"Rail: браузер с управлением с клавиатуры. Бесконечная горизонтальная лента столбцов, изолированные профили. Чёрный, белый и одна синяя точка. Muhammdrasul.",
-hint:"← → · тяните · прокрутка · 0-4",
-nav_docs:"Документация →",
-b_docs:"Документация (Docs) →",
-made_s:"Muhammdrasul",
-made:"Muhammdrasul",
-h1:"Добро пожаловать<br>в rail",
-p1:"Браузер в виде ленты. Столбцы скользят влево и вправо, стопки — вверх и вниз, а профили никогда не пересекаются. Чёрный, белый и одна синяя точка.",
-p2:"Эта страница устроена так же. Нажмите <b>→</b>, потяните или смахните.",
-b_dl:"Скачать →",b_shell:"Попробовать терминал",
-idx0:"00 / старт",idx1:"01 / скачать",idx2:"02 / профили",idx3:"03 / терминал",idx4:"04 / дорожная карта",
-nav:["старт","скачать","профили","терминал","дорожная карта"],
-os_h:"Выберите вашу ОС",os_mac:"macOS (скоро)",os_win:"Windows (скоро)",
-dl_on:"Скачать rail v{v} для Linux",soon:"Скоро",
-s_l1:"Вставьте команду в терминал или скачайте файл и сделайте его исполняемым.",
-s_l2:"Запустите rail. Он также появится в меню приложений.",
-s_l3:"Обновления: карточка «Обновить» в углу или rail --update.",
-s_m1:"Перетащите Rail в «Программы».",s_m2:"Первый запуск: правый клик, затем «Открыть».",
-s_w1:"Откройте .exe.",s_w2:"Подробнее, затем «Выполнить в любом случае».",soon_dot:"Скоро.",
-copy:"копировать",copied:"скопировано",
-prof_h:"100% изоляция",
-prof_p:"Выберите профиль, войдите, затем переключитесь. У каждого профиля свои cookie и хранилище. Ничего не утекает.",
-profile:"профиль",active:"активен",nocookie:"site.com: нет cookie",signin:"войти на site.com",clear:"очистить",
-jmsg0:"Один сайт, два аккаунта, никакого смешивания.",
-signed:"Вход выполнен в профиле {a}. Профиль {b} ничего не знает.",
-shell_init:"введите help и нажмите Enter",
-road_h:"Куда всё идёт",
-road:[["1. Сайт","эта страница, выбор ОС, загрузка в один клик",70,"Работает на Vercel, 100% бесплатно."],["2. Обновление по ОС","релизный файл для каждой ОС, проверка SHA256",0,"Файл выбирается по ОС и архитектуре. Windows: переименовать запущенный exe. macOS: снять карантин."],["3. Проба: tao + wry","много webview на 3 системах",0,"Это всё решит. Если не выйдет, Linux остаётся на GTK4, а mac/win получат облегчённую оболочку."],["4. CI","один тег, три сборки",0,"GitHub Actions по тегам v*, SHA256SUMS в релизе."],["5. Перенос функций","лента, профили, omnibar, devtools",0,"Сначала общий crate rail-core, затем интерфейс."],["6. Распространение","dmg, exe, brew, scoop, winget",0,"Всё бесплатно. SignPath для подписи Windows."]],
-road_f:"v0.5 Linux, v0.6 сайт + обновление, v0.7 проба, v0.9 бета, v1.0 стабильная.",
-boot:["$ rail --open","загрузка ленты... ok","профили: изолированы","тема: чёрный, белый, одна синяя точка"],
-whoami:"разработчик со вкусом",upd:"проверка релизов...\nrail v{v} — последняя версия. вкладки на месте.",
-nf:" +---+  rail v{v}\n | r*|  лента: 5 столбцов\n +---+  #000 #fff и одна синяя точка",
-sudo:"хорошая попытка.",nocmd:"rail: команда не найдена: ",
-docs_info:"Открытие документации: переход на docs/index.html..."
-}};
 
-var LANGS=['uz','en','ru'],lang='uz';
-try{
-  var q0=new URLSearchParams(location.search).get('lang')||localStorage.getItem('rail-lang');
-  if(LANGS.indexOf(q0)>-1) lang=q0;
-}catch(e){}
-
-var bc=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('rail_sync_channel'):null;
-if(bc){
-  bc.onmessage=function(ev){
-    if(ev.data&&LANGS.indexOf(ev.data.lang)>-1&&ev.data.lang!=lang){
-      lang=ev.data.lang;
-      apply(false);
-    }
-  };
-}
-window.addEventListener('storage',function(ev){
-  if(ev.key==='rail-lang'&&LANGS.indexOf(ev.newValue)>-1&&ev.newValue!=lang){
-    lang=ev.newValue;
-    apply(false);
-  }
-});
-
-function t(k){var d=T[lang];return d&&d[k]!=null?d[k]:T.uz[k]}
-function fm(s,o){return s.replace(/\{(\w+)\}/g,function(_,k){return o[k]})}
-var $=function(i){return document.getElementById(i)};
-var R=$('rail'),cols=[].slice.call(R.children),cur=0,VER='0.5.9',lock=0;
-for(var bi0=0;bi0<5;bi0++)(function(i){var b=document.createElement('button');b.className='mm';b.onclick=function(){go(i)};$('mm').appendChild(b)})(bi0);
-function setCur(i){cur=i;cols.forEach(function(c,k){c.classList.toggle('on',k==i)});[].forEach.call($('mm').children,function(b,k){b.classList.toggle('on',k==i)})}
-function go(i){i=Math.max(0,Math.min(cols.length-1,i));R.scrollTo({left:cols[i].offsetLeft,behavior:'smooth'})}
-function near(){var x=R.scrollLeft,b=0,d=1e9;cols.forEach(function(c,i){var e=Math.abs(c.offsetLeft-x);if(e<d){d=e;b=i}});if(x+R.clientWidth>=R.scrollWidth-2)b=cols.length-1;return b}
-R.addEventListener('scroll',function(){var b=near();if(b!=cur)setCur(b);document.body.style.setProperty('--sx',(-R.scrollLeft*.35)+'px')});
-R.addEventListener('wheel',function(e){var c=e.target.closest('.col');if(e.target.closest('#term')||(c&&c.scrollHeight>c.clientHeight+2))return;var d=Math.abs(e.deltaY)>Math.abs(e.deltaX)?e.deltaY:e.deltaX;if(Math.abs(d)>8){e.preventDefault();if(!lock){go(cur+(d>0?1:-1));lock=1;setTimeout(function(){lock=0},600)}}},{passive:false});
-var dn=0,sx=0,sl=0;
-R.addEventListener('pointerdown',function(e){if(e.pointerType!='mouse'||e.target.closest('button,select,input,a,#term,.st'))return;dn=1;sx=e.clientX;sl=R.scrollLeft;R.style.scrollSnapType='none';R.style.cursor='grabbing'});
-addEventListener('pointermove',function(e){if(dn)R.scrollLeft=sl-(e.clientX-sx)});
-addEventListener('pointerup',function(){if(!dn)return;dn=0;R.style.scrollSnapType='';R.style.cursor='';go(near())});
-addEventListener('keydown',function(e){var tg=e.target.tagName;if(tg=='INPUT'||tg=='SELECT')return;var k=e.key;if(k=='ArrowRight'||k=='l')go(cur+1);else if(k=='ArrowLeft'||k=='h')go(cur-1);else if(/^[0-4]$/.test(k))go(+k)});
-var bootTok=0;
-function bootRun(){var tok=++bootTok,L=t('boot'),bi=0,bj=0,bt='';$('boot').textContent='';(function s(){if(tok!=bootTok||bi>=L.length)return;bt+=L[bi][bj++]||'';$('boot').textContent=bt;if(bj>L[bi].length){bt+='\n';bi++;bj=0;setTimeout(s,200)}else setTimeout(s,18)})()}
-var RAW='https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh',INS=['cu','rl -fsSL ',RAW,' | ba','sh'].join('');
-var LINUX_URL='https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64';
-function steps(v){return v=='linux'?[t('s_l1'),t('s_l2'),t('s_l3')]:v=='macos'?[t('s_m1'),t('s_m2'),t('soon_dot')]:[t('s_w1'),t('s_w2'),t('soon_dot')]}
-var ASSETS={linux:LINUX_URL,macos:null,windows:null};
-function setOS(v){
-  var a=$('dl'),url=ASSETS[v]||null,on=!!url;
-  $('os').value=v;
-  a.className='big'+(on?'':' off');
-  a.href=on?url:'#';
-  a.textContent=on?fm(t('dl_on').replace('Linux',v=='macos'?'macOS':v=='windows'?'Windows':'Linux'),{v:VER}):t('soon');
-  var h=on&&v=='linux'?'<div class="cmd" data-c="'+INS+'">'+INS+'<button onclick="cp(this)">'+t('copy')+'</button></div>':'';
-  $('steps').innerHTML=h+'<ol>'+steps(v).map(function(x){return '<li>'+x+'</li>'}).join('')+'</ol>';
-}
-function cp(b){var x=b.parentNode.getAttribute('data-c');if(navigator.clipboard)navigator.clipboard.writeText(x);b.textContent=t('copied');setTimeout(function(){b.textContent=t('copy')},1200)}
-$('os').onchange=function(){setOS(this.value)};
-// Custom dark dropdown
-var osdd=$('osdd'),osbtn=$('osbtn');
-osbtn.onclick=function(e){e.stopPropagation();osdd.classList.toggle('open')};
-[].forEach.call(osdd.querySelectorAll('.os-dd-item'),function(it){
-  it.onclick=function(){var v=it.getAttribute('data-v');$('os').value=v;setOS(v);osdd.classList.remove('open');
-    [].forEach.call(osdd.querySelectorAll('.os-dd-item'),function(x){x.classList.toggle('on',x===it)});
-    osbtn.innerHTML=it.textContent+' <span>▼</span>';};
-});
-addEventListener('click',function(){osdd.classList.remove('open')});
-// Sync button text on setOS
-var _setOS=setOS;
-setOS=function(v){_setOS(v);var it=osdd.querySelector('[data-v="'+v+'"]');if(it)osbtn.innerHTML=it.textContent+' <span>▼</span>';};
-var ua=navigator.userAgent,os0=/Win/.test(ua)?'windows':(/Mac/.test(ua)&&!/iPhone|iPad/.test(ua))?'macos':'linux';
-fetch('https://api.github.com/repos/mrdevs2011/rail/releases/latest').then(function(r){return r.json()}).then(function(j){
-  if(j.tag_name){VER=j.tag_name.replace(/^v/,'');$('ver').textContent='v'+VER;}
-  if(j.assets){j.assets.forEach(function(a){
-    if(/macos|darwin/i.test(a.name)) ASSETS.macos=a.browser_download_url;
-    if(/windows|win.*\.exe/i.test(a.name)) ASSETS.windows=a.browser_download_url;
-  });}
-  setOS($('os').value);
-}).catch(function(){setOS($('os').value);});
-var jars=[[],[]],ap=0,jst=-1;
-function draw(){[0,1].forEach(function(i){var j=$('j'+i),on=i==ap,p=$('p'+(i+1));j.className='jar'+(on?' act':'');j.innerHTML='<b><i class="dot" style="opacity:'+(on?1:.2)+'"></i>'+t('profile')+' '+(i+1)+(on?' ('+t('active')+')':'')+'</b>'+(jars[i].length?jars[i].join('<br>'):'<span style="color:#666">'+t('nocookie')+'</span>');p.textContent=t('profile')+' '+(i+1);p.style.background=on?'#fff':'';p.style.color=on?'#000':''});$('jmsg').textContent=jst<0?t('jmsg0'):fm(t('signed'),{a:jst+1,b:2-jst})}
-function pick(i){ap=i;draw()}
-function signin(){jars[ap]=['sid='+Math.random().toString(36).slice(2,10),'user=account_'+(ap+1)];jst=ap;draw()}
-function wipe(){jars[ap]=[];draw()}
-function renderRoad(){var S=t('road');$('road').innerHTML=S.map(function(s){return '<div class="st" onclick="this.classList.toggle(\'open\')"><b>'+s[0]+'</b> <span style="color:#8a8a8a">'+s[1]+'</span><div class="bar"><i style="width:'+s[2]+'%"></i></div><div class="more">'+s[3]+'</div></div>'}).join('')+'<p style="color:#8a8a8a">'+t('road_f')+'</p>'}
-var out=$('out'),q=$('q'),H=[],hi=0,used=0;
-var C={help:function(){return 'help docs version update ls roadmap whoami neofetch lang clear'},docs:function(){setTimeout(function(){location.href='docs/index.html'},500);return t('docs_info')},version:function(){return 'rail v'+VER},whoami:function(){return t('whoami')},ls:function(){return 'boot/ get/ profiles/ shell/ roadmap/ docs/'},roadmap:function(){return t('road').map(function(s){return s[0]+' - '+s[1]}).join('\n')},update:function(){return fm(t('upd'),{v:VER})},neofetch:function(){return fm(t('nf'),{v:VER})},sudo:function(){return t('sudo')}};
-q.onkeydown=function(e){e.stopPropagation();var tm=$('term');if(e.key=='Enter'){var c=q.value.trim();if(!used){out.textContent='';used=1}out.textContent+='\n$ '+c;var w=c.split(/\s+/);if(c=='clear')out.textContent='';else if(w[0]=='lang'){if(LANGS.indexOf(w[1])>-1){setLang(w[1]);out.textContent+='\n'+w[1]}else out.textContent+='\nlang uz|en|ru'}else if(c){var k=c=='rail --update'?'update':w[0],f=C[k];out.textContent+='\n'+(f?f():t('nocmd')+c)}if(c)H.push(c);hi=H.length;q.value='';tm.scrollTop=tm.scrollHeight}else if(e.key=='ArrowUp'&&hi>0){q.value=H[--hi];e.preventDefault()}else if(e.key=='ArrowDown'){q.value=hi<H.length-1?H[++hi]:'';hi=Math.min(hi+1,H.length)}};
-function apply(broadcast){
-document.documentElement.lang=lang;document.title=t('title');$('md').setAttribute('content',t('desc'));
-[].forEach.call(document.querySelectorAll('[data-t]'),function(e){e.textContent=t(e.getAttribute('data-t'))});
-[].forEach.call(document.querySelectorAll('[data-th]'),function(e){e.innerHTML=t(e.getAttribute('data-th'))});
-[].forEach.call(document.querySelectorAll('.lang button'),function(b){b.classList.toggle('on',b.getAttribute('data-l')==lang)});
-var n=t('nav');[].forEach.call($('mm').children,function(b,i){b.title=n[i]});
-setOS($('os').value);draw();renderRoad();if(!used)out.textContent=t('shell_init');bootRun();
-if(broadcast!==false){
-  try{localStorage.setItem('rail-lang',lang)}catch(e){}
-  if(bc)bc.postMessage({lang:lang});
-}
-}
-function setLang(l){if(LANGS.indexOf(l)<0)return;lang=l;apply(true)}
-[].forEach.call(document.querySelectorAll('.lang button'),function(b){b.onclick=function(){setLang(b.getAttribute('data-l'))}});
-var dt=$('cur'),mx=0,my=0,cx=0,cy=0;
-if(matchMedia('(pointer:fine)').matches){addEventListener('pointermove',function(e){mx=e.clientX;my=e.clientY;dt.style.width=dt.style.height=e.target.closest('button,a,select,.st')?'34px':'18px'});(function f(){cx+=(mx-cx)*.18;cy+=(my-cy)*.18;dt.style.left=cx+'px';dt.style.top=cy+'px';requestAnimationFrame(f)})()}else dt.style.display='none';
-setOS(os0);setCur(0);apply(false);
-</script></body></html>
+<footer><span>Muhammdrasul · Linux</span><span><a href="https://github.com/mrdevs2011/rail">GitHub</a> · <a href="docs/index.html">Hujjatlar</a></span></footer>
+</div>
+<script>var C="curl -fsSL https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh | bash";var b=document.getElementById("copybtn");if(b)b.onclick=function(){navigator.clipboard&&navigator.clipboard.writeText(C);b.textContent="ok";setTimeout(function(){b.textContent="nusxa"},1000)};fetch("https://api.github.com/repos/mrdevs2011/rail/releases/latest").then(r=>r.json()).then(j=>{if(j.tag_name)document.getElementById("ver").textContent="v"+j.tag_name.replace(/^v/,"")}).catch(()=>{});</script>
+</body>
+</html>
