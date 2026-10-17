@@ -1892,17 +1892,23 @@ selection {
     color: #f87171;
 }
 button.update-get {
-    background: #ededed;
+    background: #ffffff;
     background-image: none;
-    color: #0a0a0a;
-    border: 1px solid #ededed;
+    color: #000000;
+    border: 1px solid #ffffff;
     border-radius: 3px;
     padding: 5px 20px;
     font-weight: 700;
     box-shadow: none;
 }
+button.update-get label {
+    color: #000000;
+}
 button.update-get:hover {
-    background: #ffffff;
+    background: #f0f0f0;
+}
+button.update-get:hover label {
+    color: #000000;
 }
 button.update-get:disabled {
     opacity: 0.6;

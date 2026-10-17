@@ -1,19 +1,85 @@
-name: Release
+name: Auto release
 
+# main ga har push → patch versiya oshadi + GitHub Release (rail-linux-x86_64)
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
 
 permissions:
   contents: write
 
+concurrency:
+  group: auto-release-main
+  cancel-in-progress: false
+
 jobs:
-  linux:
-    name: Build & release (Linux)
+  release:
+    name: Bump, build & release (Linux)
     runs-on: ubuntu-latest
+    # Botning o'z versiya-bump commitida qayta ishlamasin (loop yo'q)
+    if: >-
+      github.event.head_commit &&
+      !contains(github.event.head_commit.message, '[skip release]') &&
+      !startsWith(github.event.head_commit.message, 'chore: bump version')
+
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump patch version
+        id: ver
+        run: |
+          set -euo pipefail
+          OLD=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          IFS=. read -r MAJ MIN PAT <<< "$OLD"
+          NEW="${MAJ}.${MIN}.$((PAT + 1))"
+          echo "Bump $OLD → $NEW"
+
+          sed -i "s/^version = \"${OLD}\"/version = \"${NEW}\"/" Cargo.toml
+
+          if [ -f package.json ]; then
+            sed -i "s/\"version\": \"${OLD}\"/\"version\": \"${NEW}\"/" package.json || true
+            # ba'zi package.json da version boshqa formatda bo'lishi mumkin
+            python3 - <<PY
+import json, pathlib
+p = pathlib.Path("package.json")
+if p.exists():
+    data = json.loads(p.read_text())
+    data["version"] = "${NEW}"
+    p.write_text(json.dumps(data, indent=2) + "\n")
+PY
+          fi
+
+          # sayt badge lari
+          for f in index.html $(find docs -name '*.html' 2>/dev/null); do
+            [ -f "$f" ] || continue
+            sed -i "s/v${OLD}/v${NEW}/g" "$f" || true
+          done
+          if [ -f ROADMAP.md ]; then
+            sed -i "s/v${OLD}/v${NEW}/g" ROADMAP.md || true
+          fi
+
+          echo "version=${NEW}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${NEW}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump
+        id: bump
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml package.json index.html ROADMAP.md docs || true
+          if git diff --cached --quiet; then
+            echo "No version files changed"
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: bump version to ${{ steps.ver.outputs.version }} [skip release]"
+            git push origin HEAD:main
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install system deps
         run: |
@@ -37,69 +103,17 @@ jobs:
         run: |
           cp target/release/rail target/release/rail-linux-x86_64
           sha256sum target/release/rail-linux-x86_64 | tee SHA256SUMS
+          ./target/release/rail --version || true
 
-      - name: Upload to GitHub Release
+      - name: Create tag & GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: v${{ steps.ver.outputs.version }}
+          target_commitish: ${{ steps.bump.outputs.sha }}
+          generate_release_notes: true
           files: |
             target/release/rail-linux-x86_64
             SHA256SUMS
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  spike-matrix:
-    name: Spike (${{ matrix.label }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            label: macos-arm64
-            bin: spike-tao-wry
-            asset: rail-spike-macos-arm64
-          - os: windows-latest
-            label: windows-x86_64
-            bin: spike-tao-wry.exe
-            asset: rail-spike-windows-x86_64.exe
-          - os: ubuntu-latest
-            label: linux-x86_64
-            bin: spike-tao-wry
-            asset: rail-spike-linux-x86_64
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Linux deps
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build spike
-        working-directory: examples/spike-tao-wry
-        run: cargo build --release
-
-      - name: Rename asset
-        shell: bash
-        run: |
-          SRC="examples/spike-tao-wry/target/release/${{ matrix.bin }}"
-          DST="examples/spike-tao-wry/target/release/${{ matrix.asset }}"
-          if [ -f "$SRC" ]; then
-            cp "$SRC" "$DST"
-            echo "Prepared $DST"
-          else
-            echo "Binary not found: $SRC"
-            ls -la examples/spike-tao-wry/target/release/ || true
-            exit 1
-          fi
-
-      - name: Upload spike asset to release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: examples/spike-tao-wry/target/release/${{ matrix.asset }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
