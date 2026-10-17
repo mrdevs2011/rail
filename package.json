@@ -1,9 +1,9 @@
 {
   "name": "rail-browser",
-  "version": "0.5.14",
+  "version": "0.5.15",
   "type": "module",
   "private": true,
-  "description": "Rail Browser — Minimalist keyboard-driven spatial browser",
+  "description": "Rail Browser \u2014 Minimalist keyboard-driven spatial browser",
   "engines": {
     "node": ">=18"
   },
