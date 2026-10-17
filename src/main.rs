@@ -1933,8 +1933,8 @@ button.update-close:hover {
 /// How far the strip zooms out in overview (niri uses a similar factor).
 const OV_ZOOM: f64 = 0.4;
 
-/// Fon tab shuncha soniyadan keyin RAM tejash uchun to'xtatiladi (suspend)
-const SUSPEND_AFTER_SECS: u64 = 600; // 10 daqiqa fon tab uxlaydi
+/// Tab shuncha soniya davomida ekranda ko'rinmasa, RAM tejash uchun to'xtatiladi (suspend)
+const SUSPEND_AFTER_SECS: u64 = 600; // 10 daqiqa ko'rinmagan tab uxlaydi
 
 struct Tab {
     container: gtk::Box,
@@ -4463,41 +4463,52 @@ impl App {
         }
     }
 
-    fn schedule_suspend(self: &Rc<Self>, view: &WebView) {
-        let app = self.clone();
-        let v = view.clone();
-        glib::timeout_add_local_once(Duration::from_secs(SUSPEND_AFTER_SECS), move || {
-            let Ok(rows) = app.rows.try_borrow() else { return };
-            for (ri, row) in rows.iter().enumerate() {
-                for (ci, tab) in row.tabs.iter().enumerate() {
-                    if tab.view != v {
-                        continue;
-                    }
-                    let is_focused = ri == app.focus_row.get() && ci == app.focus_col.get();
-                    if is_focused
-                        || tab.suspended.get()
-                        || tab.keep_alive.get()
-                        || tab.last_active.get().elapsed() < Duration::from_secs(SUSPEND_AFTER_SECS)
-                        || tab.view.is_loading()
-                        || tab.view.is_playing_audio()
-                    {
-                        return;
-                    }
-                    let uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
-                    if uri.starts_with("http://") || uri.starts_with("https://") {
-                        *tab.saved_uri.borrow_mut() = uri;
-                        // Oxirgi kadrni muzlatib qo'yamiz — web process o'lganda ham ko'rinish qoladi
-                        let wp = gtk::WidgetPaintable::new(Some(&tab.view));
-                        let frame = gdk::prelude::PaintableExt::current_image(&wp);
-                        tab.freeze.set_paintable(Some(&frame));
-                        tab.freeze.set_visible(true);
-                        tab.suspended.set(true);
-                        tab.view.terminate_web_process();
-                    }
-                    return;
+    /// Tab hozir foydalanuvchiga ko'rinyaptimi (strip viewport bilan kesishadimi)?
+    /// Split da fokussiz, lekin yonma-yon ko'rinib turgan tab ham "ko'rinadi" hisoblanadi.
+    fn tab_is_visible(&self, tab: &Tab) -> bool {
+        if self.ov.get() {
+            return true; // overview: hamma tab ekranda
+        }
+        let Some(b) = tab.container.compute_bounds(&self.strip) else { return false };
+        let (vw, vh) = (self.strip.width() as f64, self.strip.height() as f64);
+        let (x0, y0) = (b.x() as f64, b.y() as f64);
+        let ow = (x0 + b.width() as f64).min(vw) - x0.max(0.0);
+        let oh = (y0 + b.height() as f64).min(vh) - y0.max(0.0);
+        ow > 40.0 && oh > 40.0
+    }
+
+    /// Davriy tekshiruv: ko'rinib turgan (yoki fokusdagi) tabning `last_active` vaqti yangilanadi;
+    /// SUSPEND_AFTER_SECS davomida umuman ko'rinmagan tab uxlatiladi.
+    fn suspend_hidden_tabs(&self) {
+        let Ok(rows) = self.rows.try_borrow() else { return };
+        for (ri, row) in rows.iter().enumerate() {
+            for (ci, tab) in row.tabs.iter().enumerate() {
+                let is_focused = ri == self.focus_row.get() && ci == self.focus_col.get();
+                if is_focused || self.tab_is_visible(tab) {
+                    tab.last_active.set(std::time::Instant::now());
+                    continue;
+                }
+                if tab.suspended.get()
+                    || tab.keep_alive.get()
+                    || tab.last_active.get().elapsed() < Duration::from_secs(SUSPEND_AFTER_SECS)
+                    || tab.view.is_loading()
+                    || tab.view.is_playing_audio()
+                {
+                    continue;
+                }
+                let uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
+                if uri.starts_with("http://") || uri.starts_with("https://") {
+                    *tab.saved_uri.borrow_mut() = uri;
+                    // Oxirgi kadrni muzlatib qo'yamiz — web process o'lganda ham ko'rinish qoladi
+                    let wp = gtk::WidgetPaintable::new(Some(&tab.view));
+                    let frame = gdk::prelude::PaintableExt::current_image(&wp);
+                    tab.freeze.set_paintable(Some(&frame));
+                    tab.freeze.set_visible(true);
+                    tab.suspended.set(true);
+                    tab.view.terminate_web_process();
                 }
             }
-        });
+        }
     }
 
     fn find_view_coords(&self, view: &WebView) -> Option<(usize, usize)> {
@@ -4622,10 +4633,7 @@ impl App {
                         tab.last_active.set(std::time::Instant::now());
                     }
                     tab.view.remove_css_class("focused");
-                    // Fon tabni darhol emas, SUSPEND_AFTER_SECS dan keyin to'xtatamiz
-                    if !tab.suspended.get() && !tab.keep_alive.get() {
-                        self.schedule_suspend(&tab.view);
-                    }
+                    // Uxlatish fokusga emas, ko'rinishga bog'liq: suspend_hidden_tabs davriy tekshiradi
                 }
             }
         }
@@ -9932,6 +9940,18 @@ fn build(gapp: &gtk::Application) {
         a.save_session_immediate();
         glib::Propagation::Proceed
     });
+
+    {
+        // Ko'rinmagan tablarni uxlatish (split da yonma-yon ko'rinib turgan tab uxlamaydi)
+        let weak = Rc::downgrade(&app);
+        glib::timeout_add_local(Duration::from_secs(5), move || match weak.upgrade() {
+            Some(a) => {
+                a.suspend_hidden_tabs();
+                glib::ControlFlow::Continue
+            }
+            None => glib::ControlFlow::Break,
+        });
+    }
 
     let restored = app.restore_session();
     if let Some(url) = TARGET_URL.get() {
