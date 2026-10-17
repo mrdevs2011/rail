@@ -38,3 +38,9 @@
 - Qilindi: v0.5.10: klassik bir sahifalik index.html (faqat Linux), release + o'rnatish
 - Keyingi qadam: Foydalanuvchi Rail ni qayta ochsin; sayt Vercel da yangilanishi mumkin
 - Git holati: 032827f site: klassik bir sahifalik index.html, faqat Linux (v0.5.10)
+
+---
+### 2026-10-17 06:47
+- Qilindi: v0.5.11: tab freeze 10m, uyg'onganda reload; release
+- Keyingi qadam: Foydalanuvchi Rail ni qayta ochsin
+- Git holati: ffa2b09 feat: tab freeze (10 daqiqa uxlash) + uyg'onganda yangilash (v0.5.11)
