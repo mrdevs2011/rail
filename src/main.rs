@@ -2202,7 +2202,12 @@ struct App {
     color_buttons: RefCell<Vec<gtk::Button>>,
     touchpad_mode: Cell<bool>,
     tp_switch: gtk::Switch,
-    touchpad_toast: gtk::Label,
+    touchpad_toast: gtk::Revealer,
+    touchpad_toast_state: gtk::Label,
+    touchpad_toast_sub: gtk::Label,
+    touchpad_toast_gen: Cell<u32>,
+    /// Cached: can the focused page scroll (either axis)? Touchpad slide yields to the page then.
+    page_scrollable: Cell<bool>,
     last_saved_session: RefCell<String>,
     save_session_gen: Cell<u64>,
     data_modal_info_lbl: gtk::Label,
@@ -2328,7 +2333,7 @@ const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("map", G_PANELS, "Toggle Roadmap / Minimap", ["Alt+M"]),
     sc!("overview", G_PANELS, "Toggle Spatial Overview", ["Alt+O"]),
     sc!("sidebar", G_PANELS, "Toggle Sidebar", ["Alt+B"]),
-    sc!("touchpad", G_PANELS, "Toggle Touchpad Canvas Navigation", ["Alt+Shift+T"]),
+    sc!("touchpad", G_PANELS, "Toggle Touchpad Canvas Navigation", ["Ctrl+Shift+T"]),
     sc!("back", G_PANELS, "Browser Back", ["Alt+Left"]),
     sc!("forward", G_PANELS, "Browser Forward", ["Alt+Right"]),
     sc!("fullscreen", G_PANELS, "Toggle Fullscreen", ["F11"]),
@@ -5358,19 +5363,48 @@ impl App {
         self.touchpad_mode.set(new_state);
         self.tp_switch.set_active(new_state);
         self.schedule_save_session();
+        self.refresh_page_scrollable();
         self.show_touchpad_toast(new_state);
     }
 
+    /// Asks the focused page whether it can scroll (either axis) and caches the answer.
+    /// Touchpad slide only takes over the gesture when the page has nothing to scroll.
+    fn refresh_page_scrollable(self: &Rc<Self>) {
+        let Some(view) = self.focused_view() else {
+            self.page_scrollable.set(false);
+            return;
+        };
+        let app = self.clone();
+        let js = "(function(){try{var d=document,se=d.scrollingElement||d.documentElement,b=d.body;\
+            var ok=function(o){return o!=='hidden'&&o!=='clip';};\
+            var cs=getComputedStyle(se),cb=b?getComputedStyle(b):cs;\
+            var v=se.scrollHeight-se.clientHeight>2&&ok(cs.overflowY)&&ok(cb.overflowY);\
+            var h=se.scrollWidth-se.clientWidth>2&&ok(cs.overflowX)&&ok(cb.overflowX);\
+            return (v||h)?'1':'0';}catch(e){return '0';}})()";
+        view.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, move |res| {
+            if let Ok(val) = res {
+                app.page_scrollable.set(val.to_string() == "1");
+            }
+        });
+    }
+
+    /// Bottom-right card (same style as the update card) announcing Touchpad Slide ON / OFF.
     fn show_touchpad_toast(self: &Rc<Self>, enabled: bool) {
         if enabled {
-            self.touchpad_toast.set_markup(&format!("<span weight='bold' foreground='#fafafa'>{}</span>  <span foreground='#94a3b8'>· {}</span>", tr("Touchpad Slide: ON"), tr("2-finger swipe to slide tabs")));
+            self.touchpad_toast_state.set_markup(&format!("<span foreground='#fafafa'>{}</span>", tr("ON")));
+            self.touchpad_toast_sub.set_label(tr("2-finger swipe slides tabs on pages that don't scroll"));
         } else {
-            self.touchpad_toast.set_markup(&format!("<span weight='bold' foreground='#94a3b8'>{}</span>  <span foreground='#64748b'>· {}</span>", tr("Touchpad Slide: OFF"), tr("Standard page scroll")));
+            self.touchpad_toast_state.set_markup(&format!("<span foreground='#8a8a8a'>{}</span>", tr("OFF")));
+            self.touchpad_toast_sub.set_label(tr("Standard page scroll"));
         }
-        self.touchpad_toast.set_visible(true);
-        let toast = self.touchpad_toast.clone();
-        glib::timeout_add_local_once(std::time::Duration::from_millis(1800), move || {
-            toast.set_visible(false);
+        let token = self.touchpad_toast_gen.get().wrapping_add(1);
+        self.touchpad_toast_gen.set(token);
+        self.touchpad_toast.set_reveal_child(true);
+        let app = self.clone();
+        glib::timeout_add_local_once(std::time::Duration::from_millis(2200), move || {
+            if app.touchpad_toast_gen.get() == token {
+                app.touchpad_toast.set_reveal_child(false);
+            }
         });
     }
 
@@ -7885,6 +7919,11 @@ impl App {
             self.cycle_tab(-1);
             return true;
         }
+        // Ctrl+Shift+T: toggle Touchpad Slide (keycode 28 = physical T on any layout)
+        if ctrl && shift && !alt && (k == gdk::Key::t || keycode == 28) {
+            self.toggle_touchpad_mode();
+            return true;
+        }
 
         if !ctrl && !shift && !alt && k == gdk::Key::F11 {
             self.win.set_fullscreened(!self.win.is_fullscreen());
@@ -9500,13 +9539,32 @@ fn build(gapp: &gtk::Application) {
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&shell));
     overlay.add_overlay(&load_bar);
-    let touchpad_toast = gtk::Label::new(None);
-    touchpad_toast.add_css_class("ov-hint");
-    touchpad_toast.set_halign(gtk::Align::Center);
+    let touchpad_toast = gtk::Revealer::new();
+    touchpad_toast.set_transition_type(gtk::RevealerTransitionType::SlideUp);
+    touchpad_toast.set_transition_duration(220);
+    touchpad_toast.set_halign(gtk::Align::End);
     touchpad_toast.set_valign(gtk::Align::End);
-    touchpad_toast.set_margin_bottom(28);
+    touchpad_toast.set_margin_end(16);
+    touchpad_toast.set_margin_bottom(16);
     touchpad_toast.set_can_target(false);
-    touchpad_toast.set_visible(false);
+    touchpad_toast.set_reveal_child(false);
+    let tp_card = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    tp_card.add_css_class("update-card");
+    tp_card.set_size_request(270, -1);
+    let tp_kicker = gtk::Label::new(Some(tr("TOUCHPAD SLIDE")));
+    tp_kicker.add_css_class("update-kicker");
+    tp_kicker.set_xalign(0.0);
+    let touchpad_toast_state = gtk::Label::new(None);
+    touchpad_toast_state.add_css_class("update-ver");
+    touchpad_toast_state.set_xalign(0.0);
+    let touchpad_toast_sub = gtk::Label::new(None);
+    touchpad_toast_sub.add_css_class("update-sub");
+    touchpad_toast_sub.set_xalign(0.0);
+    touchpad_toast_sub.set_wrap(true);
+    tp_card.append(&tp_kicker);
+    tp_card.append(&touchpad_toast_state);
+    tp_card.append(&touchpad_toast_sub);
+    touchpad_toast.set_child(Some(&tp_card));
 
     overlay.add_overlay(&palette);
     overlay.add_overlay(&ov_hint);
@@ -9577,6 +9635,10 @@ fn build(gapp: &gtk::Application) {
         touchpad_mode: Cell::new(false),
         tp_switch: tp_switch.clone(),
         touchpad_toast,
+        touchpad_toast_state,
+        touchpad_toast_sub,
+        touchpad_toast_gen: Cell::new(0),
+        page_scrollable: Cell::new(false),
         last_saved_session: RefCell::new(String::new()),
         save_session_gen: Cell::new(0),
         data_modal_info_lbl: data_info_lbl.clone(),
@@ -10178,6 +10240,8 @@ fn build(gapp: &gtk::Application) {
     let ay = accum_y.clone();
     let ls = last_scroll.clone();
     let l_swipe = last_swipe.clone();
+    let panned = Rc::new(Cell::new(false));
+    let panned_c = panned.clone();
     scroll.connect_scroll(move |_, dx, dy| {
         // Fast path: normal browsing — do not touch scroll at all (WebKit keeps smooth kinetic scroll)
         if !a.ov.get() && !a.touchpad_mode.get() {
@@ -10236,8 +10300,14 @@ fn build(gapp: &gtk::Application) {
             return glib::Propagation::Proceed;
         }
 
-        // 3. Touchpad slide mode (Alt+Shift+T): 1:1 finger tracking, not discrete tab jumps
+        // 3. Touchpad slide mode (Ctrl+Shift+T): 1:1 finger tracking, not discrete tab jumps
         if !a.touchpad_mode.get() {
+            return glib::Propagation::Proceed;
+        }
+
+        // The page can scroll by itself: leave the gesture alone so WebKit scrolls it natively.
+        // Touchpad slide only works on pages that have nothing to scroll.
+        if a.page_scrollable.get() {
             return glib::Propagation::Proceed;
         }
 
@@ -10246,6 +10316,7 @@ fn build(gapp: &gtk::Application) {
         if dx.abs() > 0.8 && dx.abs() > 2.0 * dy.abs() {
             ls.set(now);
             l_swipe.set(now);
+            panned_c.set(true);
             a.pan_canvas_x(dx);
             return glib::Propagation::Stop;
         }
@@ -10262,6 +10333,15 @@ fn build(gapp: &gtk::Application) {
         ax2.set(0.0);
         ay2.set(0.0);
         l_swipe2.set(0);
+    });
+    // `decelerate` never fires without the KINETIC flag, so settle on the nearest column here
+    // (only if this gesture actually panned the ribbon).
+    let a_end = app.clone();
+    let panned_end = panned.clone();
+    scroll.connect_scroll_end(move |_| {
+        if panned_end.replace(false) && a_end.touchpad_mode.get() && !a_end.ov.get() {
+            a_end.snap_canvas_to_nearest_column();
+        }
     });
     win.add_controller(scroll);
 
@@ -10345,6 +10425,20 @@ fn build(gapp: &gtk::Application) {
         glib::timeout_add_local(Duration::from_secs(5), move || match weak.upgrade() {
             Some(a) => {
                 a.suspend_hidden_tabs();
+                glib::ControlFlow::Continue
+            }
+            None => glib::ControlFlow::Break,
+        });
+    }
+
+    {
+        // Keep the "page can scroll" flag fresh while Touchpad Slide is on
+        let weak = Rc::downgrade(&app);
+        glib::timeout_add_local(Duration::from_millis(200), move || match weak.upgrade() {
+            Some(a) => {
+                if a.touchpad_mode.get() {
+                    a.refresh_page_scrollable();
+                }
                 glib::ControlFlow::Continue
             }
             None => glib::ControlFlow::Break,
