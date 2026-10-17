@@ -328,26 +328,43 @@ function initKeyboardTester() {
   if (!input || !output) return;
 
   const keyMap = {
-    'ctrl+g': 'Manzil qatori (Omnibar) ochildi',
-    'ctrl+t': 'Yangi ustun qo\'shildi (New column)',
-    'ctrl+v': 'Ustun vertikal bo\'lindi (Split stack)',
-    'ctrl+w': 'Fokusdagi oyna yopildi',
-    'ctrl+h': 'Chap ustunga fokus o\'tdi',
-    'ctrl+l': 'O\'ng ustunga fokus o\'tdi',
-    'ctrl+j': 'Pastki oynaga fokus o\'tdi',
-    'ctrl+k': 'Yuqori oynaga fokus o\'tdi',
-    'ctrl+o': 'Overview rejimi almashtirildi',
-    'ctrl+f': 'To\'liq eni / Standart eni rejimi',
-    'ctrl+p': 'Profillar boshqaruv paneli ochildi',
-    'ctrl+r': 'Sahifa qayta yuklandi (Reload)'
+    'alt+t': 'Omnibar ochildi (yangi tab)',
+    'alt+g': 'Manzil qatori (Omnibar) ochildi',
+    'alt+shift+v': 'Yangi ish maydoni ochildi',
+    'alt+w': 'Fokusdagi tab yopildi',
+    'alt+r': 'Sahifa qayta yuklandi (Reload)',
+    'alt+f': 'To\'liq eni / Standart eni rejimi',
+    'alt+h': 'Chap ustunga fokus o\'tdi',
+    'alt+l': 'O\'ng ustunga fokus o\'tdi',
+    'alt+j': 'Pastki qatorga fokus o\'tdi',
+    'alt+k': 'Yuqori qatorga fokus o\'tdi',
+    'alt+shift+h': 'Tab chapga ko\'chdi',
+    'alt+shift+l': 'Tab o\'ngga ko\'chdi',
+    'alt+shift+j': 'Tab pastki qatorga ko\'chdi',
+    'alt+shift+k': 'Tab yuqori qatorga ko\'chdi',
+    'ctrl+tab': 'Keyingi tabga o\'tildi',
+    'ctrl+shift+tab': 'Oldingi tabga o\'tildi',
+    'alt+e': 'Tab setka ko\'rinishi almashtirildi',
+    'alt+o': 'Fazoviy Overview almashtirildi',
+    'alt+b': 'Yon panel almashtirildi',
+    'alt+m': 'Roadmap / Minimap almashtirildi',
+    'alt+p': 'Profillar boshqaruv paneli ochildi',
+    'alt+i': 'Data & Backup ochildi',
+    'alt+s': 'Sozlamalar ochildi',
+    'alt+shift+t': 'Touchpad kanvas rejimi almashtirildi',
+    'f12': 'DevTools almashtirildi',
+    'f11': 'To\'liq ekran almashtirildi',
+    'alt+arrowleft': 'Orqaga',
+    'alt+arrowright': 'Oldinga',
+    'alt+q': 'Rail yopiladi'
   };
 
   input.addEventListener('keydown', (e) => {
     e.preventDefault();
     let combo = [];
     if (e.ctrlKey) combo.push('ctrl');
-    if (e.shiftKey) combo.push('shift');
     if (e.altKey) combo.push('alt');
+    if (e.shiftKey) combo.push('shift');
     if (!['Control', 'Shift', 'Alt'].includes(e.key)) {
       combo.push(e.key.toLowerCase());
     }

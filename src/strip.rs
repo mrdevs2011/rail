@@ -40,6 +40,50 @@ pub fn col_width_animated(progress: f64, viewport: f64) -> f64 {
 }
 
 
+/// Auto-fit grid used by the "tab grid" view: every tab becomes an equal tile with the
+/// same aspect ratio as the viewport, packed into the rows/columns that give the biggest tiles.
+pub struct TileGrid {
+    pub cols: usize,
+    pub scale: f64,
+    /// (x, y, w, h) of every tile in strip coordinates, in tab order.
+    pub rects: Vec<(f64, f64, f64, f64)>,
+}
+
+pub fn tile_grid(n: usize, vw: f64, vh: f64) -> TileGrid {
+    const PAD: f64 = 18.0;
+    const MAX_SCALE: f64 = 0.7;
+    if n == 0 || vw <= 0.0 || vh <= 0.0 {
+        return TileGrid { cols: 1, scale: 1.0, rects: Vec::new() };
+    }
+    let mut cols = 1usize;
+    let mut best = f64::MIN;
+    for c in 1..=n {
+        let r = (n + c - 1) / c;
+        let sw = (vw - PAD * (c as f64 + 1.0)) / (c as f64 * vw);
+        let sh = (vh - PAD * (r as f64 + 1.0)) / (r as f64 * vh);
+        let sc = sw.min(sh);
+        if sc > best + 1e-9 {
+            best = sc;
+            cols = c;
+        }
+    }
+    let rows = (n + cols - 1) / cols;
+    let scale = best.clamp(0.05, MAX_SCALE);
+    let (tw, th) = (vw * scale, vh * scale);
+    let total_h = rows as f64 * th + (rows as f64 - 1.0) * PAD;
+    let y0 = ((vh - total_h) / 2.0).max(0.0);
+    let mut rects = Vec::with_capacity(n);
+    for i in 0..n {
+        let (r, c) = (i / cols, i % cols);
+        let in_row = if r + 1 == rows { n - r * cols } else { cols };
+        let row_w = in_row as f64 * tw + (in_row as f64 - 1.0) * PAD;
+        let x0 = ((vw - row_w) / 2.0).max(0.0);
+        rects.push((x0 + c as f64 * (tw + PAD), y0 + r as f64 * (th + PAD), tw, th));
+    }
+    TileGrid { cols, scale, rects }
+}
+
+
 mod imp {
     use super::*;
     use std::cell::{Cell, RefCell};
@@ -64,6 +108,8 @@ mod imp {
         pub current_grid: RefCell<Vec<Vec<f64>>>,
         /// Custom widths per column in each row
         pub custom_widths: RefCell<Vec<Vec<Option<f64>>>>,
+        /// Tab grid view: ignore rows/columns/zoom and tile every tab evenly.
+        pub tile_mode: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -95,6 +141,22 @@ mod imp {
             let cur_prog = self.current_grid.borrow();
             let c_widths = self.custom_widths.borrow();
             let mut child = widget.first_child();
+
+            if self.tile_mode.get() {
+                let mut kids: Vec<gtk::Widget> = Vec::new();
+                while let Some(c) = child {
+                    child = c.next_sibling();
+                    kids.push(c);
+                }
+                let tg = tile_grid(kids.len(), vw, vh);
+                for (c, &(x, y, _w, _h)) in kids.iter().zip(tg.rects.iter()) {
+                    let t = gsk::Transform::new()
+                        .translate(&graphene::Point::new(x as f32, y as f32))
+                        .scale(tg.scale as f32, tg.scale as f32);
+                    c.allocate(width, height, -1, Some(t));
+                }
+                return;
+            }
 
             if grid.is_empty() {
                 let mut x = 0.0;
@@ -167,6 +229,12 @@ impl StripLayout {
     }
     pub fn set_zoom(&self, v: f64) {
         self.imp().zoom.set(v);
+    }
+    pub fn tile_mode(&self) -> bool {
+        self.imp().tile_mode.get()
+    }
+    pub fn set_tile_mode(&self, v: bool) {
+        self.imp().tile_mode.set(v);
     }
     pub fn set_grid(&self, grid: Vec<Vec<bool>>) {
         let imp = self.imp();
@@ -306,5 +374,41 @@ impl ShellLayout {
     }
     pub fn set_side(&self, v: f64) {
         self.imp().side.set(v);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tile_grid;
+
+    #[test]
+    fn six_tabs_make_three_by_two() {
+        let tg = tile_grid(6, 1600.0, 900.0);
+        assert_eq!(tg.cols, 3);
+        assert_eq!(tg.rects.len(), 6);
+        // same row -> same y, next row below
+        assert_eq!(tg.rects[0].1, tg.rects[2].1);
+        assert!(tg.rects[3].1 > tg.rects[0].1);
+    }
+
+    #[test]
+    fn tiles_stay_inside_and_never_overlap() {
+        for n in 1..=24 {
+            let tg = tile_grid(n, 1280.0, 720.0);
+            assert_eq!(tg.rects.len(), n);
+            for (i, a) in tg.rects.iter().enumerate() {
+                assert!(a.0 >= -0.01 && a.1 >= -0.01 && a.0 + a.2 <= 1280.01 && a.1 + a.3 <= 720.01, "n={n} tile {i} out of bounds");
+                for b in tg.rects.iter().skip(i + 1) {
+                    let apart = a.0 + a.2 <= b.0 + 0.01 || b.0 + b.2 <= a.0 + 0.01 || a.1 + a.3 <= b.1 + 0.01 || b.1 + b.3 <= a.1 + 0.01;
+                    assert!(apart, "n={n} overlap");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn empty_is_safe() {
+        assert!(tile_grid(0, 800.0, 600.0).rects.is_empty());
+        assert!(tile_grid(3, 0.0, 0.0).rects.is_empty());
     }
 }

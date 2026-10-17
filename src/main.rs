@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::OnceLock;
 use std::time::Duration;
-use strip::{col_width, gap, ShellLayout, StripLayout, SIDE_W};
+use strip::{col_width, gap, tile_grid, ShellLayout, StripLayout, SIDE_W};
 use webkit6::prelude::*;
 use webkit6::{
     ContextMenu, ContextMenuAction, ContextMenuItem, HitTestResult,
@@ -2153,7 +2153,6 @@ const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("close_tab", G_TABS, "Close focused tab", ["Alt+W"]),
     sc!("reload", G_TABS, "Reload active tab", ["Alt+R"]),
     sc!("full_tab", G_TABS, "Toggle Full Tab View", ["Alt+F"]),
-    sc!("split_v", G_TABS, "Split column vertically", ["Alt+N"]),
     sc!("new_workspace", G_TABS, "New Workspace", ["Alt+Shift+V"]),
     sc!("focus_left", G_TABS, "Focus column Left", ["Alt+H"]),
     sc!("focus_right", G_TABS, "Focus column Right", ["Alt+L"]),
@@ -2163,6 +2162,8 @@ const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("move_right", G_TABS, "Move tab column Right", ["Alt+Shift+L"]),
     sc!("move_down", G_TABS, "Move tab row Down", ["Alt+Shift+J"]),
     sc!("move_up", G_TABS, "Move tab row Up", ["Alt+Shift+K"]),
+    sc!("next_tab", G_TABS, "Cycle to next tab", ["Ctrl+Tab"]),
+    sc!("prev_tab", G_TABS, "Cycle to previous tab", ["Ctrl+Shift+Tab"]),
     sc!("tab_1", G_TABS, "Switch to tab 1", ["Ctrl+1"]),
     sc!("tab_2", G_TABS, "Switch to tab 2", ["Ctrl+2"]),
     sc!("tab_3", G_TABS, "Switch to tab 3", ["Ctrl+3"]),
@@ -2197,6 +2198,7 @@ const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("devtools_dock", G_PANELS, "Cycle DevTools dock position", ["Alt+Shift+D"]),
     sc!("map", G_PANELS, "Toggle Roadmap / Minimap", ["Alt+M"]),
     sc!("overview", G_PANELS, "Toggle Spatial Overview", ["Alt+O"]),
+    sc!("tab_grid", G_PANELS, "Toggle Tab Grid view", ["Alt+E"]),
     sc!("sidebar", G_PANELS, "Toggle Sidebar", ["Alt+B"]),
     sc!("touchpad", G_PANELS, "Toggle Touchpad Canvas Navigation", ["Alt+Shift+T"]),
     sc!("back", G_PANELS, "Browser Back", ["Alt+Left"]),
@@ -7123,14 +7125,62 @@ impl App {
     // ---- overview (niri-style 2D grid: zoomed out) -----------------------
 
     fn toggle_overview(self: &Rc<Self>) {
-        if self.ov.get() {
+        if self.ov.get() && !self.layout.tile_mode() {
             self.exit_overview();
         } else {
-            self.enter_overview();
+            // From the tab grid this switches to the spatial overview.
+            self.exit_overview();
+            self.enter_overview_mode(false);
         }
     }
 
-    fn enter_overview(self: &Rc<Self>) {
+    /// Tab grid: every tab as an equal tile in an auto-fit grid (see strip::tile_grid).
+    fn toggle_tab_grid(self: &Rc<Self>) {
+        if self.ov.get() && self.layout.tile_mode() {
+            self.exit_overview();
+        } else {
+            // From the spatial overview this switches to the tab grid.
+            self.exit_overview();
+            self.enter_overview_mode(true);
+        }
+    }
+
+    fn tab_count(&self) -> usize {
+        self.rows.borrow().iter().map(|r| r.tabs.len()).sum()
+    }
+
+    /// Position of tab (row, col) in the flat, row-major tab order used by the tab grid.
+    fn flat_index(&self, r: usize, c: usize) -> usize {
+        self.rows.borrow().iter().take(r).map(|x| x.tabs.len()).sum::<usize>() + c
+    }
+
+    fn coords_of_flat(&self, idx: usize) -> Option<(usize, usize)> {
+        let rows = self.rows.borrow();
+        let mut left = idx;
+        for (r, row) in rows.iter().enumerate() {
+            if left < row.tabs.len() {
+                return Some((r, left));
+            }
+            left -= row.tabs.len();
+        }
+        None
+    }
+
+    /// Moves focus inside the tab grid by (dx, dy) tiles.
+    fn grid_move(self: &Rc<Self>, dx: isize, dy: isize) {
+        let n = self.tab_count();
+        if n == 0 {
+            return;
+        }
+        let cols = tile_grid(n, self.strip.width() as f64, self.strip.height() as f64).cols as isize;
+        let cur = self.flat_index(self.focus_row.get(), self.focus_col.get()) as isize;
+        let target = (cur + dx + dy * cols).clamp(0, n as isize - 1) as usize;
+        if let Some((r, c)) = self.coords_of_flat(target) {
+            self.focus_coords(r, c);
+        }
+    }
+
+    fn enter_overview_mode(self: &Rc<Self>, tile: bool) {
         if self.ov.get() || self.rows.borrow().is_empty() {
             return;
         }
@@ -7146,7 +7196,12 @@ impl App {
                 t.view.set_can_target(false);
             }
         }
-        self.target_zoom.set(OV_ZOOM);
+        if tile {
+            self.layout.set_tile_mode(true);
+            self.strip.queue_allocate();
+        } else {
+            self.target_zoom.set(OV_ZOOM);
+        }
         self.reveal_focus();
     }
 
@@ -7155,6 +7210,10 @@ impl App {
             return;
         }
         self.ov.set(false);
+        if self.layout.tile_mode() {
+            self.layout.set_tile_mode(false);
+            self.strip.queue_allocate();
+        }
         self.strip.remove_css_class("zoomed");
         self.ov_hint.set_visible(false);
         for row in self.rows.borrow().iter() {
@@ -7178,6 +7237,19 @@ impl App {
     fn ov_click(self: &Rc<Self>, click_x: f64, click_y: f64) {
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
+
+        if self.layout.tile_mode() {
+            let tg = tile_grid(self.tab_count(), vw, vh);
+            let hit = tg
+                .rects
+                .iter()
+                .position(|&(x, y, w, h)| click_x >= x && click_x <= x + w && click_y >= y && click_y <= y + h);
+            if let Some((r, c)) = hit.and_then(|i| self.coords_of_flat(i)) {
+                self.focus_coords(r, c);
+            }
+            self.exit_overview();
+            return;
+        }
         let z = self.layout.zoom();
         let off_x = self.layout.offset_x();
         let off_y = self.layout.offset_y();
@@ -7214,41 +7286,51 @@ impl App {
     }
 
     fn ov_key(self: &Rc<Self>, k: gdk::Key, m: gdk::ModifierType) -> bool {
-        use gdk::ModifierType as M;
-        let plain = m.is_empty();
-        if plain || m == M::ALT_MASK {
-            match k {
-                gdk::Key::h | gdk::Key::Left => {
-                    self.focus_column_left();
-                    return true;
-                }
-                gdk::Key::l | gdk::Key::Right => {
-                    self.focus_column_right();
-                    return true;
-                }
-                gdk::Key::j | gdk::Key::Down => {
-                    self.focus_row_down();
-                    return true;
-                }
-                gdk::Key::k | gdk::Key::Up => {
-                    self.focus_row_up();
-                    return true;
-                }
-                _ => {}
-            }
+        // Only bare keys act inside overview / tab grid. Modified keys fall through to the
+        // regular shortcuts (e.g. Alt+H), so nothing is bound twice here.
+        if !m.is_empty() {
+            return false;
         }
-        if plain {
-            match k {
-                gdk::Key::Return | gdk::Key::KP_Enter | gdk::Key::space => self.exit_overview(),
-                gdk::Key::x | gdk::Key::Delete | gdk::Key::BackSpace => {
-                    if let Some(v) = self.focused_view() {
-                        self.close_view(&v);
-                    }
+        let tile = self.layout.tile_mode();
+        match k {
+            gdk::Key::h => {
+                if tile {
+                    self.grid_move(-1, 0)
+                } else {
+                    self.focus_column_left()
                 }
-                _ => {}
             }
+            gdk::Key::l => {
+                if tile {
+                    self.grid_move(1, 0)
+                } else {
+                    self.focus_column_right()
+                }
+            }
+            gdk::Key::j => {
+                if tile {
+                    self.grid_move(0, 1)
+                } else {
+                    self.focus_row_down()
+                }
+            }
+            gdk::Key::k => {
+                if tile {
+                    self.grid_move(0, -1)
+                } else {
+                    self.focus_row_up()
+                }
+            }
+            gdk::Key::Return | gdk::Key::KP_Enter => self.exit_overview(),
+            gdk::Key::x => {
+                if let Some(v) = self.focused_view() {
+                    self.close_view(&v);
+                }
+            }
+            _ => {}
         }
-        plain
+        // Bare keys never leak through to the (hidden) page behind the overview.
+        true
     }
 
     // ---- keys ------------------------------------------------------------
@@ -7309,10 +7391,6 @@ impl App {
                 self.hide_devtools();
                 return true;
             }
-            if alt && shift && !ctrl && (k == gdk::Key::i || k == gdk::Key::I) {
-                self.hide_devtools();
-                return true;
-            }
         }
 
         if alt && shift && !ctrl && (k == gdk::Key::d || k == gdk::Key::D) {
@@ -7321,10 +7399,6 @@ impl App {
         }
 
         if !ctrl && !shift && !alt && k == gdk::Key::F12 {
-            self.toggle_devtools();
-            return true;
-        }
-        if alt && shift && !ctrl && (k == gdk::Key::i || k == gdk::Key::I) {
             self.toggle_devtools();
             return true;
         }
@@ -7340,41 +7414,12 @@ impl App {
             }
             return false;
         }
-        let global = (ctrl && !alt && (k == gdk::Key::Tab || k == gdk::Key::ISO_Left_Tab || keycode == 23)) || (alt && !ctrl && (matches!(k, gdk::Key::o | gdk::Key::t | gdk::Key::T | gdk::Key::q | gdk::Key::p | gdk::Key::m | gdk::Key::i | gdk::Key::I | gdk::Key::s | gdk::Key::S | gdk::Key::d | gdk::Key::D) || keycode == 28 || keycode == 39))
-            || (ctrl && shift && !alt && matches!(k, gdk::Key::t | gdk::Key::T))
-            || (ctrl && !shift && !alt && (matches!(k, gdk::Key::_1 | gdk::Key::_2 | gdk::Key::_3 | gdk::Key::_4 | gdk::Key::_5 | gdk::Key::_6 | gdk::Key::_7 | gdk::Key::_8 | gdk::Key::_9 | gdk::Key::KP_1 | gdk::Key::KP_2 | gdk::Key::KP_3 | gdk::Key::KP_4 | gdk::Key::KP_5 | gdk::Key::KP_6 | gdk::Key::KP_7 | gdk::Key::KP_8 | gdk::Key::KP_9) || (keycode >= 10 && keycode <= 18) || (keycode >= 87 && keycode <= 95)));
-        if self.overview_open() && !global && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
+        if self.overview_open() && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
             return true;
         }
 
-        // Standard universal browser shortcuts (Ctrl+R, Ctrl+T, Ctrl+W, Ctrl+L, F5, Ctrl+1..9)
+        // Ctrl+Tab cycling and Ctrl+1..9 tab switching
         if ctrl && !shift && !alt {
-            match k {
-                gdk::Key::r | gdk::Key::R => {
-                    if let Some(v) = self.focused_view() {
-                        v.reload();
-                    }
-                    return true;
-                }
-                gdk::Key::t | gdk::Key::T => {
-                    self.open_new_tab_palette();
-                    return true;
-                }
-                gdk::Key::w | gdk::Key::W => {
-                    if !self.palette_open() {
-                        if let Some(v) = self.focused_view() {
-                            self.close_view(&v);
-                        }
-                    }
-                    return true;
-                }
-                gdk::Key::l | gdk::Key::L => {
-                    self.show_palette();
-                    return true;
-                }
-                _ => {}
-            }
-
             if k == gdk::Key::Tab || k == gdk::Key::ISO_Left_Tab || keycode == 23 {
                 self.cycle_tab(1);
                 return true;
@@ -7417,26 +7462,9 @@ impl App {
                 return true;
             }
         }
-        if !ctrl && !shift && !alt && (k == gdk::Key::F5 || keycode == 71) {
-            if let Some(v) = self.focused_view() {
-                v.reload();
-            }
-            return true;
-        }
-
         if ctrl && shift && !alt && (k == gdk::Key::ISO_Left_Tab || k == gdk::Key::Tab || keycode == 23) {
             self.cycle_tab(-1);
             return true;
-        }
-
-        if ctrl && shift && !alt {
-            match k {
-                gdk::Key::t | gdk::Key::T => {
-                    self.toggle_touchpad_mode();
-                    return true;
-                }
-                _ => {}
-            }
         }
 
         if !ctrl && !shift && !alt && k == gdk::Key::F11 {
@@ -7469,12 +7497,11 @@ impl App {
                 }
                 gdk::Key::i | gdk::Key::I => self.toggle_data_modal(),
                 gdk::Key::t | gdk::Key::T => self.open_new_tab_palette(),
-                gdk::Key::n => self.split_vertical(),
                 gdk::Key::f => self.toggle_full(),
                 gdk::Key::h => self.focus_column_left(),
                 gdk::Key::l => self.focus_column_right(),
-                gdk::Key::j | gdk::Key::Down => self.focus_row_down(),
-                gdk::Key::k | gdk::Key::Up => self.focus_row_up(),
+                gdk::Key::j => self.focus_row_down(),
+                gdk::Key::k => self.focus_row_up(),
                 gdk::Key::w => {
                     if !self.palette_open() {
                         if let Some(v) = self.focused_view() {
@@ -7484,14 +7511,9 @@ impl App {
                 }
                 gdk::Key::b => self.toggle_sidebar(),
                 gdk::Key::o => self.toggle_overview(),
+                gdk::Key::e => self.toggle_tab_grid(),
                 gdk::Key::m => self.toggle_map(),
                 gdk::Key::g | gdk::Key::G => self.show_palette(),
-                gdk::Key::Return | gdk::Key::KP_Enter => {
-                    if self.palette_open() {
-                        return false;
-                    }
-                    self.show_palette();
-                }
                 gdk::Key::r => {
                     if let Some(v) = self.focused_view() {
                         v.reload();
@@ -7509,6 +7531,10 @@ impl App {
                     }
                     if keycode == 28 {
                         self.open_new_tab_palette();
+                        return true;
+                    }
+                    if keycode == 26 {
+                        self.toggle_tab_grid();
                         return true;
                     }
                     if keycode == 42 {
@@ -7560,30 +7586,17 @@ impl App {
 
         if alt && shift && !ctrl {
             match k {
-                gdk::Key::s | gdk::Key::S => {
-                    self.toggle_settings_modal();
-                    return true;
-                }
-                gdk::Key::i | gdk::Key::I => self.toggle_devtools(),
-                gdk::Key::d | gdk::Key::D => {
-                    self.cycle_devtools_dock();
-                    return true;
-                }
                 gdk::Key::t | gdk::Key::T => self.toggle_touchpad_mode(),
-                gdk::Key::v | gdk::Key::V | gdk::Key::n | gdk::Key::N => self.split_vertical(),
-                gdk::Key::h | gdk::Key::Left => self.move_column(-1),
-                gdk::Key::l | gdk::Key::Right => self.move_column(1),
-                gdk::Key::j | gdk::Key::Down => self.move_tab_to_row(self.focus_row.get() + 1),
-                gdk::Key::k | gdk::Key::Up => {
+                gdk::Key::v | gdk::Key::V => self.split_vertical(),
+                gdk::Key::h => self.move_column(-1),
+                gdk::Key::l => self.move_column(1),
+                gdk::Key::j => self.move_tab_to_row(self.focus_row.get() + 1),
+                gdk::Key::k => {
                     if self.focus_row.get() > 0 {
                         self.move_tab_to_row(self.focus_row.get() - 1);
                     }
                 }
                 _ => {
-                    if keycode == 39 {
-                        self.toggle_settings_modal();
-                        return true;
-                    }
                     // Alt+Shift+1 -> move to workspace/row 1
                     if keycode == 10 || keycode == 87
                         || k == gdk::Key::_1 || k == gdk::Key::exclam || k == gdk::Key::KP_1
@@ -10373,6 +10386,19 @@ mod tests {
             let expected = format!("Ctrl+{}", num);
             assert_eq!(def.defaults[0], expected.as_str());
         }
+    }
+
+    /// One action = one shortcut, and one shortcut = one action.
+    #[test]
+    fn test_no_duplicate_default_shortcuts() {
+        let mut seen: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+        for def in SHORTCUT_DEFS {
+            assert_eq!(def.defaults.len(), 1, "\"{}\" must have exactly one default shortcut", def.id);
+            if let Some(prev) = seen.insert(def.defaults[0], def.id) {
+                panic!("{} is bound to both \"{}\" and \"{}\"", def.defaults[0], prev, def.id);
+            }
+        }
+        assert!(SHORTCUT_DEFS.iter().any(|d| d.id == "tab_grid" && d.defaults[0] == "Alt+E"));
     }
 }
 

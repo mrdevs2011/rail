@@ -92,7 +92,7 @@
     <!-- Interactive Tester -->
     <div class="kb-interactive">
       <h3 class="doc-h3" style="margin-top:0"><span class="dot"></span> <span data-t="short_tester_title">Interaktiv Klaviatura Trenajyori</span></h3>
-      <p data-t="short_tester_p">Quyidagi maydonga bosing va ixtiyoriy klavishlarni (masalan Ctrl+T, Ctrl+H, Ctrl+O) bosing:</p>
+      <p data-t="short_tester_p">Quyidagi maydonga bosing va ixtiyoriy klavishlarni (masalan Alt+T, Alt+H, Alt+E) bosing:</p>
       <input type="text" id="kbTesterInput" class="kb-search" placeholder="Shu yerga bosing va klavishlarni bosing..." readonly>
       <div id="kbTesterOutput" style="font-size:13px;color:#aaa">Kutilyapti...</div>
     </div>
@@ -109,45 +109,60 @@
           </tr>
         </thead>
         <tbody>
-          <tr data-combo="ctrl+h">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">H</span></td>
+          <tr data-combo="alt+h">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">H</span></td>
             <td>Chap ustunga o'tish</td>
-            <td>Gorizontal lentada chap tomondagi ustunga fokusni o'tkazadi</td>
+            <td>Gorizontal lentada chap tomondagi tabga fokusni o'tkazadi</td>
           </tr>
-          <tr data-combo="ctrl+l">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">L</span></td>
+          <tr data-combo="alt+l">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">L</span></td>
             <td>O'ng ustunga o'tish</td>
-            <td>Gorizontal lentada o'ng tomondagi ustunga fokusni o'tkazadi</td>
+            <td>Gorizontal lentada o'ng tomondagi tabga fokusni o'tkazadi</td>
           </tr>
-          <tr data-combo="ctrl+j">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">J</span></td>
-            <td>Pastki oynaga o'tish</td>
-            <td>Joriy ustun ichidagi stakda pastdagi oynaga o'tadi</td>
+          <tr data-combo="alt+j">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">J</span></td>
+            <td>Pastki qatorga o'tish</td>
+            <td>Pastdagi ish maydoni (workspace) qatoriga o'tadi</td>
           </tr>
-          <tr data-combo="ctrl+k">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">K</span></td>
-            <td>Yuqori oynaga o'tish</td>
-            <td>Joriy ustun ichidagi stakda yuqoridagi oynaga o'tadi</td>
+          <tr data-combo="alt+k">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">K</span></td>
+            <td>Yuqori qatorga o'tish</td>
+            <td>Yuqoridagi ish maydoni (workspace) qatoriga o'tadi</td>
           </tr>
-          <tr data-combo="ctrl+shift+h">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">Shift</span> + <span class="key-badge">H</span></td>
-            <td>Ustunni chapga ko'chirish</td>
-            <td>Joriy ustunni qo'shni chap ustun bilan o'rnini almashtiradi</td>
+          <tr data-combo="alt+shift+h">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">Shift</span> + <span class="key-badge">H</span></td>
+            <td>Tabni chapga ko'chirish</td>
+            <td>Joriy tabni qo'shni chap tab bilan o'rnini almashtiradi</td>
           </tr>
-          <tr data-combo="ctrl+shift+l">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">Shift</span> + <span class="key-badge">L</span></td>
-            <td>Ustunni o'ngga ko'chirish</td>
-            <td>Joriy ustunni qo'shni o'ng ustun bilan o'rnini almashtiradi</td>
+          <tr data-combo="alt+shift+l">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">Shift</span> + <span class="key-badge">L</span></td>
+            <td>Tabni o'ngga ko'chirish</td>
+            <td>Joriy tabni qo'shni o'ng tab bilan o'rnini almashtiradi</td>
           </tr>
-          <tr data-combo="ctrl+shift+j">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">Shift</span> + <span class="key-badge">J</span></td>
-            <td>Oynani pastga siljitish</td>
-            <td>Stak ichida oynani pastga ko'chiradi</td>
+          <tr data-combo="alt+shift+j">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">Shift</span> + <span class="key-badge">J</span></td>
+            <td>Tabni pastki qatorga ko'chirish</td>
+            <td>Tabni pastdagi ish maydoniga o'tkazadi</td>
           </tr>
-          <tr data-combo="ctrl+shift+k">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">Shift</span> + <span class="key-badge">K</span></td>
-            <td>Oynani yuqoriga siljitish</td>
-            <td>Stak ichida oynani yuqoriga ko'chiradi</td>
+          <tr data-combo="alt+shift+k">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">Shift</span> + <span class="key-badge">K</span></td>
+            <td>Tabni yuqori qatorga ko'chirish</td>
+            <td>Tabni yuqoridagi ish maydoniga o'tkazadi</td>
+          </tr>
+          <tr data-combo="ctrl+tab">
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">Tab</span></td>
+            <td>Keyingi tab</td>
+            <td>Joriy qatordagi keyingi tabga aylanma o'tadi (Ctrl+Shift+Tab — oldingisiga)</td>
+          </tr>
+          <tr>
+            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">1…9</span></td>
+            <td>N-tabga o'tish</td>
+            <td>Joriy qatordagi 1–9-tabga o'tadi (Ctrl+9 — oxirgi tab)</td>
+          </tr>
+          <tr>
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">1…9</span></td>
+            <td>N-ish maydoniga o'tish</td>
+            <td>1–9-ish maydoniga (qatorga) o'tadi; Alt+Shift+1…9 tabni shu yerga ko'chiradi</td>
           </tr>
         </tbody>
       </table>
@@ -165,30 +180,35 @@
           </tr>
         </thead>
         <tbody>
-          <tr data-combo="ctrl+t">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">T</span></td>
-            <td>Yangi ustun qo'shish</td>
-            <td>Lentaning o'ng tomoniga yangi to'liq ustun (tab) yaratadi</td>
+          <tr data-combo="alt+t">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">T</span></td>
+            <td>Yangi tab / Omnibar</td>
+            <td>Omnibar'ni ochadi va yangi tab yaratadi</td>
           </tr>
-          <tr data-combo="ctrl+v">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">V</span> / <span class="key-badge">Ctrl</span>+<span class="key-badge">Shift</span>+<span class="key-badge">T</span></td>
-            <td>Vertikal stakka bo'lish</td>
-            <td>Joriy ustun ichida pastga yangi veb-oyna stakini qo'shadi</td>
-          </tr>
-          <tr data-combo="ctrl+w">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">W</span></td>
-            <td>Oynani yopish</td>
-            <td>Fokusdagi veb-oynani yopadi (oxirgi oyna yopilsa ustun o'chadi)</td>
-          </tr>
-          <tr data-combo="ctrl+g">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">G</span></td>
+          <tr data-combo="alt+g">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">G</span></td>
             <td>URL qatori (Omnibar)</td>
-            <td>Qidiruv va manzil kiritish dialogini ochadi</td>
+            <td>Joriy tab uchun manzil/qidiruv qatorini ochadi</td>
           </tr>
-          <tr data-combo="ctrl+enter">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">Enter</span></td>
-            <td>URL'ni tahrirlash</td>
-            <td>Joriy fokusdagi sahifaning manzilini tezkor tahrirlash</td>
+          <tr data-combo="alt+shift+v">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">Shift</span> + <span class="key-badge">V</span></td>
+            <td>Yangi ish maydoni</td>
+            <td>Joriy qatordan pastda yangi ish maydoni (workspace) ochadi</td>
+          </tr>
+          <tr data-combo="alt+w">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">W</span></td>
+            <td>Tabni yopish</td>
+            <td>Fokusdagi veb-oynani yopadi</td>
+          </tr>
+          <tr data-combo="alt+r">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">R</span></td>
+            <td>Qayta yuklash</td>
+            <td>Fokusdagi veb sahifani qayta yuklaydi</td>
+          </tr>
+          <tr data-combo="alt+f">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">F</span></td>
+            <td>To'liq kenglik / Split</td>
+            <td>Tabni to'liq ekran kengligiga yoyadi yoki 50% rejimiga qaytaradi</td>
           </tr>
         </tbody>
       </table>
@@ -206,35 +226,70 @@
           </tr>
         </thead>
         <tbody>
-          <tr data-combo="ctrl+o">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">O</span></td>
-            <td>Overview rejimi</td>
-            <td>Lentani masshtabini kichraytirib (zoom 0.65), barcha oynalarni bir ekranda ko'rsatadi</td>
+          <tr data-combo="alt+e">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">E</span></td>
+            <td>Tab setka ko'rinishi</td>
+            <td>Barcha tablarni bir ekranda teng kataklar (masalan 3×2) ko'rinishida ko'rsatadi. h/j/k/l — harakat, Enter — ochish, x — yopish, Esc — bekor qilish</td>
           </tr>
-          <tr data-combo="ctrl+f">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">F</span></td>
-            <td>To'liq kenglik / Split</td>
-            <td>Ustunni to'liq ekran kengligiga yoyish yoki 50% split rejimiga qaytarish</td>
+          <tr data-combo="alt+o">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">O</span></td>
+            <td>Fazoviy Overview</td>
+            <td>Lentani kichraytirib, barcha qatorlar va ustunlarni haqiqiy joylashuvida ko'rsatadi</td>
           </tr>
-          <tr data-combo="ctrl+b">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">B</span></td>
+          <tr data-combo="alt+b">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">B</span></td>
             <td>Yon panel (Sidebar)</td>
-            <td>Xatcho'plar va profillar yon panelini ochish yoki yashirish</td>
+            <td>Yon panelni ochish yoki yashirish</td>
           </tr>
-          <tr data-combo="ctrl+p">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">P</span> / <span class="key-badge">Ctrl</span>+<span class="key-badge">Shift</span>+<span class="key-badge">P</span></td>
+          <tr data-combo="alt+m">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">M</span></td>
+            <td>Roadmap / Minimap</td>
+            <td>Tablar xaritasini ochadi yoki yopadi</td>
+          </tr>
+          <tr data-combo="alt+p">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">P</span></td>
             <td>Profillar dialogi</td>
             <td>100% izolyatsiyalangan profillar ro'yxatini ochish va tezkor almashtirish</td>
           </tr>
-          <tr>
-            <td><span class="key-badge">Alt</span> + <span class="key-badge">←</span> / <span class="key-badge">→</span></td>
-            <td>Orqaga / Oldinga</td>
-            <td>Joriy oynaning ko'rishlar tarixi bo'yicha orqaga yoki oldinga o'tish</td>
+          <tr data-combo="alt+i">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">I</span></td>
+            <td>Data & Backup</td>
+            <td>Ma'lumotlar zaxirasi va ko'chirish oynasini ochadi</td>
           </tr>
-          <tr data-combo="ctrl+r">
-            <td><span class="key-badge">Ctrl</span> + <span class="key-badge">R</span></td>
-            <td>Qayta yuklash</td>
-            <td>Fokusdagi veb sahifani to'liq qayta yuklash</td>
+          <tr data-combo="alt+s">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">S</span></td>
+            <td>Sozlamalar</td>
+            <td>Sozlamalar panelini ochadi yoki yopadi</td>
+          </tr>
+          <tr data-combo="alt+shift+t">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">Shift</span> + <span class="key-badge">T</span></td>
+            <td>Touchpad kanvas</td>
+            <td>Sensorli panel orqali kanvas navigatsiyasini yoqadi/o'chiradi</td>
+          </tr>
+          <tr data-combo="f12">
+            <td><span class="key-badge">F12</span></td>
+            <td>DevTools</td>
+            <td>Dasturchi vositalarini ochadi yoki yopadi (Alt+Shift+D — joylashuvni almashtirish)</td>
+          </tr>
+          <tr data-combo="f11">
+            <td><span class="key-badge">F11</span></td>
+            <td>To'liq ekran</td>
+            <td>To'liq ekran rejimini almashtiradi</td>
+          </tr>
+          <tr data-combo="alt+left">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">Left</span></td>
+            <td>Orqaga</td>
+            <td>Joriy tab tarixida orqaga o'tadi</td>
+          </tr>
+          <tr data-combo="alt+right">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">Right</span></td>
+            <td>Oldinga</td>
+            <td>Joriy tab tarixida oldinga o'tadi</td>
+          </tr>
+          <tr data-combo="alt+q">
+            <td><span class="key-badge">Alt</span> + <span class="key-badge">Q</span></td>
+            <td>Chiqish</td>
+            <td>Rail'ni yopadi</td>
           </tr>
         </tbody>
       </table>

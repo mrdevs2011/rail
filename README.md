@@ -73,23 +73,32 @@ Yoki ilovalar ro‘yxatidan (Rofi / Wofi / GNOME / KDE) **Rail** deb qidirib och
 
 | Klavishlar | Vazifasi |
 | :--- | :--- |
-| `Ctrl + G` | Manzil kiritish panelini ochish (URL bar) |
-| `Ctrl + Enter` | Joriy oynadagi URL'ni tahrirlash |
-| `Ctrl + T` | Yangi ustun yaratish (o‘ng tomonga yangi tab) |
-| `Ctrl + V` / `Ctrl + Shift + T` | Vertikal bo‘lish (ustun ichida pastga yangi oyna) |
-| `Ctrl + W` | Fokusdagi oynani yopish |
-| `Ctrl + H` / `Ctrl + L` | Chap / O‘ng ustunga fokusni o‘tkazish |
-| `Ctrl + J` / `Ctrl + K` | Pastki / Yuqori oynaga fokusni o‘tkazish |
-| `Ctrl + Shift + H` / `Ctrl + Shift + L` | Ustunni chapga / o‘ngga ko‘chirish |
-| `Ctrl + Shift + J` / `Ctrl + Shift + K` | Oynani pastga / yuqoriga ko‘chirish |
-| `Ctrl + P` / `Ctrl + Shift + P` | Profillar boshqaruv oynasini ochish |
-| `Ctrl + F` | To‘liq kenglik / Standart kenglik rejimini almashtirish |
-| `Ctrl + O` | Umumiy ko‘rinish (Overview) rejimini yoqish/o‘chirish |
-| `Ctrl + B` | Yon panelni (Sidebar) yashirish/ko‘rsatish |
-| `Alt + Left` / `Alt + Right` | Orqaga / Oldinga o‘tish |
-| `Ctrl + R` | Sahifani yangilash (Reload) |
-| `Ctrl + +` / `Ctrl + -` / `Ctrl + 0` | Masshtabni kattalashtirish / kichiklashtirish / tiklash |
+| `Alt + T` | Omnibar / yangi tab |
+| `Alt + G` | Manzil qatori (URL bar) |
+| `Alt + W` | Fokusdagi tabni yopish |
+| `Alt + R` | Sahifani yangilash (Reload) |
+| `Alt + F` | To‘liq kenglik / standart kenglik |
+| `Alt + Shift + V` | Yangi ish maydoni (workspace) |
+| `Alt + H` / `Alt + L` | Chap / o‘ng tabga fokus |
+| `Alt + J` / `Alt + K` | Pastki / yuqori qatorga fokus |
+| `Alt + Shift + H` / `L` | Tabni chapga / o‘ngga ko‘chirish |
+| `Alt + Shift + J` / `K` | Tabni pastki / yuqori qatorga ko‘chirish |
+| `Ctrl + Tab` / `Ctrl + Shift + Tab` | Keyingi / oldingi tab (aylanma) |
+| `Ctrl + 1…9` | Joriy qatordagi N-tabga o‘tish (`Ctrl + 9` — oxirgi) |
+| `Alt + 1…9` / `Alt + Shift + 1…9` | N-ish maydoniga o‘tish / tabni shu yerga ko‘chirish |
+| `Alt + E` | **Tab setka ko‘rinishi** — barcha tablar teng kataklarda (masalan 3×2) |
+| `Alt + O` | Fazoviy Overview (zoom-out) |
+| `Alt + B` | Yon panelni (Sidebar) yashirish/ko‘rsatish |
+| `Alt + M` | Roadmap / Minimap |
+| `Alt + P` / `Alt + I` / `Alt + S` | Profillar / Data & Backup / Sozlamalar |
+| `Alt + Shift + T` | Touchpad kanvas navigatsiyasi |
+| `F12` / `Alt + Shift + D` | DevTools / DevTools joylashuvini almashtirish |
+| `F11` | To‘liq ekran |
+| `Alt + Left` / `Alt + Right` | Orqaga / Oldinga |
+| `Alt + Q` | Rail'dan chiqish |
 
+Tab setka va Overview ichida: `h` `j` `k` `l` — harakat, `Enter` — ochish, `x` — yopish, `Esc` — bekor qilish.
+Har bir amalga **bitta** shortcut biriktirilgan; xohlasangiz Sozlamalar → Customize → Shortcuts orqali o‘zgartirishingiz mumkin.
 ---
 
 ## 🛠 Manba kodidan yig‘ish (Building from Source)

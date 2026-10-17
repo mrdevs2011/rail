@@ -88,7 +88,6 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Close focused tab", "Fokusdagi tabni yopish", "Закрыть выбранную вкладку"),
     ("Reload active tab", "Faol tabni qayta yuklash", "Перезагрузить активную вкладку"),
     ("Toggle Full Tab View", "To'liq tab ko'rinishini almashtirish", "Переключить полноэкранный вид вкладки"),
-    ("Split column vertically", "Ustunni vertikal bo'lish", "Разделить столбец по вертикали"),
     ("Focus column Left", "Chap ustunga o'tish", "Перейти в левый столбец"),
     ("Focus column Right", "O'ng ustunga o'tish", "Перейти в правый столбец"),
     ("Focus row Down", "Pastki qatorga o'tish", "Перейти в строку ниже"),
@@ -360,4 +359,7 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Confirm password (optional)", "Parolni tasdiqlang (ixtiyoriy)", "Подтвердите пароль (необязательно)"),
     ("New Workspace", "Yangi ish maydoni", "Новое рабочее пространство"),
     ("Click or switch tab to load", "Yuklash uchun bosing yoki o'ting", "Нажмите или переключитесь для загрузки"),
+    ("Toggle Tab Grid view", "Tab setka ko'rinishini almashtirish", "Показать/скрыть сетку вкладок"),
+    ("Cycle to next tab", "Keyingi tabga o'tish", "Следующая вкладка"),
+    ("Cycle to previous tab", "Oldingi tabga o'tish", "Предыдущая вкладка"),
 ];
