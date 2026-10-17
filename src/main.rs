@@ -455,6 +455,9 @@ scrollbar button {
 .rail-col {
     background: transparent;
 }
+.tab-freeze {
+    background: #050505;
+}
 .tab {
     border-radius: 5px;
     border: 1px solid #181818;
@@ -1874,11 +1877,13 @@ button.update-close:hover {
 const OV_ZOOM: f64 = 0.4;
 
 /// Fon tab shuncha soniyadan keyin RAM tejash uchun to'xtatiladi (suspend)
-const SUSPEND_AFTER_SECS: u64 = 120;
+const SUSPEND_AFTER_SECS: u64 = 600; // 10 daqiqa fon tab uxlaydi
 
 struct Tab {
     container: gtk::Box,
     view: WebView,
+    /// Oxirgi kadr (freeze) — uxlaganda skrinshot o'rnida turadi
+    freeze: gtk::Picture,
     profile_id: String,
     custom_width: Cell<Option<f64>>,
     /// Oxirgi ma'lum http(s) manzil. WebKit web process to'xtatilganda uri() ni tozalab yuboradi,
@@ -2937,11 +2942,25 @@ impl App {
         self.ov.get()
     }
 
-    fn create_tab_widget(view: &WebView) -> (gtk::Box, gtk::Box) {
+    fn create_tab_widget(view: &WebView) -> (gtk::Box, gtk::Box, gtk::Picture) {
         view.add_css_class("tab");
         view.set_overflow(gtk::Overflow::Hidden);
         view.set_vexpand(true);
         view.set_hexpand(true);
+
+        let freeze = gtk::Picture::new();
+        freeze.add_css_class("tab-freeze");
+        freeze.set_can_target(false);
+        freeze.set_content_fit(gtk::ContentFit::Fill);
+        freeze.set_hexpand(true);
+        freeze.set_vexpand(true);
+        freeze.set_visible(false);
+
+        let overlay = gtk::Overlay::new();
+        overlay.set_hexpand(true);
+        overlay.set_vexpand(true);
+        overlay.set_child(Some(view));
+        overlay.add_overlay(&freeze);
 
         let container = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         container.add_css_class("rail-col");
@@ -2953,9 +2972,9 @@ impl App {
         resize_handle.add_css_class("tab-resize-handle");
         resize_handle.set_cursor_from_name(Some("col-resize"));
 
-        container.append(view);
+        container.append(&overlay);
         container.append(&resize_handle);
-        (container, resize_handle)
+        (container, resize_handle, freeze)
     }
 
     fn set_tab_width(&self, r: usize, c: usize, width: f64) {
@@ -4110,9 +4129,13 @@ impl App {
         let app = self.clone();
         view.connect_favicon_notify(move |_| app.refresh_sidebar());
         let app = self.clone();
-        view.connect_is_loading_notify(move |_| {
+        view.connect_is_loading_notify(move |v| {
             app.refresh_sidebar();
             app.update_load_bar();
+            // Freeze faqat yuklash tugagach ochiladi (uxlagan tab uyg'onganda)
+            if !v.is_loading() {
+                app.clear_tab_freeze(v);
+            }
         });
         let app = self.clone();
         view.connect_estimated_load_progress_notify(move |_| app.update_load_bar());
@@ -4280,7 +4303,7 @@ impl App {
 
     fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_row: bool) {
         view.set_can_target(!self.ov.get());
-        let (container, resize_handle) = Self::create_tab_widget(&view);
+        let (container, resize_handle, freeze) = Self::create_tab_widget(&view);
 
         let (target_r, target_c) = {
             let mut rows = self.rows.borrow_mut();
@@ -4293,7 +4316,7 @@ impl App {
                 while rows.len() <= next_r {
                     rows.push(Row { tabs: Vec::new() });
                 }
-                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), profile_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), profile_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
                 let c_idx = rows[next_r].tabs.len() - 1;
                 (next_r, c_idx)
             } else {
@@ -4304,7 +4327,7 @@ impl App {
                 } else {
                     (cur_c + 1).min(rows[cur_r].tabs.len())
                 };
-                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), profile_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), profile_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
                 (cur_r, col_idx)
             }
         };
@@ -4355,6 +4378,19 @@ impl App {
         }
     }
 
+    fn clear_tab_freeze(&self, view: &WebView) {
+        let Ok(rows) = self.rows.try_borrow() else { return };
+        for row in rows.iter() {
+            for tab in &row.tabs {
+                if &tab.view == view && tab.freeze.is_visible() && !tab.suspended.get() {
+                    tab.freeze.set_visible(false);
+                    tab.freeze.set_paintable(Option::<&gdk::Paintable>::None);
+                    return;
+                }
+            }
+        }
+    }
+
     fn schedule_suspend(self: &Rc<Self>, view: &WebView) {
         let app = self.clone();
         let v = view.clone();
@@ -4378,6 +4414,11 @@ impl App {
                     let uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
                     if uri.starts_with("http://") || uri.starts_with("https://") {
                         *tab.saved_uri.borrow_mut() = uri;
+                        // Oxirgi kadrni muzlatib qo'yamiz — web process o'lganda ham ko'rinish qoladi
+                        let wp = gtk::WidgetPaintable::new(Some(&tab.view));
+                        let frame = gdk::prelude::PaintableExt::current_image(&wp);
+                        tab.freeze.set_paintable(Some(&frame));
+                        tab.freeze.set_visible(true);
                         tab.suspended.set(true);
                         tab.view.terminate_web_process();
                     }
@@ -4493,12 +4534,15 @@ impl App {
                 if ri == r_clamped && ci == c_clamped {
                     tab.view.add_css_class("focused");
                     tab.last_active.set(std::time::Instant::now());
-                    // Uyg'otish: to'xtatilgan tab saqlangan manzildan qayta yuklanadi
+                    // Uyg'otish: sahifani qayta yukla; freeze load tugaguncha turadi
                     if tab.suspended.get() {
                         tab.suspended.set(false);
                         let uri = tab.saved_uri.borrow().clone();
                         if !uri.is_empty() {
                             tab.view.load_uri(&uri);
+                        } else {
+                            tab.freeze.set_visible(false);
+                            tab.freeze.set_paintable(Option::<&gdk::Paintable>::None);
                         }
                     }
                 } else {
@@ -4700,11 +4744,11 @@ impl App {
             let view = Self::create_web_view(&session, &prof_id);
             view.load_html(&start_page(), Some("rail://start/"));
             view.set_can_target(!self.ov.get());
-            let (container, resize_handle) = Self::create_tab_widget(&view);
+            let (container, resize_handle, freeze) = Self::create_tab_widget(&view);
             self.setup_tab_signals(&container, &view, &resize_handle);
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, profile_id: prof_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+            rows[0].tabs.push(Tab { container, view, freeze, profile_id: prof_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
             drop(rows);
         } else if cur_row_empty && cur_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -4747,11 +4791,11 @@ impl App {
             let view = Self::create_web_view(&session, &prof_id);
             view.load_html(&start_page(), Some("rail://start/"));
             view.set_can_target(!self.ov.get());
-            let (container, resize_handle) = Self::create_tab_widget(&view);
+            let (container, resize_handle, freeze) = Self::create_tab_widget(&view);
             self.setup_tab_signals(&container, &view, &resize_handle);
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, profile_id: prof_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+            rows[0].tabs.push(Tab { container, view, freeze, profile_id: prof_id, custom_width: Cell::new(None), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
             drop(rows);
         } else if cur_row_empty && from_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -4929,12 +4973,12 @@ impl App {
             } else {
                 view.load_uri(&item.url);
             }
-            let (container, resize_handle) = Self::create_tab_widget(&view);
+            let (container, resize_handle, freeze) = Self::create_tab_widget(&view);
             if !item.full {
                 container.remove_css_class("full");
             }
             self.setup_tab_signals(&container, &view, &resize_handle);
-            loaded_tabs.push((item.row, Tab { container, view, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), saved_uri: RefCell::new(if item.url.starts_with("http") { item.url.clone() } else { String::new() }), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) }));
+            loaded_tabs.push((item.row, Tab { container, view, freeze, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), saved_uri: RefCell::new(if item.url.starts_with("http") { item.url.clone() } else { String::new() }), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) }));
         }
 
         let mut rows = self.rows.borrow_mut();
