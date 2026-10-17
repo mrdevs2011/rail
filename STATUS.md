@@ -50,3 +50,9 @@
 - Qilindi: v0.5.12: smooth scroll/slide, GPU Always, frame pan, WebGL; release
 - Keyingi qadam: Foydalanuvchi Rail ni qayta ochsin
 - Git holati: 5bf89d2 fix: scroll/slide silliqligi — GPU, frame pan, WebGL (v0.5.12)
+
+---
+### 2026-10-17 07:07
+- Qilindi: v0.5.13: folder URLs + smooth scroll + auto-update + SVG gear; release (install skip)
+- Keyingi qadam: Deploy Vercel; user can install manually
+- Git holati: b59d86e feat: folder URLs, smooth scroll, auto-update, SVG gear (v0.5.13)
