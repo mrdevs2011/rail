@@ -12,7 +12,7 @@ use gtk::glib;
 use gtk::{gdk, gio};
 use gtk4 as gtk;
 use history::{HistoryManager, HistorySuggestion, SuggestionKind};
-use profile::{ProfileManager, ProfilePersona};
+use profile::ProfileManager;
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -1129,7 +1129,7 @@ entry.palette-entry, entry.palette-entry:focus-within {
     margin-left: 8px;
 }
 
-/* ---- profile colors (True Dark Multi-Persona) ---- */
+/* ---- profile colors (True Dark Multi-Profile) ---- */
 .prof-bg-0 { background-color: #ededed; color: #050811 !important; }
 .prof-bg-1 { background-color: #c084fc; color: #050811 !important; }
 .prof-bg-2 { background-color: #4ade80; color: #050811 !important; }
@@ -4205,12 +4205,11 @@ impl App {
         None
     }
 
-    fn create_web_view(session: &webkit6::NetworkSession, profile_id: &str) -> WebView {
+    fn create_web_view(session: &webkit6::NetworkSession, _profile_id: &str) -> WebView {
         attach_download_handlers_once(session);
-        let persona = ProfilePersona::for_id(profile_id);
 
         let settings = webkit6::Settings::new();
-        settings.set_user_agent(Some(persona.user_agent));
+        // Real WebKitGTK user agent: Rail does not spoof UA, platform, GPU or any other browser property.
         settings.set_enable_webrtc(webrtc_allowed());
         settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_dns_prefetching(false);
@@ -4228,16 +4227,7 @@ impl App {
         // Back/forward uses the page cache: instant history navigation instead of a reload
         settings.set_enable_page_cache(true);
 
-        let stealth_js = persona.stealth_script();
-        let script = webkit6::UserScript::new(
-            &stealth_js,
-            webkit6::UserContentInjectedFrames::AllFrames,
-            webkit6::UserScriptInjectionTime::Start,
-            &[],
-            &[],
-        );
         let ucm = webkit6::UserContentManager::new();
-        ucm.add_script(&script);
         ucm.register_script_message_handler("railgo", None);
         let html_css = load_html_css();
         if !html_css.trim().is_empty() {
@@ -4944,12 +4934,13 @@ impl App {
 
     fn setup_view_signals(self: &Rc<Self>, view: &WebView) {
         let app = self.clone();
-        let v = view.clone();
+        let v = view.downgrade();
         let click = gtk::GestureClick::new();
         click.set_button(0); // Listen to any mouse click
         click.set_propagation_phase(gtk::PropagationPhase::Capture);
         click.connect_pressed(move |_, _, _, _| {
             if !app.ov.get() {
+                let Some(v) = v.upgrade() else { return };
                 if let Some((r, c)) = app.find_view_coords(&v) {
                     if app.focus_row.get() != r || app.focus_col.get() != c {
                         app.focus_coords(r, c);
@@ -5055,10 +5046,11 @@ impl App {
         });
 
         let app = self.clone();
-        let v = view.clone();
+        let v = view.downgrade();
         let focus = gtk::EventControllerFocus::new();
         focus.connect_enter(move |_| {
             if !app.ov.get() {
+                let Some(v) = v.upgrade() else { return };
                 if let Some((r, c)) = app.find_view_coords(&v) {
                     if app.focus_row.get() != r || app.focus_col.get() != c {
                         app.focus_coords(r, c);
@@ -5157,12 +5149,13 @@ impl App {
         self.setup_view_signals(view);
 
         let app = self.clone();
-        let v = view.clone();
+        let v = view.downgrade();
         let click = gtk::GestureClick::new();
         click.set_button(0);
         click.set_propagation_phase(gtk::PropagationPhase::Capture);
         click.connect_pressed(move |_, _, _, _| {
             if !app.ov.get() {
+                let Some(v) = v.upgrade() else { return };
                 if let Some((r, c)) = app.find_view_coords(&v) {
                     if app.focus_row.get() != r || app.focus_col.get() != c {
                         app.focus_coords(r, c);
@@ -5174,9 +5167,11 @@ impl App {
 
         // Interactive splitter resize drag gesture
         let drag = gtk::GestureDrag::new();
+        // Weak refs: the controllers live on the handle itself, so a strong capture would be a
+        // reference cycle that keeps the WebView (and its web process) alive after the tab closes.
         let app = self.clone();
-        let v = view.clone();
-        let h = resize_handle.clone();
+        let v = view.downgrade();
+        let h = resize_handle.downgrade();
         let start_w0 = Rc::new(Cell::new(0.0f64));
         let start_w1 = Rc::new(Cell::new(Option::<f64>::None));
         let start_root_x = Rc::new(Cell::new(0.0f64));
@@ -5189,7 +5184,10 @@ impl App {
             let start_w1 = start_w1.clone();
             let start_root_x = start_root_x.clone();
             move |gesture, _start_x, _start_y| {
-                h.add_css_class("active");
+                let Some(v) = v.upgrade() else { return };
+                if let Some(h) = h.upgrade() {
+                    h.add_css_class("active");
+                }
                 if let Some(ev) = gesture.current_event() {
                     if let Some((rx, _)) = ev.position() {
                         start_root_x.set(rx);
@@ -5225,6 +5223,7 @@ impl App {
             let start_w1 = start_w1.clone();
             let start_root_x = start_root_x.clone();
             move |gesture, offset_x, _offset_y| {
+                let Some(v) = v.upgrade() else { return };
                 let dx = if let Some(ev) = gesture.current_event() {
                     if let Some((rx, _)) = ev.position() {
                         rx - start_root_x.get()
@@ -5263,7 +5262,9 @@ impl App {
             let app = app.clone();
             let h = h.clone();
             move |_gesture, _offset_x, _offset_y| {
-                h.remove_css_class("active");
+                if let Some(h) = h.upgrade() {
+                    h.remove_css_class("active");
+                }
                 app.schedule_save_session();
                 app.reveal_focus();
             }
@@ -5272,10 +5273,10 @@ impl App {
         let dbl_click = gtk::GestureClick::new();
         dbl_click.set_button(gdk::BUTTON_PRIMARY);
         let app_dbl = self.clone();
-        let v_dbl = view.clone();
+        let v_dbl = view.downgrade();
         dbl_click.connect_pressed(move |_, n_press, _, _| {
             if n_press == 2 {
-                if let Some((r, c)) = app_dbl.find_view_coords(&v_dbl) {
+                if let Some((r, c)) = v_dbl.upgrade().and_then(|v| app_dbl.find_view_coords(&v)) {
                     let rows = app_dbl.rows.borrow();
                     if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(row.col_span(c).0)) {
                         tab.custom_width.set(None);
@@ -5293,8 +5294,8 @@ impl App {
         // Vertical height splitter between stacked tabs (Alt+[ / ])
         let hdrag = gtk::GestureDrag::new();
         let app = self.clone();
-        let v = view.clone();
-        let hh = height_handle.clone();
+        let v = view.downgrade();
+        let hh = height_handle.downgrade();
         let start_h0 = Rc::new(Cell::new(0.0f64));
         let start_h1 = Rc::new(Cell::new(0.0f64));
         let start_root_y = Rc::new(Cell::new(0.0f64));
@@ -5307,7 +5308,10 @@ impl App {
             let start_h1 = start_h1.clone();
             let start_root_y = start_root_y.clone();
             move |gesture, _, _| {
-                hh.add_css_class("active");
+                let Some(v) = v.upgrade() else { return };
+                if let Some(hh) = hh.upgrade() {
+                    hh.add_css_class("active");
+                }
                 if let Some(ev) = gesture.current_event() {
                     if let Some((_, ry)) = ev.position() {
                         start_root_y.set(ry);
@@ -5339,6 +5343,7 @@ impl App {
             let start_h1 = start_h1.clone();
             let start_root_y = start_root_y.clone();
             move |gesture, _ox, offset_y| {
+                let Some(v) = v.upgrade() else { return };
                 let dy = if let Some(ev) = gesture.current_event() {
                     if let Some((_, ry)) = ev.position() {
                         ry - start_root_y.get()
@@ -5363,7 +5368,9 @@ impl App {
             let app = app.clone();
             let hh = hh.clone();
             move |_, _, _| {
-                hh.remove_css_class("active");
+                if let Some(hh) = hh.upgrade() {
+                    hh.remove_css_class("active");
+                }
                 app.schedule_save_session();
             }
         });
@@ -5700,6 +5707,9 @@ impl App {
         let total_tabs: usize = rows.iter().map(|r| r.tabs.len()).sum();
         let total_rows = rows.len();
         drop(rows);
+
+        // Free the web process right away instead of waiting for the WebView to be finalized.
+        tab.view.terminate_web_process();
 
         self.sync_strip();
 
@@ -7086,8 +7096,7 @@ impl App {
                 self.profile_btn.remove_css_class(&format!("prof-bg-{}", i));
             }
             self.profile_btn.add_css_class(&format!("prof-bg-{}", p.color_idx));
-            let persona = ProfilePersona::for_id(&p.id);
-            self.profile_btn.set_tooltip_text(Some(&trf("Profile: {} [{}] (100% Isolated)", &[&p.display_name(), &persona.summary()])));
+            self.profile_btn.set_tooltip_text(Some(&trf("Profile: {} (isolated storage)", &[&p.display_name()])));
         }
     }
 
@@ -7133,7 +7142,6 @@ impl App {
             dot.set_width_request(24);
             dot.set_height_request(24);
 
-            let persona = ProfilePersona::for_id(&p.id);
             let name_col = gtk::Box::new(gtk::Orientation::Vertical, 1);
             name_col.set_hexpand(true);
 
@@ -7141,7 +7149,7 @@ impl App {
             name_lbl.add_css_class("profile-item-name");
             name_lbl.set_xalign(0.0);
 
-            let persona_lbl = gtk::Label::new(Some(&persona.summary()));
+            let persona_lbl = gtk::Label::new(Some(tr("Isolated storage")));
             persona_lbl.add_css_class("profile-item-persona");
             persona_lbl.set_xalign(0.0);
 
@@ -7268,7 +7276,7 @@ impl App {
                     "{{\"id\":\"{}\",\"name\":\"{}\",\"persona\":\"{}\",\"letter\":\"{}\",\"bg\":\"{}\",\"fg\":\"{}\"}}",
                     e(&p.id),
                     e(&p.display_name()),
-                    e(&ProfilePersona::for_id(&p.id).summary()),
+                    e(tr("Isolated storage")),
                     e(&p.initial_letter()),
                     p.hex_color(),
                     p.text_color()
@@ -8903,8 +8911,7 @@ impl App {
             name_lbl.add_css_class("profile-card-name");
             name_lbl.set_xalign(0.0);
 
-            let persona = ProfilePersona::for_id(&p.id);
-            let sub_text = trf("@{} - {} (100% Isolated)", &[&p.id, &persona.summary()]);
+            let sub_text = trf("@{} - isolated storage", &[&p.id]);
             let sub_lbl = gtk::Label::new(Some(&sub_text));
             sub_lbl.add_css_class("profile-card-sub");
             sub_lbl.set_xalign(0.0);
@@ -10547,7 +10554,7 @@ fn build(gapp: &gtk::Application) {
     let priv_title = gtk::Label::new(Some(tr("Privacy & Security Shield")));
     priv_title.add_css_class("settings-page-title");
     priv_title.set_xalign(0.0);
-    let priv_subtitle = gtk::Label::new(Some(tr("Container isolation, fingerprint shielding, and network leak prevention")));
+    let priv_subtitle = gtk::Label::new(Some(tr("Container isolation and network leak prevention")));
     priv_subtitle.add_css_class("settings-page-subtitle");
     priv_subtitle.set_xalign(0.0);
     page_privacy.append(&priv_title);
@@ -10558,7 +10565,7 @@ fn build(gapp: &gtk::Application) {
     let iso_title = gtk::Label::new(Some(tr("Multi-Container Storage Isolation")));
     iso_title.add_css_class("settings-card-title");
     iso_title.set_xalign(0.0);
-    let iso_desc = gtk::Label::new(Some(tr("Each profile runs in its own isolated WebKit WebsiteDataManager directory with completely independent cookie jars, IndexedDB databases, and localStorage partitions. Websites cannot cross-track you between personas.")));
+    let iso_desc = gtk::Label::new(Some(tr("Each profile has its own WebKit data directory with separate cookies, IndexedDB and localStorage, so websites cannot link profiles through stored data. IP address, TLS fingerprint, GPU and fonts are shared between profiles and can still be used to correlate them.")));
     iso_desc.add_css_class("settings-card-desc");
     iso_desc.set_xalign(0.0);
     iso_desc.set_wrap(true);
@@ -10606,17 +10613,6 @@ fn build(gapp: &gtk::Application) {
     ping_row.append(&ping_lbl);
     ping_row.append(&ping_badge);
     leak_card.append(&ping_row);
-
-    let dnt_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let dnt_lbl = gtk::Label::new(Some(tr("Do Not Track & Global Privacy Control")));
-    dnt_lbl.add_css_class("shortcut-desc");
-    dnt_lbl.set_hexpand(true);
-    dnt_lbl.set_xalign(0.0);
-    let dnt_badge = gtk::Label::new(Some(tr("Active")));
-    dnt_badge.add_css_class("shortcut-kbd");
-    dnt_row.append(&dnt_lbl);
-    dnt_row.append(&dnt_badge);
-    leak_card.append(&dnt_row);
 
     page_privacy.append(&leak_card);
 
@@ -10888,7 +10884,7 @@ fn build(gapp: &gtk::Application) {
         (tr("Core Engine"), "WebKitGTK 4.1 / WebKit 6.0"),
         (tr("GUI Framework"), "GTK 4.0 + GSK GPU Compositor"),
         (tr("Language"), tr("100% Pure Native Rust")),
-        (tr("Architecture"), tr("Zero-Electron / Multi-Persona Sandboxed Profiles")),
+        (tr("Architecture"), tr("Zero-Electron / Sandboxed Storage Profiles")),
         (tr("Data Directory"), "~/.local/share/rail/"),
         (tr("License"), "MIT License"),
     ];

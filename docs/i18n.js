@@ -59,10 +59,10 @@ const DOCS_T = {
 
     // Index page
     idx_title: "Rail Dokumentatsiyasi",
-    idx_lead: "Rail — Niri Wayland kompozitori konsepsiyasidan ilhomlangan, cheksiz gorizontal lenta, vertikal oynalar steki va 100% izolyatsiyalangan profillarga ega zamonaviy brauzer.",
+    idx_lead: "Rail — Niri Wayland kompozitori konsepsiyasidan ilhomlangan, cheksiz gorizontal lenta, vertikal oynalar steki va saqlash izolyatsiyasiga ega profillarga ega zamonaviy brauzer.",
     concept_h2: "01 / Nega Rail? Yangi paradigma",
     concept_p1: "An'anaviy brauzerlar (Chrome, Firefox, Safari) 20 yil oldingi tablar tizimida qotib qolgan: yuzlab tablar bir qatorda torayib, o'qib bo'lmas holatga keladi. Arc kabi brauzerlar esa vertikal panel taklif qildi, ammo u ham to'liq ekranni band qila olmaydi.",
-    concept_p2: "Rail barchasini o'zgartiradi: har bir tab cheksiz gorizontal lenta (ribbon) bo'ylab joylashgan alohida to'liq ustundir. Bir ustun ichida esa oynalarni stakka (`Ctrl+V`) ajratish mumkin. Shuningdek, 100% to'liq izolyatsiyalangan profillar cookie va ma'lumotlarni hech qachon aralashtirib yubormaydi.",
+    concept_p2: "Rail barchasini o'zgartiradi: har bir tab cheksiz gorizontal lenta (ribbon) bo'ylab joylashgan alohida to'liq ustundir. Bir ustun ichida esa oynalarni stakka (`Ctrl+V`) ajratish mumkin. Shuningdek, saqlash izolyatsiyasiga ega profillar cookie va ma'lumotlarni hech qachon aralashtirib yubormaydi.",
     made_s: "Muhammdrasul",
     made_in_uzb: "Muhammdrasul",
 
@@ -105,8 +105,8 @@ const DOCS_T = {
     short_tbl_other: "Boshqa qulayliklar",
 
     // Profiles page
-    prof_title: "100% Izolyatsiyalangan Multi-Profile Tizimi",
-    prof_lead: "Bitta brauzer ichida bir nechta akkauntdan (shaxsiy, ishchi, mijoz) aralashmasdan va hech narsa sizib chiqmasdan foydalaning.",
+    prof_title: "Saqlash izolyatsiyasiga ega Multi-Profile tizimi",
+    prof_lead: "Bitta brauzer ichida bir nechta akkauntdan (shaxsiy, ishchi, mijoz) cookie va saqlangan ma'lumotlar aralashmasdan foydalaning.",
     prof_lab_title: "Virtual Profil Laboratoriyasi",
     prof_lab_desc: "Quyidagi profillardan birini tanlab, sinov tizimiga kiring. Kuki va saqlangan ma'lumotlar ikkinchi profilga umuman o'tmasligini ko'rasiz:",
     prof_lab_p1: "Profil 1 (Shaxsiy)",
@@ -168,10 +168,10 @@ const DOCS_T = {
 
     // Index page
     idx_title: "Rail Documentation",
-    idx_lead: "Rail — a blazing-fast, keyboard-driven browser inspired by the Niri Wayland compositor, featuring an infinite horizontal ribbon, vertical window stacks, and 100% isolated multi-profiles.",
+    idx_lead: "Rail — a blazing-fast, keyboard-driven browser inspired by the Niri Wayland compositor, featuring an infinite horizontal ribbon, vertical window stacks, and storage-isolated multi-profiles.",
     concept_h2: "01 / Why Rail? A New Paradigm",
     concept_p1: "Traditional browsers (Chrome, Firefox, Safari) have been trapped in a 20-year-old tab model: dozens of horizontal tabs shrink until titles become unreadable. Browsers like Arc introduced vertical tabs, but still confine workspaces to fixed single views.",
-    concept_p2: "Rail changes everything: each tab is a full column on an infinite horizontal ribbon. Inside any column, you can vertically stack windows with `Ctrl+V`. Furthermore, 100% isolated profiles keep cookies and sessions strictly partitioned.",
+    concept_p2: "Rail changes everything: each tab is a full column on an infinite horizontal ribbon. Inside any column, you can vertically stack windows with `Ctrl+V`. Furthermore, storage-isolated profiles keep cookies and sessions strictly partitioned.",
     made_s: "Muhammdrasul",
     made_in_uzb: "Muhammdrasul",
 
@@ -214,7 +214,7 @@ const DOCS_T = {
     short_tbl_other: "Utilities",
 
     // Profiles page
-    prof_title: "100% Isolated Multi-Profile System",
+    prof_title: "Storage-Isolated Multi-Profile System",
     prof_lead: "Run multiple accounts (work, personal, clients) inside one unified browser window without cross-contamination.",
     prof_lab_title: "Virtual Profile Isolation Lab",
     prof_lab_desc: "Pick a profile below and sign in. Notice how cookies and stored data remain completely invisible to other profiles:",
@@ -277,10 +277,10 @@ const DOCS_T = {
 
     // Index page
     idx_title: "Документация Rail",
-    idx_lead: "Rail — сверхбыстрый браузер с управлением с клавиатуры, вдохновленный оконным композитором Niri Wayland, с бесконечной горизонтальной лентой, вертикальными стопками и 100% изолированными профилями.",
+    idx_lead: "Rail — сверхбыстрый браузер с управлением с клавиатуры, вдохновленный оконным композитором Niri Wayland, с бесконечной горизонтальной лентой, вертикальными стопками и профилями с изолированным хранилищем.",
     concept_h2: "01 / Почему Rail? Новая парадигма",
     concept_p1: "Традиционные браузеры (Chrome, Firefox, Safari) застряли в парадигме 20-летней давности: десятки вкладок сжимаются до неузнаваемости. Браузеры вроде Arc предложили вертикальные вкладки, но по-прежнему сковывают экран жесткими рамками.",
-    concept_p2: "Rail меняет всё: каждая вкладка — это полноценная колонка на бесконечной горизонтальной ленте. Внутри колонки окна можно делить вертикально на стопки с помощью `Ctrl+V`. А 100% изолированные профили гарантируют отсутствие утечек данных.",
+    concept_p2: "Rail меняет всё: каждая вкладка — это полноценная колонка на бесконечной горизонтальной ленте. Внутри колонки окна можно делить вертикально на стопки с помощью `Ctrl+V`. А изолированные по хранилищу профили хранят cookie и данные раздельно.",
     made_s: "Muhammdrasul",
     made_in_uzb: "Muhammdrasul",
 
@@ -323,7 +323,7 @@ const DOCS_T = {
     short_tbl_other: "Служебные команды",
 
     // Profiles page
-    prof_title: "100% Изолированные профили",
+    prof_title: "Профили с изолированным хранилищем",
     prof_lead: "Работайте с несколькими аккаунтами (личный, рабочий, клиентский) в одном окне без смешивания данных.",
     prof_lab_title: "Виртуальная лаборатория профилей",
     prof_lab_desc: "Выберите профиль ниже и войдите на сайт. Cookie и локальное хранилище никогда не попадут в соседний профиль:",

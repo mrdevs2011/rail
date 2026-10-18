@@ -1,6 +1,6 @@
 # Rail
 
-> **Rail** — a blazing-fast, keyboard-driven web browser built with GTK4 and WebKitGTK. Inspired by the **Niri** Wayland compositor, it features an infinite horizontal ribbon of columns, vertical window stacks, and 100% isolated multi-profiles.
+> **Rail** — a blazing-fast, keyboard-driven web browser built with GTK4 and WebKitGTK. Inspired by the **Niri** Wayland compositor, it features an infinite horizontal ribbon of columns, vertical window stacks, and storage-isolated multi-profiles.
 
 ---
 
@@ -57,7 +57,7 @@ Yoki ilovalar ro‘yxatidan (Rofi / Wofi / GNOME / KDE) **Rail** deb qidirib och
   - Gorizontal cheksiz lenta (horizontal strip): har bir tab alohida ustun ko‘rinishida.
   - Har bir ustun ichida vertikal oynalar steki (`Ctrl+V` yoki `Ctrl+Shift+T`).
   - To‘liq klaviatura orqali boshqaruv (`Ctrl+H/J/K/L`) va oynalarni siljitish (`Ctrl+Shift+H/J/K/L`).
-- **100% Izolyatsiyalangan Multi-Profile tizimi**:
+- **Saqlash izolyatsiyasiga ega Multi-Profile tizimi**:
   - Har bir profil uchun to‘liq alohida kuki, kesh, localStorage va sessiyalar (`WebKitNetworkSession`).
   - Profillar menejeri: `Ctrl+P` yoki `Ctrl+Shift+P`.
   - URL kiritish maydonida dumaloq profil tugmasi orqali tezkor almashtirish.
