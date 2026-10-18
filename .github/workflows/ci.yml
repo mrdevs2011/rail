@@ -56,10 +56,6 @@ jobs:
         include:
           - os: ubuntu-latest
             label: linux
-          - os: macos-latest
-            label: macos
-          - os: windows-latest
-            label: windows
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
