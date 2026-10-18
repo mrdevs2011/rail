@@ -1745,11 +1745,11 @@ button.color-choice.selected {
     border-radius: 3px;
 }
 
-/* ---- full-page settings (web-style, responsive) ---- */
+/* ---- settings page inside the tab square (not window-fullscreen) ---- */
 .settings-modal {
     background: #0b0b0b;
-    border: none;
-    border-radius: 0;
+    border: 1px solid #1a1a1a;
+    border-radius: 10px;
     box-shadow: none;
     min-width: 0;
     min-height: 0;
@@ -8809,11 +8809,6 @@ fn build(gapp: &gtk::Application) {
     brand.set_markup("<span weight='bold' font_family='monospace' size='large' foreground='#f8fafc'>rail</span><span weight='bold' size='large' foreground='#38bdf8'>.</span>");
     brand.set_hexpand(true);
     brand.set_xalign(0.0);
-    let head_settings = gtk::Button::new();
-    head_settings.set_child(Some(&create_gear_icon(16)));
-    head_settings.add_css_class("flat-icon");
-    head_settings.set_tooltip_text(Some(tr("Settings")));
-    sc_bind_tooltip(&head_settings, "Settings", &["settings"]);
     let head_close_side = gtk::Button::from_icon_name("go-previous-symbolic");
     head_close_side.add_css_class("flat-icon");
     head_close_side.set_tooltip_text(Some(tr("Close sidebar")));
@@ -8821,7 +8816,6 @@ fn build(gapp: &gtk::Application) {
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 4);
     head.set_margin_start(4);
     head.append(&brand);
-    head.append(&head_settings);
     head.append(&head_close_side);
 
     let pill_label = gtk::Label::new(Some(tr("Search or enter address")));
@@ -8901,6 +8895,12 @@ fn build(gapp: &gtk::Application) {
     strip.set_margin_end(8);
     strip.set_margin_start(6);
 
+    // Settings lives in the strip (tab square), like a normal page — not window fullscreen
+    let strip_host = gtk::Overlay::new();
+    strip_host.set_hexpand(true);
+    strip_host.set_vexpand(true);
+    strip_host.set_child(Some(&strip));
+
     let shell_layout = ShellLayout::new();
     shell_layout.set_side(SIDE_W as f64);
     let shell = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -8909,7 +8909,7 @@ fn build(gapp: &gtk::Application) {
     shell.set_hexpand(true);
     shell.set_vexpand(true);
     shell.append(&side);
-    shell.append(&strip);
+    shell.append(&strip_host);
 
     // ---- address palette ----
     let entry = gtk::Entry::new();
@@ -8969,7 +8969,7 @@ fn build(gapp: &gtk::Application) {
         pop_c.popup();
     });
 
-    // ---- full-page settings (Alt+S / Alt+P / Alt+I) — web-style, not floating ----
+    // ---- settings page in the tab square (Alt+S) — rail://settings, not window fullscreen ----
     let settings_modal = gtk::Box::new(gtk::Orientation::Vertical, 0);
     settings_modal.add_css_class("settings-modal");
     settings_modal.set_halign(gtk::Align::Fill);
@@ -8977,7 +8977,7 @@ fn build(gapp: &gtk::Application) {
     settings_modal.set_hexpand(true);
     settings_modal.set_vexpand(true);
     settings_modal.set_visible(false);
-    // no fixed size — fills window; responsive class applied on resize
+    // Fills the strip (tab area) only; sidebar stays visible
 
     // Settings Header
     let settings_header = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -10299,10 +10299,12 @@ fn build(gapp: &gtk::Application) {
     tp_card.append(&touchpad_toast_sub);
     touchpad_toast.set_child(Some(&tp_card));
 
+    // Settings overlays the strip only (tab square), not the whole window
+    strip_host.add_overlay(&settings_modal);
+
     overlay.add_overlay(&palette);
     overlay.add_overlay(&ov_hint);
     overlay.add_overlay(&touchpad_toast);
-    overlay.add_overlay(&settings_modal);
     overlay.add_overlay(&map_container);
     overlay.add_overlay(&devtools_panel);
 
@@ -10857,10 +10859,6 @@ fn build(gapp: &gtk::Application) {
     devtools_detach_btn.connect_clicked(move |_| a_dt_detach.toggle_devtools_undocked());
 
 
-    {
-        let a = app.clone();
-        head_settings.connect_clicked(move |_| a.open_settings_tab(SettingsTab::General));
-    }
     {
         let a = app.clone();
         head_close_side.connect_clicked(move |_| a.set_sidebar(false));
