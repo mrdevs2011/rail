@@ -5148,6 +5148,19 @@ impl App {
     fn setup_tab_signals(self: &Rc<Self>, container: &gtk::Box, view: &WebView, resize_handle: &gtk::Box, height_handle: &gtk::Box) {
         self.setup_view_signals(view);
 
+        // Welcome page search box (a real <input> in the page) talks to us through this handler.
+        // Connected here (not in add_view) so EVERY tab creation path gets it, including
+        // session restore at startup; otherwise the page never receives its state (placeholder,
+        // engine icon, hints, profile button).
+        if let Some(ucm) = view.user_content_manager() {
+            let app = self.clone();
+            let wv = view.downgrade();
+            ucm.connect_script_message_received(Some("railgo"), move |_, val| {
+                let Some(v) = wv.upgrade() else { return };
+                app.on_start_search(&v, val.to_str().as_str());
+            });
+        }
+
         let app = self.clone();
         let v = view.downgrade();
         let click = gtk::GestureClick::new();
@@ -5390,15 +5403,6 @@ impl App {
 
     fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_row: bool) {
         view.set_can_target(!self.ov.get());
-        // Welcome page search box (a real <input> in the page) reports Enter here.
-        if let Some(ucm) = view.user_content_manager() {
-            let app = self.clone();
-            let wv = view.downgrade();
-            ucm.connect_script_message_received(Some("railgo"), move |_, val| {
-                let Some(v) = wv.upgrade() else { return };
-                app.on_start_search(&v, val.to_str().as_str());
-            });
-        }
         let (container, resize_handle, height_handle, freeze) = Self::create_tab_widget(&view);
 
         let (target_r, target_c) = {
@@ -6261,7 +6265,7 @@ impl App {
             self.setup_tab_signals(&container, &view, &resize_handle, &height_handle);
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, freeze, height_handle, profile_id: prof_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+            rows[0].tabs.push(Tab { container, view, freeze, height_handle, profile_id: prof_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new("rail://start/".to_string()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
             drop(rows);
         } else if cur_row_empty && cur_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -6308,7 +6312,7 @@ impl App {
             self.setup_tab_signals(&container, &view, &resize_handle, &height_handle);
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, freeze, height_handle, profile_id: prof_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+            rows[0].tabs.push(Tab { container, view, freeze, height_handle, profile_id: prof_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new("rail://start/".to_string()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
             drop(rows);
         } else if cur_row_empty && from_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -6557,7 +6561,7 @@ impl App {
                 // free the idle web process WebKit may have spawned for the empty view
                 view.terminate_web_process();
             }
-            loaded_tabs.push((item.row, Tab { container, view, freeze, height_handle, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(if item.url.starts_with("http") || item.url.starts_with("rail://") { item.url.clone() } else { String::new() }), suspended: Cell::new(lazy), keep_alive: Cell::new(false), last_active: Cell::new(if lazy { std::time::Instant::now().checked_sub(Duration::from_secs(SUSPEND_AFTER_SECS + 1)).unwrap_or_else(std::time::Instant::now) } else { std::time::Instant::now() }) }));
+            loaded_tabs.push((item.row, Tab { container, view, freeze, height_handle, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(if item.url.starts_with("http") || item.url.starts_with("rail://") { item.url.clone() } else if item.url.is_empty() || item.url.starts_with("about:") { "rail://start/".to_string() } else { String::new() }), suspended: Cell::new(lazy), keep_alive: Cell::new(false), last_active: Cell::new(if lazy { std::time::Instant::now().checked_sub(Duration::from_secs(SUSPEND_AFTER_SECS + 1)).unwrap_or_else(std::time::Instant::now) } else { std::time::Instant::now() }) }));
         }
 
         let mut rows = self.rows.borrow_mut();
