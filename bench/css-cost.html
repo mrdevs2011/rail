@@ -1,0 +1,18 @@
+<!doctype html><meta charset=utf-8><title>s</title>
+<body><div id=c></div>
+<script>
+let h='';
+for(let i=0;i<1500;i++){h+='<div class="a"><h3>Title '+i+'</h3><p>Some <a href="#">link</a> and <b>bold</b> <i>it</i> <span>text</span> <code>x</code></p><ul><li>one<li>two<li>three</ul><button>go</button><input value="v"><table><tr><td>1<td>2</table></div>';}
+const c=document.getElementById('c');
+const ms=[];
+let n=0;
+function once(){
+  const t=performance.now();
+  c.innerHTML=h; c.offsetHeight;
+  ms.push(performance.now()-t);
+  if(++n<12) setTimeout(once,150);
+  else { ms.shift(); ms.sort((a,b)=>a-b); const med=ms[Math.floor(ms.length/2)];
+    new Image().src='/r?med='+med.toFixed(1)+'&min='+ms[0].toFixed(1)+'&max='+ms[ms.length-1].toFixed(1); }
+}
+setTimeout(once,1500);
+</script>
