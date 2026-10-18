@@ -2265,8 +2265,13 @@ button.update-close:hover {
 /// How far the strip zooms out in overview (niri uses a similar factor).
 const OV_ZOOM: f64 = 0.4;
 
-/// Tab shuncha soniya davomida ekranda ko'rinmasa, RAM tejash uchun to'xtatiladi (suspend)
-const SUSPEND_AFTER_SECS: u64 = 600; // 10 daqiqa ko'rinmagan tab uxlaydi
+/// Tab shuncha soniya davomida ekranda ko'rinmasa, RAM tejash uchun to'xtatiladi (suspend).
+/// 90s: Chrome-style aggressive discard without feeling instant-kill.
+const SUSPEND_AFTER_SECS: u64 = 90;
+
+/// Hard cap on simultaneous live web processes (focused + visible extras).
+/// Beyond this, oldest non-focused tabs are suspended even if still "visible".
+const MAX_LIVE_TABS: usize = 4;
 
 struct Tab {
     container: gtk::Box,
@@ -4093,8 +4098,8 @@ impl App {
         settings.set_javascript_can_access_clipboard(true);
         // Always: smooth page scroll/compositing; falls back when GPU unavailable
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
-        // Page cache helps back/forward; modest RAM cost
-        settings.set_enable_page_cache(true);
+        // Page cache keeps full DOM snapshots per navigation — costly with many tabs
+        settings.set_enable_page_cache(false);
 
         let stealth_js = persona.stealth_script();
         let script = webkit6::UserScript::new(
@@ -5236,35 +5241,102 @@ impl App {
         ow > 40.0 && oh > 40.0
     }
 
-    /// Davriy tekshiruv: ko'rinib turgan (yoki fokusdagi) tabning `last_active` vaqti yangilanadi;
-    /// SUSPEND_AFTER_SECS davomida umuman ko'rinmagan tab uxlatiladi.
+    /// Suspend a live http(s) tab: freeze last frame, kill web process, free RAM.
+    fn suspend_tab(tab: &Tab) {
+        if tab.suspended.get() || tab.keep_alive.get() {
+            return;
+        }
+        if tab.view.is_loading() || tab.view.is_playing_audio() {
+            return;
+        }
+        let uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
+        let uri = if uri.starts_with("http://") || uri.starts_with("https://") {
+            uri
+        } else {
+            tab.saved_uri.borrow().clone()
+        };
+        if uri.is_empty()
+            || !(uri.starts_with("http://") || uri.starts_with("https://"))
+        {
+            return;
+        }
+        *tab.saved_uri.borrow_mut() = uri;
+        let wp = gtk::WidgetPaintable::new(Some(&tab.view));
+        let frame = gdk::prelude::PaintableExt::current_image(&wp);
+        tab.freeze.set_paintable(Some(&frame));
+        tab.freeze.set_visible(true);
+        tab.suspended.set(true);
+        tab.view.terminate_web_process();
+    }
+
+    /// Davriy tekshiruv:
+    /// - faqat fokus / haqiqiy viewport kesishuvi `last_active` ni yangilaydi
+    ///   (overview endi BARCHA tablarni "tirik" ushlab turmaydi)
+    /// - SUSPEND_AFTER_SECS dan beri ko'rinmagan → suspend
+    /// - MAX_LIVE_TABS dan oshsa eng eski non-focused tablar majburiy suspend
     fn suspend_hidden_tabs(&self) {
         let Ok(rows) = self.rows.try_borrow() else { return };
+        let fr = self.focus_row.get();
+        let fc = self.focus_col.get();
+        let in_overview = self.ov.get();
+
+        // 1) Touch last_active only for focused tab, or actually on-screen when NOT in overview.
+        //    Overview scales everything into view — treating all as visible prevented ANY suspend.
         for (ri, row) in rows.iter().enumerate() {
             for (ci, tab) in row.tabs.iter().enumerate() {
-                let is_focused = ri == self.focus_row.get() && ci == self.focus_col.get();
-                if is_focused || self.tab_is_visible(tab) {
+                let is_focused = ri == fr && ci == fc;
+                if is_focused {
                     tab.last_active.set(std::time::Instant::now());
+                } else if !in_overview && self.tab_is_visible(tab) {
+                    tab.last_active.set(std::time::Instant::now());
+                }
+            }
+        }
+
+        // 2) Time-based suspend for off-screen tabs
+        for (ri, row) in rows.iter().enumerate() {
+            for (ci, tab) in row.tabs.iter().enumerate() {
+                let is_focused = ri == fr && ci == fc;
+                if is_focused || tab.suspended.get() || tab.keep_alive.get() {
                     continue;
                 }
-                if tab.suspended.get()
-                    || tab.keep_alive.get()
-                    || tab.last_active.get().elapsed() < Duration::from_secs(SUSPEND_AFTER_SECS)
-                    || tab.view.is_loading()
-                    || tab.view.is_playing_audio()
-                {
+                // In normal mode keep truly visible split tabs alive until max-live kicks in
+                if !in_overview && self.tab_is_visible(tab) {
+                    continue;
+                }
+                if tab.last_active.get().elapsed() < Duration::from_secs(SUSPEND_AFTER_SECS) {
+                    continue;
+                }
+                Self::suspend_tab(tab);
+            }
+        }
+
+        // 3) Hard cap: too many live web processes → suspend oldest non-focused first
+        let mut live: Vec<(std::time::Instant, usize, usize)> = Vec::new();
+        for (ri, row) in rows.iter().enumerate() {
+            for (ci, tab) in row.tabs.iter().enumerate() {
+                if tab.suspended.get() || tab.keep_alive.get() {
                     continue;
                 }
                 let uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
-                if uri.starts_with("http://") || uri.starts_with("https://") {
-                    *tab.saved_uri.borrow_mut() = uri;
-                    // Oxirgi kadrni muzlatib qo'yamiz — web process o'lganda ham ko'rinish qoladi
-                    let wp = gtk::WidgetPaintable::new(Some(&tab.view));
-                    let frame = gdk::prelude::PaintableExt::current_image(&wp);
-                    tab.freeze.set_paintable(Some(&frame));
-                    tab.freeze.set_visible(true);
-                    tab.suspended.set(true);
-                    tab.view.terminate_web_process();
+                let has_http = uri.starts_with("http://")
+                    || uri.starts_with("https://")
+                    || tab.saved_uri.borrow().starts_with("http");
+                if !has_http {
+                    continue;
+                }
+                live.push((tab.last_active.get(), ri, ci));
+            }
+        }
+        if live.len() > MAX_LIVE_TABS {
+            live.sort_by_key(|(t, _, _)| *t); // oldest first
+            let excess = live.len() - MAX_LIVE_TABS;
+            for (_, ri, ci) in live.into_iter().take(excess) {
+                if ri == fr && ci == fc {
+                    continue; // never suspend focused
+                }
+                if let Some(tab) = rows.get(ri).and_then(|r| r.tabs.get(ci)) {
+                    Self::suspend_tab(tab);
                 }
             }
         }
@@ -11121,7 +11193,7 @@ fn build(gapp: &gtk::Application) {
     {
         // Ko'rinmagan tablarni uxlatish (split da yonma-yon ko'rinib turgan tab uxlamaydi)
         let weak = Rc::downgrade(&app);
-        glib::timeout_add_local(Duration::from_secs(5), move || match weak.upgrade() {
+        glib::timeout_add_local(Duration::from_secs(2), move || match weak.upgrade() {
             Some(a) => {
                 a.suspend_hidden_tabs();
                 glib::ControlFlow::Continue
@@ -11288,12 +11360,12 @@ fn main() -> glib::ExitCode {
     }
     {
         let mut mps = webkit6::MemoryPressureSettings::new();
-        // Soft limit ~384 MiB of process memory before WebKit starts reclaiming aggressively
-        mps.set_memory_limit(384);
-        mps.set_conservative_threshold(0.33);
-        mps.set_strict_threshold(0.50);
+        // Soft limit ~256 MiB per web process before aggressive reclaim
+        mps.set_memory_limit(256);
+        mps.set_conservative_threshold(0.25);
+        mps.set_strict_threshold(0.40);
         mps.set_kill_threshold(0.0); // 0 = disabled kill; we suspend tabs ourselves
-        mps.set_poll_interval(5.0);
+        mps.set_poll_interval(3.0);
         webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
         if let Some(ctx) = webkit6::WebContext::default() {
             ctx.set_cache_model(webkit6::CacheModel::DocumentViewer);
