@@ -2455,6 +2455,8 @@ struct App {
     palette: gtk::Box,
     entry: gtk::Entry,
     palette_for_new_tab: Cell<bool>,
+    /// True while the palette is pinned under the brand on a welcome (rail://start) tab.
+    welcome_palette: Cell<bool>,
     palette_suggestions_box: gtk::Box,
     history: RefCell<HistoryManager>,
     current_suggestions: RefCell<Vec<HistorySuggestion>>,
@@ -3622,6 +3624,14 @@ fn display_uri_for_pill(uri: &str) -> String {
     host_of(uri).unwrap_or_else(|| uri.to_string())
 }
 
+/// What Ctrl+L puts into the address entry: the FULL url (pill shows only the host).
+fn edit_uri_for_entry(uri: &str) -> String {
+    if uri.is_empty() || uri.starts_with("about:") || is_internal_uri(uri) {
+        return display_uri_for_pill(uri);
+    }
+    uri.to_string()
+}
+
 fn load_internal_page(v: &WebView, uri: &str) {
     if uri.starts_with("rail://downloads") {
         v.load_html(&downloads_page(), Some("rail://downloads"));
@@ -4084,7 +4094,10 @@ impl App {
             let mut nz = zc + (zt - zc) * k;
             if near(zt, nz, 0.002) { nz = zt; }
 
-            let (mut nx, mut ny) = if (app.ov.get() && zt < 1.0) || (!app.ov.get() && zt == 1.0 && zc < 0.99) {
+            // Pure-scale anchoring only while the zoom itself is animating. Once the overview
+            // zoom has settled, the camera must follow the focused tab (h/j/k/l, arrows).
+            let zoom_busy = !near(zc, zt, 0.002);
+            let (mut nx, mut ny) = if (app.ov.get() && zt < 1.0 && zoom_busy) || (!app.ov.get() && zt == 1.0 && zc < 0.99) {
                 // Pure scale (zoom-out and zoom-in): fixed world anchor under screen center
                 let vw = strip.width() as f64;
                 let vh = strip.height() as f64;
@@ -5489,6 +5502,24 @@ impl App {
         tr("Search or enter address").into()
     }
 
+    /// Full URL of the focused tab for editing in the address entry (Ctrl+L).
+    fn focused_edit_uri(&self) -> String {
+        let Some(v) = self.focused_view() else {
+            return tr("Search or enter address").into();
+        };
+        if let Some(u) = v.uri() {
+            let us = u.as_str();
+            if !us.is_empty() && !us.starts_with("about:") {
+                return edit_uri_for_entry(us);
+            }
+        }
+        let saved = self.saved_uri_of(&v);
+        if !saved.is_empty() {
+            return edit_uri_for_entry(&saved);
+        }
+        tr("Search or enter address").into()
+    }
+
     fn mark_keep_alive(&self, view: &WebView) {
         let Ok(rows) = self.rows.try_borrow() else { return };
         for row in rows.iter() {
@@ -5792,6 +5823,7 @@ impl App {
         // Settings chrome rides *inside* the focused tab overlay so tab-switch
         // and overview treat it like any other page (no floating strip-level panel).
         self.sync_settings_chrome();
+        self.sync_welcome_palette();
 
         if !self.palette_open() && !self.ov.get() && !self.settings_modal_open() {
             if let Some(v) = self.focused_view() {
@@ -7093,15 +7125,59 @@ impl App {
     }
 
     fn update_palette_size(&self) {
-        // Fixed 580px — suggestions never change the card size
         let win_w = self.win.width().max(1);
-        let target_w = 580.min(win_w.saturating_sub(32));
+        let mut target_w = 580.min(win_w.saturating_sub(32));
+        // Welcome page: pin the omnibar directly under the "rail." brand, aligned with it.
+        // (Start page = centered column, max 580px, 20px side padding; brand block ~72px tall.)
+        if self.focused_is_welcome() {
+            if let (Some(v), Some(parent)) = (self.focused_view(), self.palette.parent()) {
+                if let Some(b) = v.compute_bounds(&parent) {
+                    if b.width() > 120.0 && b.height() > 120.0 {
+                        let cw = ((b.width() as i32) - 40).clamp(200, 580);
+                        let cx = b.x() + b.width() / 2.0;
+                        self.palette.set_size_request(cw, -1);
+                        self.palette.set_halign(gtk::Align::Start);
+                        self.palette.set_margin_start(((cx - cw as f32 / 2.0).round() as i32).max(0));
+                        let top = b.y() + b.height() / 2.0 + 36.0 + 28.0;
+                        self.palette.set_margin_top(top.round() as i32);
+                        return;
+                    }
+                }
+            }
+        }
+        // Ctrl+L on a normal page: classic centered palette near the top
+        target_w = target_w.max(200);
         self.palette.set_size_request(target_w, -1);
-        // Fixed on the welcome page, directly under the rail. brand
-        let win_h = self.win.height().max(1);
-        // Place it so it sits under the brand like a page element, not floating freely
-        let target_top = ((win_h as f64) * 0.42).round().clamp(100.0, 260.0) as i32;
-        self.palette.set_margin_top(target_top);
+        self.palette.set_halign(gtk::Align::Center);
+        self.palette.set_margin_start(16);
+        self.palette.set_margin_top(90);
+    }
+
+    /// Focused tab is the welcome / start page (rail://start).
+    fn focused_is_welcome(&self) -> bool {
+        let Some(v) = self.focused_view() else { return false };
+        let mut u = v.uri().map(|s| s.to_string()).unwrap_or_default();
+        if u.is_empty() || u.starts_with("about:") {
+            u = self.saved_uri_of(&v);
+        }
+        u.starts_with("rail://start")
+    }
+
+    /// Welcome tab focused => omnibar is always shown, fixed under the brand.
+    /// Focus moved to another page => unpin it again.
+    fn sync_welcome_palette(self: &Rc<Self>) {
+        if self.ov.get() || self.settings_modal_open() {
+            return;
+        }
+        if self.focused_is_welcome() {
+            if self.palette_open() {
+                self.update_palette_size();
+            } else {
+                self.show_palette();
+            }
+        } else if self.welcome_palette.get() && self.palette_open() {
+            self.hide_palette();
+        }
     }
 
     fn open_new_tab_palette(self: &Rc<Self>) {
@@ -7111,7 +7187,7 @@ impl App {
 
     fn show_palette(self: &Rc<Self>) {
         self.palette_for_new_tab.set(false);
-        let shown = self.focused_display_uri();
+        let shown = self.focused_edit_uri();
         let shown = if shown == tr("Search or enter address") || shown.is_empty() {
             String::new()
         } else {
@@ -7132,6 +7208,19 @@ impl App {
 
         self.update_palette_size();
         self.palette.set_visible(true);
+        let on_welcome = self.focused_is_welcome();
+        self.welcome_palette.set(on_welcome);
+        if on_welcome {
+            // Widgets may not be laid out yet (new tab / startup): re-pin once they are.
+            for ms in [60u64, 250, 700] {
+                let app = self.clone();
+                glib::timeout_add_local_once(std::time::Duration::from_millis(ms), move || {
+                    if app.palette_open() && app.welcome_palette.get() {
+                        app.update_palette_size();
+                    }
+                });
+            }
+        }
         self.entry.grab_focus();
         if shown.is_empty() {
             // Welcome / empty: caret at start, nothing selected
@@ -7142,6 +7231,7 @@ impl App {
     }
 
     fn hide_palette(&self) {
+        self.welcome_palette.set(false);
         self.palette_suggestions_box.set_visible(false);
         if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
         self.clear_suggestions_ui();
@@ -8830,10 +8920,10 @@ impl App {
             return false;
         }
         match k {
-            gdk::Key::h => self.focus_column_left(),
-            gdk::Key::l => self.focus_column_right(),
-            gdk::Key::j => self.focus_row_down(),
-            gdk::Key::k => self.focus_row_up(),
+            gdk::Key::h | gdk::Key::Left | gdk::Key::KP_Left => self.focus_column_left(),
+            gdk::Key::l | gdk::Key::Right | gdk::Key::KP_Right => self.focus_column_right(),
+            gdk::Key::j | gdk::Key::Down | gdk::Key::KP_Down => self.focus_row_down(),
+            gdk::Key::k | gdk::Key::Up | gdk::Key::KP_Up => self.focus_row_up(),
             gdk::Key::Return | gdk::Key::KP_Enter => self.exit_overview(),
             gdk::Key::x => {
                 if let Some(v) = self.focused_view() {
@@ -10755,6 +10845,7 @@ fn build(gapp: &gtk::Application) {
         palette,
         entry: entry.clone(),
         palette_for_new_tab: Cell::new(false),
+        welcome_palette: Cell::new(false),
         palette_suggestions_box: palette_suggestions_box.clone(),
         history: RefCell::new(history_mgr),
         current_suggestions: RefCell::new(Vec::new()),
@@ -11432,7 +11523,8 @@ fn build(gapp: &gtk::Application) {
     click.set_propagation_phase(gtk::PropagationPhase::Capture);
     let a = app.clone();
     click.connect_pressed(move |_, _, _, _| {
-        if a.palette_open() {
+        // On the welcome page the omnibar is part of the page: never dismiss it by clicking.
+        if a.palette_open() && !a.focused_is_welcome() {
             a.hide_palette();
         }
     });
@@ -11676,6 +11768,7 @@ fn build(gapp: &gtk::Application) {
     }
     app.update_window_title();
     win.present();
+    app.sync_welcome_palette();
 }
 
 fn export_data(archive_path: &Path) -> Result<(), String> {
