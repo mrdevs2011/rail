@@ -61,3 +61,10 @@
 - Qilindi: v0.5.14: New version chip in settings header, filled SVG gear; release (no install)
 - Keyingi qadam: User updates via Settings or card
 - Git holati: 8837a4a feat: settings header New version chip + filled SVG gear (v0.5.14)
+
+---
+### 2026-10-18 22:56
+- Qilindi: Animatsiya freeze-kadr (slide/overview) + F11 content-only fullscreen; TMPDBG olib tashlandi; 44 unit test OK; release build OK. CLAUDE.md qo'shildi.
+- Hozirgi muammo/blocker: headless testda F11+Alt+H dan keyin session'da rail://downloads ko'rinishi — kod yo'li topilmadi, real GPU'da tekshirish kerak.
+- Keyingi qadam: main ga push → auto-release v0.5.72
+- Git holati: uncommitted → commit + push

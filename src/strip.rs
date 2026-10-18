@@ -13,7 +13,23 @@ pub const GAP: f64 = 6.0;
 /// Must be **constant** (not a function of zoom): otherwise every animation frame
 /// reflows the grid and the overview looks like it slides sideways.
 pub fn gap(_zoom: f64) -> f64 {
-    GAP
+    gap_px()
+}
+
+/// Fullscreen (F11) da faqat kontent: tab oralig'i 0. Bu faqat fullscreen almashganda o'zgaradi,
+/// animatsiya kadrlarida emas — shuning uchun "gap doimiy" qoidasi buzilmaydi.
+static CONTENT_ONLY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_content_only(on: bool) {
+    CONTENT_ONLY.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn gap_px() -> f64 {
+    if CONTENT_ONLY.load(std::sync::atomic::Ordering::Relaxed) {
+        0.0
+    } else {
+        GAP
+    }
 }
 
 /// Minimum width for a column to be usable.
@@ -21,20 +37,20 @@ pub const MIN_COL_W: f64 = 480.0;
 
 /// Column width calculation
 pub fn col_width(full: bool, viewport: f64) -> f64 {
-    if full || viewport < (MIN_COL_W * 2.0 + GAP) {
+    if full || viewport < (MIN_COL_W * 2.0 + gap_px()) {
         viewport.max(280.0)
     } else {
-        ((viewport - GAP) / 2.0).floor()
+        ((viewport - gap_px()) / 2.0).floor()
     }
 }
 
 /// Smooth animated column width calculation (progress 0.0: normal, 1.0: full)
 pub fn col_width_animated(progress: f64, viewport: f64) -> f64 {
     let p = progress.clamp(0.0, 1.0);
-    if viewport < (MIN_COL_W * 2.0 + GAP) {
+    if viewport < (MIN_COL_W * 2.0 + gap_px()) {
         viewport.max(280.0)
     } else {
-        let normal_w = ((viewport - GAP) / 2.0).floor();
+        let normal_w = ((viewport - gap_px()) / 2.0).floor();
         let full_w = viewport.max(280.0);
         normal_w + (full_w - normal_w) * p
     }

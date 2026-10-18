@@ -721,6 +721,25 @@ scrollbar button {
     outline-offset: 1px;
     box-shadow: none;
 }
+/* ---- fullscreen (F11): faqat kontent — chegara, burchak, soya va ajratgich yo'q ---- */
+.fs-content .tab,
+.fs-content .tab.focused {
+    border-width: 0;
+    border-radius: 0;
+    box-shadow: none;
+    outline: none;
+}
+.fs-content .tab-resize-handle {
+    min-width: 0;
+}
+.fs-content .zoomed .tab {
+    border-width: 1px;
+    border-radius: 6px;
+}
+.fs-content .zoomed .tab.focused {
+    border-width: 1px;
+    outline: 2px solid #ededed;
+}
 .ov-hint {
     opacity: 0;
     min-height: 0;
@@ -2372,6 +2391,8 @@ progressbar.load-bar progress {
 
 /// How far the strip zooms out in overview (niri uses a similar factor).
 const OV_ZOOM: f64 = 0.4;
+/// Overview zoom in/out duration (fixed, ease-out): zoom, pan and grid land together.
+const OV_ANIM_SECS: f64 = 0.24;
 
 /// Xotira tanqis bo'lgandagi (yoki RAIL_LOW_MEM=1) qiymatlar: tez uxlatish, 4 ta tirik tab.
 const SUSPEND_AFTER_SECS: u64 = 120;
@@ -2705,6 +2726,8 @@ struct App {
     cam_spring_y: Cell<Option<CamSpring>>,
     /// Release velocity (px/s) of a touchpad flick, consumed when the next x spring starts.
     cam_v0_x: Cell<f64>,
+    /// Animatsiya paytida freeze-kadrga almashtirilgan tablar; animatsiya tugagach jonliga qaytariladi.
+    anim_frozen: RefCell<Vec<(gtk::Picture, WebView)>>,
     side_open: Cell<bool>,
     side_gen: Cell<u32>,
     /// A just-created tab that has never navigated; Esc discards it.
@@ -4296,6 +4319,7 @@ impl App {
             && near(self.target_zoom.get(), self.layout.zoom(), 0.002);
 
         if cam_ready && !self.layout.grid_needs_animation() {
+            self.unfreeze_after_anim();
             self.layout.set_offset_x(self.target_x.get());
             self.layout.set_offset_y(self.target_y.get());
             self.layout.set_zoom(self.target_zoom.get());
@@ -4303,13 +4327,17 @@ impl App {
             return;
         }
         self.animating.set(true);
+        self.freeze_for_anim();
         let app = self.clone();
         let last = Cell::new(None::<i64>);
+        // Timed overview zoom: (start time us, start zoom, target zoom, start offset x, start offset y).
+        // A fixed-duration ease-out has no long exponential tail, so zoom, pan and grid land together
+        // instead of "zoom first, then slowly slide to the middle".
+        let zanim = Cell::new(None::<(i64, f64, f64, f64, f64)>);
         self.strip.add_tick_callback(move |strip, clock| {
             let now = clock.frame_time();
             let dt = last.replace(Some(now)).map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
-            // Slightly slower ease → reads as a calm, flat zoom-out
-            let k = (dt / 0.045).min(1.0); // linear, faster
+            let k = (dt / 0.045).min(1.0);
 
             let oxc = app.layout.offset_x();
             let oyc = app.layout.offset_y();
@@ -4318,32 +4346,60 @@ impl App {
             let oyt = app.target_y.get();
             let zt = app.target_zoom.get();
 
-            let mut nz = zc + (zt - zc) * k;
-            if near(zt, nz, 0.002) { nz = zt; }
-
-            // Pure-scale anchoring only while the zoom itself is animating. Once the overview
-            // zoom has settled, the camera must follow the focused tab (h/j/k/l, arrows).
+            let vw = strip.width() as f64;
+            let vh = strip.height() as f64;
             let zoom_busy = !near(zc, zt, 0.002);
-            let (mut nx, mut ny) = if (app.ov.get() && zt < 1.0 && zoom_busy) || (!app.ov.get() && zt == 1.0 && zc < 0.99) {
-                // Pure scale (zoom-out and zoom-in): fixed world anchor under screen center
-                let vw = strip.width() as f64;
-                let vh = strip.height() as f64;
-                if vw > 1.0 && vh > 1.0 && nz > 0.01 {
-                    // Anchor = pre-overview camera center (saved on enter)
-                    let ax = app.ov_saved_x.get() + vw * 0.5;
-                    let ay = app.ov_saved_y.get() + vh * 0.5;
-                    app.cam_spring_x.set(None);
-                    app.cam_spring_y.set(None);
-                    (ax - (vw * 0.5) / nz, ay - (vh * 0.5) / nz)
+            let ov_motion = vw > 1.0
+                && vh > 1.0
+                && zoom_busy
+                && ((app.ov.get() && zt < 1.0) || (!app.ov.get() && zt == 1.0));
+
+            let nz: f64;
+            let mut nx: f64;
+            let mut ny: f64;
+            if ov_motion {
+                let (t0, z0, _, ox0, oy0) = match zanim.get() {
+                    Some(a) if (a.2 - zt).abs() < 1e-9 => a,
+                    _ => {
+                        // (re)start from wherever the camera is right now
+                        let a = (now, zc, zt, oxc, oyc);
+                        zanim.set(Some(a));
+                        a
+                    }
+                };
+                let u = (((now - t0) as f64 / 1e6) / OV_ANIM_SECS).clamp(0.0, 1.0);
+                let e = 1.0 - (1.0 - u).powi(3);
+                if u >= 1.0 {
+                    nz = zt;
+                    nx = oxt;
+                    ny = oyt;
                 } else {
-                    (oxt, oyt)
+                    // log-space zoom: the scale changes at a uniform perceived rate
+                    nz = (z0.ln() + (zt.ln() - z0.ln()) * e).exp();
+                    // Pure scale around the point that was under the screen center when we started ...
+                    let (ax, ay) = (ox0 + vw * 0.5 / z0, oy0 + vh * 0.5 / z0);
+                    let (px, py) = (ax - vw * 0.5 / nz, ay - vh * 0.5 / nz);
+                    // ... blended into the framed (centered) camera for the current zoom, so the
+                    // grid is centered on every frame and pan finishes together with the zoom.
+                    let (ex, ey) = if app.ov.get() { app.overview_offsets_at_zoom(nz) } else { (oxt, oyt) };
+                    let t = (e * 2.0).min(1.0);
+                    let s = t * t * (3.0 - 2.0 * t);
+                    nx = px + (ex - px) * s;
+                    ny = py + (ey - py) * s;
                 }
+                app.cam_spring_x.set(None);
+                app.cam_spring_y.set(None);
             } else {
+                zanim.set(None);
+                let mut z = zc + (zt - zc) * k;
+                if near(zt, z, 0.002) { z = zt; }
+                nz = z;
                 // Niri-style critically damped spring on the real frame time (no per-frame lerp)
-                let (nx, _) = step_cam_axis(&app.cam_spring_x, oxc, oxt, &app.cam_v0_x, now);
-                let (ny, _) = step_cam_axis(&app.cam_spring_y, oyc, oyt, &Cell::new(0.0), now);
-                (nx, ny)
-            };
+                let (sx, _) = step_cam_axis(&app.cam_spring_x, oxc, oxt, &app.cam_v0_x, now);
+                let (sy, _) = step_cam_axis(&app.cam_spring_y, oyc, oyt, &Cell::new(0.0), now);
+                nx = sx;
+                ny = sy;
+            }
             if near(oxt, nx, 0.5) && nz == zt { nx = oxt; }
             if near(oyt, ny, 0.5) && nz == zt { ny = oyt; }
 
@@ -4358,6 +4414,7 @@ impl App {
                 app.cam_spring_x.set(None);
                 app.cam_spring_y.set(None);
                 app.animating.set(false);
+                app.unfreeze_after_anim();
                 glib::ControlFlow::Break
             } else {
                 glib::ControlFlow::Continue
@@ -5820,6 +5877,97 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Animatsiya (slide / overview zoom) boshida ko'rinib turgan jonli tablarning oxirgi kadrini
+    /// freeze'ga qo'yadi: animatsiya davomida ekranda tayyor tekstura siljiydi, WebView esa qayta
+    /// chizilmaydi. Video/audio o'ynayotgan va yuklanayotgan tablar tegilmaydi (jonli qoladi).
+    /// `RAIL_NO_ANIM_FREEZE=1` bilan o'chiriladi (GPU'da solishtirish uchun).
+    fn freeze_for_anim(&self) {
+        static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        if !*ENABLED.get_or_init(|| std::env::var_os("RAIL_NO_ANIM_FREEZE").is_none()) {
+            return;
+        }
+        if !self.anim_frozen.borrow().is_empty() {
+            return;
+        }
+        let Ok(rows) = self.rows.try_borrow() else { return };
+        let mut frozen = Vec::new();
+        for row in rows.iter() {
+            for tab in &row.tabs {
+                // uxlagan / uyg'onayotgan tabning freeze'i o'ziniki — tegmaymiz
+                if tab.suspended.get() || tab.freeze.is_visible() || !tab.view.is_mapped() {
+                    continue;
+                }
+                if tab.view.is_loading() || tab.view.is_playing_audio() || !self.tab_is_visible(tab) {
+                    continue;
+                }
+                let wp = gtk::WidgetPaintable::new(Some(&tab.view));
+                let frame = gdk::prelude::PaintableExt::current_image(&wp);
+                tab.freeze.set_paintable(Some(&frame));
+                tab.freeze.set_visible(true);
+                frozen.push((tab.freeze.clone(), tab.view.clone()));
+            }
+        }
+        *self.anim_frozen.borrow_mut() = frozen;
+    }
+
+    /// Animatsiya tugadi: `freeze_for_anim` qo'ygan kadrlarni olib tashlaydi.
+    fn unfreeze_after_anim(self: &Rc<Self>) {
+        if self.anim_frozen.borrow().is_empty() {
+            return;
+        }
+        let Ok(rows) = self.rows.try_borrow() else {
+            // rows band — keyinroq qayta urinamiz, tab qotib qolmasin
+            let app = self.clone();
+            glib::idle_add_local_once(move || app.unfreeze_after_anim());
+            return;
+        };
+        let frozen = std::mem::take(&mut *self.anim_frozen.borrow_mut());
+        for (pic, view) in frozen {
+            let Some(tab) = rows.iter().flat_map(|r| r.tabs.iter()).find(|t| t.view == view) else { continue };
+            // suspend ulgurgan bo'lsa, freeze endi suspend'ning o'zi
+            if tab.suspended.get() {
+                continue;
+            }
+            pic.set_visible(false);
+            // yashirilgan (unmapped) tabning kadri suspend uchun kerak — faqat ko'rinayotganini tozalaymiz
+            if tab.view.is_mapped() {
+                pic.set_paintable(Option::<&gdk::Paintable>::None);
+            }
+        }
+    }
+
+    /// F11: oyna fullscreen bo'lganda faqat kontent qoladi (yon panel, tab oralig'i, yuklanish
+    /// chizig'i, chegara va burchaklar yo'q); chiqqanda hammasi joyiga qaytadi.
+    fn apply_fullscreen_mode(self: &Rc<Self>) {
+        let fs = self.win.is_fullscreen();
+        strip::set_content_only(fs);
+        // ishlab turgan sidebar animatsiyasini bekor qilamiz
+        self.side_gen.set(self.side_gen.get().wrapping_add(1));
+        if fs {
+            self.win.add_css_class("fs-content");
+            self.shell_layout.set_side(0.0);
+            self.side.set_visible(false);
+            self.strip.set_margin_top(0);
+            self.strip.set_margin_bottom(0);
+            self.strip.set_margin_start(0);
+            self.strip.set_margin_end(0);
+            self.load_bar.set_visible(false);
+        } else {
+            self.win.remove_css_class("fs-content");
+            let open = self.side_open.get();
+            self.shell_layout.set_side(if open { SIDE_W as f64 } else { 0.0 });
+            self.side.set_visible(open);
+            self.strip.set_margin_top(8);
+            self.strip.set_margin_bottom(8);
+            self.strip.set_margin_start(6);
+            self.strip.set_margin_end(8);
+            self.update_load_bar();
+        }
+        self.shell.queue_allocate();
+        self.strip.queue_allocate();
+        self.reveal_focus();
     }
 
     fn clear_tab_freeze(&self, view: &WebView) {
@@ -7362,6 +7510,10 @@ impl App {
     fn set_sidebar(self: &Rc<Self>, open: bool) {
         self.side_open.set(open);
         self.schedule_save_session();
+        if self.win.is_fullscreen() {
+            // fullscreen'da faqat kontent: tanlov saqlanadi, fullscreen'dan chiqqanda qo'llanadi
+            return;
+        }
         let epoch = self.side_gen.get().wrapping_add(1);
         self.side_gen.set(epoch);
         if open {
@@ -7402,6 +7554,10 @@ impl App {
 
     fn update_load_bar(self: &Rc<Self>) {
         let bar = &self.load_bar;
+        if self.win.is_fullscreen() {
+            bar.set_visible(false);
+            return;
+        }
         let Some(v) = self.focused_view() else {
             bar.set_visible(false);
             return;
@@ -11484,6 +11640,7 @@ fn build(gapp: &gtk::Application) {
         cam_spring_x: Cell::new(None),
         cam_spring_y: Cell::new(None),
         cam_v0_x: Cell::new(0.0),
+        anim_frozen: RefCell::new(Vec::new()),
         side_open: Cell::new(true),
         side_gen: Cell::new(0),
         fresh: RefCell::new(None),
@@ -11960,6 +12117,15 @@ fn build(gapp: &gtk::Application) {
                     }
                     return;
                 }
+            }
+        });
+    }
+
+    {
+        let weak = Rc::downgrade(&app);
+        app.win.connect_fullscreened_notify(move |_| {
+            if let Some(a) = weak.upgrade() {
+                a.apply_fullscreen_mode();
             }
         });
     }
