@@ -2245,12 +2245,12 @@ button.update-close:hover {
 const OV_ZOOM: f64 = 0.4;
 
 /// Tab shuncha soniya davomida ekranda ko'rinmasa, RAM tejash uchun to'xtatiladi (suspend).
-/// 90s: Chrome-style aggressive discard without feeling instant-kill.
-const SUSPEND_AFTER_SECS: u64 = 15;
+/// 120s: tab switching inside a couple of minutes stays instant (no reload).
+const SUSPEND_AFTER_SECS: u64 = 120;
 
 /// Hard cap on simultaneous live web processes (focused + visible extras).
 /// Beyond this, oldest non-focused tabs are suspended even if still "visible".
-const MAX_LIVE_TABS: usize = 1;
+const MAX_LIVE_TABS: usize = 4;
 
 struct Tab {
     container: gtk::Box,
@@ -4244,7 +4244,7 @@ impl App {
         settings.set_enable_site_specific_quirks(true);
         settings.set_javascript_can_access_clipboard(true);
         // Always: smooth page scroll/compositing; falls back when GPU unavailable
-        settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Never);
+        settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
         // Page cache keeps full DOM snapshots per navigation — costly with many tabs
         settings.set_enable_page_cache(false);
 
