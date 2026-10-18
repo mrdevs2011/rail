@@ -12124,7 +12124,8 @@ mod tests {
         cfg.site_wins = true;
         assert!(!sc_enabled(&cfg, "data"));
         assert!(!sc_enabled(&cfg, "ws_1"));
-        assert!(sc_enabled(&cfg, "settings")); // Settings remains accessible
+        // settings is not in SC_LOCKED, so it is disabled with the rest
+        assert!(!sc_enabled(&cfg, "settings"));
     }
 
     #[test]
