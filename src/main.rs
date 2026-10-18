@@ -5708,9 +5708,12 @@ impl App {
             return;
         }
         *tab.saved_uri.borrow_mut() = uri;
-        let wp = gtk::WidgetPaintable::new(Some(&tab.view));
-        let frame = gdk::prelude::PaintableExt::current_image(&wp);
-        tab.freeze.set_paintable(Some(&frame));
+        // An unmapped (hidden off-screen) view would snapshot as blank: keep the frame grabbed when it was hidden.
+        if tab.view.is_mapped() || tab.freeze.paintable().is_none() {
+            let wp = gtk::WidgetPaintable::new(Some(&tab.view));
+            let frame = gdk::prelude::PaintableExt::current_image(&wp);
+            tab.freeze.set_paintable(Some(&frame));
+        }
         tab.freeze.set_visible(true);
         tab.suspended.set(true);
         tab.view.terminate_web_process();
@@ -11770,6 +11773,33 @@ fn build(gapp: &gtk::Application) {
     new_profile_entry.connect_changed(move |_| {
         a.update_create_profile_btn_state();
     });
+
+    {
+        // Off-screen columns are unmapped by the strip layout (WebKit then throttles them). Grab the last
+        // frame just before a live tab is hidden (so suspend can still freeze it) and drop it when shown.
+        let weak = Rc::downgrade(&app);
+        layout.connect_visibility(move |child, visible| {
+            let Some(a) = weak.upgrade() else { return };
+            let Ok(rows) = a.rows.try_borrow() else { return };
+            for row in rows.iter() {
+                for tab in row.tabs.iter() {
+                    if tab.container.upcast_ref::<gtk::Widget>() != child {
+                        continue;
+                    }
+                    if visible {
+                        if !tab.suspended.get() {
+                            tab.freeze.set_paintable(None::<&gdk::Paintable>);
+                        }
+                    } else if !tab.suspended.get() && tab.view.is_mapped() {
+                        let wp = gtk::WidgetPaintable::new(Some(&tab.view));
+                        let frame = gdk::prelude::PaintableExt::current_image(&wp);
+                        tab.freeze.set_paintable(Some(&frame));
+                    }
+                    return;
+                }
+            }
+        });
+    }
 
     let a = app.clone();
     layout.connect_resized(move || {

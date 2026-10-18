@@ -81,6 +81,9 @@ mod imp {
         pub width: Cell<i32>,
         pub height: Cell<i32>,
         pub on_resize: RefCell<Option<Rc<dyn Fn()>>>,
+        /// Called with (child, now_visible) right BEFORE a column is hidden (so the app can grab a last
+        /// frame) and right after it is shown again.
+        pub on_visibility: RefCell<Option<Rc<dyn Fn(&gtk::Widget, bool)>>>,
         /// For each row: list of is_full flags for each column
         pub grid: RefCell<Vec<Vec<bool>>>,
         /// Target progress (0.0 for normal, 1.0 for full)
@@ -104,6 +107,44 @@ mod imp {
 
     impl ObjectImpl for StripLayout {}
 
+    impl StripLayout {
+        /// Columns far outside the viewport are unmapped (`set_child_visible(false)`). WebKit derives page
+        /// visibility from the widget's mapped state, so hidden pages stop painting and their timers /
+        /// requestAnimationFrame are throttled — without this every off-screen tab runs at full speed.
+        /// A margin keeps neighbours mapped so they are already painted when they slide into view, and the
+        /// column holding keyboard focus is never hidden.
+        #[allow(clippy::too_many_arguments)]
+        fn apply_visibility(&self, c: &gtk::Widget, x: f64, y: f64, w: f64, h: f64, vw: f64, vh: f64, focus: Option<&gtk::Widget>) {
+            if vw <= 1.0 || vh <= 1.0 {
+                return;
+            }
+            let (mx, my) = (vw * 0.25, vh * 0.25);
+            let mut vis = x + w > -mx && x < vw + mx && y + h > -my && y < vh + my;
+            if !vis {
+                if let Some(f) = focus {
+                    if f == c || f.is_ancestor(c) {
+                        vis = true;
+                    }
+                }
+            }
+            if vis == c.is_child_visible() {
+                return;
+            }
+            let cb = self.on_visibility.borrow().clone();
+            if !vis {
+                if let Some(cb) = &cb {
+                    cb(c, false);
+                }
+            }
+            c.set_child_visible(vis);
+            if vis {
+                if let Some(cb) = &cb {
+                    cb(c, true);
+                }
+            }
+        }
+    }
+
     impl LayoutManagerImpl for StripLayout {
         fn measure(&self, _w: &gtk::Widget, _o: gtk::Orientation, _for_size: i32) -> (i32, i32, i32, i32) {
             (0, 0, -1, -1)
@@ -125,14 +166,17 @@ mod imp {
             let c_widths = self.custom_widths.borrow();
             let c_heights = self.custom_heights.borrow();
             let mut child = widget.first_child();
+            let focus = widget.root().and_then(|r| r.focus());
 
             if grid.is_empty() {
                 let mut x = 0.0;
                 while let Some(c) = child {
                     let cw = col_width(c.has_css_class("full"), vw);
+                    let (tx, ty) = (((x - off_x) * z) as f32, ((0.0 - off_y) * z) as f32);
                     let t = gsk::Transform::new()
-                        .translate(&graphene::Point::new(((x - off_x) * z) as f32, ((0.0 - off_y) * z) as f32))
+                        .translate(&graphene::Point::new(tx, ty))
                         .scale(z as f32, z as f32);
+                    self.apply_visibility(&c, tx as f64, ty as f64, cw * z, height as f64 * z, vw, vh, focus.as_ref());
                     c.allocate(cw as i32, height, -1, Some(t));
                     x += cw + g;
                     child = c.next_sibling();
@@ -193,6 +237,7 @@ mod imp {
                             .translate(&graphene::Point::new(tx, ty))
                             .scale(z as f32, z as f32);
                         let ch = if len == 1 { height } else { ch_f.round() as i32 };
+                        self.apply_visibility(&c, tx as f64, ty as f64, cw.round() * z, ch as f64 * z, vw, vh, focus.as_ref());
                         c.allocate(cw.round() as i32, ch, -1, Some(t));
                         y_off += ch_f + g;
                         child = c.next_sibling();
@@ -321,6 +366,9 @@ impl StripLayout {
             }
         }
         still_animating
+    }
+    pub fn connect_visibility(&self, f: impl Fn(&gtk::Widget, bool) + 'static) {
+        *self.imp().on_visibility.borrow_mut() = Some(std::rc::Rc::new(f));
     }
     pub fn connect_resized(&self, f: impl Fn() + 'static) {
         *self.imp().on_resize.borrow_mut() = Some(std::rc::Rc::new(f));
