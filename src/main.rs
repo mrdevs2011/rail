@@ -3470,9 +3470,52 @@ fn is_internal_uri(u: &str) -> bool {
     u.starts_with("rail://")
 }
 
+fn settings_shell_page() -> String {
+    format!(
+        r#"<!doctype html><html lang="{lang}"><head><meta charset="utf-8">
+<title>Settings</title>
+<style>html,body{{margin:0;background:#0b0b0b;color:#a1a1a1;font-family:monospace;height:100%}}
+.wrap{{display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;opacity:.35}}
+</style></head><body><div class="wrap">rail://settings</div></body></html>"#,
+        lang = i18n::current().code()
+    )
+}
+
+fn settings_uri_for_tab(tab: SettingsTab) -> &'static str {
+    match tab {
+        SettingsTab::General => "rail://settings",
+        SettingsTab::Profiles => "rail://settings/profiles",
+        SettingsTab::Data => "rail://settings/data",
+        SettingsTab::Privacy => "rail://settings/privacy",
+        SettingsTab::Customize => "rail://settings/customize",
+        SettingsTab::Update => "rail://settings/updates",
+        SettingsTab::About => "rail://settings/about",
+    }
+}
+
+fn settings_tab_from_uri(uri: &str) -> Option<SettingsTab> {
+    let u = uri.trim().trim_end_matches('/');
+    if !u.starts_with("rail://settings") {
+        return None;
+    }
+    let rest = u.strip_prefix("rail://settings").unwrap_or("").trim_start_matches('/');
+    Some(match rest {
+        "" | "general" => SettingsTab::General,
+        "profiles" | "profile" => SettingsTab::Profiles,
+        "data" | "backup" => SettingsTab::Data,
+        "privacy" | "shield" => SettingsTab::Privacy,
+        "customize" | "css" | "shortcuts" => SettingsTab::Customize,
+        "updates" | "update" => SettingsTab::Update,
+        "about" => SettingsTab::About,
+        _ => SettingsTab::General,
+    })
+}
+
 fn load_internal_page(v: &WebView, uri: &str) {
     if uri.starts_with("rail://downloads") {
         v.load_html(&downloads_page(), Some("rail://downloads"));
+    } else if uri.starts_with("rail://settings") {
+        v.load_html(&settings_shell_page(), Some(uri.split('#').next().unwrap_or("rail://settings")));
     } else {
         v.load_html(&start_page(), Some("rail://start/"));
     }
@@ -4901,6 +4944,11 @@ impl App {
             app.update_window_title();
             app.schedule_save_session();
             if let Some(u) = v.uri() {
+                let us = u.as_str();
+                // Settings UI only stays up while the active page is rail://settings
+                if app.settings_modal_open() && !us.starts_with("rail://settings") {
+                    app.settings_modal.set_visible(false);
+                }
                 let title = v.title().unwrap_or_default().to_string();
                 app.history.borrow_mut().record_visit(&u, &title);
             }
@@ -5378,7 +5426,38 @@ impl App {
             self.show_devtools();
         }
 
-        if !self.palette_open() && !self.ov.get() {
+        // Settings is a tab page (rail://settings): show UI only for that tab
+        if let Some(v) = self.focused_view() {
+            let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
+            if let Some(tab) = settings_tab_from_uri(&uri) {
+                if !self.settings_modal_open() || self.current_settings_tab.get() != tab {
+                    // Re-open section without rewriting the URI (already correct)
+                    self.current_settings_tab.set(tab);
+                    let tab_name = match tab {
+                        SettingsTab::General => "general",
+                        SettingsTab::Profiles => "profiles",
+                        SettingsTab::Data => "data",
+                        SettingsTab::Privacy => "privacy",
+                        SettingsTab::Customize => "customize",
+                        SettingsTab::Update => "update",
+                        SettingsTab::About => "about",
+                    };
+                    self.settings_stack.set_visible_child_name(tab_name);
+                    for (btn_tab, btn) in self.settings_tab_buttons.borrow().iter() {
+                        if *btn_tab == tab {
+                            btn.add_css_class("active");
+                        } else {
+                            btn.remove_css_class("active");
+                        }
+                    }
+                }
+                self.settings_modal.set_visible(true);
+            } else if self.settings_modal_open() {
+                self.settings_modal.set_visible(false);
+            }
+        }
+
+        if !self.palette_open() && !self.ov.get() && !self.settings_modal_open() {
             if let Some(v) = self.focused_view() {
                 v.grab_focus();
             }
@@ -6901,7 +6980,7 @@ impl App {
             let uri = to_uri(text, &self.search_engine.borrow());
             self.history.borrow_mut().record_visit(&uri, "");
 
-            // Internal pages: rail://downloads / rail://start
+            // Internal pages: rail://downloads / rail://settings / rail://start
             if uri.starts_with("rail://downloads") {
                 if is_new_tab {
                     self.profiles.borrow_mut().set_active(&target_profile_id);
@@ -6914,7 +6993,14 @@ impl App {
                     self.pill_label.set_text("downloads");
                     self.refresh_sidebar();
                 }
+                self.hide_settings_modal();
                 self.hide_palette();
+                return;
+            }
+            if uri.starts_with("rail://settings") {
+                let tab = settings_tab_from_uri(&uri).unwrap_or(SettingsTab::General);
+                self.hide_palette();
+                self.open_settings_tab(tab);
                 return;
             }
 
@@ -7016,6 +7102,23 @@ impl App {
         } else {
             self.settings_modal.remove_css_class("responsive-narrow");
         }
+
+        // Settings is a real internal page: rail://settings[/section]
+        let settings_uri = settings_uri_for_tab(tab);
+        self.exit_overview();
+        if let Some(v) = self.focused_view() {
+            v.load_html(&settings_shell_page(), Some(settings_uri));
+            self.pill_label.set_text("settings");
+            self.refresh_sidebar();
+        } else {
+            let prof_id = self.profiles.borrow().active_id().to_string();
+            let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
+            let view = Self::create_web_view(&session, &prof_id);
+            view.load_html(&settings_shell_page(), Some(settings_uri));
+            self.add_view(view, prof_id, false);
+            self.pill_label.set_text("settings");
+        }
+        self.schedule_save_session();
         self.settings_modal.set_visible(true);
     }
 
@@ -7031,9 +7134,17 @@ impl App {
         }
     }
 
-    fn hide_settings_modal(&self) {
+    fn hide_settings_modal(self: &Rc<Self>) {
         self.settings_modal.set_visible(false);
+        // Leaving settings page → back to start (like navigating away from chrome://settings)
         if let Some(v) = self.focused_view() {
+            let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
+            if uri.starts_with("rail://settings") {
+                v.load_html(&start_page(), Some("rail://start/"));
+                self.pill_label.set_text(tr("Search or enter address"));
+                self.refresh_sidebar();
+                self.schedule_save_session();
+            }
             v.grab_focus();
         }
     }
