@@ -1129,7 +1129,7 @@ entry.palette-entry, entry.palette-entry:focus-within {
     margin-bottom: 4px;
 }
 .palette-suggestions-scroll {
-    min-height: 220px;
+    min-height: 0;
     max-height: 220px;
 }
 .palette-sug-item {
@@ -5165,8 +5165,7 @@ impl App {
                     // Re-attach settings chrome
                     app_term.sync_settings_chrome();
                 } else if saved.starts_with("rail://downloads") {
-                    // Downloads is pure HTML; reload via the internal loader if available
-                    v.load_html(&start_page(), Some("rail://downloads"));
+                    load_internal_page(v, "rail://downloads");
                 } else {
                     v.load_uri(&saved);
                 }
@@ -5783,7 +5782,11 @@ impl App {
                         tab.suspended.set(false);
                         let uri = tab.saved_uri.borrow().clone();
                         if !uri.is_empty() {
-                            tab.view.load_uri(&uri);
+                            if is_internal_uri(&uri) {
+                                load_internal_page(&tab.view, &uri);
+                            } else {
+                                tab.view.load_uri(&uri);
+                            }
                         } else {
                             tab.freeze.set_visible(false);
                             tab.freeze.set_paintable(Option::<&gdk::Paintable>::None);
@@ -7206,8 +7209,7 @@ impl App {
         self.select_palette_profile(&prof_id);
         self.rebuild_profile_popover();
 
-        self.palette_suggestions_box.set_visible(false);
-        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
+        self.set_suggestions_visible(false);
         self.clear_suggestions_ui();
         *self.current_suggestions.borrow_mut() = Vec::new();
         self.selected_suggestion_idx.set(None);
@@ -7218,6 +7220,21 @@ impl App {
         let on_welcome = self.focused_is_welcome();
         self.welcome_palette.set(on_welcome);
         if on_welcome {
+            // Keep the omnibar glued to the welcome page every frame (tab strip scroll,
+            // sidebar toggle, window resize) so it never floats away from the brand.
+            thread_local! { static WELCOME_TICK: Cell<bool> = Cell::new(false); }
+            if !WELCOME_TICK.with(|t| t.replace(true)) {
+                let app = self.clone();
+                self.palette.add_tick_callback(move |_, _| {
+                    if app.palette_open() && app.welcome_palette.get() {
+                        app.update_palette_size();
+                        glib::ControlFlow::Continue
+                    } else {
+                        WELCOME_TICK.with(|t| t.set(false));
+                        glib::ControlFlow::Break
+                    }
+                });
+            }
             // Widgets may not be laid out yet (new tab / startup): re-pin once they are.
             for ms in [60u64, 250, 700] {
                 let app = self.clone();
@@ -7239,8 +7256,7 @@ impl App {
 
     fn hide_palette(&self) {
         self.welcome_palette.set(false);
-        self.palette_suggestions_box.set_visible(false);
-        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
+        self.set_suggestions_visible(false);
         self.clear_suggestions_ui();
         *self.current_suggestions.borrow_mut() = Vec::new();
         self.selected_suggestion_idx.set(None);
@@ -7253,6 +7269,20 @@ impl App {
         }
     }
 
+    /// Show/hide the suggestions list together with its ScrolledWindow (so an empty
+    /// omnibar has no tall blank area).
+    fn set_suggestions_visible(&self, vis: bool) {
+        self.palette_suggestions_box.set_visible(vis);
+        let mut w = self.palette_suggestions_box.parent();
+        while let Some(p) = w {
+            if p.is::<gtk::ScrolledWindow>() {
+                p.set_visible(vis);
+                break;
+            }
+            w = p.parent();
+        }
+    }
+
     fn clear_suggestions_ui(&self) {
         while let Some(child) = self.palette_suggestions_box.first_child() {
             self.palette_suggestions_box.remove(&child);
@@ -7262,8 +7292,7 @@ impl App {
     fn render_suggestions_ui(self: &Rc<Self>, suggestions: &[HistorySuggestion]) {
         self.clear_suggestions_ui();
         if suggestions.is_empty() {
-            self.palette_suggestions_box.set_visible(false);
-        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
+            self.set_suggestions_visible(false);
             return;
         }
 
@@ -7326,8 +7355,7 @@ impl App {
             self.palette_suggestions_box.append(&item_btn);
         }
 
-        self.palette_suggestions_box.set_visible(true);
-        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
+        self.set_suggestions_visible(true);
     }
 
     fn handle_entry_changed(self: &Rc<Self>) {
@@ -7344,8 +7372,7 @@ impl App {
         self.selected_suggestion_idx.set(None);
 
         if text.trim().is_empty() {
-            self.palette_suggestions_box.set_visible(false);
-        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
+            self.set_suggestions_visible(false);
             self.clear_suggestions_ui();
             *self.current_suggestions.borrow_mut() = Vec::new();
             return;
@@ -7353,8 +7380,7 @@ impl App {
 
         let suggestions = self.history.borrow().suggest(&text);
         if suggestions.is_empty() {
-            self.palette_suggestions_box.set_visible(false);
-        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
+            self.set_suggestions_visible(false);
             self.clear_suggestions_ui();
             *self.current_suggestions.borrow_mut() = Vec::new();
             return;
@@ -7505,7 +7531,11 @@ impl App {
             if uri.starts_with("about:") || uri.is_empty() {
                 new_view.load_html(&start_page(), Some("rail://start/"));
             } else {
-                new_view.load_uri(&uri);
+                if is_internal_uri(&uri) {
+                    load_internal_page(&new_view, &uri);
+                } else {
+                    new_view.load_uri(&uri);
+                }
             }
         } else {
             new_view.load_html(&start_page(), Some("rail://start/"));
@@ -7589,7 +7619,11 @@ impl App {
 
                 if let Some(v) = self.focused_view() {
                     self.pill_label.set_text(&host_of(&uri).unwrap_or(uri.clone()));
-                    v.load_uri(&uri);
+                    if is_internal_uri(&uri) {
+                        load_internal_page(&v, &uri);
+                    } else {
+                        v.load_uri(&uri);
+                    }
                     *self.fresh.borrow_mut() = None;
                     self.refresh_sidebar();
                     self.schedule_save_session();
@@ -8822,6 +8856,8 @@ impl App {
             }
         }
         self.settings_modal.set_can_target(false);
+        // Overview is view-only: take keyboard focus away from whichever page/form had it.
+        gtk::prelude::GtkWindowExt::set_focus(&self.win, None::<&gtk::Widget>);
 
         // Pure zoom-out from the current viewport center (no pan / rise).
         // Same world point stays under the screen center for the whole animation.
@@ -8953,6 +8989,20 @@ impl App {
         let shift = state.contains(M::SHIFT_MASK);
         let alt = state.contains(M::ALT_MASK);
         let k = key.to_lower();
+
+        // Overview is a read-only bird's-eye view: it comes first, before settings / devtools /
+        // page handling, so arrows (and h/j/k/l, Enter, x, Esc) work WITHOUT Alt and never
+        // reach any tab (including the settings tab). Ctrl/Alt/Super combos fall through.
+        if self.overview_open() {
+            if k == gdk::Key::Escape {
+                self.cancel_overview();
+                return true;
+            }
+            if !ctrl && !alt && !state.contains(M::SUPER_MASK) {
+                self.ov_key(k, M::empty());
+                return true;
+            }
+        }
 
         if self.settings_modal_open() {
             // Settings is a real tab (rail://settings) — Esc never closes it.
@@ -9464,12 +9514,11 @@ fn build(gapp: &gtk::Application) {
     let palette_suggestions_scroll = gtk::ScrolledWindow::new();
     palette_suggestions_scroll.add_css_class("palette-suggestions-scroll");
     palette_suggestions_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-    palette_suggestions_scroll.set_min_content_height(220);
+    palette_suggestions_scroll.set_min_content_height(0);
     palette_suggestions_scroll.set_max_content_height(220);
-    palette_suggestions_scroll.set_size_request(-1, 220);
     palette_suggestions_scroll.set_child(Some(&palette_suggestions_box));
-    palette_suggestions_scroll.set_visible(true);
-    palette_suggestions_scroll.set_propagate_natural_height(false);
+    palette_suggestions_scroll.set_visible(false);
+    palette_suggestions_scroll.set_propagate_natural_height(true);
 
     let phint = gtk::Label::new(None);
     sc_bind_text(&phint, "Enter  go      Esc  cancel      Alt+P  profiles", &["profiles"]);
