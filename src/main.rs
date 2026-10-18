@@ -235,7 +235,7 @@ const START_PAGE: &str = r##"<!doctype html>
 <title>Rail Browser</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-:root { --bg: #050505; --fg: #ededed; --dim: #525252; --line-hi: #3a3a3a; --acc: #38bdf8; }
+:root { --bg: #000000; --fg: #ededed; --dim: #525252; --line-hi: #3a3a3a; --acc: #38bdf8; }
 body {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
   background: var(--bg);
@@ -383,7 +383,7 @@ r#"<!doctype html>
   * {{ box-sizing: border-box; }}
   body {{
     margin: 0; padding: 32px 28px 48px;
-    background: #0a0a0a; color: #e8e8e8;
+    background: #000000; color: #e8e8e8;
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', ui-monospace, monospace;
   }}
   h1 {{ font-size: 22px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em; }}
@@ -567,7 +567,7 @@ fn create_gear_icon(size: i32) -> gtk::Image {
 
 const CSS: &str = "
 window {
-    background: #080808;
+    background: #000000;
     border-radius: 0;
     box-shadow: none;
     color: #f4f4f4;
@@ -686,12 +686,12 @@ scrollbar button {
     background: transparent;
 }
 .tab-freeze {
-    background: #050505;
+    background: #000000;
 }
 .tab {
     border-radius: 5px;
     border: 1px solid #181818;
-    background: #0c0c0c;
+    background: #000000;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     transition: border-color 150ms ease, box-shadow 150ms ease;
 }
@@ -752,7 +752,7 @@ scrollbar button {
 
 /* ---- sidebar (Modern Obsidian Acrylic) ---- */
 .side-bar {
-    background: #0a0a0a;
+    background: #000000;
     border-right: 1px solid #121212;
     padding-right: 2px;
 }
@@ -887,7 +887,7 @@ button.pill:hover .pill-chip {
     padding: 6px 8px;
     margin: 8px 2px 3px 2px;
     border-radius: 3px;
-    background: #0c0c0c;
+    background: #000000;
     border: 1px solid #141414;
     transition: all 120ms ease;
 }
@@ -1033,7 +1033,7 @@ button.pill:hover .pill-chip {
 .btn-new-workspace {
     margin: 10px 2px 6px 2px;
     padding: 7px 8px;
-    background: #0c0c0c;
+    background: #000000;
     border: 1px dashed #1d1d1d;
     border-radius: 3px;
     color: #727272;
@@ -1076,7 +1076,7 @@ progressbar.load-bar progress {
 
 /* ---- address & command palette (fixed size under welcome brand) ---- */
 .palette {
-    background: #0c0c0c;
+    background: #000000;
     border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     padding: 14px 18px 12px;
@@ -1209,7 +1209,7 @@ popover.profile-popover.background {
     padding: 0;
 }
 popover.profile-popover > contents {
-    background: #0c0c0c;
+    background: #000000;
     background-color: #0c0c0c;
     border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 5px;
@@ -1218,7 +1218,7 @@ popover.profile-popover > contents {
     color: #ffffff;
 }
 popover.profile-popover > arrow {
-    background: #0c0c0c;
+    background: #000000;
     background-color: #0c0c0c;
     border-color: rgba(255, 255, 255, 0.14);
 }
@@ -1292,7 +1292,7 @@ button.profile-item-btn:hover image {
 
 /* ---- profiles manager modal (Alt+P) ---- */
 .profiles-modal {
-    background: #0c0c0c;
+    background: #000000;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 6px;
     padding: 24px 28px;
@@ -1525,7 +1525,7 @@ button.color-choice.selected {
 
 /* ---- JS script dialogs ---- */
 .js-dialog-window {
-    background: #0c0c0c;
+    background: #000000;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 5px;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9);
@@ -1580,7 +1580,7 @@ button.color-choice.selected {
 
 /* ---- data backup & migration modal (Alt+I) ---- */
 .data-modal {
-    background: #0c0c0c;
+    background: #000000;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 6px;
     padding: 24px 28px;
@@ -1680,7 +1680,7 @@ button.color-choice.selected {
 
 /* ---- settings page fills the tab like downloads (no floating card) ---- */
 .settings-modal {
-    background: #0b0b0b;
+    background: #000000;
     border: none;
     border-radius: 0;
     box-shadow: none;
@@ -1751,7 +1751,7 @@ button.color-choice.selected {
     margin-left: 8px;
 }
 .settings-body {
-    background: #0b0b0b;
+    background: #000000;
 }
 .settings-sidebar {
     background: #090909;
@@ -1814,7 +1814,7 @@ button.color-choice.selected {
     margin-bottom: 6px;
 }
 .settings-option-item {
-    background: #0c0c0c;
+    background: #000000;
     border: 1px solid #191919;
     border-radius: 3px;
     padding: 6px 12px;
@@ -1890,7 +1890,7 @@ button.color-choice.selected {
 
 /* ---- floating minimap / roadmap (Alt+M) ---- */
 .minimap-window {
-    background: #0b0b0b;
+    background: #000000;
     border: 1px solid #1b1b1b;
     border-radius: 5px;
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05);
@@ -1967,7 +1967,7 @@ button.color-choice.selected {
 
 /* ---- Rail DevTools Panel (F12 / Alt+Shift+I / Alt+Shift+D) ---- */
 .devtools-panel {
-    background: #0b0b0b;
+    background: #000000;
     box-shadow: 0 0 48px rgba(0, 0, 0, 0.85);
 }
 .devtools-panel.dock-bottom {
@@ -2001,7 +2001,7 @@ button.color-choice.selected {
     background: rgba(255, 255, 255, 0.27);
 }
 .devtools-window-box {
-    background: #0b0b0b;
+    background: #000000;
 }
 .devtools-header {
     background: #0e0e0e;
@@ -2051,7 +2051,7 @@ button.color-choice.selected {
     border-color: rgba(255, 255, 255, 0.18);
 }
 .devtools-log-area {
-    background: #0b0b0b;
+    background: #000000;
 }
 .devtools-log-box {
     padding: 6px 12px;
@@ -2104,7 +2104,7 @@ button.color-choice.selected {
     font-size: 12px;
 }
 .devtools-text-view {
-    background: #0b0b0b;
+    background: #000000;
     color: #d4d4d4;
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11.5px;
@@ -2231,11 +2231,11 @@ const OV_ZOOM: f64 = 0.4;
 
 /// Tab shuncha soniya davomida ekranda ko'rinmasa, RAM tejash uchun to'xtatiladi (suspend).
 /// 90s: Chrome-style aggressive discard without feeling instant-kill.
-const SUSPEND_AFTER_SECS: u64 = 90;
+const SUSPEND_AFTER_SECS: u64 = 15;
 
 /// Hard cap on simultaneous live web processes (focused + visible extras).
 /// Beyond this, oldest non-focused tabs are suspended even if still "visible".
-const MAX_LIVE_TABS: usize = 4;
+const MAX_LIVE_TABS: usize = 1;
 
 struct Tab {
     container: gtk::Box,
@@ -3541,7 +3541,7 @@ fn settings_shell_page() -> String {
     format!(
         r#"<!doctype html><html lang="{lang}"><head><meta charset="utf-8">
 <title>Settings</title>
-<style>html,body{{margin:0;background:#0b0b0b;height:100%}}</style>
+<style>html,body{{margin:0;background:#000000;height:100%}}</style>
 </head><body></body></html>"#,
         lang = i18n::current().code()
     )
@@ -4057,7 +4057,7 @@ impl App {
             let now = clock.frame_time();
             let dt = last.replace(Some(now)).map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
             // Slightly slower ease → reads as a calm, flat zoom-out
-            let k = 1.0 - (-dt / 0.08).exp();
+            let k = (dt / 0.045).min(1.0); // linear, faster
 
             let oxc = app.layout.offset_x();
             let oyc = app.layout.offset_y();
@@ -4216,7 +4216,7 @@ impl App {
         settings.set_enable_site_specific_quirks(true);
         settings.set_javascript_can_access_clipboard(true);
         // Always: smooth page scroll/compositing; falls back when GPU unavailable
-        settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
+        settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Never);
         // Page cache keeps full DOM snapshots per navigation — costly with many tabs
         settings.set_enable_page_cache(false);
 
@@ -5504,15 +5504,10 @@ impl App {
         if tab.view.is_loading() || tab.view.is_playing_audio() {
             return;
         }
-        let uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
-        let uri = if uri.starts_with("http://") || uri.starts_with("https://") {
-            uri
-        } else {
-            tab.saved_uri.borrow().clone()
-        };
-        if uri.is_empty()
-            || !(uri.starts_with("http://") || uri.starts_with("https://"))
-        {
+        let live = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
+        let uri = if !live.is_empty() { live } else { tab.saved_uri.borrow().clone() };
+        // Suspend both real pages and internal pages (settings/start) to free RAM
+        if uri.is_empty() {
             return;
         }
         *tab.saved_uri.borrow_mut() = uri;
@@ -5574,10 +5569,9 @@ impl App {
                     continue;
                 }
                 let uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
-                let has_http = uri.starts_with("http://")
-                    || uri.starts_with("https://")
-                    || tab.saved_uri.borrow().starts_with("http");
-                if !has_http {
+                let saved = tab.saved_uri.borrow().clone();
+                let is_real = uri.starts_with("http") || uri.starts_with("rail://") || saved.starts_with("http") || saved.starts_with("rail://");
+                if !is_real {
                     continue;
                 }
                 live.push((tab.last_active.get(), ri, ci));
