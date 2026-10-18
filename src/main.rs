@@ -235,90 +235,19 @@ const START_PAGE: &str = r##"<!doctype html>
 <title>Rail Browser</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --bg: #050505;
-  --panel: #0b0b0b;
-  --line: #242424;
-  --line-hi: #3a3a3a;
-  --fg: #ededed;
-  --mut: #8a8a8a;
-  --dim: #525252;
-  --acc: #38bdf8;
-}
+:root { --bg: #050505; --fg: #ededed; --dim: #525252; --line-hi: #3a3a3a; --acc: #38bdf8; }
 body {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
   background: var(--bg);
-  color: var(--mut);
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', ui-monospace, monospace;
-  font-size: 13px;
-  padding: 32px 20px;
-  overflow-y: auto;
-  user-select: none;
+  user-select: none; padding: 0 20px 140px;
 }
-.container {
-  width: 100%;
-  max-width: 680px;
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
-  animation: fadeIn 160ms ease-out;
-}
+.container { width: 100%; max-width: 580px; display: flex; flex-direction: column; align-items: flex-start; animation: fadeIn 160ms ease-out; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.brand-title {
-  font-size: 46px;
-  font-weight: 700;
-  letter-spacing: -0.05em;
-  color: var(--fg);
-  line-height: 1;
-}
+.brand-title { font-size: 46px; font-weight: 700; letter-spacing: -0.05em; color: var(--fg); line-height: 1; }
 .brand-title .dot { color: var(--acc); }
-.brand-subtitle {
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--dim);
-}
+.brand-subtitle { margin-top: 10px; font-size: 12px; color: var(--dim); }
 .brand-subtitle::before { content: '// '; color: var(--line-hi); }
-.search-wrapper { position: relative; width: 100%; }
-.prompt {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--fg);
-  font-weight: 700;
-  pointer-events: none;
-}
-.search-bar {
-  width: 100%;
-  background: var(--panel);
-  border: 1px solid var(--line-hi);
-  border-radius: 3px;
-  padding: 13px 92px 13px 34px;
-  font: inherit;
-  font-size: 14px;
-  color: var(--fg);
-  caret-color: var(--acc);
-  outline: none;
-  transition: border-color 120ms ease;
-}
-.search-bar:focus { border-color: var(--fg); }
-.search-bar::placeholder { color: var(--dim); }
-.search-hint {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 10.5px;
-  color: var(--mut);
-  border: 1px solid var(--line-hi);
-  border-bottom-width: 2px;
-  border-radius: 3px;
-  padding: 1px 7px;
-  pointer-events: none;
-}
 </style>
 </head>
 <body>
@@ -326,19 +255,6 @@ body {
   <div class="brand-area">
     <div class="brand-title">rail<span class="dot">.</span></div>
     <div class="brand-subtitle">keyboard-first browser for developers</div>
-  </div>
-
-  <div class="search-wrapper">
-    <span class="prompt">&gt;</span>
-    <input
-      type="text"
-      class="search-bar"
-      placeholder="search or enter url"
-      autocomplete="off"
-      spellcheck="false"
-      onkeydown="if(event.key==='Enter'){var q=this.value.trim();if(q){if(q.indexOf('://')!==-1||(q.indexOf('.')!==-1&&q.indexOf(' ')===-1)){location.href=q.indexOf('://')===-1?'https://'+q:q;}else{location.href='https://www.google.com/search?q='+encodeURIComponent(q);}}}"
-    />
-    <span class="search-hint">Ctrl+L</span>
   </div>
 </div>
 </body>
@@ -1158,13 +1074,15 @@ progressbar.load-bar progress {
     box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
 }
 
-/* ---- address & command palette (Spotlight / Raycast style) ---- */
+/* ---- address & command palette (fixed size under welcome brand) ---- */
 .palette {
     background: #0c0c0c;
     border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     padding: 14px 18px 12px;
     box-shadow: 0 24px 72px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    min-width: 580px;
+    max-width: 580px;
 }
 .palette image {
     color: #727272;
@@ -1194,6 +1112,10 @@ entry.palette-entry, entry.palette-entry:focus-within {
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     padding-top: 6px;
     margin-bottom: 4px;
+}
+.palette-suggestions-scroll {
+    min-height: 220px;
+    max-height: 220px;
 }
 .palette-sug-item {
     padding: 7px 11px;
@@ -7005,15 +6927,13 @@ impl App {
     }
 
     fn update_palette_size(&self) {
-        let win_w = self.win.width();
-        let target_w = if win_w < 900 {
-            (win_w - 48).clamp(280, 520)
-        } else {
-            580
-        };
+        // Fixed 580px — suggestions never change the card size
+        let win_w = self.win.width().max(1);
+        let target_w = 580.min(win_w.saturating_sub(32));
         self.palette.set_size_request(target_w, -1);
-        let win_h = self.win.height();
-        let target_top = if win_h < 600 { 50 } else { 90 };
+        // Under welcome brand (page center)
+        let win_h = self.win.height().max(1);
+        let target_top = ((win_h as f64) * 0.42).round().clamp(48.0, 220.0) as i32;
         self.palette.set_margin_top(target_top);
     }
 
@@ -7037,6 +6957,7 @@ impl App {
         self.rebuild_profile_popover();
 
         self.palette_suggestions_box.set_visible(false);
+        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(false); }
         self.clear_suggestions_ui();
         *self.current_suggestions.borrow_mut() = Vec::new();
         self.selected_suggestion_idx.set(None);
@@ -7055,6 +6976,7 @@ impl App {
 
     fn hide_palette(&self) {
         self.palette_suggestions_box.set_visible(false);
+        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(false); }
         self.clear_suggestions_ui();
         *self.current_suggestions.borrow_mut() = Vec::new();
         self.selected_suggestion_idx.set(None);
@@ -7077,6 +6999,7 @@ impl App {
         self.clear_suggestions_ui();
         if suggestions.is_empty() {
             self.palette_suggestions_box.set_visible(false);
+        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(false); }
             return;
         }
 
@@ -7140,6 +7063,7 @@ impl App {
         }
 
         self.palette_suggestions_box.set_visible(true);
+        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
     }
 
     fn handle_entry_changed(self: &Rc<Self>) {
@@ -7157,6 +7081,7 @@ impl App {
 
         if text.trim().is_empty() {
             self.palette_suggestions_box.set_visible(false);
+        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(false); }
             self.clear_suggestions_ui();
             *self.current_suggestions.borrow_mut() = Vec::new();
             return;
@@ -7165,6 +7090,7 @@ impl App {
         let suggestions = self.history.borrow().suggest(&text);
         if suggestions.is_empty() {
             self.palette_suggestions_box.set_visible(false);
+        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(false); }
             self.clear_suggestions_ui();
             *self.current_suggestions.borrow_mut() = Vec::new();
             return;
@@ -9259,7 +9185,16 @@ fn build(gapp: &gtk::Application) {
 
     let palette_suggestions_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
     palette_suggestions_box.add_css_class("palette-suggestions-box");
-    palette_suggestions_box.set_visible(false);
+
+    let palette_suggestions_scroll = gtk::ScrolledWindow::new();
+    palette_suggestions_scroll.add_css_class("palette-suggestions-scroll");
+    palette_suggestions_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    palette_suggestions_scroll.set_min_content_height(220);
+    palette_suggestions_scroll.set_max_content_height(220);
+    palette_suggestions_scroll.set_size_request(-1, 220);
+    palette_suggestions_scroll.set_child(Some(&palette_suggestions_box));
+    palette_suggestions_scroll.set_visible(false);
+    palette_suggestions_scroll.set_propagate_natural_height(false);
 
     let phint = gtk::Label::new(None);
     sc_bind_text(&phint, "Enter  go      Esc  cancel      Alt+P  profiles", &["profiles"]);
@@ -9272,8 +9207,9 @@ fn build(gapp: &gtk::Application) {
     palette.set_margin_top(90);
     palette.set_margin_start(16);
     palette.set_margin_end(16);
+    palette.set_size_request(580, -1);
     palette.append(&prow);
-    palette.append(&palette_suggestions_box);
+    palette.append(&palette_suggestions_scroll);
     palette.append(&phint);
     palette.set_visible(false);
 
