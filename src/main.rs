@@ -1469,16 +1469,35 @@ button.color-choice.selected {
     border-radius: 3px;
 }
 
-/* ---- floating settings modal (Alt+Shift+S) ---- */
+/* ---- full-page settings (web-style, responsive) ---- */
 .settings-modal {
     background: #0b0b0b;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 6px;
-    box-shadow: 0 32px 84px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.06);
-    min-width: 820px;
-    min-height: 540px;
-    margin-left: 20px;
-    margin-right: 20px;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+}
+/* desktop / tablet / mobile breakpoints for settings layout */
+.settings-modal.responsive-narrow .settings-body {
+    flex-direction: column;
+}
+.settings-modal.responsive-narrow .settings-sidebar {
+    border-right: none;
+    border-bottom: 1px solid #151515;
+    min-width: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 8px;
+    max-height: none;
+}
+.settings-modal.responsive-narrow .settings-tab-btn {
+    margin: 2px;
+    padding: 8px 10px;
+}
+.settings-modal.responsive-narrow .settings-content-page {
+    padding: 14px 16px;
 }
 .settings-header {
     background: #0e0e0e;
@@ -2288,6 +2307,7 @@ const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("focus_url", G_TABS, "Focus URL / Address bar", ["Ctrl+L"]),
     sc!("close_tab", G_TABS, "Close focused tab", ["Ctrl+W"]),
     sc!("reload", G_TABS, "Reload active tab", ["Ctrl+R"]),
+    sc!("hard_reload", G_TABS, "Hard reload (bypass cache)", ["Ctrl+Shift+R"]),
     sc!("full_tab", G_TABS, "Toggle Full Tab View", ["Alt+F"]),
     sc!("new_workspace", G_TABS, "New Workspace", ["Alt+Shift+V"]),
     sc!("focus_left", G_TABS, "Focus column Left", ["Alt+H"]),
@@ -3172,6 +3192,16 @@ fn reload_or_start(v: &WebView) {
         v.load_html(&start_page(), Some("rail://start/"));
     } else {
         v.reload();
+    }
+}
+
+/// Hard refresh (Ctrl+Shift+R): bypass HTTP cache like Chrome / Brave.
+fn hard_reload_or_start(v: &WebView) {
+    let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
+    if is_internal_uri(&uri) {
+        v.load_html(&start_page(), Some("rail://start/"));
+    } else {
+        v.reload_bypass_cache();
     }
 }
 
@@ -6590,6 +6620,13 @@ impl App {
             _ => {}
         }
 
+        // Responsive: narrow windows get stacked sidebar (tablet/mobile)
+        let w = self.win.width();
+        if w > 0 && w < 900 {
+            self.settings_modal.add_css_class("responsive-narrow");
+        } else {
+            self.settings_modal.remove_css_class("responsive-narrow");
+        }
         self.settings_modal.set_visible(true);
     }
 
@@ -7882,6 +7919,14 @@ impl App {
             return true;
         }
 
+        // Ctrl+Shift+R — hard refresh (bypass cache), Chrome/Brave bilan bir xil
+        if ctrl && shift && !alt && (k == gdk::Key::r || keycode == 27) {
+            if let Some(v) = self.focused_view() {
+                hard_reload_or_start(&v);
+            }
+            return true;
+        }
+
         // Ctrl+Tab cycling and Ctrl+1..9 tab switching
         if ctrl && !shift && !alt {
             // Standart brauzer shortcutlari: Ctrl+T / Ctrl+L / Ctrl+W / Ctrl+R / Ctrl+Q
@@ -8312,13 +8357,15 @@ fn build(gapp: &gtk::Application) {
         pop_c.popup();
     });
 
-    // ---- floating settings panel (Alt+Shift+S / Alt+P / Alt+I) ----
+    // ---- full-page settings (Alt+S / Alt+P / Alt+I) — web-style, not floating ----
     let settings_modal = gtk::Box::new(gtk::Orientation::Vertical, 0);
     settings_modal.add_css_class("settings-modal");
-    settings_modal.set_halign(gtk::Align::Center);
-    settings_modal.set_valign(gtk::Align::Center);
+    settings_modal.set_halign(gtk::Align::Fill);
+    settings_modal.set_valign(gtk::Align::Fill);
+    settings_modal.set_hexpand(true);
+    settings_modal.set_vexpand(true);
     settings_modal.set_visible(false);
-    settings_modal.set_size_request(820, 560);
+    // no fixed size — fills window; responsive class applied on resize
 
     // Settings Header
     let settings_header = gtk::Box::new(gtk::Orientation::Horizontal, 10);
