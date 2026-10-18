@@ -8394,6 +8394,11 @@ impl App {
             return;
         }
         self.palette.set_visible(false);
+        // Settings is a chrome overlay — hide it so overview zooms the real tabs,
+        // not a full-window panel that then vanishes mid-gesture.
+        if self.settings_modal_open() {
+            self.settings_modal.set_visible(false);
+        }
         self.ov.set(true);
         self.ov_return.set((self.focus_row.get(), self.focus_col.get()));
         self.ov_saved_x.set(self.target_x.get());
@@ -8407,11 +8412,22 @@ impl App {
             }
         }
 
-        // Flat zoom-out from *where you are*: keep the same world point under the
-        // viewport center while zoom goes 1 → OV_ZOOM (no pan / no re-frame).
+        // Flat zoom-out from *where you are*: same world point stays under the
+        // viewport center (gap is constant → pure scale, no sideways reflow).
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
-        let z0 = self.layout.zoom().max(0.01);
+        if vw <= 1.0 || vh <= 1.0 {
+            self.target_zoom.set(OV_ZOOM);
+            self.animate();
+            return;
+        }
+        // Snap camera to current targets first so anchor is not mid-ease.
+        self.layout.set_offset_x(self.target_x.get());
+        self.layout.set_offset_y(self.target_y.get());
+        self.layout.set_zoom(1.0);
+        self.strip.queue_allocate();
+
+        let z0 = 1.0;
         let ox0 = self.layout.offset_x();
         let oy0 = self.layout.offset_y();
         let anchor_x = ox0 + (vw * 0.5) / z0;
@@ -8440,7 +8456,16 @@ impl App {
         }
         self.target_zoom.set(1.0);
         self.reveal_focus();
+        // Restore settings chrome if the focused tab is a settings page
         if let Some(v) = self.focused_view() {
+            let on_settings = v
+                .uri()
+                .map(|u| u.starts_with("rail://settings"))
+                .unwrap_or(false)
+                || self.saved_uri_of(&v).starts_with("rail://settings");
+            if on_settings {
+                self.settings_modal.set_visible(true);
+            }
             v.grab_focus();
         }
     }

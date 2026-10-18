@@ -9,10 +9,11 @@ use gtk4 as gtk;
 
 pub const GAP: f64 = 6.0;
 
-/// Space between columns and rows, in strip coordinates. It grows as the strip zooms
-/// out so scaled-down tabs keep a readable gap instead of nearly touching.
-pub fn gap(zoom: f64) -> f64 {
-    GAP + (1.0 - zoom) * 40.0
+/// Space between columns and rows, in strip coordinates.
+/// Must be **constant** (not a function of zoom): otherwise every animation frame
+/// reflows the grid and the overview looks like it slides sideways.
+pub fn gap(_zoom: f64) -> f64 {
+    GAP
 }
 
 /// Minimum width for a column to be usable.
