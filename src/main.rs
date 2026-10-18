@@ -4157,7 +4157,8 @@ impl App {
         let view = Self::create_web_view(&session, &prof_id);
         view.load_html(&start_page(), Some("rail://start/"));
         *self.fresh.borrow_mut() = Some(view.clone());
-        self.add_view(view, prof_id.clone(), false);
+        self.add_view(view.clone(), prof_id.clone(), false);
+        self.set_view_saved_uri(&view, "rail://start/");
         self.select_palette_profile(&prof_id);
         self.show_palette();
     }
@@ -5211,11 +5212,14 @@ impl App {
         String::new()
     }
 
-    /// Joriy http(s) manzilni eslab qoladi (web process to'xtatilganda uri() tozalanadi)
+    /// Remember live URI (http(s) or rail://) — web process kill clears view.uri()
     fn remember_uri(&self, view: &WebView) {
         let Some(u) = view.uri() else { return };
         let u = u.to_string();
-        if !(u.starts_with("http://") || u.starts_with("https://")) {
+        if !(u.starts_with("http://")
+            || u.starts_with("https://")
+            || u.starts_with("rail://"))
+        {
             return;
         }
         let Ok(rows) = self.rows.try_borrow() else { return };
@@ -5227,6 +5231,36 @@ impl App {
                 }
             }
         }
+    }
+
+    fn set_view_saved_uri(&self, view: &WebView, uri: &str) {
+        let Ok(rows) = self.rows.try_borrow() else { return };
+        for row in rows.iter() {
+            for tab in &row.tabs {
+                if &tab.view == view {
+                    *tab.saved_uri.borrow_mut() = uri.to_string();
+                    return;
+                }
+            }
+        }
+    }
+
+    /// Best-known URI for the focused tab (live or saved), for omnibar / pill.
+    fn focused_display_uri(&self) -> String {
+        let Some(v) = self.focused_view() else {
+            return tr("Search or enter address").into();
+        };
+        if let Some(u) = v.uri() {
+            let us = u.as_str();
+            if !us.is_empty() && !us.starts_with("about:") {
+                return display_uri_for_pill(us);
+            }
+        }
+        let saved = self.saved_uri_of(&v);
+        if !saved.is_empty() {
+            return display_uri_for_pill(&saved);
+        }
+        tr("Search or enter address").into()
     }
 
     fn mark_keep_alive(&self, view: &WebView) {
@@ -6524,11 +6558,7 @@ impl App {
         new_ws_box.add_controller(new_ws_click);
         self.list.append(&new_ws_box);
 
-        let text = match self.focused_view().and_then(|v| v.uri()) {
-            Some(u) => display_uri_for_pill(&u),
-            None => tr("Search or enter address").into(),
-        };
-        self.pill_label.set_text(&text);
+        self.pill_label.set_text(&self.focused_display_uri());
     }
 
     fn toggle_sidebar(self: &Rc<Self>) {
@@ -6550,7 +6580,8 @@ impl App {
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
         load_internal_page(&view, &uri);
-        self.add_view(view, prof_id, false);
+        self.add_view(view.clone(), prof_id, false);
+        self.set_view_saved_uri(&view, &uri);
         self.pill_label.set_text(&uri);
         if uri.starts_with("rail://settings") {
             // UI for settings is shown by open_settings_tab / focus sync
@@ -6790,12 +6821,12 @@ impl App {
 
     fn show_palette(self: &Rc<Self>) {
         self.palette_for_new_tab.set(false);
-        let uri = self.focused_view().and_then(|v| v.uri()).filter(|u| !u.starts_with("about:"));
-        let shown = uri
-            .as_ref()
-            .map(|u| display_uri_for_pill(u))
-            .filter(|s| s != tr("Search or enter address"))
-            .unwrap_or_default();
+        let shown = self.focused_display_uri();
+        let shown = if shown == tr("Search or enter address") {
+            String::new()
+        } else {
+            shown
+        };
         self.entry.set_text(&shown);
 
         let prof_id = self.profiles.borrow().active_id().to_string();
@@ -7097,7 +7128,8 @@ impl App {
                 let session = self.profiles.borrow_mut().get_or_create_session(&target_profile_id);
                 let view = Self::create_web_view(&session, &target_profile_id);
                 load_internal_page(&view, &canon);
-                self.add_view(view, target_profile_id, false);
+                self.add_view(view.clone(), target_profile_id, false);
+                self.set_view_saved_uri(&view, &canon);
                 self.pill_label.set_text(&canon);
                 self.hide_palette();
                 if canon.starts_with("rail://settings") {
@@ -7241,13 +7273,15 @@ impl App {
         if on_settings {
             if let Some(v) = self.focused_view() {
                 v.load_html(&settings_shell_page(), Some(settings_uri));
+                self.set_view_saved_uri(&v, settings_uri);
             }
         } else {
             let prof_id = self.profiles.borrow().active_id().to_string();
             let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
             let view = Self::create_web_view(&session, &prof_id);
             view.load_html(&settings_shell_page(), Some(settings_uri));
-            self.add_view(view, prof_id, false);
+            self.add_view(view.clone(), prof_id, false);
+            self.set_view_saved_uri(&view, settings_uri);
         }
         self.pill_label.set_text(settings_uri);
         self.refresh_sidebar();
@@ -11052,15 +11086,14 @@ fn build(gapp: &gtk::Application) {
     });
     app.strip.add_controller(pick);
 
+    // Close palette when clicking the page area — never auto-dismiss settings
+    // (settings is a real page; shell Capture used to hide it on every click).
     let click = gtk::GestureClick::new();
     click.set_propagation_phase(gtk::PropagationPhase::Capture);
     let a = app.clone();
     click.connect_pressed(move |_, _, _, _| {
         if a.palette_open() {
             a.hide_palette();
-        }
-        if a.settings_modal_open() {
-            a.hide_settings_modal();
         }
     });
     shell.add_controller(click);
