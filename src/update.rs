@@ -261,10 +261,13 @@ pub fn download_and_install(url: &str) -> Result<(), String> {
 
 pub fn restart(win: &gtk::ApplicationWindow) {
     let exe = install_path();
+    // Rail is single-instance: wait until THIS process has exited, otherwise the new one
+    // would just hand over to us and quit.
     let _ = Command::new("sh")
         .arg("-c")
-        .arg("sleep 0.8; exec \"$0\"")
+        .arg("i=0; while kill -0 \"$1\" 2>/dev/null && [ $i -lt 50 ]; do i=$((i+1)); sleep 0.2; done; exec \"$0\"")
         .arg(&exe)
+        .arg(std::process::id().to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

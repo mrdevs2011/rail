@@ -2664,6 +2664,8 @@ enum ScResolve {
 thread_local! {
     static SHORTCUTS: RefCell<ShortcutConfig> = RefCell::new(ShortcutConfig::default());
     static KEY_CTL: RefCell<Option<gtk::EventControllerKey>> = RefCell::new(None);
+    /// The one running Rail window state: a second `rail [URL]` launch is forwarded here.
+    static MAIN_APP: RefCell<Option<Rc<App>>> = RefCell::new(None);
     /// Re-entrancy guard: Inspector::show() emits bring-to-front, which called show_devtools() again (stack overflow).
     static IN_SHOW_DEVTOOLS: Cell<bool> = Cell::new(false);
     /// The view whose inspector is currently shown in the Rail panel/window (may differ from the focused view after Ctrl+Tab).
@@ -11827,6 +11829,7 @@ fn build(gapp: &gtk::Application) {
     app.update_window_title();
     win.present();
     app.sync_welcome_palette();
+    MAIN_APP.with(|m| *m.borrow_mut() = Some(app.clone()));
 }
 
 fn export_data(archive_path: &Path) -> Result<(), String> {
@@ -12062,12 +12065,58 @@ fn main() -> glib::ExitCode {
         let _ = TARGET_URL.set(u);
     }
 
+    // Single instance: running `rail [URL]` again hands the request to the already-open Rail
+    // (profiles live inside Rail, no need for several processes). A custom data dir
+    // (-d / RAIL_DATA_DIR) gets its own instance id, so portable setups stay independent.
+    let app_id = if CUSTOM_DATA_DIR.get().is_some() || std::env::var_os("RAIL_DATA_DIR").is_some() {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        rail_data_dir().to_string_lossy().hash(&mut h);
+        format!("dev.rail.browser.d{:x}", h.finish())
+    } else {
+        "dev.rail.browser".to_string()
+    };
     let app = gtk::Application::builder()
-        .application_id("dev.rail.browser")
-        .flags(gio::ApplicationFlags::NON_UNIQUE)
+        .application_id(app_id.as_str())
+        .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE)
         .build();
     app.connect_activate(build);
-    app.run_with_args::<&str>(&[])
+    app.connect_command_line(|gapp, cmdline| {
+        let args: Vec<String> = cmdline.arguments().iter().map(|a| a.to_string_lossy().into_owned()).collect();
+        let url = parse_cli_url(&args);
+        let existing = MAIN_APP.with(|m| m.borrow().clone());
+        match existing {
+            // Already running: open the URL in a new tab and raise the window.
+            Some(a) => {
+                if let Some(u) = url {
+                    a.new_tab();
+                    a.navigate(&u);
+                }
+                a.win.present();
+            }
+            // First launch: build() uses TARGET_URL parsed in main().
+            None => gapp.activate(),
+        }
+        glib::ExitCode::SUCCESS
+    });
+    app.run_with_args(&args)
+}
+
+/// First positional argument (the URL / search text), skipping `-d <dir>` and `--data-dir=…`.
+fn parse_cli_url(args: &[String]) -> Option<String> {
+    let mut i = 1;
+    while i < args.len() {
+        let a = &args[i];
+        if a == "-d" || a == "--data-dir" {
+            i += 2;
+            continue;
+        }
+        if !a.starts_with('-') {
+            return Some(a.clone());
+        }
+        i += 1;
+    }
+    None
 }
 
 #[cfg(test)]
