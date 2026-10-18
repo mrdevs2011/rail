@@ -3276,6 +3276,8 @@ fn sc_apply_slot(ui: &ScUi, def: &'static ShortcutDef, slot: usize, combo: Strin
 }
 
 fn sc_build(ui: &ScUi) {
+    // Prevent Switch::set_active during rebuild from firing handlers that mutate config
+    ui.is_syncing.set(true);
     let container = &ui.rows;
     while let Some(child) = container.first_child() {
         container.remove(&child);
@@ -3433,6 +3435,7 @@ fn sc_build(ui: &ScUi) {
         }
         container.append(&row);
     }
+    ui.is_syncing.set(false);
 }
 
 fn to_uri(input: &str, search_engine: &str) -> String {
@@ -9483,13 +9486,13 @@ fn build(gapp: &gtk::Application) {
             if ui.is_syncing.get() {
                 return;
             }
+            // Master switch is boss: ON → every shortcut on; OFF → every (non-locked) off
             let rail_wins = c.is_active();
             {
                 let mut p = ui.pending.borrow_mut();
                 p.site_wins = !rail_wins;
-                if rail_wins {
-                    p.disabled.clear();
-                } else {
+                p.disabled.clear();
+                if !rail_wins {
                     for def in SHORTCUT_DEFS {
                         if !sc_is_locked(def.id) {
                             p.disabled.insert(def.id.to_string());
@@ -9498,7 +9501,8 @@ fn build(gapp: &gtk::Application) {
                 }
             }
             sc_commit(&ui);
-            sc_refresh(&ui);
+            // Rebuild rows immediately so every checkbox mirrors the master
+            sc_build(&ui);
         });
     }
     {
