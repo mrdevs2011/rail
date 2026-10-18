@@ -3488,12 +3488,12 @@ fn is_internal_uri(u: &str) -> bool {
 }
 
 fn settings_shell_page() -> String {
+    // Same bg as .settings-modal so overview / tab-switch never flash a different page
     format!(
         r#"<!doctype html><html lang="{lang}"><head><meta charset="utf-8">
 <title>Settings</title>
-<style>html,body{{margin:0;background:#0b0b0b;color:#a1a1a1;font-family:monospace;height:100%}}
-.wrap{{display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;opacity:.35}}
-</style></head><body><div class="wrap">rail://settings</div></body></html>"#,
+<style>html,body{{margin:0;background:#0b0b0b;height:100%}}</style>
+</head><body></body></html>"#,
         lang = i18n::current().code()
     )
 }
@@ -5574,42 +5574,84 @@ impl App {
             self.show_devtools();
         }
 
-        // Settings is a tab page (rail://settings): show UI only for that tab
-        if let Some(v) = self.focused_view() {
-            let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
-            if let Some(tab) = settings_tab_from_uri(&uri) {
-                if !self.settings_modal_open() || self.current_settings_tab.get() != tab {
-                    // Re-open section without rewriting the URI (already correct)
-                    self.current_settings_tab.set(tab);
-                    let tab_name = match tab {
-                        SettingsTab::General => "general",
-                        SettingsTab::Profiles => "profiles",
-                        SettingsTab::Data => "data",
-                        SettingsTab::Privacy => "privacy",
-                        SettingsTab::Customize => "customize",
-                        SettingsTab::Update => "update",
-                        SettingsTab::About => "about",
-                    };
-                    self.settings_stack.set_visible_child_name(tab_name);
-                    for (btn_tab, btn) in self.settings_tab_buttons.borrow().iter() {
-                        if *btn_tab == tab {
-                            btn.add_css_class("active");
-                        } else {
-                            btn.remove_css_class("active");
-                        }
-                    }
-                }
-                self.settings_modal.set_visible(true);
-            } else if self.settings_modal_open() {
-                self.settings_modal.set_visible(false);
-            }
-        }
+        // Settings chrome rides *inside* the focused tab overlay so tab-switch
+        // and overview treat it like any other page (no floating strip-level panel).
+        self.sync_settings_chrome();
 
         if !self.palette_open() && !self.ov.get() && !self.settings_modal_open() {
             if let Some(v) = self.focused_view() {
                 v.grab_focus();
             }
         }
+    }
+
+    /// Attach / detach the GTK settings UI so it lives on the settings tab only.
+    fn sync_settings_chrome(self: &Rc<Self>) {
+        if self.ov.get() {
+            self.settings_modal.set_visible(false);
+            return;
+        }
+        let Some(v) = self.focused_view() else {
+            self.settings_modal.set_visible(false);
+            return;
+        };
+        let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
+        let saved = self.saved_uri_of(&v);
+        let check = if uri.starts_with("rail://settings") {
+            uri.as_str()
+        } else {
+            saved.as_str()
+        };
+        let Some(section) = settings_tab_from_uri(check) else {
+            self.settings_modal.set_visible(false);
+            return;
+        };
+
+        if !self.settings_modal_open() || self.current_settings_tab.get() != section {
+            self.current_settings_tab.set(section);
+            let tab_name = match section {
+                SettingsTab::General => "general",
+                SettingsTab::Profiles => "profiles",
+                SettingsTab::Data => "data",
+                SettingsTab::Privacy => "privacy",
+                SettingsTab::Customize => "customize",
+                SettingsTab::Update => "update",
+                SettingsTab::About => "about",
+            };
+            self.settings_stack.set_visible_child_name(tab_name);
+            for (btn_tab, btn) in self.settings_tab_buttons.borrow().iter() {
+                if *btn_tab == section {
+                    btn.add_css_class("active");
+                } else {
+                    btn.remove_css_class("active");
+                }
+            }
+        }
+
+        // Reparent onto this tab's Overlay (sibling of the WebView) so the panel
+        // moves and zooms with the tab — same as a normal site.
+        if let Some(parent) = v.parent() {
+            if let Ok(ov) = parent.downcast::<gtk::Overlay>() {
+                let already = self
+                    .settings_modal
+                    .parent()
+                    .map(|p| p == *ov.upcast_ref::<gtk::Widget>())
+                    .unwrap_or(false);
+                if !already {
+                    if let Some(old) = self.settings_modal.parent() {
+                        if let Ok(old_ov) = old.downcast::<gtk::Overlay>() {
+                            old_ov.remove_overlay(&self.settings_modal);
+                        }
+                    }
+                    self.settings_modal.set_halign(gtk::Align::Fill);
+                    self.settings_modal.set_valign(gtk::Align::Fill);
+                    self.settings_modal.set_hexpand(true);
+                    self.settings_modal.set_vexpand(true);
+                    ov.add_overlay(&self.settings_modal);
+                }
+            }
+        }
+        self.settings_modal.set_visible(true);
     }
 
     /// Focus the neighbouring column, landing on the window at the same height when possible.
@@ -7308,7 +7350,8 @@ impl App {
         self.pill_label.set_text(settings_uri);
         self.refresh_sidebar();
         self.schedule_save_session();
-        self.settings_modal.set_visible(true);
+        // Attach to the (new) focused tab overlay — not the whole strip
+        self.sync_settings_chrome();
     }
 
     fn reload_css_editor(&self) {
@@ -8478,17 +8521,11 @@ impl App {
         }
         self.target_zoom.set(1.0);
         self.reveal_focus();
-        // Restore settings chrome if the focused tab is a settings page
+        self.sync_settings_chrome();
         if let Some(v) = self.focused_view() {
-            let on_settings = v
-                .uri()
-                .map(|u| u.starts_with("rail://settings"))
-                .unwrap_or(false)
-                || self.saved_uri_of(&v).starts_with("rail://settings");
-            if on_settings {
-                self.settings_modal.set_visible(true);
+            if !self.settings_modal_open() {
+                v.grab_focus();
             }
-            v.grab_focus();
         }
     }
 
