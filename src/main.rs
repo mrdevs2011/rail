@@ -5112,7 +5112,7 @@ impl App {
 
         let app = self.clone();
         view.connect_title_notify(move |v| {
-            app.refresh_sidebar();
+            app.refresh_sidebar_soon();
             app.update_window_title();
             if let Some(u) = v.uri() {
                 let title = v.title().unwrap_or_default().to_string();
@@ -5122,7 +5122,7 @@ impl App {
         let app = self.clone();
         view.connect_uri_notify(move |v| {
             app.remember_uri(v);
-            app.refresh_sidebar();
+            app.refresh_sidebar_soon();
             app.update_window_title();
             app.schedule_save_session();
             if let Some(u) = v.uri() {
@@ -5141,10 +5141,10 @@ impl App {
             }
         });
         let app = self.clone();
-        view.connect_favicon_notify(move |_| app.refresh_sidebar());
+        view.connect_favicon_notify(move |_| app.refresh_sidebar_soon());
         let app = self.clone();
         view.connect_is_loading_notify(move |v| {
-            app.refresh_sidebar();
+            app.refresh_sidebar_soon();
             app.update_load_bar();
             // Freeze faqat yuklash tugagach ochiladi (uxlagan tab uyg'onganda)
             if !v.is_loading() {
@@ -6679,6 +6679,21 @@ impl App {
         badge.set_valign(gtk::Align::Center);
         badge.set_halign(gtk::Align::Center);
         badge.upcast()
+    }
+
+    /// WebKit notifications (title / favicon / uri / loading) fire in bursts, especially while many
+    /// tabs load. Rebuilding the whole sidebar for each one froze the UI, so they are coalesced
+    /// into at most one rebuild per ~60 ms. User actions still call refresh_sidebar() directly.
+    fn refresh_sidebar_soon(self: &Rc<Self>) {
+        thread_local! { static SIDEBAR_PENDING: Cell<bool> = Cell::new(false); }
+        if SIDEBAR_PENDING.with(|p| p.replace(true)) {
+            return;
+        }
+        let app = self.clone();
+        glib::timeout_add_local_once(Duration::from_millis(60), move || {
+            SIDEBAR_PENDING.with(|p| p.set(false));
+            app.refresh_sidebar();
+        });
     }
 
     fn refresh_sidebar(self: &Rc<Self>) {
@@ -11885,6 +11900,7 @@ fn build(gapp: &gtk::Application) {
     let a = app.clone();
     win.connect_close_request(move |_| {
         a.save_session_immediate();
+        a.history.borrow_mut().flush();
         glib::Propagation::Proceed
     });
 
@@ -11894,6 +11910,9 @@ fn build(gapp: &gtk::Application) {
         glib::timeout_add_local(Duration::from_secs(2), move || match weak.upgrade() {
             Some(a) => {
                 a.suspend_hidden_tabs();
+                if let Ok(mut h) = a.history.try_borrow_mut() {
+                    h.flush();
+                }
                 glib::ControlFlow::Continue
             }
             None => glib::ControlFlow::Break,

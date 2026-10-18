@@ -55,6 +55,8 @@ pub struct HistorySuggestion {
 pub struct HistoryManager {
     entries: HashMap<String, HistoryEntry>,
     file_path: PathBuf,
+    /// Visits are written to disk lazily (flush()), never on the UI thread per navigation.
+    dirty: bool,
 }
 
 impl HistoryManager {
@@ -64,6 +66,7 @@ impl HistoryManager {
         let mut mgr = Self {
             entries: HashMap::new(),
             file_path,
+            dirty: false,
         };
         mgr.load();
         mgr
@@ -147,7 +150,15 @@ impl HistoryManager {
                 },
             );
         }
-        self.save();
+        self.dirty = true;
+    }
+
+    /// Writes history to disk if something changed since the last write.
+    pub fn flush(&mut self) {
+        if self.dirty {
+            self.dirty = false;
+            self.save();
+        }
     }
 
     pub fn clear(&mut self) {
@@ -392,5 +403,11 @@ mod tests {
         let mgr2 = HistoryManager::new(temp_dir.clone());
         assert_eq!(mgr2.entries.len(), 0);
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+}
+
+impl Drop for HistoryManager {
+    fn drop(&mut self) {
+        self.flush();
     }
 }
