@@ -4977,8 +4977,13 @@ impl App {
             app.schedule_save_session();
             if let Some(u) = v.uri() {
                 let us = u.as_str();
-                // Settings UI only stays up while the active page is rail://settings
-                if app.settings_modal_open() && !us.starts_with("rail://settings") {
+                // Settings chrome follows the tab. Ignore about:blank mid load_html
+                // (otherwise the panel vanishes the moment settings opens).
+                if app.settings_modal_open()
+                    && !us.starts_with("rail://settings")
+                    && !us.is_empty()
+                    && !us.starts_with("about:")
+                {
                     app.settings_modal.set_visible(false);
                 }
                 let title = v.title().unwrap_or_default().to_string();
@@ -5424,6 +5429,17 @@ impl App {
 
     fn close_view(self: &Rc<Self>, view: &WebView) {
         let Some((r_idx, c_idx)) = self.find_view_coords(view) else { return };
+        // Closing the settings tab (or any tab) dismisses the settings chrome
+        if self.settings_modal_open() {
+            let closing_settings = view
+                .uri()
+                .map(|u| u.starts_with("rail://settings"))
+                .unwrap_or(false)
+                || self.saved_uri_of(view).starts_with("rail://settings");
+            if closing_settings {
+                self.settings_modal.set_visible(false);
+            }
+        }
         if self.fresh.borrow().as_ref() == Some(view) {
             *self.fresh.borrow_mut() = None;
         }
@@ -8547,32 +8563,26 @@ impl App {
         let k = key.to_lower();
 
         if self.settings_modal_open() {
+            // Settings is a real tab (rail://settings) — Esc never closes it.
+            // Ctrl+W / other browser shortcuts fall through below.
             if k == gdk::Key::Escape {
-                self.hide_settings_modal();
-                return true;
-            }
-            if alt && !ctrl && (k == gdk::Key::s || k == gdk::Key::S || keycode == 39) {
-                self.hide_settings_modal();
-                return true;
+                return true; // swallow; do not hide
             }
             if alt && !shift && !ctrl && (k == gdk::Key::p || k == gdk::Key::P) {
-                if self.current_settings_tab.get() == SettingsTab::Profiles {
-                    self.hide_settings_modal();
-                } else {
-                    self.open_settings_tab(SettingsTab::Profiles);
-                }
+                self.open_settings_tab(SettingsTab::Profiles);
                 return true;
             }
             if alt && !shift && !ctrl && (k == gdk::Key::i || k == gdk::Key::I) {
-                if self.current_settings_tab.get() == SettingsTab::Data {
-                    self.hide_settings_modal();
-                } else {
-                    self.open_settings_tab(SettingsTab::Data);
-                }
+                self.open_settings_tab(SettingsTab::Data);
                 return true;
             }
-            // All other keystrokes pass directly to settings_modal without triggering window shortcuts
-            return false;
+            // Ctrl / Alt browser shortcuts: continue to global handlers (Ctrl+W closes tab)
+            if ctrl || (alt && !shift) {
+                // fall through
+            } else {
+                // Typing goes to settings form fields
+                return false;
+            }
         }
 
         if self.map_open() {
@@ -9105,6 +9115,8 @@ fn build(gapp: &gtk::Application) {
     settings_modal.set_valign(gtk::Align::Fill);
     settings_modal.set_hexpand(true);
     settings_modal.set_vexpand(true);
+    settings_modal.set_can_target(true);
+    settings_modal.set_focusable(true);
     settings_modal.set_visible(false);
     // Fills the strip (tab area) only; sidebar stays visible
 
@@ -9132,7 +9144,7 @@ fn build(gapp: &gtk::Application) {
 
     let settings_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
     settings_close_btn.add_css_class("flat-icon");
-    settings_close_btn.set_tooltip_text(Some(tr("Close Settings (Esc)")));
+    settings_close_btn.set_tooltip_text(Some(tr("Close tab (Ctrl+W)")));
 
     settings_header.append(&settings_icon);
     settings_header.append(&settings_title);
@@ -9189,12 +9201,7 @@ fn build(gapp: &gtk::Application) {
     sidebar_spacer.set_vexpand(true);
     settings_sidebar.append(&sidebar_spacer);
 
-    let esc_hint = gtk::Label::new(Some(tr("Esc to close")));
-    esc_hint.add_css_class("data-section-desc");
-    esc_hint.set_xalign(0.5);
-    esc_hint.set_margin_bottom(8);
-    settings_sidebar.append(&esc_hint);
-
+    // Settings is a tab — no "Esc to close" hint
     settings_body.append(&settings_sidebar);
     settings_body.append(&settings_stack);
     settings_modal.append(&settings_body);
@@ -10775,7 +10782,21 @@ fn build(gapp: &gtk::Application) {
     map_header_row.add_controller(header_drag);
 
     let a = app.clone();
-    settings_close_btn.connect_clicked(move |_| a.hide_settings_modal());
+    settings_close_btn.connect_clicked(move |_| {
+        // X = close the settings tab (same as Ctrl+W), not just hide chrome
+        if let Some(v) = a.focused_view() {
+            let is_settings = v
+                .uri()
+                .map(|u| u.starts_with("rail://settings"))
+                .unwrap_or(false)
+                || a.saved_uri_of(&v).starts_with("rail://settings");
+            if is_settings {
+                a.close_view(&v);
+                return;
+            }
+        }
+        a.hide_settings_modal();
+    });
 
     {
         let a = app.clone();
