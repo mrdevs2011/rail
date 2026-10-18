@@ -2394,25 +2394,22 @@ const OV_ZOOM: f64 = 0.4;
 /// Overview zoom in/out duration (fixed, ease-out): zoom, pan and grid land together.
 const OV_ANIM_SECS: f64 = 0.24;
 
-/// Xotira tanqis bo'lgandagi (yoki RAIL_LOW_MEM=1) qiymatlar: tez uxlatish, 4 ta tirik tab.
-const SUSPEND_AFTER_SECS: u64 = 120;
-const MAX_LIVE_TABS: usize = 4;
+/// Xotira tanqis (yoki RAIL_LOW_MEM=1 yoki swap to'liq): tez uxlatish, 3 ta tirik tab.
+const SUSPEND_AFTER_SECS: u64 = 60;
+const MAX_LIVE_TABS: usize = 3;
 
-/// Xotira yetarli bo'lganda: tab 15 daqiqa ko'rinmaguncha tirik turadi, 10 tagacha tirik tab
-/// (har tirik tab ~200 MB web process). Xotira bosimi oshsa, quyidagi pog'onalar ishga tushadi.
-const ROOMY_SUSPEND_AFTER_SECS: u64 = 900;
-const ROOMY_MAX_LIVE_TABS: usize = 10;
+/// Xotira yetarli: 10 daqiqa, 6 ta tirik tab (har biri ~80–200 MB web process).
+const ROOMY_SUSPEND_AFTER_SECS: u64 = 600;
+const ROOMY_MAX_LIVE_TABS: usize = 6;
 
-/// O'rta pog'ona (xotira kamayganda yoki yengil bosim): 5 daqiqa, 6 ta tirik tab.
-const TIGHT_SUSPEND_AFTER_SECS: u64 = 300;
-const TIGHT_MAX_LIVE_TABS: usize = 6;
+/// O'rta pog'ona: 3 daqiqa, 4 ta tirik tab.
+const TIGHT_SUSPEND_AFTER_SECS: u64 = 180;
+const TIGHT_MAX_LIVE_TABS: usize = 4;
 
-/// Ko'rinmaydigan bo'sh (start page) tab hech narsa saqlamaydi — tez uxlatiladi va ~200 MB qaytaradi.
-const BLANK_TAB_SUSPEND_SECS: u64 = 30;
+/// Bo'sh start-page tab — tez uxlatiladi.
+const BLANK_TAB_SUSPEND_SECS: u64 = 20;
 
-/// Memory pressure from PSI (`/proc/pressure/memory`, "some avg10"): the percentage of the last 10 s in
-/// which tasks stalled waiting for memory. Unlike MemAvailable it reacts to real contention, like Chrome's
-/// Memory Saver. None when the kernel has no PSI.
+/// Memory pressure from PSI (`/proc/pressure/memory`, "some avg10").
 fn memory_pressure_avg10() -> Option<f64> {
     let text = std::fs::read_to_string("/proc/pressure/memory").ok()?;
     let line = text.lines().find(|l| l.starts_with("some"))?;
@@ -2427,15 +2424,39 @@ fn mem_available_mb() -> Option<u64> {
     Some(kb / 1024)
 }
 
+/// Swap nearly full? System is paging — suspend aggressively even if MemAvailable looks OK.
+fn swap_under_pressure() -> bool {
+    let text = match std::fs::read_to_string("/proc/meminfo") {
+        Ok(t) => t,
+        Err(_) => return false,
+    };
+    let mut total = 0u64;
+    let mut free = 0u64;
+    for line in text.lines() {
+        if let Some(rest) = line.strip_prefix("SwapTotal:") {
+            total = rest.split_whitespace().next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        } else if let Some(rest) = line.strip_prefix("SwapFree:") {
+            free = rest.split_whitespace().next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        }
+    }
+    if total < 1024 { return false; } // no meaningful swap
+    // <15% free or <256 MiB free while most swap is used
+    free * 100 / total < 15 || (total - free > 512 * 1024 && free < 256 * 1024)
+}
+
 /// (suspend_after_secs, max_live_tabs) for the current memory situation.
 fn suspend_policy() -> (u64, usize) {
     if std::env::var_os("RAIL_LOW_MEM").is_some_and(|v| v != "0") {
         return (SUSPEND_AFTER_SECS, MAX_LIVE_TABS);
     }
+    // Swap full = system is thrashing; do not trust MemAvailable alone.
+    if swap_under_pressure() {
+        return (SUSPEND_AFTER_SECS, MAX_LIVE_TABS);
+    }
     let pressure = memory_pressure_avg10().unwrap_or(0.0);
     match mem_available_mb() {
         Some(m) if m < 1500 => (SUSPEND_AFTER_SECS, MAX_LIVE_TABS),
-        _ if pressure >= 10.0 => (SUSPEND_AFTER_SECS, MAX_LIVE_TABS),
+        _ if pressure >= 8.0 => (SUSPEND_AFTER_SECS, MAX_LIVE_TABS),
         Some(m) if m < 3000 => (TIGHT_SUSPEND_AFTER_SECS, TIGHT_MAX_LIVE_TABS),
         _ if pressure >= 1.0 => (TIGHT_SUSPEND_AFTER_SECS, TIGHT_MAX_LIVE_TABS),
         _ => (ROOMY_SUSPEND_AFTER_SECS, ROOMY_MAX_LIVE_TABS),
@@ -5476,20 +5497,33 @@ impl App {
         let app_term = self.clone();
         view.connect_web_process_terminated(move |v, _reason| {
             // Background tabs are intentionally suspended (terminate) to free RAM.
-            // Only the focused tab auto-reloads so the user keeps browsing.
-            if app_term.focused_view().as_ref() == Some(v) {
-                let saved = app_term.saved_uri_of(v);
-                if saved.is_empty() || saved.starts_with("rail://start") {
-                    v.load_html(&start_page(), Some("rail://start/"));
-                } else if saved.starts_with("rail://settings") {
-                    v.load_html(&settings_shell_page(), Some(&saved));
-                    // Re-attach settings chrome
-                    app_term.sync_settings_chrome();
-                } else if saved.starts_with("rail://downloads") {
-                    load_internal_page(v, "rail://downloads");
-                } else {
-                    v.load_uri(&saved);
+            // Only the focused tab auto-reloads — rate-limited so OOM thrash cannot loop.
+            if app_term.focused_view().as_ref() != Some(v) {
+                return;
+            }
+            thread_local! {
+                static LAST: Cell<Option<std::time::Instant>> = const { Cell::new(None) };
+            }
+            let now = std::time::Instant::now();
+            let too_soon = LAST.with(|c| {
+                match c.get() {
+                    Some(t) if now.duration_since(t) < Duration::from_secs(4) => true,
+                    _ => { c.set(Some(now)); false }
                 }
+            });
+            if too_soon {
+                return;
+            }
+            let saved = app_term.saved_uri_of(v);
+            if saved.is_empty() || saved.starts_with("rail://start") {
+                v.load_html(&start_page(), Some("rail://start/"));
+            } else if saved.starts_with("rail://settings") {
+                v.load_html(&settings_shell_page(), Some(&saved));
+                app_term.sync_settings_chrome();
+            } else if saved.starts_with("rail://downloads") {
+                load_internal_page(v, "rail://downloads");
+            } else {
+                v.load_uri(&saved);
             }
         });
     }
@@ -6002,6 +6036,16 @@ impl App {
         let live = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
         let uri = if live.is_empty() { tab.saved_uri.borrow().clone() } else { live };
         uri.starts_with("rail://start")
+    }
+
+    /// Terminate every tab web process (window close / quit). Network process dies with the app.
+    fn shutdown_all_web_processes(&self) {
+        let Ok(rows) = self.rows.try_borrow() else { return };
+        for row in rows.iter() {
+            for tab in &row.tabs {
+                tab.view.terminate_web_process();
+            }
+        }
     }
 
     /// Suspend a live http(s) tab: freeze last frame, kill web process, free RAM.
@@ -12549,6 +12593,14 @@ fn build(gapp: &gtk::Application) {
     win.connect_close_request(move |_| {
         a.save_session_immediate();
         a.history.borrow_mut().flush();
+        // Kill every WebKit process now so closing the window never leaves RAM-eating orphans.
+        a.shutdown_all_web_processes();
+        if let Some(gapp) = a.win.application() {
+            let gapp = gapp.clone();
+            glib::idle_add_local_once(move || {
+                gapp.quit();
+            });
+        }
         glib::Propagation::Proceed
     });
 
@@ -12752,7 +12804,7 @@ fn main() -> glib::ExitCode {
         }
     }
     if std::env::var_os("RAIL_LOW_MEM").is_some_and(|v| v != "0") {
-        // Eski tejamkor rejim: kichik xotira limiti va keshsiz model.
+        // Extreme low-RAM: small limit, aggressive reclaim, no process kill (0.0 = never kill).
         let mut mps = webkit6::MemoryPressureSettings::new();
         mps.set_memory_limit(256);
         mps.set_conservative_threshold(0.25);
@@ -12763,9 +12815,19 @@ fn main() -> glib::ExitCode {
         if let Some(ctx) = webkit6::WebContext::default() {
             ctx.set_cache_model(webkit6::CacheModel::DocumentViewer);
         }
-    } else if let Some(ctx) = webkit6::WebContext::default() {
-        // Haqiqiy brauzer keshi; WebKit'ning o'z xotira-bosim sozlamalari qoldiriladi.
-        ctx.set_cache_model(webkit6::CacheModel::WebBrowser);
+    } else {
+        // Default: real browser cache + WebKit memory pressure so RAM stays bounded
+        // without the kill-reload thrash of an ultra-low limit.
+        let mut mps = webkit6::MemoryPressureSettings::new();
+        mps.set_memory_limit(768);
+        mps.set_conservative_threshold(0.33);
+        mps.set_strict_threshold(0.66);
+        mps.set_kill_threshold(0.0); // never kill web process from WebKit side; Rail suspends instead
+        mps.set_poll_interval(5.0);
+        webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
+        if let Some(ctx) = webkit6::WebContext::default() {
+            ctx.set_cache_model(webkit6::CacheModel::WebBrowser);
+        }
     }
 
     let args: Vec<String> = std::env::args().collect();

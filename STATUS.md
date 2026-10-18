@@ -68,3 +68,9 @@
 - Hozirgi muammo/blocker: headless testda F11+Alt+H dan keyin session'da rail://downloads ko'rinishi — kod yo'li topilmadi, real GPU'da tekshirish kerak.
 - Keyingi qadam: main ga push → auto-release v0.5.72
 - Git holati: uncommitted → commit + push
+
+---
+### 2026-10-18 23:05
+- Qilindi: RAM/exit fix — swap-aware suspend (max 3 live under pressure), tighter defaults (6/4/3), window close kills all WebKit + app.quit, focused reload rate-limit 4s, default WebKit MemoryPressure 768MB kill=0.
+- Tahlil: "yopilgan" Rail aslida tirik edi (~108MB + web process). Tizim swap 4GB to'liq — lockscreen WebKit ham ~157MB yegan. Rail emas, umumiy OOM.
+- Keyingi: push → auto-release v0.5.73
