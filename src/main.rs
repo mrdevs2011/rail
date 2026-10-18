@@ -1745,11 +1745,11 @@ button.color-choice.selected {
     border-radius: 3px;
 }
 
-/* ---- settings page inside the tab square (not window-fullscreen) ---- */
+/* ---- settings page fills the tab like downloads (no floating card) ---- */
 .settings-modal {
     background: #0b0b0b;
-    border: 1px solid #1a1a1a;
-    border-radius: 10px;
+    border: none;
+    border-radius: 0;
     box-shadow: none;
     min-width: 0;
     min-height: 0;
@@ -5581,29 +5581,48 @@ impl App {
         }
     }
 
-    /// Attach / detach the GTK settings UI so it lives on the settings tab only.
+    /// Keep settings UI on the settings tab's Overlay (like downloads lives in its
+    /// WebView) so overview / tab-switch show real content, not an empty shell.
     fn sync_settings_chrome(self: &Rc<Self>) {
-        if self.ov.get() {
-            self.settings_modal.set_visible(false);
-            return;
+        // Prefer the focused tab if it is settings; otherwise any open settings tab.
+        let mut target: Option<(webkit6::WebView, SettingsTab)> = None;
+        if let Some(v) = self.focused_view() {
+            let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
+            let saved = self.saved_uri_of(&v);
+            let check = if uri.starts_with("rail://settings") {
+                uri.clone()
+            } else {
+                saved
+            };
+            if let Some(section) = settings_tab_from_uri(&check) {
+                target = Some((v, section));
+            }
         }
-        let Some(v) = self.focused_view() else {
-            self.settings_modal.set_visible(false);
-            return;
-        };
-        let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
-        let saved = self.saved_uri_of(&v);
-        let check = if uri.starts_with("rail://settings") {
-            uri.as_str()
-        } else {
-            saved.as_str()
-        };
-        let Some(section) = settings_tab_from_uri(check) else {
+        if target.is_none() {
+            let rows = self.rows.borrow();
+            'outer: for row in rows.iter() {
+                for tab in &row.tabs {
+                    let uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
+                    let saved = tab.saved_uri.borrow().clone();
+                    let check = if uri.starts_with("rail://settings") {
+                        uri
+                    } else {
+                        saved
+                    };
+                    if let Some(section) = settings_tab_from_uri(&check) {
+                        target = Some((tab.view.clone(), section));
+                        break 'outer;
+                    }
+                }
+            }
+        }
+
+        let Some((v, section)) = target else {
             self.settings_modal.set_visible(false);
             return;
         };
 
-        if !self.settings_modal_open() || self.current_settings_tab.get() != section {
+        if self.current_settings_tab.get() != section {
             self.current_settings_tab.set(section);
             let tab_name = match section {
                 SettingsTab::General => "general",
@@ -5624,8 +5643,8 @@ impl App {
             }
         }
 
-        // Reparent onto this tab's Overlay (sibling of the WebView) so the panel
-        // moves and zooms with the tab — same as a normal site.
+        // Stay parented on the settings tab overlay even when another tab is focused,
+        // so overview shows settings content the same way it shows downloads HTML.
         if let Some(parent) = v.parent() {
             if let Ok(ov) = parent.downcast::<gtk::Overlay>() {
                 let already = self
@@ -5647,7 +5666,15 @@ impl App {
                 }
             }
         }
+
         self.settings_modal.set_visible(true);
+        // Clicks only when this tab is focused and not in overview (overview picks the card)
+        let focused_is_settings = self
+            .focused_view()
+            .map(|fv| fv == v)
+            .unwrap_or(false);
+        self.settings_modal
+            .set_can_target(focused_is_settings && !self.ov.get());
     }
 
     /// Focus the neighbouring column, landing on the window at the same height when possible.
@@ -8455,11 +8482,8 @@ impl App {
             return;
         }
         self.palette.set_visible(false);
-        // Settings is a chrome overlay — hide it so overview zooms the real tabs,
-        // not a full-window panel that then vanishes mid-gesture.
-        if self.settings_modal_open() {
-            self.settings_modal.set_visible(false);
-        }
+        // Settings rides on its tab overlay (like downloads HTML) — keep it visible
+        // so the overview card shows real content, not a blank shell.
         self.ov.set(true);
         self.ov_return.set((self.focus_row.get(), self.focus_col.get()));
         self.ov_saved_x.set(self.target_x.get());
@@ -8472,6 +8496,7 @@ impl App {
                 t.view.set_can_target(false);
             }
         }
+        self.settings_modal.set_can_target(false);
 
         // Flat zoom-out from *where you are*: same world point stays under the
         // viewport center (gap is constant → pure scale, no sideways reflow).
