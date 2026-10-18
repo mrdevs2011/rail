@@ -372,7 +372,7 @@ r#"<!doctype html>
   .sub {{ color: #737373; font-size: 12px; margin-bottom: 22px; }}
   .empty {{ color: #666; padding: 40px 0; text-align: center; font-size: 13px; }}
   .dl-row {{
-    border: 1px solid #1a1a1a; background: #111; border-radius: 6px;
+    border: 1px solid #1a1a1a; background: #111; border-radius: 0;
     padding: 12px 14px; margin-bottom: 10px;
   }}
   .dl-name {{ font-size: 13px; font-weight: 600; color: #f4f4f4; }}
@@ -607,9 +607,9 @@ scrollbar.overlay-indicator:not(.dragging):not(.hovering) slider,
 scrollbar range trough slider {
     min-width: 3px;
     min-height: 24px;
-    border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.25);
-    background-color: rgba(255, 255, 255, 0.25);
+    border-radius: 0;
+    background: rgba(255, 255, 255, 0.28);
+    background-color: rgba(255, 255, 255, 0.28);
     border: none;
     box-shadow: none;
     margin: 0;
@@ -671,15 +671,15 @@ scrollbar button {
     background: #000000;
 }
 .tab {
-    border-radius: 5px;
-    border: 1px solid #181818;
+    border-radius: 0;
+    border: 1px solid #1a1a1a;
     background: #000000;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-    transition: border-color 150ms ease, box-shadow 150ms ease;
+    box-shadow: none;
+    transition: border-color 80ms ease;
 }
 .tab.focused {
     border-color: #ededed;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 12px 36px rgba(0, 0, 0, 0.7);
+    box-shadow: none;
 }
 
 /* ---- stacked-tab vertical height splitter ---- */
@@ -702,7 +702,7 @@ scrollbar button {
 .tab-resize-handle:hover,
 .tab-resize-handle.active {
     background: #ededed;
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+    box-shadow: none;
 }
 
 /* ---- overview (the live strip, zoomed out in 2D) ---- */
@@ -711,7 +711,7 @@ scrollbar button {
     background: #000000;
 }
 .zoomed .tab {
-    border-radius: 6px;
+    border-radius: 0;
     border: 1px solid #282828;
     box-shadow: none;
 }
@@ -734,7 +734,7 @@ scrollbar button {
 }
 .fs-content .zoomed .tab {
     border-width: 1px;
-    border-radius: 6px;
+    border-radius: 0;
 }
 .fs-content .zoomed .tab.focused {
     border-width: 1px;
@@ -763,7 +763,7 @@ scrollbar button {
 button.side-footer-btn {
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: 0;
     color: #a1a1a1;
     padding: 8px 10px;
     font-size: 12px;
@@ -790,7 +790,7 @@ button.side-footer-btn label {
 button.btn-add-tab {
     background: #111111;
     border: 1px solid #1a1a1a;
-    border-radius: 3px;
+    border-radius: 0;
     min-width: 28px;
     min-height: 28px;
     color: #a1a1a1;
@@ -809,7 +809,7 @@ button.flat-icon {
     min-width: 28px;
     min-height: 28px;
     padding: 0;
-    border-radius: 2px;
+    border-radius: 0;
     color: #727272;
     transition: background-color 100ms ease, border-color 100ms ease, color 100ms ease, box-shadow 100ms ease, opacity 100ms ease;
 }
@@ -820,11 +820,11 @@ button.flat-icon:hover {
 button.pill {
     background: #111111;
     border: 1px solid #1a1a1a;
-    border-radius: 4px;
+    border-radius: 0;
     padding: 7px 11px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    box-shadow: none;
     color: #a1a1a1;
-    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+    transition: background-color 80ms ease, border-color 80ms ease, color 80ms ease;
 }
 button.pill:hover {
     background: #141414;
@@ -870,7 +870,7 @@ button.pill:hover .pill-chip {
 .tablist row {
     padding: 0;
     margin: 2px 0;
-    border-radius: 3px;
+    border-radius: 0;
     border: 1px solid transparent;
     transition: background-color 100ms ease, border-color 100ms ease, color 100ms ease, box-shadow 100ms ease, opacity 100ms ease;
 }
@@ -885,7 +885,7 @@ button.pill:hover .pill-chip {
 .workspace-header {
     padding: 6px 8px;
     margin: 8px 2px 3px 2px;
-    border-radius: 3px;
+    border-radius: 0;
     background: #000000;
     border: 1px solid #141414;
     transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
@@ -952,7 +952,7 @@ button.pill:hover .pill-chip {
 .tabrow {
     padding: 6px 6px 6px 10px;
     margin: 2px 2px;
-    border-radius: 3px;
+    border-radius: 0;
     border: 1px solid transparent;
     transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
@@ -975,20 +975,20 @@ button.pill:hover .pill-chip {
     border-color: rgba(255, 255, 255, 0.18);
 }
 .tabrow.dragging {
-    opacity: 0.88;
+    opacity: 0.9;
     background: #191919;
     border: 1px solid #ededed;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65), 0 0 14px rgba(255, 255, 255, 0.05);
+    box-shadow: none;
 }
 .tabrow.drop-target-above {
-    border-top: 3px solid #ededed;
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 -3px 10px rgba(255, 255, 255, 0.05);
+    border-top: 2px solid #ededed;
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: none;
 }
 .tabrow.drop-target-below {
-    border-bottom: 3px solid #ededed;
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 3px 10px rgba(255, 255, 255, 0.05);
+    border-bottom: 2px solid #ededed;
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: none;
 }
 .tab-index {
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
@@ -1034,7 +1034,7 @@ button.pill:hover .pill-chip {
     padding: 7px 8px;
     background: #000000;
     border: 1px dashed #1d1d1d;
-    border-radius: 3px;
+    border-radius: 0;
     color: #727272;
     font-size: 11px;
     font-weight: 600;
@@ -1069,17 +1069,17 @@ progressbar.load-bar trough { min-height: 2px; background: transparent; border: 
 progressbar.load-bar progress {
     min-height: 2px;
     background: #ededed;
-    border-radius: 0px;
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+    border-radius: 0;
+    box-shadow: none;
 }
 
 /* ---- address & command palette (fixed size under welcome brand) ---- */
 .palette {
     background: #000000;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0;
+    border: 1px solid #2a2a2a;
     padding: 14px 18px 12px;
-    box-shadow: 0 24px 72px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    box-shadow: none;
     min-width: 580px;
     max-width: 580px;
 }
@@ -1171,9 +1171,9 @@ button.profile-circle-btn {
     min-width: 28px;
     min-height: 28px;
     padding: 0;
-    border-radius: 9999px;
+    border-radius: 0;
     border: 2px solid rgba(255, 255, 255, 0.25);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    box-shadow: none;
     background-image: none;
     opacity: 1;
     transition: transform 120ms ease, border-color 120ms ease;
@@ -1211,9 +1211,9 @@ popover.profile-popover > contents {
     background: #000000;
     background-color: #0c0c0c;
     border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 5px;
+    border-radius: 0;
     padding: 6px 8px;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.95);
+    box-shadow: none;
     color: #ffffff;
 }
 popover.profile-popover > arrow {
@@ -1256,7 +1256,7 @@ button.profile-item-btn {
 button.profile-item-btn .profile-item-dot {
     min-width: 24px;
     min-height: 24px;
-    border-radius: 9999px;
+    border-radius: 0;
     font-size: 10px;
     letter-spacing: -0.03em;
     font-weight: 800;
@@ -1293,9 +1293,9 @@ button.profile-item-btn:hover image {
 .profiles-modal {
     background: #000000;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
+    border-radius: 0;
     padding: 24px 28px;
-    box-shadow: 0 32px 84px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    box-shadow: none;
     min-width: 440px;
     margin-left: 16px;
     margin-right: 16px;
@@ -1328,7 +1328,7 @@ button.profile-item-btn:hover image {
 .profile-card {
     background: #111111;
     border: 1px solid #191919;
-    border-radius: 4px;
+    border-radius: 0;
     padding: 10px 14px;
     margin-bottom: 6px;
     transition: transform 180ms cubic-bezier(0.2, 0, 0, 1), background-color 120ms ease, border-color 120ms ease;
@@ -1340,7 +1340,7 @@ button.profile-item-btn:hover image {
 .profile-card.active-profile {
     border-color: #ededed;
     background: #131313;
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
+    box-shadow: none;
 }
 .profile-card.shift-up {
     transform: translateY(-60px);
@@ -1352,7 +1352,7 @@ button.profile-item-btn:hover image {
     opacity: 0.98;
     border-color: #ededed;
     background: #181818;
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 24px rgba(255, 255, 255, 0.05);
+    box-shadow: none;
     transition: none;
 }
 .profile-drag-handle {
@@ -1369,7 +1369,7 @@ button.profile-item-btn:hover image {
 .profile-avatar-circle {
     min-width: 30px;
     min-height: 30px;
-    border-radius: 9999px;
+    border-radius: 0;
     font-size: 12px;
     font-weight: 800;
     margin: 0;
@@ -1389,7 +1389,7 @@ button.profile-item-btn:hover image {
 .profile-badge-active {
     font-size: 9.5px;
     font-weight: 700;
-    border-radius: 9999px;
+    border-radius: 0;
     padding: 2px 8px;
     background: rgba(255, 255, 255, 0.07);
     color: #ededed;
@@ -1498,7 +1498,7 @@ button.btn-create-profile.active-ready:hover {
     letter-spacing: -0.03em;
     min-width: 18px;
     min-height: 16px;
-    border-radius: 9999px;
+    border-radius: 0;
     margin-left: 2px;
     margin-right: 4px;
     padding: 0 3px;
@@ -1509,7 +1509,7 @@ button.color-choice {
     min-width: 22px;
     min-height: 22px;
     padding: 0;
-    border-radius: 9999px;
+    border-radius: 0;
     border: 2px solid transparent;
     transition: transform 100ms ease, border-color 100ms ease;
 }
@@ -1526,8 +1526,8 @@ button.color-choice.selected {
 .js-dialog-window {
     background: #000000;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 5px;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9);
+    border-radius: 0;
+    box-shadow: none;
 }
 .js-dialog-title {
     color: #ededed;
@@ -1581,9 +1581,9 @@ button.color-choice.selected {
 .data-modal {
     background: #000000;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
+    border-radius: 0;
     padding: 24px 28px;
-    box-shadow: 0 32px 84px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    box-shadow: none;
     min-width: 520px;
     margin-left: 16px;
     margin-right: 16px;
@@ -1603,7 +1603,7 @@ button.color-choice.selected {
 .data-section-box {
     background: #0f0f0f;
     border: 1px solid #191919;
-    border-radius: 4px;
+    border-radius: 0;
     padding: 12px 16px;
     margin-top: 8px;
 }
@@ -1797,7 +1797,7 @@ button.color-choice.selected {
 .settings-card {
     background: #111111;
     border: 1px solid #191919;
-    border-radius: 4px;
+    border-radius: 0;
     padding: 12px 16px;
     margin-bottom: 10px;
 }
@@ -1852,7 +1852,7 @@ button.color-choice.selected {
 .shortcut-stack-card {
     background: #121212;
     border: 1px solid #2a2a2a;
-    border-radius: 6px;
+    border-radius: 0;
     padding: 6px 10px;
     min-width: 88px;
     transition: background 120ms ease, border-color 120ms ease;
@@ -1891,8 +1891,8 @@ button.color-choice.selected {
 .minimap-window {
     background: #000000;
     border: 1px solid #1b1b1b;
-    border-radius: 5px;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    border-radius: 0;
+    box-shadow: none;
 }
 .minimap-header {
     background: #0e0e0e;
@@ -1941,7 +1941,7 @@ button.color-choice.selected {
     border: 1px solid #ededed;
     border-radius: 8px;
     padding: 3px 10px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.85);
+    box-shadow: none;
     transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .minimap-location-btn image {
@@ -1967,11 +1967,11 @@ button.color-choice.selected {
 /* ---- Rail DevTools Panel (F12 / Alt+Shift+I / Alt+Shift+D) ---- */
 .devtools-panel {
     background: #000000;
-    box-shadow: 0 0 48px rgba(0, 0, 0, 0.85);
+    box-shadow: none;
 }
 .devtools-panel.dock-bottom {
     border-top: 1px solid #181818;
-    box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.85);
+    box-shadow: none;
 }
 .devtools-panel.dock-left {
     border-right: 1px solid #181818;
@@ -2156,9 +2156,9 @@ selection {
 .update-card {
     background: #111111;
     border: 1px solid #2e2e2e;
-    border-radius: 4px;
+    border-radius: 0;
     padding: 12px 14px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    box-shadow: none;
 }
 .update-kicker {
     font-size: 10px;
@@ -2244,7 +2244,7 @@ button:focus-visible, modelbutton:focus-visible {
 tooltip.background {
     background: #0e0e0e;
     border: 1px solid #262626;
-    border-radius: 6px;
+    border-radius: 0;
     box-shadow: none;
 }
 tooltip.background label {
@@ -2257,12 +2257,12 @@ popover.menu > contents {
     border: 1px solid #1f1f1f;
     border-radius: 8px;
     padding: 4px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+    box-shadow: none;
 }
 popover.menu modelbutton {
     min-height: 28px;
     padding: 0 10px;
-    border-radius: 5px;
+    border-radius: 0;
     color: #d4d4d4;
 }
 popover.menu modelbutton label {
@@ -2296,7 +2296,7 @@ popover.menu separator {
 button.btn-add-tab, button.pill {
     background: #0e0e0e;
     border: 1px solid #1c1c1c;
-    border-radius: 6px;
+    border-radius: 0;
     box-shadow: none;
 }
 button.btn-add-tab:hover, button.pill:hover {
@@ -2305,10 +2305,10 @@ button.btn-add-tab:hover, button.pill:hover {
     color: #ffffff;
 }
 button.flat-icon, button.side-footer-btn {
-    border-radius: 6px;
+    border-radius: 0;
 }
 .pill-chip, .tab-index, .workspace-badge, .tab-close, .btn-ws-add {
-    border-radius: 4px;
+    border-radius: 0;
 }
 .tab-index {
     color: #6f6f6f;
@@ -2319,7 +2319,7 @@ button.flat-icon, button.side-footer-btn {
 .tabrow {
     margin: 1px 4px;
     padding: 6px 8px 6px 10px;
-    border-radius: 6px;
+    border-radius: 0;
     border-left: 2px solid transparent;
 }
 .tabrow:hover {
@@ -2333,7 +2333,7 @@ button.flat-icon, button.side-footer-btn {
 }
 .workspace-header {
     margin: 10px 4px 3px 4px;
-    border-radius: 6px;
+    border-radius: 0;
     background: transparent;
     border: 1px solid #141414;
     border-left: 2px solid transparent;
@@ -2375,7 +2375,7 @@ progressbar.load-bar progress {
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8);
 }
 .palette-sug-item {
-    border-radius: 6px;
+    border-radius: 0;
 }
 .palette-sug-item:hover, .palette-sug-item.selected {
     background: rgba(255, 255, 255, 0.07);
