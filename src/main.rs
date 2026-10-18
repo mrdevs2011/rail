@@ -1846,6 +1846,37 @@ button.color-choice.selected {
     font-size: 12px;
     color: #d4d4d4;
 }
+/* Stacked multi-binding shortcut card (Ctrl+1..9 etc.) */
+.shortcut-stack {
+    position: relative;
+}
+.shortcut-stack-card {
+    background: #121212;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    padding: 6px 10px;
+    min-width: 88px;
+    transition: background 120ms ease, border-color 120ms ease;
+}
+.shortcut-stack-card:hover {
+    background: #181818;
+    border-color: #3a3a3a;
+}
+.shortcut-stack-layers {
+    /* stacked deck under the top card */
+    box-shadow:
+        0 3px 0 -1px #0e0e0e,
+        0 3px 0 0 #222,
+        0 6px 0 -1px #0a0a0a,
+        0 6px 0 0 #1a1a1a;
+}
+.shortcut-stack-expand {
+    margin-top: 6px;
+}
+.shortcut-stack-item {
+    padding: 4px 0;
+}
+
 .shortcut-kbd {
     background: #161616;
     border: 1px solid #333333;
@@ -3212,6 +3243,24 @@ fn sc_apply_slot(ui: &ScUi, def: &'static ShortcutDef, slot: usize, combo: Strin
     sc_refresh(ui);
 }
 
+
+/// Numbered series (Ctrl+1..9 etc.) collapsed into one stacked card.
+fn sc_series_for(id: &str) -> Option<(&'static str, &'static [&'static str])> {
+    const TABS: &[&str] = &["tab_1", "tab_2", "tab_3", "tab_4", "tab_5", "tab_6", "tab_7", "tab_8", "tab_9"];
+    const WS: &[&str] = &["ws_1", "ws_2", "ws_3", "ws_4", "ws_5", "ws_6", "ws_7", "ws_8", "ws_9"];
+    const MV: &[&str] = &["mv_1", "mv_2", "mv_3", "mv_4", "mv_5", "mv_6", "mv_7", "mv_8", "mv_9"];
+    match id {
+        "tab_1" => Some(("Switch to tab 1–9", TABS)),
+        "ws_1" => Some(("Switch to workspace 1–9", WS)),
+        "mv_1" => Some(("Move tab to workspace 1–9", MV)),
+        _ => None,
+    }
+}
+
+fn sc_series_member(id: &str) -> bool {
+    id.starts_with("tab_") || id.starts_with("ws_") || id.starts_with("mv_")
+}
+
 fn sc_build(ui: &ScUi) {
     // Prevent Switch::set_active during rebuild from firing handlers that mutate config
     ui.is_syncing.set(true);
@@ -3221,7 +3270,14 @@ fn sc_build(ui: &ScUi) {
     }
     let cfg = ui.pending.borrow().clone();
     let mut last_group = "";
-    for def in SHORTCUT_DEFS {
+    let mut i = 0;
+    while i < SHORTCUT_DEFS.len() {
+        let def = &SHORTCUT_DEFS[i];
+        // Skip non-head members of a numbered series (rendered via stack card)
+        if sc_series_member(def.id) && sc_series_for(def.id).is_none() {
+            i += 1;
+            continue;
+        }
         if def.group != last_group {
             last_group = def.group;
             let h = gtk::Label::new(Some(tr(def.group)));
@@ -3231,6 +3287,58 @@ fn sc_build(ui: &ScUi) {
             h.set_margin_bottom(4);
             container.append(&h);
         }
+
+        // Stacked card for Ctrl+1..9 / Alt+1..9 series
+        if let Some((title, ids)) = sc_series_for(def.id) {
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+            row.add_css_class("shortcut-row");
+            row.set_margin_top(3);
+            row.set_margin_bottom(3);
+            let d = gtk::Label::new(Some(tr(title)));
+            d.add_css_class("shortcut-desc");
+            d.set_xalign(0.0);
+            d.set_hexpand(true);
+            d.set_valign(gtk::Align::Start);
+            row.append(&d);
+
+            let stack = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            stack.add_css_class("shortcut-stack");
+            stack.set_halign(gtk::Align::End);
+
+            // Top card shows the *last* binding (e.g. Ctrl+9)
+            let last_id = ids.last().copied().unwrap_or(def.id);
+            let last_def = SHORTCUT_DEFS.iter().find(|d| d.id == last_id).unwrap_or(def);
+            let last_combo = sc_effective(last_def, &cfg).first().cloned().unwrap_or_default();
+            let top = gtk::Button::with_label(&last_combo);
+            top.add_css_class("shortcut-stack-card");
+            top.add_css_class("shortcut-stack-layers");
+            top.set_tooltip_text(Some(tr("Click to show all bindings")));
+
+            let expand = gtk::Box::new(gtk::Orientation::Vertical, 2);
+            expand.add_css_class("shortcut-stack-expand");
+            expand.set_visible(false);
+            for sid in ids.iter() {
+                if let Some(sd) = SHORTCUT_DEFS.iter().find(|d| d.id == *sid) {
+                    let c = sc_effective(sd, &cfg).first().cloned().unwrap_or_default();
+                    let item = gtk::Label::new(Some(&format!("{}  ·  {}", c, tr(sd.desc))));
+                    item.add_css_class("shortcut-stack-item");
+                    item.add_css_class("shortcut-kbd");
+                    item.set_xalign(1.0);
+                    expand.append(&item);
+                }
+            }
+            let expand_c = expand.clone();
+            top.connect_clicked(move |_| {
+                expand_c.set_visible(!expand_c.is_visible());
+            });
+            stack.append(&top);
+            stack.append(&expand);
+            row.append(&stack);
+            container.append(&row);
+            i += ids.len();
+            continue;
+        }
+
         let enabled = sc_enabled(&cfg, def.id);
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         row.add_css_class("shortcut-row");
@@ -3371,6 +3479,7 @@ fn sc_build(ui: &ScUi) {
             row.append(&spacer);
         }
         container.append(&row);
+        i += 1;
     }
     ui.is_syncing.set(false);
 }
@@ -3950,12 +4059,28 @@ impl App {
             let oyt = app.target_y.get();
             let zt = app.target_zoom.get();
 
-            let mut nx = oxc + (oxt - oxc) * k;
-            let mut ny = oyc + (oyt - oyc) * k;
             let mut nz = zc + (zt - zc) * k;
-            if near(oxt, nx, 0.5) { nx = oxt; }
-            if near(oyt, ny, 0.5) { ny = oyt; }
             if near(zt, nz, 0.002) { nz = zt; }
+
+            // Overview: keep equal margins every frame (not independent x/y lerp)
+            let (mut nx, mut ny) = if app.ov.get() {
+                app.overview_offsets_at_zoom(nz)
+            } else {
+                let mut nx = oxc + (oxt - oxc) * k;
+                let mut ny = oyc + (oyt - oyc) * k;
+                if near(oxt, nx, 0.5) { nx = oxt; }
+                if near(oyt, ny, 0.5) { ny = oyt; }
+                (nx, ny)
+            };
+            if !app.ov.get() {
+                // already set above
+            } else {
+                // Snap to final targets when zoom is done
+                if nz == zt {
+                    nx = oxt;
+                    ny = oyt;
+                }
+            }
 
             let grid_busy = app.layout.step_grid_progress(k);
 
@@ -8551,8 +8676,10 @@ impl App {
         }
         self.settings_modal.set_can_target(false);
 
-        // Flat zoom-out from *where you are*: same world point stays under the
-        // viewport center (gap is constant → pure scale, no sideways reflow).
+        // Niri-style overview: frame the whole grid with *equal margins* on all
+        // four sides when it fits; otherwise center on the focused tab.
+        // Offsets are recomputed every animation frame from the current zoom so
+        // the framing never skews (Bad vs Good diagram).
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
         if vw <= 1.0 || vh <= 1.0 {
@@ -8560,23 +8687,15 @@ impl App {
             self.animate();
             return;
         }
-        // Snap camera to current targets first so anchor is not mid-ease.
         self.layout.set_offset_x(self.target_x.get());
         self.layout.set_offset_y(self.target_y.get());
         self.layout.set_zoom(1.0);
         self.strip.queue_allocate();
 
-        let z0 = 1.0;
-        let ox0 = self.layout.offset_x();
-        let oy0 = self.layout.offset_y();
-        let anchor_x = ox0 + (vw * 0.5) / z0;
-        let anchor_y = oy0 + (vh * 0.5) / z0;
-        let tx = anchor_x - (vw * 0.5) / OV_ZOOM;
-        let ty = anchor_y - (vh * 0.5) / OV_ZOOM;
-
+        self.target_zoom.set(OV_ZOOM);
+        let (tx, ty) = self.overview_offsets_at_zoom(OV_ZOOM);
         self.target_x.set(tx);
         self.target_y.set(ty);
-        self.target_zoom.set(OV_ZOOM);
         self.animate();
     }
 
