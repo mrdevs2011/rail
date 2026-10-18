@@ -3958,7 +3958,7 @@ impl App {
         self.animate();
     }
 
-    /// Ease both the scroll offsets (X, Y) and zoom toward their targets.
+    /// Ease scroll offsets + zoom toward targets (flat zoom, no mid-frame re-centering).
     fn animate(self: &Rc<Self>) {
         if self.animating.get() {
             return;
@@ -3981,34 +3981,22 @@ impl App {
         self.strip.add_tick_callback(move |strip, clock| {
             let now = clock.frame_time();
             let dt = last.replace(Some(now)).map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
-            let k = 1.0 - (-dt / 0.05).exp();
+            // Slightly slower ease → reads as a calm, flat zoom-out
+            let k = 1.0 - (-dt / 0.08).exp();
 
             let oxc = app.layout.offset_x();
             let oyc = app.layout.offset_y();
             let zc = app.layout.zoom();
+            let oxt = app.target_x.get();
+            let oyt = app.target_y.get();
             let zt = app.target_zoom.get();
-
-            let mut nz = zc + (zt - zc) * k;
-            if near(zt, nz, 0.002) {
-                nz = zt;
-            }
-
-            // Recompute camera for *current* zoom so every frame has equal margins
-            // (independent zoom/offset easing used to skew the frame mid-animation).
-            let (oxt, oyt) = if nz < 0.999 {
-                app.overview_offsets_at_zoom(nz)
-            } else {
-                (app.target_x.get(), app.target_y.get())
-            };
 
             let mut nx = oxc + (oxt - oxc) * k;
             let mut ny = oyc + (oyt - oyc) * k;
-            if near(oxt, nx, 0.5) {
-                nx = oxt;
-            }
-            if near(oyt, ny, 0.5) {
-                ny = oyt;
-            }
+            let mut nz = zc + (zt - zc) * k;
+            if near(oxt, nx, 0.5) { nx = oxt; }
+            if near(oyt, ny, 0.5) { ny = oyt; }
+            if near(zt, nz, 0.002) { nz = zt; }
 
             let grid_busy = app.layout.step_grid_progress(k);
 
@@ -8384,8 +8372,23 @@ impl App {
                 t.view.set_can_target(false);
             }
         }
+
+        // Flat zoom-out from *where you are*: keep the same world point under the
+        // viewport center while zoom goes 1 → OV_ZOOM (no pan / no re-frame).
+        let vw = self.strip.width() as f64;
+        let vh = self.strip.height() as f64;
+        let z0 = self.layout.zoom().max(0.01);
+        let ox0 = self.layout.offset_x();
+        let oy0 = self.layout.offset_y();
+        let anchor_x = ox0 + (vw * 0.5) / z0;
+        let anchor_y = oy0 + (vh * 0.5) / z0;
+        let tx = anchor_x - (vw * 0.5) / OV_ZOOM;
+        let ty = anchor_y - (vh * 0.5) / OV_ZOOM;
+
+        self.target_x.set(tx);
+        self.target_y.set(ty);
         self.target_zoom.set(OV_ZOOM);
-        self.reveal_focus();
+        self.animate();
     }
 
     fn exit_overview(self: &Rc<Self>) {
