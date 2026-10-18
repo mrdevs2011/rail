@@ -6681,6 +6681,51 @@ impl App {
         badge.upcast()
     }
 
+    /// The UI thread was blocked for `gap` (watchdog in main loop). Append one line to
+    /// stalls.log with what was going on, so freezes can be traced instead of guessed.
+    fn log_stall(&self, gap: Duration) {
+        use std::io::Write;
+        let (mut live, mut loading, mut total) = (0usize, 0usize, 0usize);
+        let mut loading_hosts: Vec<String> = Vec::new();
+        if let Ok(rows) = self.rows.try_borrow() {
+            for row in rows.iter() {
+                for t in row.tabs.iter() {
+                    total += 1;
+                    if !t.suspended.get() {
+                        live += 1;
+                    }
+                    if t.view.is_loading() {
+                        loading += 1;
+                        if loading_hosts.len() < 4 {
+                            loading_hosts.push(host_of(&t.real_uri()).unwrap_or_default());
+                        }
+                    }
+                }
+            }
+        }
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let path = rail_data_dir().join("stalls.log");
+        if std::fs::metadata(&path).map(|m| m.len() > 256 * 1024).unwrap_or(false) {
+            let _ = std::fs::write(&path, "");
+        }
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+            let _ = writeln!(
+                f,
+                "{} stall={}ms tabs={} live={} loading={} overview={} [{}]",
+                secs,
+                gap.as_millis().saturating_sub(100),
+                total,
+                live,
+                loading,
+                self.ov.get(),
+                loading_hosts.join(", ")
+            );
+        }
+    }
+
     /// WebKit notifications (title / favicon / uri / loading) fire in bursts, especially while many
     /// tabs load. Rebuilding the whole sidebar for each one froze the UI, so they are coalesced
     /// into at most one rebuild per ~60 ms. User actions still call refresh_sidebar() directly.
@@ -11916,6 +11961,21 @@ fn build(gapp: &gtk::Application) {
                 glib::ControlFlow::Continue
             }
             None => glib::ControlFlow::Break,
+        });
+    }
+
+    {
+        // Main-loop watchdog: a 100 ms timer that fires late means the UI thread was blocked.
+        let weak = Rc::downgrade(&app);
+        let last = Rc::new(Cell::new(std::time::Instant::now()));
+        glib::timeout_add_local(Duration::from_millis(100), move || {
+            let Some(a) = weak.upgrade() else { return glib::ControlFlow::Break };
+            let now = std::time::Instant::now();
+            let gap = now.duration_since(last.replace(now));
+            if gap > Duration::from_millis(300) && gap < Duration::from_secs(30) {
+                a.log_stall(gap);
+            }
+            glib::ControlFlow::Continue
         });
     }
 
