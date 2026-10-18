@@ -2274,7 +2274,11 @@ macro_rules! sc {
     };
 }
 
-const SC_LOCKED: &str = "settings";
+const SC_LOCKED: &[&str] = &["settings", "win_left", "win_right", "win_up", "win_down"];
+
+fn sc_is_locked(id: &str) -> bool {
+    SC_LOCKED.iter().any(|x| *x == id)
+}
 
 const G_TABS: &str = "Tabs & Workspaces";
 const G_PANELS: &str = "Panels, Settings & Tools";
@@ -2290,6 +2294,10 @@ const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("focus_right", G_TABS, "Focus column Right", ["Alt+L"]),
     sc!("focus_down", G_TABS, "Focus window Down", ["Alt+J"]),
     sc!("focus_up", G_TABS, "Focus window Up", ["Alt+K"]),
+    sc!("win_left", G_TABS, "Focus column Left (Win+Arrow)", ["Super+Left"]),
+    sc!("win_right", G_TABS, "Focus column Right (Win+Arrow)", ["Super+Right"]),
+    sc!("win_up", G_TABS, "Focus workspace Up (Win+Arrow)", ["Super+Up"]),
+    sc!("win_down", G_TABS, "Focus workspace Down (Win+Arrow)", ["Super+Down"]),
     sc!("move_left", G_TABS, "Move tab column Left", ["Alt+Shift+H"]),
     sc!("move_right", G_TABS, "Move tab column Right", ["Alt+Shift+L"]),
     sc!("move_down", G_TABS, "Move window Down", ["Alt+Shift+J"]),
@@ -2460,11 +2468,13 @@ fn sc_effective(def: &ShortcutDef, cfg: &ShortcutConfig) -> Vec<String> {
 }
 
 fn sc_enabled(cfg: &ShortcutConfig, id: &str) -> bool {
-    id == SC_LOCKED || !cfg.disabled.contains(id)
+    sc_is_locked(id) || !cfg.disabled.contains(id)
 }
 
 fn sc_normalize(cfg: &mut ShortcutConfig) {
-    cfg.disabled.remove(SC_LOCKED);
+    for id in SC_LOCKED {
+        cfg.disabled.remove(*id);
+    }
     cfg.disabled
         .retain(|id| SHORTCUT_DEFS.iter().any(|d| d.id == id.as_str()));
     for def in SHORTCUT_DEFS {
@@ -2477,9 +2487,13 @@ fn sc_normalize(cfg: &mut ShortcutConfig) {
             cfg.overrides.remove(def.id);
         }
     }
-    // The Settings shortcut can never end up unbound.
-    if cfg.overrides.get(SC_LOCKED).map(|l| l.is_empty()).unwrap_or(false) {
-        cfg.overrides.remove(SC_LOCKED);
+    // Locked shortcuts can never end up unbound or remapped.
+    for id in SC_LOCKED {
+        if cfg.overrides.get(*id).map(|l| l.is_empty()).unwrap_or(false) {
+            cfg.overrides.remove(*id);
+        }
+        // Force defaults for locked ids (read-only).
+        cfg.overrides.remove(*id);
     }
 }
 
@@ -2494,11 +2508,14 @@ fn sc_set_slot(
     if !sc_valid_combo(combo) {
         return Err(tr("Pick Alt or Ctrl with a key (F-keys can be used alone).").to_string());
     }
-    if def.id != SC_LOCKED {
-        if let Some(locked) = SHORTCUT_DEFS.iter().find(|d| d.id == SC_LOCKED) {
-            if sc_effective(locked, cfg).iter().any(|c| c == combo) {
-                return Err(trf("{} is reserved for opening Settings.", &[&combo]));
-            }
+    // Win+Arrow shortcuts are fully locked (read-only).
+    if def.id.starts_with("win_") {
+        return Err(tr("This shortcut is locked and cannot be changed.").to_string());
+    }
+    // Reserved combos of locked shortcuts cannot be stolen.
+    for locked in SHORTCUT_DEFS.iter().filter(|d| sc_is_locked(d.id)) {
+        if sc_effective(locked, cfg).iter().any(|c| c == combo) {
+            return Err(trf("{} is reserved and cannot be reassigned.", &[&combo]));
         }
     }
     let mut note = String::new();
@@ -2982,13 +2999,19 @@ fn sc_build(ui: &ScUi) {
         d.set_opacity(if enabled { 1.0 } else { 0.45 });
         row.append(&d);
 
-        if def.id == SC_LOCKED {
+        if sc_is_locked(def.id) {
             let lock = gtk::Image::from_icon_name("changes-prevent-symbolic");
             lock.set_valign(gtk::Align::Center);
-            lock.set_tooltip_text(Some(
-                tr("Always on: this opens Settings, so it can't be turned off."),
-            ));
+            lock.set_opacity(0.7);
+            let tip = if def.id == "settings" {
+                tr("Always on: this opens Settings, so it can't be turned off.")
+            } else {
+                tr("Locked (read-only): system navigation, cannot be edited.")
+            };
+            lock.set_tooltip_text(Some(tip));
             row.append(&lock);
+            // Gray the description for locked rows
+            d.set_opacity(0.55);
         } else {
             let sw = gtk::Switch::new();
             sw.set_active(enabled);
@@ -3029,6 +3052,22 @@ fn sc_build(ui: &ScUi) {
         line.set_valign(gtk::Align::Center);
         let eff = sc_effective(def, &cfg);
         let combo = eff.first().cloned().unwrap_or_default();
+
+        // Win+Arrow locked shortcuts: gray read-only badge, no editor
+        if def.id.starts_with("win_") {
+            let kbd = gtk::Label::new(Some(&combo));
+            kbd.add_css_class("shortcut-kbd");
+            kbd.set_opacity(0.5);
+            kbd.set_tooltip_text(Some(tr("Locked — display only, not editable")));
+            line.append(&kbd);
+            row.append(&line);
+            let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            spacer.set_size_request(32, -1);
+            row.append(&spacer);
+            container.append(&row);
+            continue;
+        }
+
         let (mod_idx, key) = if combo.is_empty() {
             (0u32, String::new())
         } else {
@@ -7930,6 +7969,30 @@ impl App {
             return true;
         }
 
+        // Win/Super + Arrow: navigate tabs (columns) and workspaces (rows) — locked shortcuts
+        let super_key = state.contains(M::SUPER_MASK);
+        if super_key && !ctrl && !alt && !shift {
+            match k {
+                gdk::Key::Left | gdk::Key::KP_Left => {
+                    self.focus_column_left();
+                    return true;
+                }
+                gdk::Key::Right | gdk::Key::KP_Right => {
+                    self.focus_column_right();
+                    return true;
+                }
+                gdk::Key::Up | gdk::Key::KP_Up => {
+                    self.focus_row_up();
+                    return true;
+                }
+                gdk::Key::Down | gdk::Key::KP_Down => {
+                    self.focus_row_down();
+                    return true;
+                }
+                _ => {}
+            }
+        }
+
         if alt && !shift && !ctrl {
             match k {
                 gdk::Key::Left => {
@@ -8614,7 +8677,7 @@ fn build(gapp: &gtk::Application) {
                     p.disabled.clear();
                 } else {
                     for def in SHORTCUT_DEFS {
-                        if def.id != SC_LOCKED {
+                        if !sc_is_locked(def.id) {
                             p.disabled.insert(def.id.to_string());
                         }
                     }
@@ -10885,14 +10948,14 @@ mod tests {
 
         // Master checkbox turned OFF -> forces all shortcuts disabled except locked settings
         for def in SHORTCUT_DEFS {
-            if def.id != SC_LOCKED {
+            if !sc_is_locked(def.id) {
                 cfg.disabled.insert(def.id.to_string());
             }
         }
         cfg.site_wins = true;
         assert!(!sc_enabled(&cfg, "data"));
         assert!(!sc_enabled(&cfg, "ws_1"));
-        assert!(sc_enabled(&cfg, SC_LOCKED)); // Settings remains accessible
+        assert!(sc_enabled(&cfg, "settings")); // Settings remains accessible
     }
 
     #[test]
