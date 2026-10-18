@@ -711,17 +711,15 @@ scrollbar button {
     background: #000000;
 }
 .zoomed .tab {
-    opacity: 0.88;
     border-radius: 6px;
     border: 1px solid #282828;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+    box-shadow: none;
 }
 .zoomed .tab.focused {
-    opacity: 1;
     border-color: #ededed;
     outline: 2px solid #ededed;
     outline-offset: 1px;
-    box-shadow: 0 0 24px rgba(255, 255, 255, 0.05);
+    box-shadow: none;
 }
 .ov-hint {
     opacity: 0;
@@ -778,7 +776,7 @@ button.btn-add-tab {
     min-height: 28px;
     color: #a1a1a1;
     padding: 0;
-    transition: all 40ms ease;
+    transition: background-color 40ms ease, border-color 40ms ease, color 40ms ease, box-shadow 40ms ease, opacity 40ms ease;
 }
 button.btn-add-tab:hover {
     background: #161616;
@@ -794,7 +792,7 @@ button.flat-icon {
     padding: 0;
     border-radius: 2px;
     color: #727272;
-    transition: all 100ms ease;
+    transition: background-color 100ms ease, border-color 100ms ease, color 100ms ease, box-shadow 100ms ease, opacity 100ms ease;
 }
 button.flat-icon:hover {
     background: rgba(255, 255, 255, 0.06);
@@ -807,7 +805,7 @@ button.pill {
     padding: 7px 11px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
     color: #a1a1a1;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 button.pill:hover {
     background: #141414;
@@ -855,7 +853,7 @@ button.pill:hover .pill-chip {
     margin: 2px 0;
     border-radius: 3px;
     border: 1px solid transparent;
-    transition: all 100ms ease;
+    transition: background-color 100ms ease, border-color 100ms ease, color 100ms ease, box-shadow 100ms ease, opacity 100ms ease;
 }
 .tablist row:hover {
     background: #111111;
@@ -871,7 +869,7 @@ button.pill:hover .pill-chip {
     border-radius: 3px;
     background: #000000;
     border: 1px solid #141414;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .workspace-header:hover {
     background: #111111;
@@ -921,7 +919,7 @@ button.pill:hover .pill-chip {
     border: none;
     color: #727272;
     opacity: 0;
-    transition: all 100ms ease;
+    transition: background-color 100ms ease, border-color 100ms ease, color 100ms ease, box-shadow 100ms ease, opacity 100ms ease;
 }
 .workspace-header:hover .btn-ws-add,
 .btn-ws-add:focus {
@@ -937,7 +935,7 @@ button.pill:hover .pill-chip {
     margin: 2px 2px;
     border-radius: 3px;
     border: 1px solid transparent;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .tabrow:hover {
     background: #0f0f0f;
@@ -1002,7 +1000,7 @@ button.pill:hover .pill-chip {
     border: none;
     box-shadow: none;
     color: #727272;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .tab-close:hover {
     background: rgba(244, 63, 94, 0.18);
@@ -1021,7 +1019,7 @@ button.pill:hover .pill-chip {
     color: #727272;
     font-size: 11px;
     font-weight: 600;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .btn-new-workspace:hover {
     background: #131313;
@@ -1387,7 +1385,7 @@ button.btn-make-active {
     padding: 4px 10px;
     font-size: 11px;
     font-weight: 600;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 button.btn-make-active:hover {
     background: #ededed;
@@ -1430,7 +1428,7 @@ button.btn-del-profile:hover {
     padding: 8px 12px;
     color: #f4f4f4;
     font-size: 13px;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .profile-entry-box:focus {
     border-color: #ededed;
@@ -1451,7 +1449,7 @@ button.btn-create-profile {
     border: 1px solid #1d1d1d;
     border-radius: 3px;
     padding: 7px 18px;
-    transition: all 30ms ease;
+    transition: background-color 30ms ease, border-color 30ms ease, color 30ms ease, box-shadow 30ms ease, opacity 30ms ease;
 }
 button.btn-create-profile label {
     color: #727272;
@@ -1619,7 +1617,7 @@ button.color-choice.selected {
     font-size: 12px;
     font-weight: 600;
     padding: 5px 12px;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .btn-data-action:hover {
     background: #1d1d1d;
@@ -1634,7 +1632,7 @@ button.color-choice.selected {
     font-size: 12px;
     font-weight: 700;
     padding: 5px 14px;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .btn-data-primary:hover {
     background: #3d3d3d;
@@ -1750,7 +1748,7 @@ button.color-choice.selected {
     margin-bottom: 4px;
     font-size: 12.5px;
     font-weight: 500;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .settings-tab-btn:hover {
     background: #111111;
@@ -1804,7 +1802,7 @@ button.color-choice.selected {
     color: #d4d4d4;
     font-size: 12px;
     font-weight: 500;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .settings-option-item:hover {
     background: #131313;
@@ -1925,7 +1923,7 @@ button.color-choice.selected {
     border-radius: 8px;
     padding: 3px 10px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.85);
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .minimap-location-btn image {
     color: #ededed;
@@ -2021,7 +2019,7 @@ button.color-choice.selected {
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 11px;
     font-weight: 600;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 .devtools-tab-btn:hover {
     background: rgba(255, 255, 255, 0.05);
@@ -2206,6 +2204,170 @@ button.update-close:hover {
     background: rgba(255, 255, 255, 0.10);
     color: #ffffff;
 }
+/* ===== Rail visual polish layer (last on purpose; delete this block to revert) =====
+   One signature accent (sky, same as the start page dot) marks where you are: active row rail,
+   caret, load bar, selected suggestion. Everything else stays monochrome.
+   Surfaces: #000 canvas / #0a0a0a raised / #0e0e0e hover / #141414 active. Lines: #1a1a1a / #2a2a2a.
+   Radii: 4 chips, 6 controls, 8-10 panels. Transitions animate colors only; no blurred shadows on panes. */
+
+selection, entry selection, label selection, textview text selection {
+    background: rgba(56, 189, 248, 0.28);
+    color: #ffffff;
+}
+entry, text, textview text {
+    caret-color: #38bdf8;
+}
+button:focus-visible, modelbutton:focus-visible {
+    outline: 1px solid rgba(56, 189, 248, 0.7);
+    outline-offset: 1px;
+}
+
+tooltip.background {
+    background: #0e0e0e;
+    border: 1px solid #262626;
+    border-radius: 6px;
+    box-shadow: none;
+}
+tooltip.background label {
+    color: #e4e4e4;
+    font-size: 11.5px;
+    padding: 2px 4px;
+}
+popover.menu > contents {
+    background: #0a0a0a;
+    border: 1px solid #1f1f1f;
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+popover.menu modelbutton {
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 5px;
+    color: #d4d4d4;
+}
+popover.menu modelbutton label {
+    color: inherit;
+}
+popover.menu modelbutton:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+popover.menu modelbutton:disabled {
+    color: #535353;
+}
+popover.menu separator {
+    background: #1a1a1a;
+    min-height: 1px;
+    margin: 4px 2px;
+}
+
+.tab {
+    border: 1px solid #1a1a1a;
+    box-shadow: none;
+}
+.tab.focused {
+    border-color: #ededed;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.side-bar {
+    border-right: 1px solid #141414;
+}
+button.btn-add-tab, button.pill {
+    background: #0e0e0e;
+    border: 1px solid #1c1c1c;
+    border-radius: 6px;
+    box-shadow: none;
+}
+button.btn-add-tab:hover, button.pill:hover {
+    background: #151515;
+    border-color: #3a3a3a;
+    color: #ffffff;
+}
+button.flat-icon, button.side-footer-btn {
+    border-radius: 6px;
+}
+.pill-chip, .tab-index, .workspace-badge, .tab-close, .btn-ws-add {
+    border-radius: 4px;
+}
+.tab-index {
+    color: #6f6f6f;
+    background: #0c0c0c;
+    border-color: #1a1a1a;
+}
+
+.tabrow {
+    margin: 1px 4px;
+    padding: 6px 8px 6px 10px;
+    border-radius: 6px;
+    border-left: 2px solid transparent;
+}
+.tabrow:hover {
+    background: #0e0e0e;
+    border-color: #1c1c1c;
+}
+.tabrow.active-tab {
+    background: #121212;
+    border-color: #202020;
+    border-left: 2px solid #38bdf8;
+}
+.workspace-header {
+    margin: 10px 4px 3px 4px;
+    border-radius: 6px;
+    background: transparent;
+    border: 1px solid #141414;
+    border-left: 2px solid transparent;
+}
+.workspace-header:hover {
+    background: #0e0e0e;
+    border-color: #222222;
+}
+.workspace-header.active-workspace {
+    background: #101010;
+    border-color: #262626;
+    border-left: 2px solid #38bdf8;
+}
+
+.tab-title, .workspace-title, .palette-sug-title, button.pill label, button.side-footer-btn label {
+    font-family: 'Inter', 'Cantarell', 'Noto Sans', system-ui, sans-serif;
+}
+.tab-title {
+    font-size: 12.5px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+}
+.workspace-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+progressbar.load-bar progress {
+    background: #38bdf8;
+    box-shadow: none;
+}
+
+.palette {
+    background: #060606;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8);
+}
+.palette-sug-item {
+    border-radius: 6px;
+}
+.palette-sug-item:hover, .palette-sug-item.selected {
+    background: rgba(255, 255, 255, 0.07);
+}
+.palette-sug-item.selected {
+    box-shadow: inset 2px 0 0 #38bdf8;
+}
+.palette-sug-item:hover .palette-sug-icon, .palette-sug-item.selected .palette-sug-icon {
+    color: #38bdf8;
+}
+
 ";
 
 /// How far the strip zooms out in overview (niri uses a similar factor).
