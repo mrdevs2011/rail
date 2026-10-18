@@ -2205,10 +2205,26 @@ const OV_ZOOM: f64 = 0.4;
 const SUSPEND_AFTER_SECS: u64 = 120;
 const MAX_LIVE_TABS: usize = 4;
 
-/// Xotira yetarli bo'lganda: tab 30 daqiqa ko'rinmaguncha tirik turadi (Chrome kabi),
-/// 16 tagacha tirik tab. Uxlatish faqat haqiqiy zarurat bo'lganda.
-const ROOMY_SUSPEND_AFTER_SECS: u64 = 1800;
-const ROOMY_MAX_LIVE_TABS: usize = 16;
+/// Xotira yetarli bo'lganda: tab 15 daqiqa ko'rinmaguncha tirik turadi, 10 tagacha tirik tab
+/// (har tirik tab ~200 MB web process). Xotira bosimi oshsa, quyidagi pog'onalar ishga tushadi.
+const ROOMY_SUSPEND_AFTER_SECS: u64 = 900;
+const ROOMY_MAX_LIVE_TABS: usize = 10;
+
+/// O'rta pog'ona (xotira kamayganda yoki yengil bosim): 5 daqiqa, 6 ta tirik tab.
+const TIGHT_SUSPEND_AFTER_SECS: u64 = 300;
+const TIGHT_MAX_LIVE_TABS: usize = 6;
+
+/// Ko'rinmaydigan bo'sh (start page) tab hech narsa saqlamaydi — tez uxlatiladi va ~200 MB qaytaradi.
+const BLANK_TAB_SUSPEND_SECS: u64 = 30;
+
+/// Memory pressure from PSI (`/proc/pressure/memory`, "some avg10"): the percentage of the last 10 s in
+/// which tasks stalled waiting for memory. Unlike MemAvailable it reacts to real contention, like Chrome's
+/// Memory Saver. None when the kernel has no PSI.
+fn memory_pressure_avg10() -> Option<f64> {
+    let text = std::fs::read_to_string("/proc/pressure/memory").ok()?;
+    let line = text.lines().find(|l| l.starts_with("some"))?;
+    line.split_whitespace().find_map(|t| t.strip_prefix("avg10="))?.parse().ok()
+}
 
 /// MemAvailable (MiB) from /proc/meminfo.
 fn mem_available_mb() -> Option<u64> {
@@ -2223,9 +2239,12 @@ fn suspend_policy() -> (u64, usize) {
     if std::env::var_os("RAIL_LOW_MEM").is_some_and(|v| v != "0") {
         return (SUSPEND_AFTER_SECS, MAX_LIVE_TABS);
     }
+    let pressure = memory_pressure_avg10().unwrap_or(0.0);
     match mem_available_mb() {
         Some(m) if m < 1500 => (SUSPEND_AFTER_SECS, MAX_LIVE_TABS),
-        Some(m) if m < 3000 => (600, 8),
+        _ if pressure >= 10.0 => (SUSPEND_AFTER_SECS, MAX_LIVE_TABS),
+        Some(m) if m < 3000 => (TIGHT_SUSPEND_AFTER_SECS, TIGHT_MAX_LIVE_TABS),
+        _ if pressure >= 1.0 => (TIGHT_SUSPEND_AFTER_SECS, TIGHT_MAX_LIVE_TABS),
         _ => (ROOMY_SUSPEND_AFTER_SECS, ROOMY_MAX_LIVE_TABS),
     }
 }
@@ -5557,6 +5576,13 @@ impl App {
         ow > 40.0 && oh > 40.0
     }
 
+    /// Is this tab just showing the built-in start page (nothing worth keeping alive)?
+    fn is_blank_start_tab(tab: &Tab) -> bool {
+        let live = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
+        let uri = if live.is_empty() { tab.saved_uri.borrow().clone() } else { live };
+        uri.starts_with("rail://start")
+    }
+
     /// Suspend a live http(s) tab: freeze last frame, kill web process, free RAM.
     fn suspend_tab(tab: &Tab) {
         if tab.suspended.get() || tab.keep_alive.get() {
@@ -5616,7 +5642,8 @@ impl App {
                 if !in_overview && self.tab_is_visible(tab) {
                     continue;
                 }
-                if tab.last_active.get().elapsed() < Duration::from_secs(suspend_after) {
+                let after = if Self::is_blank_start_tab(tab) { suspend_after.min(BLANK_TAB_SUSPEND_SECS) } else { suspend_after };
+                if tab.last_active.get().elapsed() < Duration::from_secs(after) {
                     continue;
                 }
                 Self::suspend_tab(tab);
