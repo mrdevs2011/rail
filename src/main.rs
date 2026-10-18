@@ -784,6 +784,17 @@ scrollbar button {
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 12px 36px rgba(0, 0, 0, 0.7);
 }
 
+/* ---- stacked-tab vertical height splitter ---- */
+.tab-height-handle {
+    min-height: 6px;
+    background: transparent;
+    transition: background-color 120ms ease;
+}
+.tab-height-handle:hover,
+.tab-height-handle.active {
+    background: rgba(255, 255, 255, 0.18);
+}
+
 /* ---- interactive tab resize splitter handle ---- */
 .tab-resize-handle {
     min-width: 6px;
@@ -2278,8 +2289,12 @@ struct Tab {
     view: WebView,
     /// Oxirgi kadr (freeze) — uxlaganda skrinshot o'rnida turadi
     freeze: gtk::Picture,
+    /// Horizontal strip between stacked tabs — drag up/down to set height
+    height_handle: gtk::Box,
     profile_id: String,
     custom_width: Cell<Option<f64>>,
+    /// Height inside a stacked column (None = equal share)
+    custom_height: Cell<Option<f64>>,
     /// Consecutive tabs of a row with the same id share one column, stacked vertically (like niri)
     col_id: Cell<u64>,
     /// Oxirgi ma'lum http(s) manzil. WebKit web process to'xtatilganda uri() ni tozalab yuboradi,
@@ -3734,7 +3749,7 @@ impl App {
         self.ov.get()
     }
 
-    fn create_tab_widget(view: &WebView) -> (gtk::Box, gtk::Box, gtk::Picture) {
+    fn create_tab_widget(view: &WebView) -> (gtk::Box, gtk::Box, gtk::Box, gtk::Picture) {
         view.add_css_class("tab");
         view.set_overflow(gtk::Overflow::Hidden);
         view.set_vexpand(true);
@@ -3748,11 +3763,21 @@ impl App {
         freeze.set_vexpand(true);
         freeze.set_visible(false);
 
+        let height_handle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        height_handle.add_css_class("tab-height-handle");
+        height_handle.set_cursor_from_name(Some("row-resize"));
+        height_handle.set_valign(gtk::Align::End);
+        height_handle.set_halign(gtk::Align::Fill);
+        height_handle.set_hexpand(true);
+        height_handle.set_size_request(-1, 8);
+        height_handle.set_visible(false);
+
         let overlay = gtk::Overlay::new();
         overlay.set_hexpand(true);
         overlay.set_vexpand(true);
         overlay.set_child(Some(view));
         overlay.add_overlay(&freeze);
+        overlay.add_overlay(&height_handle);
 
         let container = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         container.add_css_class("rail-col");
@@ -3766,7 +3791,7 @@ impl App {
 
         container.append(&overlay);
         container.append(&resize_handle);
-        (container, resize_handle, freeze)
+        (container, resize_handle, height_handle, freeze)
     }
 
     fn set_tab_width(&self, r: usize, c: usize, width: f64) {
@@ -3813,16 +3838,26 @@ impl App {
         let rows = self.rows.borrow();
         let mut grid = Vec::new();
         let mut custom_widths = Vec::new();
+        let mut custom_heights = Vec::new();
         let mut col_ids = Vec::new();
         let mut prev: Option<gtk::Widget> = None;
         for row in rows.iter() {
             let mut row_grid = Vec::new();
             let mut row_widths = Vec::new();
+            let mut row_heights = Vec::new();
             let mut row_ids = Vec::new();
-            for tab in row.tabs.iter() {
+            for (ci, tab) in row.tabs.iter().enumerate() {
                 row_grid.push(tab.container.has_css_class("full"));
                 row_widths.push(tab.custom_width.get());
+                row_heights.push(tab.custom_height.get());
                 row_ids.push(tab.col_id.get());
+                // Height handle only between stacked neighbors
+                let has_below = row
+                    .tabs
+                    .get(ci + 1)
+                    .map(|t| t.col_id.get() == tab.col_id.get())
+                    .unwrap_or(false);
+                tab.height_handle.set_visible(has_below);
                 if tab.container.parent().as_ref() != Some(self.strip.upcast_ref()) {
                     self.strip.append(&tab.container);
                 }
@@ -3831,11 +3866,13 @@ impl App {
             }
             grid.push(row_grid);
             custom_widths.push(row_widths);
+            custom_heights.push(row_heights);
             col_ids.push(row_ids);
         }
         drop(rows);
         self.layout.set_grid(grid);
         self.layout.set_custom_widths(custom_widths);
+        self.layout.set_custom_heights(custom_heights);
         self.layout.set_col_ids(col_ids);
         self.strip.queue_allocate();
     }
@@ -5037,7 +5074,7 @@ impl App {
         });
     }
 
-    fn setup_tab_signals(self: &Rc<Self>, container: &gtk::Box, view: &WebView, resize_handle: &gtk::Box) {
+    fn setup_tab_signals(self: &Rc<Self>, container: &gtk::Box, view: &WebView, resize_handle: &gtk::Box, height_handle: &gtk::Box) {
         self.setup_view_signals(view);
 
         let app = self.clone();
@@ -5173,11 +5210,101 @@ impl App {
 
         resize_handle.add_controller(drag);
         resize_handle.add_controller(dbl_click);
+
+        // Vertical height splitter between stacked tabs (Alt+[ / ])
+        let hdrag = gtk::GestureDrag::new();
+        let app = self.clone();
+        let v = view.clone();
+        let hh = height_handle.clone();
+        let start_h0 = Rc::new(Cell::new(0.0f64));
+        let start_h1 = Rc::new(Cell::new(0.0f64));
+        let start_root_y = Rc::new(Cell::new(0.0f64));
+
+        hdrag.connect_drag_begin({
+            let app = app.clone();
+            let v = v.clone();
+            let hh = hh.clone();
+            let start_h0 = start_h0.clone();
+            let start_h1 = start_h1.clone();
+            let start_root_y = start_root_y.clone();
+            move |gesture, _, _| {
+                hh.add_css_class("active");
+                if let Some(ev) = gesture.current_event() {
+                    if let Some((_, ry)) = ev.position() {
+                        start_root_y.set(ry);
+                    }
+                }
+                if let Some((r, c)) = app.find_view_coords(&v) {
+                    let vh = app.strip.height() as f64;
+                    let rows = app.rows.borrow();
+                    let Some(row) = rows.get(r) else { return };
+                    let Some(next) = row.tabs.get(c + 1).filter(|t| t.col_id.get() == row.tabs[c].col_id.get()) else {
+                        return;
+                    };
+                    // Equal share baseline if unset
+                    let id = row.tabs[c].col_id.get();
+                    let k = row.tabs.iter().filter(|t| t.col_id.get() == id).count().max(1);
+                    let equal = stack_height(vh, k, gap(1.0));
+                    let h0 = row.tabs[c].custom_height.get().unwrap_or(equal);
+                    let h1 = next.custom_height.get().unwrap_or(equal);
+                    start_h0.set(h0);
+                    start_h1.set(h1);
+                }
+            }
+        });
+
+        hdrag.connect_drag_update({
+            let app = app.clone();
+            let v = v.clone();
+            let start_h0 = start_h0.clone();
+            let start_h1 = start_h1.clone();
+            let start_root_y = start_root_y.clone();
+            move |gesture, _ox, offset_y| {
+                let dy = if let Some(ev) = gesture.current_event() {
+                    if let Some((_, ry)) = ev.position() {
+                        ry - start_root_y.get()
+                    } else {
+                        offset_y
+                    }
+                } else {
+                    offset_y
+                };
+                if let Some((r, c)) = app.find_view_coords(&v) {
+                    let min_h = 80.0;
+                    let pair = start_h0.get() + start_h1.get();
+                    let new0 = (start_h0.get() + dy).clamp(min_h, (pair - min_h).max(min_h));
+                    let new1 = (pair - new0).max(min_h);
+                    app.set_tab_stack_height(r, c, new0);
+                    app.set_tab_stack_height(r, c + 1, new1);
+                }
+            }
+        });
+
+        hdrag.connect_drag_end({
+            let app = app.clone();
+            let hh = hh.clone();
+            move |_, _, _| {
+                hh.remove_css_class("active");
+                app.schedule_save_session();
+            }
+        });
+
+        height_handle.add_controller(hdrag);
+    }
+
+    fn set_tab_stack_height(&self, r: usize, c: usize, height: f64) {
+        let rows = self.rows.borrow();
+        if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) {
+            tab.custom_height.set(Some(height.max(80.0)));
+        }
+        drop(rows);
+        self.layout.set_tab_height(r, c, Some(height.max(80.0)));
+        self.strip.queue_allocate();
     }
 
     fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_row: bool) {
         view.set_can_target(!self.ov.get());
-        let (container, resize_handle, freeze) = Self::create_tab_widget(&view);
+        let (container, resize_handle, height_handle, freeze) = Self::create_tab_widget(&view);
 
         let (target_r, target_c) = {
             let mut rows = self.rows.borrow_mut();
@@ -5190,7 +5317,7 @@ impl App {
                 while rows.len() <= next_r {
                     rows.push(Row { tabs: Vec::new() });
                 }
-                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), profile_id, custom_width: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), height_handle: height_handle.clone(), profile_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
                 let c_idx = rows[next_r].tabs.len() - 1;
                 (next_r, c_idx)
             } else {
@@ -5202,12 +5329,12 @@ impl App {
                     // a new tab opens in a column of its own, right after the focused column
                     rows[cur_r].col_span(cur_c.min(rows[cur_r].tabs.len() - 1)).1
                 };
-                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), profile_id, custom_width: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), height_handle: height_handle.clone(), profile_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
                 (cur_r, col_idx)
             }
         };
 
-        self.setup_tab_signals(&container, &view, &resize_handle);
+        self.setup_tab_signals(&container, &view, &resize_handle, &height_handle);
         self.sync_strip();
         self.focus_coords(target_r, target_c);
     }
@@ -6007,11 +6134,11 @@ impl App {
             let view = Self::create_web_view(&session, &prof_id);
             view.load_html(&start_page(), Some("rail://start/"));
             view.set_can_target(!self.ov.get());
-            let (container, resize_handle, freeze) = Self::create_tab_widget(&view);
-            self.setup_tab_signals(&container, &view, &resize_handle);
+            let (container, resize_handle, height_handle, freeze) = Self::create_tab_widget(&view);
+            self.setup_tab_signals(&container, &view, &resize_handle, &height_handle);
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, freeze, profile_id: prof_id, custom_width: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+            rows[0].tabs.push(Tab { container, view, freeze, height_handle, profile_id: prof_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
             drop(rows);
         } else if cur_row_empty && cur_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -6054,11 +6181,11 @@ impl App {
             let view = Self::create_web_view(&session, &prof_id);
             view.load_html(&start_page(), Some("rail://start/"));
             view.set_can_target(!self.ov.get());
-            let (container, resize_handle, freeze) = Self::create_tab_widget(&view);
-            self.setup_tab_signals(&container, &view, &resize_handle);
+            let (container, resize_handle, height_handle, freeze) = Self::create_tab_widget(&view);
+            self.setup_tab_signals(&container, &view, &resize_handle, &height_handle);
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, freeze, profile_id: prof_id, custom_width: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+            rows[0].tabs.push(Tab { container, view, freeze, height_handle, profile_id: prof_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
             drop(rows);
         } else if cur_row_empty && from_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -6278,12 +6405,12 @@ impl App {
             } else {
                 view.load_uri(&item.url);
             }
-            let (container, resize_handle, freeze) = Self::create_tab_widget(&view);
+            let (container, resize_handle, height_handle, freeze) = Self::create_tab_widget(&view);
             if !item.full {
                 container.remove_css_class("full");
             }
-            self.setup_tab_signals(&container, &view, &resize_handle);
-            loaded_tabs.push((item.row, Tab { container, view, freeze, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(if item.url.starts_with("http") { item.url.clone() } else { String::new() }), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) }));
+            self.setup_tab_signals(&container, &view, &resize_handle, &height_handle);
+            loaded_tabs.push((item.row, Tab { container, view, freeze, height_handle, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(if item.url.starts_with("http") { item.url.clone() } else { String::new() }), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) }));
         }
 
         let mut rows = self.rows.borrow_mut();

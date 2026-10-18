@@ -89,6 +89,8 @@ mod imp {
         pub current_grid: RefCell<Vec<Vec<f64>>>,
         /// Custom widths per column in each row
         pub custom_widths: RefCell<Vec<Vec<Option<f64>>>>,
+        /// Custom heights per tab (stack splits); None = equal share
+        pub custom_heights: RefCell<Vec<Vec<Option<f64>>>>,
         /// Per row: column id of every tab. Consecutive equal ids are stacked in one column.
         pub col_ids: RefCell<Vec<Vec<u64>>>,
     }
@@ -121,6 +123,7 @@ mod imp {
             let grid = self.grid.borrow();
             let cur_prog = self.current_grid.borrow();
             let c_widths = self.custom_widths.borrow();
+            let c_heights = self.custom_heights.borrow();
             let mut child = widget.first_child();
 
             if grid.is_empty() {
@@ -158,16 +161,40 @@ mod imp {
                             .unwrap_or(if is_full { 1.0 } else { 0.0 });
                         col_width_animated(prog, vw)
                     };
-                    let h = stack_height(vh, len, g);
+                    // Per-tab heights inside a stacked column (drag-resizable)
+                    let equal_h = stack_height(vh, len, g);
+                    let mut hs: Vec<f64> = (0..len)
+                        .map(|j| {
+                            c_heights
+                                .get(r_idx)
+                                .and_then(|r| r.get(start + j))
+                                .copied()
+                                .flatten()
+                                .unwrap_or(equal_h)
+                        })
+                        .collect();
+                    if len > 1 {
+                        let target = (vh - (len as f64 - 1.0) * g).max(80.0 * len as f64);
+                        let sum: f64 = hs.iter().sum();
+                        if sum > 1.0 && (sum - target).abs() > 0.5 {
+                            let scale = target / sum;
+                            for h in &mut hs {
+                                *h = (*h * scale).max(80.0);
+                            }
+                        }
+                    }
+                    let mut y_off = 0.0f64;
                     for j in 0..len {
                         let Some(c) = child else { break };
+                        let ch_f = if len == 1 { vh } else { hs[j] };
                         let tx = ((col_x - off_x) * z) as f32;
-                        let ty = ((row_y + j as f64 * (h + g) - off_y) * z) as f32;
+                        let ty = ((row_y + y_off - off_y) * z) as f32;
                         let t = gsk::Transform::new()
                             .translate(&graphene::Point::new(tx, ty))
                             .scale(z as f32, z as f32);
-                        let ch = if len == 1 { height } else { h.round() as i32 };
+                        let ch = if len == 1 { height } else { ch_f.round() as i32 };
                         c.allocate(cw.round() as i32, ch, -1, Some(t));
+                        y_off += ch_f + g;
                         child = c.next_sibling();
                     }
                     col_x += cw + g;
@@ -228,6 +255,20 @@ impl StripLayout {
     }
     pub fn set_custom_widths(&self, widths: Vec<Vec<Option<f64>>>) {
         *self.imp().custom_widths.borrow_mut() = widths;
+    }
+    pub fn set_custom_heights(&self, heights: Vec<Vec<Option<f64>>>) {
+        *self.imp().custom_heights.borrow_mut() = heights;
+    }
+    pub fn set_tab_height(&self, r_idx: usize, c_idx: usize, height: Option<f64>) {
+        let imp = self.imp();
+        let mut heights = imp.custom_heights.borrow_mut();
+        while heights.len() <= r_idx {
+            heights.push(Vec::new());
+        }
+        while heights[r_idx].len() <= c_idx {
+            heights[r_idx].push(None);
+        }
+        heights[r_idx][c_idx] = height;
     }
     pub fn set_column_width(&self, r_idx: usize, c_idx: usize, width: Option<f64>) {
         let imp = self.imp();
