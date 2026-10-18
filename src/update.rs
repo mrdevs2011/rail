@@ -284,10 +284,13 @@ pub fn build_card(win: &gtk::ApplicationWindow) -> gtk::Revealer {
     rev.set_margin_end(16);
     rev.set_margin_bottom(16);
     rev.set_reveal_child(false);
+    // Keep pointer events on the card so the page underneath is not clicked
+    rev.set_can_target(true);
 
     let card = gtk::Box::new(gtk::Orientation::Vertical, 4);
     card.add_css_class("update-card");
     card.set_size_request(270, -1);
+    card.set_can_target(true);
 
     let top = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     let kicker = gtk::Label::new(Some(tr("UPDATE AVAILABLE")));

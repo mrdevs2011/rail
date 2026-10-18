@@ -797,6 +797,10 @@ scrollbar button {
 }
 
 /* ---- overview (the live strip, zoomed out in 2D) ---- */
+/* Pure black canvas behind zoomed tabs */
+.zoomed {
+    background: #000000;
+}
 .zoomed .tab {
     opacity: 0.88;
     border-radius: 6px;
@@ -811,14 +815,12 @@ scrollbar button {
     box-shadow: 0 0 24px rgba(255, 255, 255, 0.05);
 }
 .ov-hint {
-    background: #0d0d0d;
-    color: #d4d4d4;
-    border: 1px solid #2c2c2c;
-    border-radius: 3px;
-    padding: 7px 16px;
-    font-size: 11.5px;
-    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
 }
 
 /* ---- sidebar (Modern Obsidian Acrylic) ---- */
@@ -2241,15 +2243,22 @@ button.update-close {
     background-image: none;
     border: none;
     box-shadow: none;
-    color: #8a8a8a;
-    opacity: 0.35;
-    min-height: 0;
-    min-width: 0;
+    color: #cfcfcf;
+    opacity: 0;
+    min-width: 28px;
+    min-height: 28px;
     padding: 0 6px;
+    border-radius: 3px;
+    transition: opacity 120ms ease, background 120ms ease;
+}
+.update-card:hover button.update-close,
+button.update-close:hover,
+button.update-close:focus {
+    opacity: 0.95;
 }
 button.update-close:hover {
-    opacity: 0.9;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.10);
+    color: #ffffff;
 }
 ";
 
@@ -2499,6 +2508,7 @@ struct App {
     touchpad_toast_state: gtk::Label,
     touchpad_toast_sub: gtk::Label,
     touchpad_toast_gen: Cell<u32>,
+    touchpad_toast_hover: Cell<bool>,
     /// Cached: can the focused page scroll (either axis)? Touchpad slide yields to the page then.
     page_scrollable: Cell<bool>,
     last_saved_session: RefCell<String>,
@@ -5742,6 +5752,7 @@ impl App {
     }
 
     /// Bottom-right card (same style as the update card) announcing Touchpad Slide ON / OFF.
+    /// Hover freezes auto-dismiss; leave resumes a fresh timeout. Clicks stay on the card.
     fn show_touchpad_toast(self: &Rc<Self>, enabled: bool) {
         if enabled {
             self.touchpad_toast_state.set_markup(&format!("<span foreground='#fafafa'>{}</span>", tr("ON")));
@@ -5752,12 +5763,21 @@ impl App {
         }
         let token = self.touchpad_toast_gen.get().wrapping_add(1);
         self.touchpad_toast_gen.set(token);
+        self.touchpad_toast_hover.set(false);
         self.touchpad_toast.set_reveal_child(true);
+        self.schedule_touchpad_toast_hide(token);
+    }
+
+    fn schedule_touchpad_toast_hide(self: &Rc<Self>, token: u32) {
         let app = self.clone();
         glib::timeout_add_local_once(std::time::Duration::from_millis(2200), move || {
-            if app.touchpad_toast_gen.get() == token {
-                app.touchpad_toast.set_reveal_child(false);
+            if app.touchpad_toast_gen.get() != token {
+                return;
             }
+            if app.touchpad_toast_hover.get() {
+                return; // frozen while hovered
+            }
+            app.touchpad_toast.set_reveal_child(false);
         });
     }
 
@@ -8058,7 +8078,8 @@ impl App {
         self.ov_saved_x.set(self.target_x.get());
         self.ov_saved_y.set(self.target_y.get());
         self.strip.add_css_class("zoomed");
-        self.ov_hint.set_visible(true);
+        self.shell.add_css_class("zoomed");
+        self.ov_hint.set_visible(false);
         for row in self.rows.borrow().iter() {
             for t in row.tabs.iter() {
                 t.view.set_can_target(false);
@@ -8074,6 +8095,7 @@ impl App {
         }
         self.ov.set(false);
         self.strip.remove_css_class("zoomed");
+        self.shell.remove_css_class("zoomed");
         self.ov_hint.set_visible(false);
         for row in self.rows.borrow().iter() {
             for t in row.tabs.iter() {
@@ -10014,14 +10036,25 @@ fn build(gapp: &gtk::Application) {
     touchpad_toast.set_valign(gtk::Align::End);
     touchpad_toast.set_margin_end(16);
     touchpad_toast.set_margin_bottom(16);
-    touchpad_toast.set_can_target(false);
+    // Absorb clicks so the page behind is not activated
+    touchpad_toast.set_can_target(true);
     touchpad_toast.set_reveal_child(false);
     let tp_card = gtk::Box::new(gtk::Orientation::Vertical, 4);
     tp_card.add_css_class("update-card");
     tp_card.set_size_request(270, -1);
+    tp_card.set_can_target(true);
+    let tp_top = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     let tp_kicker = gtk::Label::new(Some(tr("TOUCHPAD SLIDE")));
     tp_kicker.add_css_class("update-kicker");
     tp_kicker.set_xalign(0.0);
+    tp_kicker.set_hexpand(true);
+    let tp_close = gtk::Button::with_label("\u{00d7}");
+    tp_close.add_css_class("update-close");
+    tp_close.set_tooltip_text(Some(tr("Dismiss")));
+    tp_close.set_halign(gtk::Align::End);
+    tp_close.set_valign(gtk::Align::Start);
+    tp_top.append(&tp_kicker);
+    tp_top.append(&tp_close);
     let touchpad_toast_state = gtk::Label::new(None);
     touchpad_toast_state.add_css_class("update-ver");
     touchpad_toast_state.set_xalign(0.0);
@@ -10029,7 +10062,7 @@ fn build(gapp: &gtk::Application) {
     touchpad_toast_sub.add_css_class("update-sub");
     touchpad_toast_sub.set_xalign(0.0);
     touchpad_toast_sub.set_wrap(true);
-    tp_card.append(&tp_kicker);
+    tp_card.append(&tp_top);
     tp_card.append(&touchpad_toast_state);
     tp_card.append(&touchpad_toast_sub);
     touchpad_toast.set_child(Some(&tp_card));
@@ -10106,6 +10139,7 @@ fn build(gapp: &gtk::Application) {
         touchpad_toast_state,
         touchpad_toast_sub,
         touchpad_toast_gen: Cell::new(0),
+        touchpad_toast_hover: Cell::new(false),
         page_scrollable: Cell::new(false),
         last_saved_session: RefCell::new(String::new()),
         save_session_gen: Cell::new(0),
@@ -10606,6 +10640,29 @@ fn build(gapp: &gtk::Application) {
     {
         let a = app.clone();
         footer_downloads.connect_clicked(move |_| a.open_downloads());
+    }
+
+    // Notification card: X dismiss + hover freeze (clicks do not pass through)
+    {
+        let a = app.clone();
+        tp_close.connect_clicked(move |_| {
+            a.touchpad_toast.set_reveal_child(false);
+        });
+    }
+    {
+        let motion = gtk::EventControllerMotion::new();
+        let a_enter = app.clone();
+        motion.connect_enter(move |_, _, _| {
+            a_enter.touchpad_toast_hover.set(true);
+        });
+        let a_leave = app.clone();
+        motion.connect_leave(move |_| {
+            a_leave.touchpad_toast_hover.set(false);
+            let token = a_leave.touchpad_toast_gen.get();
+            a_leave.schedule_touchpad_toast_hide(token);
+        });
+        // controller on the revealer so the whole card area counts
+        app.touchpad_toast.add_controller(motion);
     }
     let a = app.clone();
     pill.connect_clicked(move |_| a.show_palette());
