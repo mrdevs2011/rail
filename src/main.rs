@@ -226,82 +226,13 @@ fn save_css_editor(buffer: &gtk::TextBuffer, btn: &gtk::Button) {
     glib::timeout_add_local_once(Duration::from_millis(1500), move || b.set_label(tr("Save")));
 }
 
-const START_PAGE: &str = r##"<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark">
-<title>Rail Browser</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-:root { --bg: #000000; --fg: #ededed; --dim: #525252; --line-hi: #3a3a3a; --acc: #38bdf8; --panel: #0c0c0c; }
-body {
-  min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  background: var(--bg);
-  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', ui-monospace, monospace;
-  user-select: none; padding: 0 20px;
-}
-.container { width: 100%; max-width: 580px; display: flex; flex-direction: column; align-items: flex-start; gap: 28px; animation: fadeIn 160ms ease-out; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.brand-title { font-size: 46px; font-weight: 700; letter-spacing: -0.05em; color: var(--fg); line-height: 1; }
-.brand-title .dot { color: var(--acc); }
-.brand-subtitle { margin-top: 10px; font-size: 12px; color: var(--dim); }
-.brand-subtitle::before { content: '// '; color: var(--line-hi); }
-.search-wrapper { position: relative; width: 100%; }
-.search-bar {
-  width: 100%;
-  background: var(--panel);
-  border: 1px solid var(--line-hi);
-  border-radius: 6px;
-  padding: 14px 16px;
-  font: inherit;
-  font-size: 15px;
-  color: var(--fg);
-  caret-color: var(--acc);
-  outline: none;
-}
-.search-bar:focus { border-color: var(--fg); }
-.search-bar::placeholder { color: var(--dim); }
-.search-hint { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--dim); pointer-events: none; }
-</style>
-</head>
-<body>
-<div class="container">
-  <div class="brand-area">
-    <div class="brand-title">rail<span class="dot">.</span></div>
-    <div class="brand-subtitle">keyboard-first browser for developers</div>
-  </div>
-  <div class="search-wrapper">
-    <input id="q" class="search-bar" type="text" placeholder="search or enter url" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus>
-    <span class="search-hint">Ctrl+L</span>
-  </div>
-</div>
-<script>
-(function () {
-  var i = document.getElementById('q');
-  function go() {
-    var v = i.value.trim();
-    if (!v) return;
-    try { window.webkit.messageHandlers.railgo.postMessage(v); } catch (e) {}
-  }
-  i.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); go(); }
-    else if (e.key === 'Escape') { i.value = ''; i.blur(); }
-  });
-  window.addEventListener('load', function () { i.focus(); });
-})();
-</script>
-</body>
-</html>"##;
+const START_PAGE: &str = include_str!("start_page.html");
 
 /// Boshlang'ich sahifa: til, sarlavha, tavsif va qidiruv placeholder joriy tilga o'giriladi.
 fn start_page() -> String {
     START_PAGE
         .replacen("<html lang=\"en\">", &format!("<html lang=\"{}\">", i18n::current().code()), 1)
         .replacen("keyboard-first browser for developers", tr("keyboard-first browser for developers"), 1)
-        .replacen("placeholder=\"search or enter url\"", &format!("placeholder=\"{}\"", tr("search or enter url")), 1)
-        .replacen("<span class=\"search-hint\">Ctrl+L</span>", &format!("<span class=\"search-hint\">{}</span>", glib::markup_escape_text(&sc_display("focus_url"))), 1)
 }
 
 #[derive(Clone, Debug)]
@@ -7285,31 +7216,128 @@ impl App {
         v.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
     }
 
-    /// Enter pressed in the welcome page's own search input.
-    fn on_start_search(self: &Rc<Self>, view: &WebView, text: &str) {
-        // Only the real start page may drive navigation (the handler exists in every page).
-        let mut u = view.uri().map(|s| s.to_string()).unwrap_or_default();
-        if u.is_empty() || u.starts_with("about:") {
-            u = self.saved_uri_of(view);
-        }
-        if !u.starts_with("rail://start") || text.trim().is_empty() {
-            return;
-        }
-        if self.focused_view().as_ref() != Some(view) {
-            return;
-        }
+    fn start_eval(view: &WebView, js: &str) {
+        view.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+    }
+
+    /// Everything the in-page omnibar needs: engine icon, placeholder, hints, profiles.
+    fn start_state_json(&self, view: &WebView) -> String {
+        use minijson::escape as e;
+        let mgr = self.profiles.borrow();
         let tab_prof = self
             .rows
             .borrow()
             .iter()
             .flat_map(|r| r.tabs.iter())
             .find(|t| &t.view == view)
-            .map(|t| t.profile_id.clone());
-        if let Some(p) = tab_prof {
-            self.select_palette_profile(&p);
+            .map(|t| t.profile_id.clone())
+            .unwrap_or_else(|| mgr.active_id().to_string());
+        let profs: Vec<String> = mgr
+            .profiles()
+            .iter()
+            .map(|p| {
+                format!(
+                    "{{\"id\":\"{}\",\"name\":\"{}\",\"persona\":\"{}\",\"letter\":\"{}\",\"bg\":\"{}\",\"fg\":\"{}\"}}",
+                    e(&p.id),
+                    e(&p.display_name()),
+                    e(&ProfilePersona::for_id(&p.id).summary()),
+                    e(&p.initial_letter()),
+                    p.hex_color(),
+                    p.text_color()
+                )
+            })
+            .collect();
+        format!(
+            "{{\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}]}}",
+            e(tr("Search Google or enter web address...")),
+            e(GOOGLE_G_SVG),
+            e(&sc_apply(tr("Enter  go      Esc  cancel      Alt+P  profiles"), &["profiles"])),
+            e(tr("Select Profile")),
+            e(&sc_apply(tr("Manage Profiles in Settings (Alt+P)"), &["profiles"])),
+            e(tr("History")),
+            e(tr("Top")),
+            e(tr("Search")),
+            e(&tab_prof),
+            profs.join(",")
+        )
+    }
+
+    fn push_start_state(&self, view: &WebView) {
+        let js = format!("window.railState&&window.railState({})", self.start_state_json(view));
+        Self::start_eval(view, &js);
+    }
+
+    /// Alt+P on the welcome page: toggle the in-page profile menu.
+    fn toggle_welcome_profiles(&self) {
+        if let Some(v) = self.focused_view() {
+            Self::start_eval(&v, "window.railToggleProfiles&&window.railToggleProfiles()");
         }
-        self.palette_for_new_tab.set(false);
-        self.navigate(text);
+    }
+
+    /// Messages from the welcome page's own omnibar (see start_page.html):
+    /// `init`, `q\t<text>` (suggestions), `go\t<profile>\t<text>`, `manage`.
+    fn on_start_search(self: &Rc<Self>, view: &WebView, msg: &str) {
+        // Only the real start page may talk to us (the handler exists in every page).
+        let mut u = view.uri().map(|s| s.to_string()).unwrap_or_default();
+        if u.is_empty() || u.starts_with("about:") {
+            u = self.saved_uri_of(view);
+        }
+        if !u.starts_with("rail://start") {
+            return;
+        }
+        let (kind, rest) = msg.split_once('\t').unwrap_or((msg, ""));
+        match kind {
+            "init" => self.push_start_state(view),
+            "q" => {
+                use minijson::escape as e;
+                let sugs = self.history.borrow().suggest(rest);
+                let items: Vec<String> = sugs
+                    .iter()
+                    .map(|s| {
+                        let k = match s.kind {
+                            SuggestionKind::History => 0,
+                            SuggestionKind::Popular => 1,
+                            SuggestionKind::Search => 2,
+                        };
+                        format!(
+                            "{{\"title\":\"{}\",\"url\":\"{}\",\"target\":\"{}\",\"autofill\":\"{}\",\"kind\":{}}}",
+                            e(&s.display_title),
+                            e(&s.display_url),
+                            e(&s.target_url),
+                            e(&s.autofill_text),
+                            k
+                        )
+                    })
+                    .collect();
+                let js = format!("window.railSugg&&window.railSugg(\"{}\",[{}])", e(rest), items.join(","));
+                Self::start_eval(view, &js);
+            }
+            "go" => {
+                let (pid, text) = rest.split_once('\t').unwrap_or(("", ""));
+                if text.trim().is_empty() || self.focused_view().as_ref() != Some(view) {
+                    return;
+                }
+                let tab_prof = self
+                    .rows
+                    .borrow()
+                    .iter()
+                    .flat_map(|r| r.tabs.iter())
+                    .find(|t| &t.view == view)
+                    .map(|t| t.profile_id.clone());
+                let chosen = if !pid.is_empty() && self.profiles.borrow().get_profile(pid).is_some() {
+                    Some(pid.to_string())
+                } else {
+                    tab_prof
+                };
+                if let Some(p) = chosen {
+                    self.select_palette_profile(&p);
+                }
+                self.palette_for_new_tab.set(false);
+                self.navigate(text);
+            }
+            "manage" => self.open_settings_tab(SettingsTab::Profiles),
+            _ => {}
+        }
     }
 
     /// Focused tab is the welcome / start page (rail://start).
@@ -7334,6 +7362,9 @@ impl App {
                 self.hide_palette();
             }
             self.focus_welcome_input(false);
+            if let Some(v) = self.focused_view() {
+                self.push_start_state(&v);
+            }
         } else if self.welcome_palette.get() && self.palette_open() {
             self.hide_palette();
         }
@@ -9356,7 +9387,9 @@ impl App {
                     return true;
                 }
                 gdk::Key::p | gdk::Key::P => {
-                    if self.palette_open() {
+                    if self.focused_is_welcome() && !self.settings_modal_open() {
+                        self.toggle_welcome_profiles();
+                    } else if self.palette_open() {
                         if self.profile_popover.is_visible() {
                             self.profile_popover.popdown();
                         } else {
