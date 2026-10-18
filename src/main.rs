@@ -235,19 +235,34 @@ const START_PAGE: &str = r##"<!doctype html>
 <title>Rail Browser</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-:root { --bg: #000000; --fg: #ededed; --dim: #525252; --line-hi: #3a3a3a; --acc: #38bdf8; }
+:root { --bg: #000000; --fg: #ededed; --dim: #525252; --line-hi: #3a3a3a; --acc: #38bdf8; --panel: #0c0c0c; }
 body {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
   background: var(--bg);
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', ui-monospace, monospace;
-  user-select: none; padding: 0 20px 140px;
+  user-select: none; padding: 0 20px;
 }
-.container { width: 100%; max-width: 580px; display: flex; flex-direction: column; align-items: flex-start; animation: fadeIn 160ms ease-out; }
+.container { width: 100%; max-width: 580px; display: flex; flex-direction: column; align-items: flex-start; gap: 28px; animation: fadeIn 160ms ease-out; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .brand-title { font-size: 46px; font-weight: 700; letter-spacing: -0.05em; color: var(--fg); line-height: 1; }
 .brand-title .dot { color: var(--acc); }
 .brand-subtitle { margin-top: 10px; font-size: 12px; color: var(--dim); }
 .brand-subtitle::before { content: '// '; color: var(--line-hi); }
+.search-wrapper { position: relative; width: 100%; }
+.search-bar {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line-hi);
+  border-radius: 6px;
+  padding: 14px 16px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--fg);
+  caret-color: var(--acc);
+  outline: none;
+}
+.search-bar:focus { border-color: var(--fg); }
+.search-bar::placeholder { color: var(--dim); }
 </style>
 </head>
 <body>
@@ -256,7 +271,24 @@ body {
     <div class="brand-title">rail<span class="dot">.</span></div>
     <div class="brand-subtitle">keyboard-first browser for developers</div>
   </div>
+  <div class="search-wrapper">
+    <input id="q" type="text" class="search-bar" placeholder="search or enter url" autocomplete="off" spellcheck="false" autofocus>
+  </div>
 </div>
+<script>
+document.getElementById('q').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    var q = this.value.trim();
+    if (!q) return;
+    if (q.indexOf('://') !== -1 || (q.indexOf('.') !== -1 && q.indexOf(' ') === -1)) {
+      location.href = q.indexOf('://') === -1 ? 'https://' + q : q;
+    } else {
+      location.href = 'https://www.google.com/search?q=' + encodeURIComponent(q);
+    }
+  }
+});
+</script>
 </body>
 </html>"##;
 
@@ -4252,12 +4284,8 @@ impl App {
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view.clone(), prof_id.clone(), false);
         self.set_view_saved_uri(&view, "rail://start/");
-        self.select_palette_profile(&prof_id);
-        self.show_palette();
-        // Welcome: never prefill rail://start/
-        self.entry.set_text("");
-        self.last_entry_len.set(0);
-        self.entry.grab_focus();
+        // Welcome page has its own fixed search input — do not show floating palette
+        self.hide_palette();
     }
 
     fn split_vertical(self: &Rc<Self>) {
@@ -5099,6 +5127,16 @@ impl App {
             // Freeze faqat yuklash tugagach ochiladi (uxlagan tab uyg'onganda)
             if !v.is_loading() {
                 app.clear_tab_freeze(v);
+                // Mark as no longer suspended once content is back
+                if let Ok(rows) = app.rows.try_borrow() {
+                    for row in rows.iter() {
+                        for tab in &row.tabs {
+                            if &tab.view == v {
+                                tab.suspended.set(false);
+                            }
+                        }
+                    }
+                }
             }
         });
         let app = self.clone();
@@ -5120,9 +5158,15 @@ impl App {
             // Only the focused tab auto-reloads so the user keeps browsing.
             if app_term.focused_view().as_ref() == Some(v) {
                 let saved = app_term.saved_uri_of(v);
-                if saved.is_empty() {
-                    // http(s) tabda saved doim bor; bo'sh bo'lsa bu start sahifa
+                if saved.is_empty() || saved.starts_with("rail://start") {
                     v.load_html(&start_page(), Some("rail://start/"));
+                } else if saved.starts_with("rail://settings") {
+                    v.load_html(&settings_shell_page(), Some(&saved));
+                    // Re-attach settings chrome
+                    app_term.sync_settings_chrome();
+                } else if saved.starts_with("rail://downloads") {
+                    // Downloads is pure HTML; reload via the internal loader if available
+                    v.load_html(&start_page(), Some("rail://downloads"));
                 } else {
                     v.load_uri(&saved);
                 }
