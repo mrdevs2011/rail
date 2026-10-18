@@ -271,24 +271,7 @@ body {
     <div class="brand-title">rail<span class="dot">.</span></div>
     <div class="brand-subtitle">keyboard-first browser for developers</div>
   </div>
-  <div class="search-wrapper">
-    <input id="q" type="text" class="search-bar" placeholder="search or enter url" autocomplete="off" spellcheck="false" autofocus>
-  </div>
 </div>
-<script>
-document.getElementById('q').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    var q = this.value.trim();
-    if (!q) return;
-    if (q.indexOf('://') !== -1 || (q.indexOf('.') !== -1 && q.indexOf(' ') === -1)) {
-      location.href = q.indexOf('://') === -1 ? 'https://' + q : q;
-    } else {
-      location.href = 'https://www.google.com/search?q=' + encodeURIComponent(q);
-    }
-  }
-});
-</script>
 </body>
 </html>"##;
 
@@ -4284,8 +4267,12 @@ impl App {
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view.clone(), prof_id.clone(), false);
         self.set_view_saved_uri(&view, "rail://start/");
-        // Welcome page has its own fixed search input — do not show floating palette
-        self.hide_palette();
+        // Show the omnibar fixed under the brand on the welcome page
+        self.select_palette_profile(&prof_id);
+        self.show_palette();
+        self.entry.set_text("");
+        self.last_entry_len.set(0);
+        self.entry.grab_focus();
     }
 
     fn split_vertical(self: &Rc<Self>) {
@@ -7110,11 +7097,10 @@ impl App {
         let win_w = self.win.width().max(1);
         let target_w = 580.min(win_w.saturating_sub(32));
         self.palette.set_size_request(target_w, -1);
-        // Completely fixed under the welcome brand
-        // Brand is centered but shifted up by the 140px bottom padding on the start page
+        // Fixed on the welcome page, directly under the rail. brand
         let win_h = self.win.height().max(1);
-        let brand_center_offset = 70.0; // approximate half of bottom padding
-        let target_top = ((win_h as f64 * 0.5) - brand_center_offset + 90.0).round().clamp(60.0, 320.0) as i32;
+        // Place it so it sits under the brand like a page element, not floating freely
+        let target_top = ((win_h as f64) * 0.42).round().clamp(100.0, 260.0) as i32;
         self.palette.set_margin_top(target_top);
     }
 
