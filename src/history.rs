@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread::JoinHandle;
 
 pub const POPULAR_DOMAINS: &[(&str, &str)] = &[
     ("google.com", "Google Search"),
@@ -34,6 +36,101 @@ pub struct HistoryEntry {
     pub title: String,
     pub visit_count: u32,
     pub last_visit: i64,
+    // Lower-cased / derived forms, computed once when the entry is created or its title changes, so
+    // `suggest()` (runs on every keystroke in the omnibar) does no per-entry allocation or lower-casing.
+    url_lower: String,
+    domain: String,
+    title_lower: String,
+}
+
+impl HistoryEntry {
+    fn new(url: String, title: String, visit_count: u32, last_visit: i64) -> Self {
+        let url_lower = url.to_lowercase();
+        let domain = extract_clean_domain(&url_lower);
+        let title_lower = title.to_lowercase();
+        Self { url, title, visit_count, last_visit, url_lower, domain, title_lower }
+    }
+    fn set_title(&mut self, title: &str) {
+        self.title = title.to_string();
+        self.title_lower = self.title.to_lowercase();
+    }
+}
+
+/// One serialized-on-the-writer-thread history row: (url, title, visit_count, last_visit).
+type Row = (String, String, u32, i64);
+
+/// Background history writer. The UI thread only clones a snapshot and sends it; sorting, formatting and the
+/// (atomic tmp + rename) file write happen on this thread. Newer snapshots replace queued older ones.
+/// The mutex holds the "epoch": `clear()` bumps it under the lock so a stale queued snapshot can never
+/// resurrect cleared history.
+struct DiskWriter {
+    tx: Option<mpsc::Sender<(u64, Vec<Row>)>>,
+    handle: Option<JoinHandle<()>>,
+    epoch: Arc<Mutex<u64>>,
+}
+
+fn write_rows(path: &PathBuf, mut rows: Vec<Row>) {
+    // Keep most recently and frequently visited entries, limit to 2000
+    rows.sort_by(|a, b| {
+        let score_b = (b.2 as i64 * 3600) + (b.3 / 1_000_000);
+        let score_a = (a.2 as i64 * 3600) + (a.3 / 1_000_000);
+        score_b.cmp(&score_a)
+    });
+    let mut out = String::new();
+    for (url, title, count, last) in rows.into_iter().take(2000) {
+        let clean_title = title.replace('\t', " ").replace('\n', " ");
+        out.push_str(&format!("{}\t{}\t{}\t{}\n", url, clean_title, count, last));
+    }
+    let tmp = path.with_extension("txt.tmp");
+    if fs::write(&tmp, &out).is_ok() {
+        if fs::rename(&tmp, path).is_err() {
+            let _ = fs::write(path, &out);
+        }
+    } else {
+        let _ = fs::write(path, &out);
+    }
+}
+
+impl DiskWriter {
+    fn spawn(path: PathBuf) -> Self {
+        let epoch = Arc::new(Mutex::new(0u64));
+        let (tx, rx) = mpsc::channel::<(u64, Vec<Row>)>();
+        let ep = epoch.clone();
+        let handle = std::thread::Builder::new()
+            .name("rail-history".into())
+            .spawn(move || {
+                while let Ok(mut msg) = rx.recv() {
+                    while let Ok(newer) = rx.try_recv() {
+                        msg = newer;
+                    }
+                    let guard = ep.lock().unwrap_or_else(|e| e.into_inner());
+                    if msg.0 == *guard {
+                        write_rows(&path, msg.1);
+                    }
+                    drop(guard);
+                }
+            })
+            .ok();
+        Self { tx: Some(tx), handle, epoch }
+    }
+    fn send(&self, rows: Vec<Row>) {
+        let ep = *self.epoch.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(tx) = &self.tx {
+            let _ = tx.send((ep, rows));
+        }
+    }
+    /// Drops queued writes and runs `f` (which truncates the file) while the writer is locked out.
+    fn invalidate_and<F: FnOnce()>(&self, f: F) {
+        let mut g = self.epoch.lock().unwrap_or_else(|e| e.into_inner());
+        *g += 1;
+        f();
+    }
+    fn finish(&mut self) {
+        self.tx.take();
+        if let Some(h) = self.handle.take() {
+            let _ = h.join();
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -55,18 +152,21 @@ pub struct HistorySuggestion {
 pub struct HistoryManager {
     entries: HashMap<String, HistoryEntry>,
     file_path: PathBuf,
-    /// Visits are written to disk lazily (flush()), never on the UI thread per navigation.
+    /// Visits are written to disk lazily (flush()), by the background writer, never on the UI thread.
     dirty: bool,
+    writer: DiskWriter,
 }
 
 impl HistoryManager {
     pub fn new(root: PathBuf) -> Self {
         let _ = fs::create_dir_all(&root);
         let file_path = root.join("history.txt");
+        let writer = DiskWriter::spawn(file_path.clone());
         let mut mgr = Self {
             entries: HashMap::new(),
             file_path,
             dirty: false,
+            writer,
         };
         mgr.load();
         mgr
@@ -84,12 +184,7 @@ impl HistoryManager {
                     if !url.is_empty() {
                         self.entries.insert(
                             url.clone(),
-                            HistoryEntry {
-                                url,
-                                title,
-                                visit_count,
-                                last_visit,
-                            },
+                            HistoryEntry::new(url, title, visit_count, last_visit),
                         );
                     }
                 }
@@ -97,24 +192,14 @@ impl HistoryManager {
         }
     }
 
+    /// Hands a snapshot to the background writer (non-blocking).
     pub fn save(&self) {
-        let mut sorted: Vec<&HistoryEntry> = self.entries.values().collect();
-        // Keep most recently and frequently visited entries, limit to 2000
-        sorted.sort_by(|a, b| {
-            let score_b = (b.visit_count as i64 * 3600) + (b.last_visit / 1_000_000);
-            let score_a = (a.visit_count as i64 * 3600) + (a.last_visit / 1_000_000);
-            score_b.cmp(&score_a)
-        });
-
-        let mut out = String::new();
-        for entry in sorted.into_iter().take(2000) {
-            let clean_title = entry.title.replace('\t', " ").replace('\n', " ");
-            out.push_str(&format!(
-                "{}\t{}\t{}\t{}\n",
-                entry.url, clean_title, entry.visit_count, entry.last_visit
-            ));
-        }
-        let _ = fs::write(&self.file_path, out);
+        let rows: Vec<Row> = self
+            .entries
+            .values()
+            .map(|e| (e.url.clone(), e.title.clone(), e.visit_count, e.last_visit))
+            .collect();
+        self.writer.send(rows);
     }
 
     pub fn record_visit(&mut self, url: &str, title: &str) {
@@ -137,17 +222,12 @@ impl HistoryManager {
             existing.visit_count = existing.visit_count.saturating_add(1);
             existing.last_visit = now;
             if !clean_title.is_empty() && existing.title.is_empty() {
-                existing.title = clean_title.to_string();
+                existing.set_title(clean_title);
             }
         } else {
             self.entries.insert(
                 trimmed.to_string(),
-                HistoryEntry {
-                    url: trimmed.to_string(),
-                    title: clean_title.to_string(),
-                    visit_count: 1,
-                    last_visit: now,
-                },
+                HistoryEntry::new(trimmed.to_string(), clean_title.to_string(), 1, now),
             );
         }
         self.dirty = true;
@@ -163,7 +243,11 @@ impl HistoryManager {
 
     pub fn clear(&mut self) {
         self.entries.clear();
-        let _ = fs::write(&self.file_path, "");
+        self.dirty = false;
+        let path = self.file_path.clone();
+        self.writer.invalidate_and(|| {
+            let _ = fs::write(&path, "");
+        });
     }
 
     pub fn suggest(&self, query: &str) -> Vec<HistorySuggestion> {
@@ -197,24 +281,24 @@ impl HistoryManager {
 
         // 1. Check history entries
         for entry in self.entries.values() {
-            let url_lower = entry.url.to_lowercase();
-            let domain = extract_clean_domain(&url_lower);
+            let url_lower = entry.url_lower.as_str();
+            let domain = entry.domain.as_str();
             let mut score = 0i64;
-            let mut autofill = domain.clone();
+            let mut autofill = String::new();
 
             if domain.starts_with(q_clean) {
                 // Exact prefix match on domain: Highest rank!
                 score = 10000 + (entry.visit_count as i64 * 100) + (100 - domain.len() as i64);
-                autofill = domain.clone();
+                autofill = domain.to_string();
             } else if domain.contains(q_clean) {
                 score = 5000 + (entry.visit_count as i64 * 50);
-                autofill = domain.clone();
+                autofill = domain.to_string();
             } else if url_lower.contains(q_clean) {
                 score = 3000 + (entry.visit_count as i64 * 20);
                 autofill = entry.url.clone();
-            } else if !entry.title.is_empty() && entry.title.to_lowercase().contains(q_clean) {
+            } else if entry.title_lower.contains(q_clean) {
                 score = 1500 + (entry.visit_count as i64 * 10);
-                autofill = domain.clone();
+                autofill = domain.to_string();
             }
 
             if score > 0 {
@@ -222,7 +306,7 @@ impl HistoryManager {
                     autofill = format!("https://{}", autofill);
                 }
                 let title = if entry.title.is_empty() {
-                    domain.clone()
+                    domain.to_string()
                 } else {
                     entry.title.clone()
                 };
@@ -235,7 +319,7 @@ impl HistoryManager {
                     score,
                     kind: SuggestionKind::History,
                 });
-                seen_domains.insert(domain, candidates.len() - 1);
+                seen_domains.insert(domain.to_string(), candidates.len() - 1);
             }
         }
 
@@ -409,5 +493,7 @@ mod tests {
 impl Drop for HistoryManager {
     fn drop(&mut self) {
         self.flush();
+        // Wait for the queued snapshot to reach the disk before the process exits.
+        self.writer.finish();
     }
 }
