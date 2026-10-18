@@ -1,6 +1,6 @@
 {
   "name": "rail-browser",
-  "version": "0.5.60",
+  "version": "0.5.61",
   "type": "module",
   "private": true,
   "description": "Rail Browser \u2014 Minimalist keyboard-driven spatial browser",
