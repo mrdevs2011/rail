@@ -6,6 +6,7 @@ mod i18n;
 mod i18n_tables;
 mod update;
 mod sync;
+mod spring;
 use i18n::{tr, trf};
 
 use gtk::glib;
@@ -18,6 +19,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::OnceLock;
 use std::time::Duration;
+use spring::{coast_distance, Spring, SwipeTracker, SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS};
 use strip::{col_width, gap, group_ranges, stack_height, ShellLayout, StripLayout, SIDE_W};
 use webkit6::prelude::*;
 use webkit6::{
@@ -233,6 +235,13 @@ fn save_css_editor(buffer: &gtk::TextBuffer, btn: &gtk::Button) {
 }
 
 const START_PAGE: &str = include_str!("start_page.html");
+
+thread_local! {
+    /// Sidebar widgets from the last `refresh_sidebar()`: workspace headers and tab rows.
+    /// Lets overview navigation flip the active highlight without rebuilding the whole list.
+    static SIDEBAR_ITEMS: RefCell<(Vec<(usize, gtk::Box)>, Vec<(usize, usize, gtk::Box)>)> =
+        RefCell::new((Vec::new(), Vec::new()));
+}
 
 /// Boshlang'ich sahifa: til, sarlavha, tavsif va qidiruv placeholder joriy tilga o'giriladi.
 fn start_page() -> String {
@@ -2373,6 +2382,55 @@ impl Row {
 }
 
 /// Columns of a row as (first tab, tab count, x, width).
+/// One running camera spring (x or y). `start_us` is a GDK frame-clock time.
+#[derive(Clone, Copy)]
+struct CamSpring {
+    spring: Spring,
+    start_us: i64,
+}
+
+/// Advances one camera axis with a niri-style spring and returns `(value, at_rest)`.
+/// Retargeting mid-flight keeps the current speed, so chained moves stay smooth.
+/// `v0_hint` is a release velocity (touchpad flick) used when a new spring starts.
+fn step_cam_axis(
+    slot: &Cell<Option<CamSpring>>,
+    cur: f64,
+    target: f64,
+    v0_hint: &Cell<f64>,
+    now_us: i64,
+) -> (f64, bool) {
+    let hint = v0_hint.replace(0.0);
+    let mut cs = slot.get();
+    match cs {
+        Some(c) if (c.spring.to - target).abs() > 0.01 => {
+            let t = (now_us - c.start_us) as f64 / 1e6;
+            let v = if hint != 0.0 { hint } else { c.spring.velocity_at(t) };
+            cs = Some(CamSpring {
+                spring: Spring::new(cur, target, v, SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS),
+                start_us: now_us,
+            });
+        }
+        None if (cur - target).abs() > 0.01 => {
+            cs = Some(CamSpring {
+                spring: Spring::new(cur, target, hint, SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS),
+                start_us: now_us,
+            });
+        }
+        _ => {}
+    }
+    let Some(c) = cs else {
+        slot.set(None);
+        return (target, true);
+    };
+    let t = (now_us - c.start_us) as f64 / 1e6;
+    if c.spring.is_settled(t) {
+        slot.set(None);
+        return (target, true);
+    }
+    slot.set(Some(c));
+    (c.spring.value_at(t), false)
+}
+
 fn row_cols(row: &Row, vw: f64, g: f64) -> Vec<(usize, usize, f64, f64)> {
     let mut out = Vec::new();
     let mut x = 0.0;
@@ -2479,6 +2537,11 @@ struct App {
     animating: Cell<bool>,
     /// Touchpad slide: at most one strip allocate per frame (avoids jank)
     pan_alloc_pending: Cell<bool>,
+    /// Niri-style springs for the camera; `None` while at rest.
+    cam_spring_x: Cell<Option<CamSpring>>,
+    cam_spring_y: Cell<Option<CamSpring>>,
+    /// Release velocity (px/s) of a touchpad flick, consumed when the next x spring starts.
+    cam_v0_x: Cell<f64>,
     side_open: Cell<bool>,
     side_gen: Cell<u32>,
     /// A just-created tab that has never navigated; Esc discards it.
@@ -2505,6 +2568,8 @@ struct App {
     touchpad_toast_hover: Cell<bool>,
     /// Cached: can the focused page scroll (either axis)? Touchpad slide yields to the page then.
     page_scrollable: Cell<bool>,
+    /// monotonic µs of the last scroll event seen in Touchpad Slide mode (poll only when idle)
+    last_scroll_us: Cell<i64>,
     last_saved_session: RefCell<String>,
     save_session_gen: Cell<u64>,
     data_modal_info_lbl: gtk::Label,
@@ -4104,15 +4169,16 @@ impl App {
                     // Anchor = pre-overview camera center (saved on enter)
                     let ax = app.ov_saved_x.get() + vw * 0.5;
                     let ay = app.ov_saved_y.get() + vh * 0.5;
+                    app.cam_spring_x.set(None);
+                    app.cam_spring_y.set(None);
                     (ax - (vw * 0.5) / nz, ay - (vh * 0.5) / nz)
                 } else {
                     (oxt, oyt)
                 }
             } else {
-                let mut nx = oxc + (oxt - oxc) * k;
-                let mut ny = oyc + (oyt - oyc) * k;
-                if near(oxt, nx, 0.5) { nx = oxt; }
-                if near(oyt, ny, 0.5) { ny = oyt; }
+                // Niri-style critically damped spring on the real frame time (no per-frame lerp)
+                let (nx, _) = step_cam_axis(&app.cam_spring_x, oxc, oxt, &app.cam_v0_x, now);
+                let (ny, _) = step_cam_axis(&app.cam_spring_y, oyc, oyt, &Cell::new(0.0), now);
                 (nx, ny)
             };
             if near(oxt, nx, 0.5) && nz == zt { nx = oxt; }
@@ -4126,6 +4192,8 @@ impl App {
             strip.queue_allocate();
 
             if nx == oxt && ny == oyt && nz == zt && !grid_busy {
+                app.cam_spring_x.set(None);
+                app.cam_spring_y.set(None);
                 app.animating.set(false);
                 glib::ControlFlow::Break
             } else {
@@ -4152,6 +4220,10 @@ impl App {
         drop(rows);
         let max_x = (row_w - vw).max(0.0);
         let nx = (self.layout.offset_x() + dx).clamp(0.0, max_x);
+        // A new swipe grabs the view: stop any running spring right where it is (like niri)
+        self.cam_spring_x.set(None);
+        self.cam_spring_y.set(None);
+        self.cam_v0_x.set(0.0);
         self.layout.set_offset_x(nx);
         self.target_x.set(nx);
         // One allocate per display frame — per-event allocate freezes WebKit tabs
@@ -4166,36 +4238,74 @@ impl App {
         }
     }
 
-    /// After a finger swipe ends, snap focus to the column under the viewport center.
-    fn snap_canvas_to_nearest_column(self: &Rc<Self>) {
+    /// Finger lifted after a touchpad slide (niri `view_offset_gesture_end`): project where the
+    /// swipe would coast to, snap to the nearest column edge there, focus the furthest column
+    /// that is fully visible in the swipe direction, and let the spring continue from the
+    /// release velocity so the motion never stops and restarts.
+    fn finish_slide(self: &Rc<Self>, vel: f64) {
         let vw = self.strip.width() as f64;
         if vw <= 0.0 {
             return;
         }
         let g = gap(self.target_zoom.get());
         let cur_r = self.focus_row.get();
-        let ox = self.layout.offset_x();
-        let center = ox + vw / 2.0;
-        let rows = self.rows.borrow();
-        if cur_r >= rows.len() || rows[cur_r].tabs.is_empty() {
+        let cur_off = self.layout.offset_x();
+        let cols = {
+            let rows = self.rows.borrow();
+            if cur_r >= rows.len() || rows[cur_r].tabs.is_empty() {
+                return;
+            }
+            row_cols(&rows[cur_r], vw, g)
+        };
+        if cols.is_empty() {
             return;
         }
-        let mut best_c = 0usize;
-        let mut best_d = f64::MAX;
-        let cur_c = self.focus_col.get();
-        for (start, len, x, w) in row_cols(&rows[cur_r], vw, g) {
-            let d = (x + w / 2.0 - center).abs();
-            if d < best_d {
-                best_d = d;
-                // keep the focused window if it lives in this column, else the top one
-                best_c = if cur_c >= start && cur_c < start + len { cur_c } else { start };
-            }
+        let row_w = cols.last().map_or(0.0, |&(_, _, x, w)| x + w);
+        let max_x = (row_w - vw).max(0.0);
+
+        // Where the swipe would stop after decelerating
+        let proj = (cur_off + coast_distance(vel)).clamp(0.0, max_x);
+
+        // Snap points: a column's left edge or right edge aligned with the view edge
+        let mut snaps = vec![0.0, max_x];
+        for &(_, _, x, w) in &cols {
+            snaps.push(x.clamp(0.0, max_x));
+            snaps.push((x + w - vw).clamp(0.0, max_x));
         }
-        drop(rows);
-        if best_c != self.focus_col.get() {
-            self.focus_coords(cur_r, best_c);
+        let snap = snaps
+            .into_iter()
+            .min_by(|a, b| (a - proj).abs().total_cmp(&(b - proj).abs()))
+            .unwrap_or(cur_off);
+
+        // Focus the furthest fully visible column in the direction of travel
+        let visible: Vec<usize> = cols
+            .iter()
+            .enumerate()
+            .filter(|&(_, &(_, _, x, w))| x >= snap - 0.5 && x + w <= snap + vw + 0.5)
+            .map(|(i, _)| i)
+            .collect();
+        let pick = if visible.is_empty() {
+            let center = snap + vw / 2.0;
+            cols.iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| {
+                    ((a.2 + a.3 / 2.0) - center).abs().total_cmp(&((b.2 + b.3 / 2.0) - center).abs())
+                })
+                .map_or(0, |(i, _)| i)
+        } else if snap >= cur_off {
+            *visible.last().unwrap()
         } else {
-            // Same tab: still settle so edges align cleanly
+            visible[0]
+        };
+        let (start, len, _, _) = cols[pick];
+        let cur_c = self.focus_col.get();
+        let new_c = if cur_c >= start && cur_c < start + len { cur_c } else { start };
+
+        self.target_x.set(snap);
+        self.cam_v0_x.set(vel);
+        if new_c != cur_c {
+            self.focus_coords(cur_r, new_c);
+        } else {
             self.reveal_focus();
         }
     }
@@ -5844,6 +5954,11 @@ impl App {
         // Sidebar rebuild, session save, tab wake-up etc. run once on exit_overview().
         if self.ov.get() {
             self.reveal_focus();
+            // Keep the left bar's active tab and the minimap in step with the overview cursor.
+            self.sync_sidebar_active();
+            if self.map_open() {
+                self.trigger_map_animation();
+            }
             return;
         }
 
@@ -6729,6 +6844,30 @@ impl App {
     /// WebKit notifications (title / favicon / uri / loading) fire in bursts, especially while many
     /// tabs load. Rebuilding the whole sidebar for each one froze the UI, so they are coalesced
     /// into at most one rebuild per ~60 ms. User actions still call refresh_sidebar() directly.
+    /// Cheap sidebar update: only moves the active-workspace / active-tab highlight to the
+    /// current focus (used while navigating in overview, where a full rebuild would be slow).
+    fn sync_sidebar_active(&self) {
+        let cur_r = self.focus_row.get();
+        let cur_c = self.focus_col.get();
+        SIDEBAR_ITEMS.with(|s| {
+            let s = s.borrow();
+            for (ri, b) in &s.0 {
+                if *ri == cur_r {
+                    b.add_css_class("active-workspace");
+                } else {
+                    b.remove_css_class("active-workspace");
+                }
+            }
+            for (ri, ci, b) in &s.1 {
+                if *ri == cur_r && *ci == cur_c {
+                    b.add_css_class("active-tab");
+                } else {
+                    b.remove_css_class("active-tab");
+                }
+            }
+        });
+    }
+
     fn refresh_sidebar_soon(self: &Rc<Self>) {
         thread_local! { static SIDEBAR_PENDING: Cell<bool> = Cell::new(false); }
         if SIDEBAR_PENDING.with(|p| p.replace(true)) {
@@ -6749,6 +6888,7 @@ impl App {
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
         let tab_items_registry: Rc<RefCell<Vec<(usize, usize, gtk::Box)>>> = Rc::new(RefCell::new(Vec::new()));
+        let mut ws_headers: Vec<(usize, gtk::Box)> = Vec::new();
 
         for (ri, row) in rows.iter().enumerate() {
             // Workspace Header
@@ -6758,6 +6898,7 @@ impl App {
             if ri == cur_r {
                 ws_box.add_css_class("active-workspace");
             }
+            ws_headers.push((ri, ws_box.clone()));
 
             let ws_title = gtk::Label::new(Some(&trf("Workspace {}", &[&(ri + 1).to_string()])));
             ws_title.add_css_class("workspace-title");
@@ -7017,6 +7158,7 @@ impl App {
         new_ws_box.add_controller(new_ws_click);
         self.list.append(&new_ws_box);
 
+        SIDEBAR_ITEMS.with(|s| *s.borrow_mut() = (ws_headers, tab_items_registry.borrow().clone()));
         self.pill_label.set_text(&self.focused_display_uri());
     }
 
@@ -11173,6 +11315,9 @@ fn build(gapp: &gtk::Application) {
         target_y: Cell::new(0.0),
         animating: Cell::new(false),
         pan_alloc_pending: Cell::new(false),
+        cam_spring_x: Cell::new(None),
+        cam_spring_y: Cell::new(None),
+        cam_v0_x: Cell::new(0.0),
         side_open: Cell::new(true),
         side_gen: Cell::new(0),
         fresh: RefCell::new(None),
@@ -11196,6 +11341,7 @@ fn build(gapp: &gtk::Application) {
         touchpad_toast_gen: Cell::new(0),
         touchpad_toast_hover: Cell::new(false),
         page_scrollable: Cell::new(false),
+        last_scroll_us: Cell::new(0),
         last_saved_session: RefCell::new(String::new()),
         save_session_gen: Cell::new(0),
         data_modal_info_lbl: data_info_lbl.clone(),
@@ -11846,14 +11992,17 @@ fn build(gapp: &gtk::Application) {
     let last_scroll = Rc::new(Cell::new(0i64));
     let last_swipe = Rc::new(Cell::new(0i64));
     let a = app.clone();
-    let a_dec = app.clone();
     let ax = accum_x.clone();
     let ay = accum_y.clone();
     let ls = last_scroll.clone();
     let l_swipe = last_swipe.clone();
     let panned = Rc::new(Cell::new(false));
     let panned_c = panned.clone();
-    scroll.connect_scroll(move |_, dx, dy| {
+    let tracker = Rc::new(RefCell::new(SwipeTracker::new()));
+    let tracker_c = tracker.clone();
+    let last_ev_us = Rc::new(Cell::new(0i64));
+    let last_ev_c = last_ev_us.clone();
+    scroll.connect_scroll(move |ctl, dx, dy| {
         // Fast path: normal browsing — do not touch scroll at all (WebKit keeps smooth kinetic scroll)
         if !a.ov.get() && !a.touchpad_mode.get() {
             return glib::Propagation::Proceed;
@@ -11863,6 +12012,7 @@ fn build(gapp: &gtk::Application) {
         }
 
         let now = glib::monotonic_time();
+        a.last_scroll_us.set(now);
 
         // 2. Overview mode: 2D canvas pan navigation on zoomed-out workspace grid
         if a.ov.get() {
@@ -11927,7 +12077,12 @@ fn build(gapp: &gtk::Application) {
         if dx.abs() > 0.8 && dx.abs() > 2.0 * dy.abs() {
             ls.set(now);
             l_swipe.set(now);
+            if !panned_c.get() {
+                tracker_c.borrow_mut().reset();
+            }
             panned_c.set(true);
+            tracker_c.borrow_mut().push(dx, ctl.current_event_time() as f64 / 1000.0);
+            last_ev_c.set(now);
             a.pan_canvas_x(dx);
             return glib::Propagation::Stop;
         }
@@ -11938,9 +12093,7 @@ fn build(gapp: &gtk::Application) {
     let ay2 = accum_y.clone();
     let l_swipe2 = last_swipe.clone();
     scroll.connect_decelerate(move |_, _vx, _vy| {
-        if a_dec.touchpad_mode.get() && !a_dec.ov.get() {
-            a_dec.snap_canvas_to_nearest_column();
-        }
+        // The release is handled in scroll_end with our own velocity tracker (niri-style).
         ax2.set(0.0);
         ay2.set(0.0);
         l_swipe2.set(0);
@@ -11951,7 +12104,10 @@ fn build(gapp: &gtk::Application) {
     let panned_end = panned.clone();
     scroll.connect_scroll_end(move |_| {
         if panned_end.replace(false) && a_end.touchpad_mode.get() && !a_end.ov.get() {
-            a_end.snap_canvas_to_nearest_column();
+            let idle = (glib::monotonic_time() - last_ev_us.get()) as f64 / 1e6;
+            let vel = tracker.borrow_mut().release_velocity(idle);
+            tracker.borrow_mut().reset();
+            a_end.finish_slide(vel);
         }
     });
     win.add_controller(scroll);
@@ -12070,9 +12226,12 @@ fn build(gapp: &gtk::Application) {
     {
         // Keep the "page can scroll" flag fresh while Touchpad Slide is on
         let weak = Rc::downgrade(&app);
-        glib::timeout_add_local(Duration::from_millis(200), move || match weak.upgrade() {
+        // Never while scrolling or animating: a JS round-trip (forced style/layout) every 200 ms
+        // made normal page scrolling hitch. Only poll when the page has been idle for a while.
+        glib::timeout_add_local(Duration::from_millis(500), move || match weak.upgrade() {
             Some(a) => {
-                if a.touchpad_mode.get() {
+                let idle = glib::monotonic_time() - a.last_scroll_us.get() > 700_000;
+                if a.touchpad_mode.get() && idle && !a.animating.get() {
                     a.refresh_page_scrollable();
                 }
                 glib::ControlFlow::Continue
