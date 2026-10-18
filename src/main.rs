@@ -7072,10 +7072,11 @@ impl App {
         let win_w = self.win.width().max(1);
         let target_w = 580.min(win_w.saturating_sub(32));
         self.palette.set_size_request(target_w, -1);
-        // Fixed under the welcome brand (centered in start page)
+        // Completely fixed under the welcome brand
+        // Brand is centered but shifted up by the 140px bottom padding on the start page
         let win_h = self.win.height().max(1);
-        // Brand is roughly at center; place omnibar just below it
-        let target_top = ((win_h as f64) * 0.50).round().clamp(80.0, 280.0) as i32;
+        let brand_center_offset = 70.0; // approximate half of bottom padding
+        let target_top = ((win_h as f64 * 0.5) - brand_center_offset + 90.0).round().clamp(60.0, 320.0) as i32;
         self.palette.set_margin_top(target_top);
     }
 
