@@ -263,6 +263,7 @@ body {
 }
 .search-bar:focus { border-color: var(--fg); }
 .search-bar::placeholder { color: var(--dim); }
+.search-hint { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--dim); pointer-events: none; }
 </style>
 </head>
 <body>
@@ -271,7 +272,26 @@ body {
     <div class="brand-title">rail<span class="dot">.</span></div>
     <div class="brand-subtitle">keyboard-first browser for developers</div>
   </div>
+  <div class="search-wrapper">
+    <input id="q" class="search-bar" type="text" placeholder="search or enter url" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus>
+    <span class="search-hint">Ctrl+L</span>
+  </div>
 </div>
+<script>
+(function () {
+  var i = document.getElementById('q');
+  function go() {
+    var v = i.value.trim();
+    if (!v) return;
+    try { window.webkit.messageHandlers.railgo.postMessage(v); } catch (e) {}
+  }
+  i.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); go(); }
+    else if (e.key === 'Escape') { i.value = ''; i.blur(); }
+  });
+  window.addEventListener('load', function () { i.focus(); });
+})();
+</script>
 </body>
 </html>"##;
 
@@ -4260,6 +4280,7 @@ impl App {
         );
         let ucm = webkit6::UserContentManager::new();
         ucm.add_script(&script);
+        ucm.register_script_message_handler("railgo", None);
         let html_css = load_html_css();
         if !html_css.trim().is_empty() {
             ucm.add_style_sheet(&user_style_sheet(&html_css));
@@ -4287,7 +4308,6 @@ impl App {
         self.show_palette();
         self.entry.set_text("");
         self.last_entry_len.set(0);
-        self.entry.grab_focus();
     }
 
     fn split_vertical(self: &Rc<Self>) {
@@ -5405,6 +5425,15 @@ impl App {
 
     fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_row: bool) {
         view.set_can_target(!self.ov.get());
+        // Welcome page search box (a real <input> in the page) reports Enter here.
+        if let Some(ucm) = view.user_content_manager() {
+            let app = self.clone();
+            let wv = view.downgrade();
+            ucm.connect_script_message_received(Some("railgo"), move |_, val| {
+                let Some(v) = wv.upgrade() else { return };
+                app.on_start_search(&v, val.to_str().as_str());
+            });
+        }
         let (container, resize_handle, height_handle, freeze) = Self::create_tab_widget(&view);
 
         let (target_r, target_c) = {
@@ -7165,6 +7194,45 @@ impl App {
         self.palette.set_margin_top(90);
     }
 
+    /// Focus the search <input> that lives inside the welcome page itself.
+    fn focus_welcome_input(&self, select: bool) {
+        let Some(v) = self.focused_view() else { return };
+        v.grab_focus();
+        let js = if select {
+            "(function(){var e=document.getElementById('q');if(e){e.focus();e.select();}})();"
+        } else {
+            "(function(){var e=document.getElementById('q');if(e&&document.activeElement!==e){e.focus();}})();"
+        };
+        v.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+    }
+
+    /// Enter pressed in the welcome page's own search input.
+    fn on_start_search(self: &Rc<Self>, view: &WebView, text: &str) {
+        // Only the real start page may drive navigation (the handler exists in every page).
+        let mut u = view.uri().map(|s| s.to_string()).unwrap_or_default();
+        if u.is_empty() || u.starts_with("about:") {
+            u = self.saved_uri_of(view);
+        }
+        if !u.starts_with("rail://start") || text.trim().is_empty() {
+            return;
+        }
+        if self.focused_view().as_ref() != Some(view) {
+            return;
+        }
+        let tab_prof = self
+            .rows
+            .borrow()
+            .iter()
+            .flat_map(|r| r.tabs.iter())
+            .find(|t| &t.view == view)
+            .map(|t| t.profile_id.clone());
+        if let Some(p) = tab_prof {
+            self.select_palette_profile(&p);
+        }
+        self.palette_for_new_tab.set(false);
+        self.navigate(text);
+    }
+
     /// Focused tab is the welcome / start page (rail://start).
     fn focused_is_welcome(&self) -> bool {
         let Some(v) = self.focused_view() else { return false };
@@ -7182,11 +7250,11 @@ impl App {
             return;
         }
         if self.focused_is_welcome() {
+            // The search box is part of the page now: no floating GTK palette here.
             if self.palette_open() {
-                self.update_palette_size();
-            } else {
-                self.show_palette();
+                self.hide_palette();
             }
+            self.focus_welcome_input(false);
         } else if self.welcome_palette.get() && self.palette_open() {
             self.hide_palette();
         }
@@ -7198,6 +7266,13 @@ impl App {
     }
 
     fn show_palette(self: &Rc<Self>) {
+        if self.focused_is_welcome() {
+            if self.palette_open() {
+                self.hide_palette();
+            }
+            self.focus_welcome_input(true);
+            return;
+        }
         self.palette_for_new_tab.set(false);
         let shown = self.focused_edit_uri();
         let shown = if shown == tr("Search or enter address") || shown.is_empty() {
@@ -8885,8 +8960,13 @@ impl App {
         let tx = anchor_x - (vw * 0.5) / OV_ZOOM;
         let ty = anchor_y - (vh * 0.5) / OV_ZOOM;
 
-        self.target_x.set(tx);
-        self.target_y.set(ty);
+        // The zoom-out itself is anchored on the old camera center (see animate()); once the
+        // zoom settles the camera glides to the framed position: whole grid centered when it
+        // fits, otherwise the active tab centered (clamped at the grid edges).
+        let _ = (tx, ty);
+        let (fx, fy) = self.overview_offsets_at_zoom(OV_ZOOM);
+        self.target_x.set(fx);
+        self.target_y.set(fy);
         self.target_zoom.set(OV_ZOOM);
         self.animate();
     }
