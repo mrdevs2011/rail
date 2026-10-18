@@ -1,8 +1,8 @@
 name: CI
 
+# main ga push da build/test/release .github/workflows/release.yml da bajariladi
+# (ikki marta build bo'lmasligi uchun). Bu yerda faqat pull request tekshiriladi.
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 

@@ -99,6 +99,9 @@ jobs:
       - name: Build release
         run: cargo build --release
 
+      - name: Test
+        run: cargo test --release
+
       - name: Prepare asset
         run: |
           cp target/release/rail target/release/rail-linux-x86_64
