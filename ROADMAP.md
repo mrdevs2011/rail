@@ -1,7 +1,7 @@
 # Rail Roadmap
 
 > **Maqsad:** bitta kod, uch tizim (Linux, macOS, Windows), hammasi **bepul**. Toza qora-oq dasturchi brauzeri. O'rnatish va yangilash foydalanuvchi uchun 1 bosish.
-> Oxirgi yangilanish: 2026-10-17 (v0.5.35). Sayt: https://rail-browser.vercel.app
+> Oxirgi yangilanish: 2026-10-17 (v0.5.36). Sayt: https://rail-browser.vercel.app
 >
 > **Qaror:** rail.uz domeni olinmaydi. Sayt Vercel'da (rail-browser.vercel.app) turaveradi. Butun yo'l 100% bepul.
 
@@ -20,7 +20,7 @@ Belgilar: [x] tayyor, [ ] qilinadi, [?] tajribada tekshiriladi, [~] boshlangan /
 
 ---
 
-## 1. Hozirgi holat (v0.5.35) — Linux to'liq ishlaydi
+## 1. Hozirgi holat (v0.5.36) — Linux to'liq ishlaydi
 
 - [x] Rasm paste (Ctrl+V va o'ng tugma): WebKitGTK DataTransfer'da rasm bermaydi (WebKit bug 218519), Rail rasmni o'zi o'qib sahifaga paste hodisasi sifatida beradi (Gemini va h.k.)
 - [x] DevTools: F12 da stack overflow (SIGABRT) tuzatildi, alohida oyna floating bo'lmay oddiy oyna bo'lib ochiladi, Left/Right dock tugmalari va eskirgan koordinata ushlagichlari tuzatildi
