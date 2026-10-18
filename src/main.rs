@@ -7066,16 +7066,22 @@ impl App {
     }
 
     fn cancel_palette(self: &Rc<Self>) {
-        let is_new_tab = self.palette_for_new_tab.get();
+        // Always dismiss the omnibar/input first (Esc on new tab / Ctrl+L).
         self.palette_for_new_tab.set(false);
         self.hide_palette();
-        if !is_new_tab {
-            let view = self.focused_view();
-            let fresh = self.fresh.borrow().clone();
-            if let (Some(v), Some(f)) = (view, fresh) {
+
+        // If this was an unused fresh start tab (created by new_tab, never navigated)
+        // and other tabs exist, discard it — same as Chrome closing an empty new tab flow.
+        // If it is the only tab, keep the start page and just close the input.
+        let view = self.focused_view();
+        let fresh = self.fresh.borrow().clone();
+        if let (Some(v), Some(f)) = (view, fresh) {
+            if v == f {
                 let total_tabs: usize = self.rows.borrow().iter().map(|r| r.tabs.len()).sum();
-                if v == f && total_tabs > 1 {
+                if total_tabs > 1 {
                     self.close_view(&v);
+                } else {
+                    *self.fresh.borrow_mut() = None;
                 }
             }
         }
@@ -11088,6 +11094,13 @@ fn build(gapp: &gtk::Application) {
         }
 
         match key {
+            gdk::Key::Escape => {
+                // New-tab / omnibar input: Esc dismisses the palette
+                if a.palette_open() {
+                    a.cancel_palette();
+                    return glib::Propagation::Stop;
+                }
+            }
             gdk::Key::Down => {
                 if a.move_suggestion_selection(1) {
                     return glib::Propagation::Stop;
@@ -11278,6 +11291,12 @@ fn build(gapp: &gtk::Application) {
         let ctrl = state.contains(M::CONTROL_MASK);
         let alt = state.contains(M::ALT_MASK);
         let super_key = state.contains(M::SUPER_MASK);
+
+        // Omnibar / new-tab input: Esc must close it even if a shortcut map interferes
+        if key == gdk::Key::Escape && a.palette_open() {
+            a.cancel_palette();
+            return glib::Propagation::Stop;
+        }
 
         // Image paste: WebKitGTK gives pages an empty clipboardData for images
         if ctrl && !alt && !state.contains(M::SHIFT_MASK)
