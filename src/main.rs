@@ -88,6 +88,12 @@ pub fn devtools_dock_from_str(s: &str) -> DevToolsDockSide {
     }
 }
 
+/// WebRTC on/off from settings.json (default on), read once per launch.
+fn webrtc_allowed() -> bool {
+    static V: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *V.get_or_init(|| load_app_settings().webrtc_enabled)
+}
+
 pub fn load_app_settings() -> AppSettings {
     let mut s = AppSettings::default();
     let Ok(text) = std::fs::read_to_string(settings_json_path()) else {
@@ -2195,13 +2201,34 @@ button.update-close:hover {
 /// How far the strip zooms out in overview (niri uses a similar factor).
 const OV_ZOOM: f64 = 0.4;
 
-/// Tab shuncha soniya davomida ekranda ko'rinmasa, RAM tejash uchun to'xtatiladi (suspend).
-/// 120s: tab switching inside a couple of minutes stays instant (no reload).
+/// Xotira tanqis bo'lgandagi (yoki RAIL_LOW_MEM=1) qiymatlar: tez uxlatish, 4 ta tirik tab.
 const SUSPEND_AFTER_SECS: u64 = 120;
-
-/// Hard cap on simultaneous live web processes (focused + visible extras).
-/// Beyond this, oldest non-focused tabs are suspended even if still "visible".
 const MAX_LIVE_TABS: usize = 4;
+
+/// Xotira yetarli bo'lganda: tab 30 daqiqa ko'rinmaguncha tirik turadi (Chrome kabi),
+/// 16 tagacha tirik tab. Uxlatish faqat haqiqiy zarurat bo'lganda.
+const ROOMY_SUSPEND_AFTER_SECS: u64 = 1800;
+const ROOMY_MAX_LIVE_TABS: usize = 16;
+
+/// MemAvailable (MiB) from /proc/meminfo.
+fn mem_available_mb() -> Option<u64> {
+    let text = std::fs::read_to_string("/proc/meminfo").ok()?;
+    let line = text.lines().find(|l| l.starts_with("MemAvailable:"))?;
+    let kb: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
+    Some(kb / 1024)
+}
+
+/// (suspend_after_secs, max_live_tabs) for the current memory situation.
+fn suspend_policy() -> (u64, usize) {
+    if std::env::var_os("RAIL_LOW_MEM").is_some_and(|v| v != "0") {
+        return (SUSPEND_AFTER_SECS, MAX_LIVE_TABS);
+    }
+    match mem_available_mb() {
+        Some(m) if m < 1500 => (SUSPEND_AFTER_SECS, MAX_LIVE_TABS),
+        Some(m) if m < 3000 => (600, 8),
+        _ => (ROOMY_SUSPEND_AFTER_SECS, ROOMY_MAX_LIVE_TABS),
+    }
+}
 
 struct Tab {
     container: gtk::Box,
@@ -4184,22 +4211,22 @@ impl App {
 
         let settings = webkit6::Settings::new();
         settings.set_user_agent(Some(persona.user_agent));
-        settings.set_enable_webrtc(false);
+        settings.set_enable_webrtc(webrtc_allowed());
         settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_dns_prefetching(false);
         settings.set_enable_smooth_scrolling(true);
         settings.set_enable_webgl(true); // needed for smooth compositing on many sites
         settings.set_enable_developer_extras(true);
         settings.set_enable_back_forward_navigation_gestures(true);
-        settings.set_enable_webaudio(false);
+        settings.set_enable_webaudio(true);
         settings.set_enable_html5_local_storage(true);
         settings.set_enable_html5_database(true);
         settings.set_enable_site_specific_quirks(true);
         settings.set_javascript_can_access_clipboard(true);
         // Always: smooth page scroll/compositing; falls back when GPU unavailable
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
-        // Page cache keeps full DOM snapshots per navigation — costly with many tabs
-        settings.set_enable_page_cache(false);
+        // Back/forward uses the page cache: instant history navigation instead of a reload
+        settings.set_enable_page_cache(true);
 
         let stealth_js = persona.stealth_script();
         let script = webkit6::UserScript::new(
@@ -5552,6 +5579,7 @@ impl App {
         let fr = self.focus_row.get();
         let fc = self.focus_col.get();
         let in_overview = self.ov.get();
+        let (suspend_after, max_live) = suspend_policy();
 
         // 1) Touch last_active only for focused tab, or actually on-screen when NOT in overview.
         //    Overview scales everything into view — treating all as visible prevented ANY suspend.
@@ -5577,7 +5605,7 @@ impl App {
                 if !in_overview && self.tab_is_visible(tab) {
                     continue;
                 }
-                if tab.last_active.get().elapsed() < Duration::from_secs(SUSPEND_AFTER_SECS) {
+                if tab.last_active.get().elapsed() < Duration::from_secs(suspend_after) {
                     continue;
                 }
                 Self::suspend_tab(tab);
@@ -5600,9 +5628,9 @@ impl App {
                 live.push((tab.last_active.get(), ri, ci));
             }
         }
-        if live.len() > MAX_LIVE_TABS {
+        if live.len() > max_live {
             live.sort_by_key(|(t, _, _)| *t); // oldest first
-            let excess = live.len() - MAX_LIVE_TABS;
+            let excess = live.len() - max_live;
             for (_, ri, ci) in live.into_iter().take(excess) {
                 if ri == fr && ci == fc {
                     continue; // never suspend focused
@@ -12170,18 +12198,21 @@ fn main() -> glib::ExitCode {
             std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
         }
     }
-    {
+    if std::env::var_os("RAIL_LOW_MEM").is_some_and(|v| v != "0") {
+        // Eski tejamkor rejim: kichik xotira limiti va keshsiz model.
         let mut mps = webkit6::MemoryPressureSettings::new();
-        // Soft limit ~256 MiB per web process before aggressive reclaim
         mps.set_memory_limit(256);
         mps.set_conservative_threshold(0.25);
         mps.set_strict_threshold(0.40);
-        mps.set_kill_threshold(0.0); // 0 = disabled kill; we suspend tabs ourselves
+        mps.set_kill_threshold(0.0);
         mps.set_poll_interval(3.0);
         webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
         if let Some(ctx) = webkit6::WebContext::default() {
             ctx.set_cache_model(webkit6::CacheModel::DocumentViewer);
         }
+    } else if let Some(ctx) = webkit6::WebContext::default() {
+        // Haqiqiy brauzer keshi; WebKit'ning o'z xotira-bosim sozlamalari qoldiriladi.
+        ctx.set_cache_model(webkit6::CacheModel::WebBrowser);
     }
 
     let args: Vec<String> = std::env::args().collect();
