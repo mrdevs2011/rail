@@ -3445,6 +3445,18 @@ fn sc_build(ui: &ScUi) {
 fn to_uri(input: &str, search_engine: &str) -> String {
     let s = input.trim();
     let s = s.strip_prefix("view-source:").unwrap_or(s).trim();
+    // Short internal names → rail:// URLs
+    match s.to_ascii_lowercase().as_str() {
+        "settings" | "rail:settings" => return "rail://settings".into(),
+        "downloads" | "rail:downloads" => return "rail://downloads".into(),
+        "start" | "newtab" | "rail:start" => return "rail://start/".into(),
+        _ => {}
+    }
+    if s.starts_with("rail:") && !s.contains("://") {
+        // rail:settings → rail://settings
+        let rest = s.trim_start_matches("rail:").trim_start_matches('/');
+        return format!("rail://{rest}");
+    }
     if s.contains("://") || s.starts_with("about:") || s.starts_with("file:") {
         return s.into();
     }
@@ -3514,6 +3526,32 @@ fn settings_tab_from_uri(uri: &str) -> Option<SettingsTab> {
         "about" => SettingsTab::About,
         _ => SettingsTab::General,
     })
+}
+
+/// Canonical internal URI for display / load base.
+fn normalize_internal_uri(uri: &str) -> String {
+    let u = uri.trim();
+    if u.starts_with("rail://downloads") {
+        return "rail://downloads".into();
+    }
+    if u.starts_with("rail://settings") {
+        return settings_uri_for_tab(settings_tab_from_uri(u).unwrap_or(SettingsTab::General)).into();
+    }
+    if u.starts_with("rail://start") || u == "rail://" || u == "rail:" {
+        return "rail://start/".into();
+    }
+    u.into()
+}
+
+/// What the omnibar / pill shows for a tab URI.
+fn display_uri_for_pill(uri: &str) -> String {
+    if uri.is_empty() || uri.starts_with("about:") {
+        return tr("Search or enter address").into();
+    }
+    if is_internal_uri(uri) {
+        return normalize_internal_uri(uri);
+    }
+    host_of(uri).unwrap_or_else(|| uri.to_string())
 }
 
 fn load_internal_page(v: &WebView, uri: &str) {
@@ -6499,8 +6537,8 @@ impl App {
         self.list.append(&new_ws_box);
 
         let text = match self.focused_view().and_then(|v| v.uri()) {
-            Some(u) if !u.starts_with("about:") => host_of(&u).unwrap_or(u.to_string()),
-            _ => tr("Search or enter address").into(),
+            Some(u) => display_uri_for_pill(&u),
+            None => tr("Search or enter address").into(),
         };
         self.pill_label.set_text(&text);
     }
@@ -6509,22 +6547,29 @@ impl App {
         self.set_sidebar(!self.side_open.get());
     }
 
-    /// Open rail://downloads in the focused tab (or a new tab if none).
+    /// Open rail://downloads in a **new tab** (target=_blank style).
     fn open_downloads(self: &Rc<Self>) {
         self.exit_overview();
         self.hide_settings_modal();
         self.hide_palette();
-        if let Some(v) = self.focused_view() {
-            v.load_html(&downloads_page(), Some("rail://downloads"));
-            self.pill_label.set_text("downloads");
-            self.refresh_sidebar();
+        self.open_internal_new_tab("rail://downloads");
+    }
+
+    /// Always open an internal page in a new tab and show the real rail:// URL.
+    fn open_internal_new_tab(self: &Rc<Self>, uri: &str) {
+        let uri = normalize_internal_uri(uri);
+        let prof_id = self.profiles.borrow().active_id().to_string();
+        let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
+        let view = Self::create_web_view(&session, &prof_id);
+        load_internal_page(&view, &uri);
+        self.add_view(view, prof_id, false);
+        self.pill_label.set_text(&uri);
+        if uri.starts_with("rail://settings") {
+            // UI for settings is shown by open_settings_tab / focus sync
         } else {
-            let prof_id = self.profiles.borrow().active_id().to_string();
-            let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-            let view = Self::create_web_view(&session, &prof_id);
-            view.load_html(&downloads_page(), Some("rail://downloads"));
-            self.add_view(view, prof_id, false);
+            self.hide_settings_modal();
         }
+        self.refresh_sidebar();
         self.schedule_save_session();
     }
 
@@ -6757,8 +6802,13 @@ impl App {
 
     fn show_palette(self: &Rc<Self>) {
         self.palette_for_new_tab.set(false);
-        let uri = self.focused_view().and_then(|v| v.uri()).filter(|u| !u.starts_with("about:") && !is_internal_uri(u));
-        self.entry.set_text(uri.as_deref().unwrap_or(""));
+        let uri = self.focused_view().and_then(|v| v.uri()).filter(|u| !u.starts_with("about:"));
+        let shown = uri
+            .as_ref()
+            .map(|u| display_uri_for_pill(u))
+            .filter(|s| s != tr("Search or enter address"))
+            .unwrap_or_default();
+        self.entry.set_text(&shown);
 
         let prof_id = self.profiles.borrow().active_id().to_string();
         self.select_palette_profile(&prof_id);
@@ -7052,27 +7102,44 @@ impl App {
             let uri = to_uri(text, &self.search_engine.borrow());
             self.history.borrow_mut().record_visit(&uri, "");
 
-            // Internal pages: rail://downloads / rail://settings / rail://start
-            if uri.starts_with("rail://downloads") {
-                if is_new_tab {
-                    self.profiles.borrow_mut().set_active(&target_profile_id);
-                    let session = self.profiles.borrow_mut().get_or_create_session(&target_profile_id);
-                    let view = Self::create_web_view(&session, &target_profile_id);
-                    view.load_html(&downloads_page(), Some("rail://downloads"));
-                    self.add_view(view, target_profile_id, false);
-                } else if let Some(v) = self.focused_view() {
-                    v.load_html(&downloads_page(), Some("rail://downloads"));
-                    self.pill_label.set_text("downloads");
-                    self.refresh_sidebar();
+            // Internal pages always open in a new tab (target=_blank) with real rail:// URL
+            if is_internal_uri(&uri) {
+                let canon = normalize_internal_uri(&uri);
+                self.profiles.borrow_mut().set_active(&target_profile_id);
+                let session = self.profiles.borrow_mut().get_or_create_session(&target_profile_id);
+                let view = Self::create_web_view(&session, &target_profile_id);
+                load_internal_page(&view, &canon);
+                self.add_view(view, target_profile_id, false);
+                self.pill_label.set_text(&canon);
+                self.hide_palette();
+                if canon.starts_with("rail://settings") {
+                    let tab = settings_tab_from_uri(&canon).unwrap_or(SettingsTab::General);
+                    // Show settings UI without creating yet another tab
+                    self.current_settings_tab.set(tab);
+                    let tab_name = match tab {
+                        SettingsTab::General => "general",
+                        SettingsTab::Profiles => "profiles",
+                        SettingsTab::Data => "data",
+                        SettingsTab::Privacy => "privacy",
+                        SettingsTab::Customize => "customize",
+                        SettingsTab::Update => "update",
+                        SettingsTab::About => "about",
+                    };
+                    self.settings_stack.set_visible_child_name(tab_name);
+                    for (btn_tab, btn) in self.settings_tab_buttons.borrow().iter() {
+                        if *btn_tab == tab {
+                            btn.add_css_class("active");
+                        } else {
+                            btn.remove_css_class("active");
+                        }
+                    }
+                    self.settings_modal.set_visible(true);
+                } else {
+                    self.hide_settings_modal();
                 }
-                self.hide_settings_modal();
-                self.hide_palette();
-                return;
-            }
-            if uri.starts_with("rail://settings") {
-                let tab = settings_tab_from_uri(&uri).unwrap_or(SettingsTab::General);
-                self.hide_palette();
-                self.open_settings_tab(tab);
+                self.refresh_sidebar();
+                self.schedule_save_session();
+                let _ = is_new_tab; // always new-tab for internal
                 return;
             }
 
@@ -7175,21 +7242,27 @@ impl App {
             self.settings_modal.remove_css_class("responsive-narrow");
         }
 
-        // Settings is a real internal page: rail://settings[/section]
+        // Settings page: new tab unless focused tab is already any rail://settings*
         let settings_uri = settings_uri_for_tab(tab);
         self.exit_overview();
-        if let Some(v) = self.focused_view() {
-            v.load_html(&settings_shell_page(), Some(settings_uri));
-            self.pill_label.set_text("settings");
-            self.refresh_sidebar();
+        let on_settings = self
+            .focused_view()
+            .and_then(|v| v.uri())
+            .map(|u| u.starts_with("rail://settings"))
+            .unwrap_or(false);
+        if on_settings {
+            if let Some(v) = self.focused_view() {
+                v.load_html(&settings_shell_page(), Some(settings_uri));
+            }
         } else {
             let prof_id = self.profiles.borrow().active_id().to_string();
             let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
             let view = Self::create_web_view(&session, &prof_id);
             view.load_html(&settings_shell_page(), Some(settings_uri));
             self.add_view(view, prof_id, false);
-            self.pill_label.set_text("settings");
         }
+        self.pill_label.set_text(settings_uri);
+        self.refresh_sidebar();
         self.schedule_save_session();
         self.settings_modal.set_visible(true);
     }
@@ -7208,15 +7281,9 @@ impl App {
 
     fn hide_settings_modal(self: &Rc<Self>) {
         self.settings_modal.set_visible(false);
-        // Leaving settings page → back to start (like navigating away from chrome://settings)
+        // Keep the tab on rail://settings (URL stays in omnibar); only hide the GTK chrome.
+        // User can close the tab or navigate away like any other site.
         if let Some(v) = self.focused_view() {
-            let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
-            if uri.starts_with("rail://settings") {
-                v.load_html(&start_page(), Some("rail://start/"));
-                self.pill_label.set_text(tr("Search or enter address"));
-                self.refresh_sidebar();
-                self.schedule_save_session();
-            }
             v.grab_focus();
         }
     }
