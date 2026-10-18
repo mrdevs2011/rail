@@ -2263,7 +2263,14 @@ impl Tab {
     /// Haqiqiy manzil: jonli uri bo'sh bo'lsa (to'xtatilgan tab) saqlangan nusxa
     fn real_uri(&self) -> String {
         let live = self.view.uri().map(|s| s.to_string()).unwrap_or_default();
-        // Rail'ning ichki start sahifasi (rail://start/) haqiqiy manzil emas: sessiyaga yozilmaydi
+        // Start page is not a real destination — don't persist it.
+        // Settings / downloads *are* real pages and must survive session restore.
+        if live.starts_with("rail://start") {
+            return String::new();
+        }
+        if live.starts_with("rail://settings") || live.starts_with("rail://downloads") {
+            return live;
+        }
         if is_internal_uri(&live) {
             return String::new();
         }
@@ -4062,8 +4069,8 @@ impl App {
             let mut nz = zc + (zt - zc) * k;
             if near(zt, nz, 0.002) { nz = zt; }
 
-            let (mut nx, mut ny) = if app.ov.get() && zt < 1.0 {
-                // Pure zoom-out: fixed world anchor under screen center (no rise/slide)
+            let (mut nx, mut ny) = if (app.ov.get() && zt < 1.0) || (!app.ov.get() && zt == 1.0 && zc < 0.99) {
+                // Pure scale (zoom-out and zoom-in): fixed world anchor under screen center
                 let vw = strip.width() as f64;
                 let vh = strip.height() as f64;
                 if vw > 1.0 && vh > 1.0 && nz > 0.01 {
@@ -6449,8 +6456,13 @@ impl App {
         for item in tab_items {
             let session = self.profiles.borrow_mut().get_or_create_session(&item.profile_id);
             let view = Self::create_web_view(&session, &item.profile_id);
-            if item.url.is_empty() || item.url.starts_with("about:") || is_internal_uri(&item.url) {
+            if item.url.is_empty() || item.url.starts_with("about:") || item.url.starts_with("rail://start") {
                 view.load_html(&start_page(), Some("rail://start/"));
+            } else if item.url.starts_with("rail://settings") {
+                view.load_html(&settings_shell_page(), Some(&item.url));
+            } else if item.url.starts_with("rail://downloads") {
+                // downloads is pure HTML; will be refreshed later if needed
+                view.load_html(&start_page(), Some("rail://downloads")); // placeholder; real content loaded on focus/refresh
             } else {
                 view.load_uri(&item.url);
             }
@@ -6459,7 +6471,7 @@ impl App {
                 container.remove_css_class("full");
             }
             self.setup_tab_signals(&container, &view, &resize_handle, &height_handle);
-            loaded_tabs.push((item.row, Tab { container, view, freeze, height_handle, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(if item.url.starts_with("http") { item.url.clone() } else { String::new() }), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) }));
+            loaded_tabs.push((item.row, Tab { container, view, freeze, height_handle, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(if item.url.starts_with("http") || item.url.starts_with("rail://") { item.url.clone() } else { String::new() }), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) }));
         }
 
         let mut rows = self.rows.borrow_mut();
@@ -6483,6 +6495,8 @@ impl App {
 
         self.sync_strip();
         self.focus_coords(state.focus.0, state.focus.1);
+        // Ensure settings chrome is attached for any restored settings tabs
+        self.sync_settings_chrome();
         true
     }
 
@@ -7058,9 +7072,10 @@ impl App {
         let win_w = self.win.width().max(1);
         let target_w = 580.min(win_w.saturating_sub(32));
         self.palette.set_size_request(target_w, -1);
-        // Under welcome brand (page center)
+        // Fixed under the welcome brand (centered in start page)
         let win_h = self.win.height().max(1);
-        let target_top = ((win_h as f64) * 0.42).round().clamp(48.0, 220.0) as i32;
+        // Brand is roughly at center; place omnibar just below it
+        let target_top = ((win_h as f64) * 0.50).round().clamp(80.0, 280.0) as i32;
         self.palette.set_margin_top(target_top);
     }
 
@@ -7084,7 +7099,7 @@ impl App {
         self.rebuild_profile_popover();
 
         self.palette_suggestions_box.set_visible(false);
-        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(false); }
+        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
         self.clear_suggestions_ui();
         *self.current_suggestions.borrow_mut() = Vec::new();
         self.selected_suggestion_idx.set(None);
@@ -7103,7 +7118,7 @@ impl App {
 
     fn hide_palette(&self) {
         self.palette_suggestions_box.set_visible(false);
-        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(false); }
+        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
         self.clear_suggestions_ui();
         *self.current_suggestions.borrow_mut() = Vec::new();
         self.selected_suggestion_idx.set(None);
@@ -7126,7 +7141,7 @@ impl App {
         self.clear_suggestions_ui();
         if suggestions.is_empty() {
             self.palette_suggestions_box.set_visible(false);
-        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(false); }
+        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
             return;
         }
 
@@ -7208,7 +7223,7 @@ impl App {
 
         if text.trim().is_empty() {
             self.palette_suggestions_box.set_visible(false);
-        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(false); }
+        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
             self.clear_suggestions_ui();
             *self.current_suggestions.borrow_mut() = Vec::new();
             return;
@@ -7217,7 +7232,7 @@ impl App {
         let suggestions = self.history.borrow().suggest(&text);
         if suggestions.is_empty() {
             self.palette_suggestions_box.set_visible(false);
-        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(false); }
+        if let Some(par) = self.palette_suggestions_box.parent() { par.set_visible(true); }
             self.clear_suggestions_ui();
             *self.current_suggestions.borrow_mut() = Vec::new();
             return;
@@ -7571,11 +7586,19 @@ impl App {
 
     fn hide_settings_modal(self: &Rc<Self>) {
         self.settings_modal.set_visible(false);
-        // Keep the tab on rail://settings (URL stays in omnibar); only hide the GTK chrome.
-        // User can close the tab or navigate away like any other site.
+        // Avoid leaving a blank shell: if this tab is settings, go back to start page
+        // so Alt+S toggle does not show an empty black area.
         if let Some(v) = self.focused_view() {
+            let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
+            if uri.starts_with("rail://settings") {
+                v.load_html(&start_page(), Some("rail://start/"));
+                self.set_view_saved_uri(&v, "rail://start/");
+                self.pill_label.set_text("rail://start/");
+            }
             v.grab_focus();
         }
+        self.refresh_sidebar();
+        self.schedule_save_session();
     }
 
     fn profiles_modal_open(&self) -> bool {
@@ -9321,7 +9344,7 @@ fn build(gapp: &gtk::Application) {
     palette_suggestions_scroll.set_max_content_height(220);
     palette_suggestions_scroll.set_size_request(-1, 220);
     palette_suggestions_scroll.set_child(Some(&palette_suggestions_box));
-    palette_suggestions_scroll.set_visible(false);
+    palette_suggestions_scroll.set_visible(true);
     palette_suggestions_scroll.set_propagate_natural_height(false);
 
     let phint = gtk::Label::new(None);
