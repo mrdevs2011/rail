@@ -5779,7 +5779,7 @@ impl App {
                     tab.view.add_css_class("focused");
                     tab.last_active.set(std::time::Instant::now());
                     // Uyg'otish: sahifani qayta yukla; freeze load tugaguncha turadi
-                    if tab.suspended.get() {
+                    if tab.suspended.get() && !self.ov.get() {
                         tab.suspended.set(false);
                         let uri = tab.saved_uri.borrow().clone();
                         if !uri.is_empty() {
@@ -5805,6 +5805,13 @@ impl App {
             }
         }
         drop(rows);
+
+        // Overview navigation (h/j/k/l, arrows) must stay snappy: only move the camera.
+        // Sidebar rebuild, session save, tab wake-up etc. run once on exit_overview().
+        if self.ov.get() {
+            self.reveal_focus();
+            return;
+        }
 
         self.update_load_bar();
         self.reveal_focus();
@@ -8860,7 +8867,9 @@ impl App {
             }
         }
         self.target_zoom.set(1.0);
-        self.reveal_focus();
+        // Full focus pipeline once (wakes a suspended tab, sidebar, title, session save, camera)
+        let (fr, fc) = (self.focus_row.get(), self.focus_col.get());
+        self.focus_coords(fr, fc);
         self.sync_settings_chrome();
         if let Some(v) = self.focused_view() {
             if !self.settings_modal_open() {
