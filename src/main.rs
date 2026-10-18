@@ -3544,6 +3544,10 @@ fn display_uri_for_pill(uri: &str) -> String {
     if uri.is_empty() || uri.starts_with("about:") {
         return tr("Search or enter address").into();
     }
+    // Welcome / start page: never put rail://start into the omnibar — keep input empty
+    if uri.starts_with("rail://start") || uri == "rail://" || uri == "rail:" {
+        return tr("Search or enter address").into();
+    }
     if is_internal_uri(uri) {
         return normalize_internal_uri(uri);
     }
@@ -4157,6 +4161,10 @@ impl App {
         self.set_view_saved_uri(&view, "rail://start/");
         self.select_palette_profile(&prof_id);
         self.show_palette();
+        // Welcome: never prefill rail://start/
+        self.entry.set_text("");
+        self.last_entry_len.set(0);
+        self.entry.grab_focus();
     }
 
     fn split_vertical(self: &Rc<Self>) {
@@ -4169,6 +4177,9 @@ impl App {
         self.add_view(view, prof_id.clone(), true);
         self.select_palette_profile(&prof_id);
         self.show_palette();
+        self.entry.set_text("");
+        self.last_entry_len.set(0);
+        self.entry.grab_focus();
     }
 
     fn new_tab_with_url_and_profile(self: &Rc<Self>, url: &str, profile_id: &str) {
@@ -6880,30 +6891,14 @@ impl App {
     }
 
     fn open_new_tab_palette(self: &Rc<Self>) {
-        self.exit_overview();
-        self.palette_for_new_tab.set(true);
-
-        self.entry.set_text("");
-
-        let prof_id = self.profiles.borrow().active_id().to_string();
-        self.select_palette_profile(&prof_id);
-        self.rebuild_profile_popover();
-
-        self.palette_suggestions_box.set_visible(false);
-        self.clear_suggestions_ui();
-        *self.current_suggestions.borrow_mut() = Vec::new();
-        self.selected_suggestion_idx.set(None);
-        self.last_entry_len.set(0);
-
-        self.update_palette_size();
-        self.palette.set_visible(true);
-        self.entry.grab_focus();
+        // Ctrl+T = new tab with welcome page + empty omnibar (not rail://start in the input)
+        self.new_tab();
     }
 
     fn show_palette(self: &Rc<Self>) {
         self.palette_for_new_tab.set(false);
         let shown = self.focused_display_uri();
-        let shown = if shown == tr("Search or enter address") {
+        let shown = if shown == tr("Search or enter address") || shown.is_empty() {
             String::new()
         } else {
             shown
@@ -6923,7 +6918,12 @@ impl App {
         self.update_palette_size();
         self.palette.set_visible(true);
         self.entry.grab_focus();
-        self.entry.select_region(0, -1);
+        if shown.is_empty() {
+            // Welcome / empty: caret at start, nothing selected
+            self.entry.set_position(0);
+        } else {
+            self.entry.select_region(0, -1);
+        }
     }
 
     fn hide_palette(&self) {
