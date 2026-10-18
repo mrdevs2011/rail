@@ -1,9 +1,0 @@
-[package]
-name = "spike-tao-wry"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-gtk = { version = "0.18", features = ["v3_24"] }
-tao = "0.30"
-wry = "0.46"

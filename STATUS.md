@@ -29,8 +29,7 @@
 
 ---
 ### 2026-10-16 22:45
-- Qilindi: CI to'liq — main push da avtomatik 3 OS build (Rail Linux + spike Linux/macOS/Windows). release.yml tuzatildi (to'g'ri asset nomi + SHA256SUMS). index.html/package.json versiya 0.5.9. Mac/Win asosiy binary hali GTK4 sabab chiqmaydi — spike orqali yo'l ochiq.
-- Keyingi qadam: tao+wry spike da ko'p webview + profil izolyatsiyasini yakunlash, keyin asosiy Rail ni ko'chirish.
+- Qilindi: CI to'liq — main push da avtomatik Linux build. release.yml tuzatildi (to'g'ri asset nomi + SHA256SUMS). index.html/package.json versiya 0.5.9.
 - Git holati: CI workflows + index.html yangilandi
 
 ---
