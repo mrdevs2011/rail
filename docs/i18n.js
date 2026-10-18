@@ -120,7 +120,7 @@ const DOCS_T = {
 
     // Installation page
     inst_title: "O'rnatish va CLI Qo'llanmasi",
-    inst_lead: "Rail Linux tizimlarida o'ta yengil va birgina buyruq bilan o'rnatiladi. Windows va macOS uchun esa tez orada chiqariladi.",
+    inst_lead: "Rail Linux tizimlarida o'ta yengil va birgina buyruq bilan o'rnatiladi.",
     inst_m1_title: "1-usul: Bir qatorli avtomatik o'rnatish (Tavsiya etiladi)",
     inst_m1_p: "Ushbu buyruq kerakli kutubxonalarni tekshiradi, binarni `~/.local/bin/rail` ga joylaydi va tizim menyusiga ilova yorlig'ini qo'shadi:",
     inst_m2_title: "2-usul: Tayyor binar faylni yuklab olish (~500 KB)",
@@ -229,7 +229,7 @@ const DOCS_T = {
 
     // Installation page
     inst_title: "Installation & CLI Guide",
-    inst_lead: "Rail installs on Linux in seconds via a one-line installer. Windows and macOS support is on the active roadmap.",
+    inst_lead: "Rail installs on Linux in seconds via a one-line installer.",
     inst_m1_title: "Method 1: One-line Automatic Installer (Recommended)",
     inst_m1_p: "This script verifies prerequisites, copies the binary to `~/.local/bin/rail`, and adds a desktop menu entry:",
     inst_m2_title: "Method 2: Standalone Binary (~500 KB)",
@@ -338,7 +338,7 @@ const DOCS_T = {
 
     // Installation page
     inst_title: "Установка и справочник CLI",
-    inst_lead: "Rail устанавливается в Linux за пару секунд одной командой. Поддержка Windows и macOS находится в активной разработке.",
+    inst_lead: "Rail устанавливается в Linux за пару секунд одной командой.",
     inst_m1_title: "Способ 1: Автоматическая установка одной строкой (Рекомендуется)",
     inst_m1_p: "Скрипт проверяет зависимости, копирует бинарник в `~/.local/bin/rail` и добавляет ярлык в меню приложений:",
     inst_m2_title: "Способ 2: Готовый бинарный файл (~500 КБ)",

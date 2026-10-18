@@ -1,6 +1,6 @@
 # Rail Roadmap
 
-> **Maqsad:** bitta kod, uch tizim (Linux, macOS, Windows), hammasi **bepul**. Toza qora-oq dasturchi brauzeri. O'rnatish va yangilash foydalanuvchi uchun 1 bosish.
+> **Maqsad:** faqat Linux, hammasi **bepul**. Toza qora-oq dasturchi brauzeri. O'rnatish va yangilash foydalanuvchi uchun 1 bosish.
 > Oxirgi yangilanish: 2026-10-17 (v0.5.56). Sayt: https://rail-browser.vercel.app
 >
 > **Qaror:** rail.uz domeni olinmaydi. Sayt Vercel'da (rail-browser.vercel.app) turaveradi. Butun yo'l 100% bepul.
@@ -40,7 +40,7 @@ Belgilar: [x] tayyor, [ ] qilinadi, [?] tajribada tekshiriladi, [~] boshlangan /
 - [x] To'liq i18n: o'zbekcha (default), English, Русский — Settings > Interface Language + sayt
 - [x] Ko'p sahifali docs/ (architecture, shortcuts, profiles, installation, configuration) + real-time i18n sync
 - [x] **Sayt jonli:** https://rail-browser.vercel.app
-- [x] **CI:** `main` ga push → Linux rail build + spike (Linux/macOS/Windows). Tag `v*` → release + SHA256SUMS
+- [x] **CI:** `main` ga push → Linux rail build. Tag `v*` → release + SHA256SUMS
 
 **Cheklov:** UI qatlami GTK4 ga bog'langan. macOS/Windows uchun 3-bosqich (tao + wry) hal qiladi.
 
