@@ -3756,15 +3756,15 @@ impl App {
 
     // ---- strip scrolling -------------------------------------------------
 
-    /// Normal mode: scroll 2D minimum needed to show focused row and column.
-    /// Overview: center the 2D grid in the zoomed-out plane.
-    fn reveal_focus(self: &Rc<Self>) {
+    /// Camera offsets that keep the overview grid framed with equal margins
+    /// (or focused on the active tab when the grid is larger than the view).
+    /// Computed for an arbitrary zoom so animation frames stay centered — not skewed.
+    fn overview_offsets_at_zoom(&self, z: f64) -> (f64, f64) {
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
-        if vw <= 0.0 || vh <= 0.0 {
-            return;
+        if vw <= 0.0 || vh <= 0.0 || z <= 0.01 {
+            return (self.target_x.get(), self.target_y.get());
         }
-        let z = self.target_zoom.get();
         let visible_w = vw / z;
         let visible_h = vh / z;
         let g = gap(z);
@@ -3773,13 +3773,12 @@ impl App {
 
         let rows = self.rows.borrow();
         if rows.is_empty() {
-            return;
+            return (0.0, 0.0);
         }
 
         let total_h = rows.len() as f64 * vh + (rows.len().saturating_sub(1) as f64) * g;
         let mut max_w: f64 = 0.0;
         let mut active_span: Option<(f64, f64)> = None;
-        let mut active_row_total_w = 0.0;
 
         for (ri, row) in rows.iter().enumerate() {
             let cols = row_cols(row, vw, g);
@@ -3790,32 +3789,67 @@ impl App {
                     .map(|&(_, _, x, w)| (x, x + w));
             }
             let row_w = cols.last().map_or(0.0, |&(_, _, x, w)| x + w);
-            if ri == cur_r {
-                active_row_total_w = row_w;
-            }
             if row_w > max_w {
                 max_w = row_w;
             }
         }
         drop(rows);
 
-        let (target_x, target_y) = if self.ov.get() {
-            let ty = if total_h <= visible_h {
-                -(visible_h - total_h) / 2.0
-            } else {
-                let row_center_y = cur_r as f64 * (vh + g) + vh / 2.0;
-                let max_y = (total_h - visible_h).max(0.0);
-                (row_center_y - visible_h / 2.0).clamp(0.0, max_y)
-            };
+        // Equal margins when the whole grid fits; otherwise center on the focused tab.
+        let ty = if total_h <= visible_h {
+            -(visible_h - total_h) / 2.0
+        } else {
+            let row_center_y = cur_r as f64 * (vh + g) + vh / 2.0;
+            let max_y = (total_h - visible_h).max(0.0);
+            (row_center_y - visible_h / 2.0).clamp(0.0, max_y)
+        };
 
-            let tx = if max_w <= visible_w {
-                -(visible_w - max_w) / 2.0
-            } else {
-                let max_x = (max_w - visible_w).max(0.0);
-                let col_center_x = active_span.map_or(0.0, |(l, r)| (l + r) / 2.0);
-                (col_center_x - visible_w / 2.0).clamp(0.0, max_x)
-            };
-            (tx, ty)
+        let tx = if max_w <= visible_w {
+            -(visible_w - max_w) / 2.0
+        } else {
+            let max_x = (max_w - visible_w).max(0.0);
+            let col_center_x = active_span.map_or(0.0, |(l, r)| (l + r) / 2.0);
+            (col_center_x - visible_w / 2.0).clamp(0.0, max_x)
+        };
+        (tx, ty)
+    }
+
+    /// Normal mode: scroll 2D minimum needed to show focused row and column.
+    /// Overview: center the 2D grid in the zoomed-out plane (equal margins).
+    fn reveal_focus(self: &Rc<Self>) {
+        let vw = self.strip.width() as f64;
+        let vh = self.strip.height() as f64;
+        if vw <= 0.0 || vh <= 0.0 {
+            return;
+        }
+        let z = self.target_zoom.get();
+        let visible_w = vw / z;
+        let g = gap(z);
+        let cur_r = self.focus_row.get();
+        let cur_c = self.focus_col.get();
+
+        let rows = self.rows.borrow();
+        if rows.is_empty() {
+            return;
+        }
+
+        let mut active_span: Option<(f64, f64)> = None;
+        let mut active_row_total_w = 0.0;
+
+        for (ri, row) in rows.iter().enumerate() {
+            let cols = row_cols(row, vw, g);
+            if ri == cur_r {
+                active_span = cols
+                    .iter()
+                    .find(|&&(st, len, _, _)| cur_c >= st && cur_c < st + len)
+                    .map(|&(_, _, x, w)| (x, x + w));
+                active_row_total_w = cols.last().map_or(0.0, |&(_, _, x, w)| x + w);
+            }
+        }
+        drop(rows);
+
+        let (target_x, target_y) = if self.ov.get() {
+            self.overview_offsets_at_zoom(z)
         } else {
             let ty = cur_r as f64 * (vh + g);
             let tx = if let Some((l, r)) = active_span {
@@ -3863,17 +3897,32 @@ impl App {
             let dt = last.replace(Some(now)).map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
             let k = 1.0 - (-dt / 0.05).exp();
 
-            let (oxc, oxt) = (app.layout.offset_x(), app.target_x.get());
-            let (oyc, oyt) = (app.layout.offset_y(), app.target_y.get());
-            let (zc, zt) = (app.layout.zoom(), app.target_zoom.get());
+            let oxc = app.layout.offset_x();
+            let oyc = app.layout.offset_y();
+            let zc = app.layout.zoom();
+            let zt = app.target_zoom.get();
+
+            let mut nz = zc + (zt - zc) * k;
+            if near(zt, nz, 0.002) {
+                nz = zt;
+            }
+
+            // Recompute camera for *current* zoom so every frame has equal margins
+            // (independent zoom/offset easing used to skew the frame mid-animation).
+            let (oxt, oyt) = if nz < 0.999 {
+                app.overview_offsets_at_zoom(nz)
+            } else {
+                (app.target_x.get(), app.target_y.get())
+            };
 
             let mut nx = oxc + (oxt - oxc) * k;
             let mut ny = oyc + (oyt - oyc) * k;
-            let mut nz = zc + (zt - zc) * k;
-
-            if near(oxt, nx, 0.5) { nx = oxt; }
-            if near(oyt, ny, 0.5) { ny = oyt; }
-            if near(zt, nz, 0.002) { nz = zt; }
+            if near(oxt, nx, 0.5) {
+                nx = oxt;
+            }
+            if near(oyt, ny, 0.5) {
+                ny = oyt;
+            }
 
             let grid_busy = app.layout.step_grid_progress(k);
 
