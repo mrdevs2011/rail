@@ -4062,9 +4062,18 @@ impl App {
             let mut nz = zc + (zt - zc) * k;
             if near(zt, nz, 0.002) { nz = zt; }
 
-            // Overview: keep equal margins every frame (not independent x/y lerp)
-            let (mut nx, mut ny) = if app.ov.get() {
-                app.overview_offsets_at_zoom(nz)
+            let (mut nx, mut ny) = if app.ov.get() && zt < 1.0 {
+                // Pure zoom-out: fixed world anchor under screen center (no rise/slide)
+                let vw = strip.width() as f64;
+                let vh = strip.height() as f64;
+                if vw > 1.0 && vh > 1.0 && nz > 0.01 {
+                    // Anchor = pre-overview camera center (saved on enter)
+                    let ax = app.ov_saved_x.get() + vw * 0.5;
+                    let ay = app.ov_saved_y.get() + vh * 0.5;
+                    (ax - (vw * 0.5) / nz, ay - (vh * 0.5) / nz)
+                } else {
+                    (oxt, oyt)
+                }
             } else {
                 let mut nx = oxc + (oxt - oxc) * k;
                 let mut ny = oyc + (oyt - oyc) * k;
@@ -4072,15 +4081,8 @@ impl App {
                 if near(oyt, ny, 0.5) { ny = oyt; }
                 (nx, ny)
             };
-            if !app.ov.get() {
-                // already set above
-            } else {
-                // Snap to final targets when zoom is done
-                if nz == zt {
-                    nx = oxt;
-                    ny = oyt;
-                }
-            }
+            if near(oxt, nx, 0.5) && nz == zt { nx = oxt; }
+            if near(oyt, ny, 0.5) && nz == zt { ny = oyt; }
 
             let grid_busy = app.layout.step_grid_progress(k);
 
@@ -8676,10 +8678,8 @@ impl App {
         }
         self.settings_modal.set_can_target(false);
 
-        // Niri-style overview: frame the whole grid with *equal margins* on all
-        // four sides when it fits; otherwise center on the focused tab.
-        // Offsets are recomputed every animation frame from the current zoom so
-        // the framing never skews (Bad vs Good diagram).
+        // Pure zoom-out from the current viewport center (no pan / rise).
+        // Same world point stays under the screen center for the whole animation.
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
         if vw <= 1.0 || vh <= 1.0 {
@@ -8687,15 +8687,24 @@ impl App {
             self.animate();
             return;
         }
+        // Snap camera so the anchor is not mid-ease
         self.layout.set_offset_x(self.target_x.get());
         self.layout.set_offset_y(self.target_y.get());
         self.layout.set_zoom(1.0);
         self.strip.queue_allocate();
 
-        self.target_zoom.set(OV_ZOOM);
-        let (tx, ty) = self.overview_offsets_at_zoom(OV_ZOOM);
+        let ox0 = self.target_x.get();
+        let oy0 = self.target_y.get();
+        // World point currently under the viewport center
+        let anchor_x = ox0 + vw * 0.5;
+        let anchor_y = oy0 + vh * 0.5;
+        // Keep that point centered while zooming to OV_ZOOM
+        let tx = anchor_x - (vw * 0.5) / OV_ZOOM;
+        let ty = anchor_y - (vh * 0.5) / OV_ZOOM;
+
         self.target_x.set(tx);
         self.target_y.set(ty);
+        self.target_zoom.set(OV_ZOOM);
         self.animate();
     }
 
