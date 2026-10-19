@@ -235,12 +235,6 @@ impl App {
             self.cycle_tab(-1);
             return true;
         }
-        // Ctrl+Shift+T: toggle Touchpad Slide (keycode 28 = physical T on any layout)
-        if ctrl && shift && !alt && (k == gdk::Key::t || keycode == 28) {
-            self.toggle_touchpad_mode();
-            return true;
-        }
-
         if !ctrl && !shift && !alt && k == gdk::Key::F11 {
             self.win.set_fullscreened(!self.win.is_fullscreen());
             return true;
@@ -352,7 +346,6 @@ impl App {
 
         if alt && shift && !ctrl {
             match k {
-                gdk::Key::t | gdk::Key::T => self.toggle_touchpad_mode(),
                 gdk::Key::v | gdk::Key::V => self.split_vertical(),
                 gdk::Key::h => self.move_column(-1),
                 gdk::Key::l => self.move_column(1),

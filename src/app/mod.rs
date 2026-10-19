@@ -11,7 +11,6 @@ mod signals;
 mod lifecycle;
 mod focus;
 mod moving;
-mod touchpad;
 mod session;
 mod sidebar;
 mod load_bar;
@@ -101,19 +100,8 @@ pub(crate) struct App {
     pub(crate) add_prof_btn: gtk::Button,
     pub(crate) new_profile_color_idx: Cell<usize>,
     pub(crate) color_buttons: RefCell<Vec<gtk::Button>>,
-    pub(crate) touchpad_mode: Cell<bool>,
-    pub(crate) tp_switch: gtk::Switch,
-    pub(crate) touchpad_toast: gtk::Revealer,
-    pub(crate) touchpad_toast_state: gtk::Label,
-    pub(crate) touchpad_toast_sub: gtk::Label,
-    pub(crate) touchpad_toast_gen: Cell<u32>,
-    pub(crate) touchpad_toast_hover: Cell<bool>,
     /// Active screenshot overlay (Zen-style); removed on capture/cancel.
     pub(crate) ss_overlay: RefCell<Option<gtk::Overlay>>,
-    /// Cached: can the focused page scroll (either axis)? Touchpad slide yields to the page then.
-    pub(crate) page_scrollable: Cell<bool>,
-    /// monotonic µs of the last scroll event seen in Touchpad Slide mode (poll only when idle)
-    pub(crate) last_scroll_us: Cell<i64>,
     pub(crate) last_saved_session: RefCell<String>,
     pub(crate) save_session_gen: Cell<u64>,
     pub(crate) data_modal_info_lbl: gtk::Label,

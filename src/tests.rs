@@ -4,11 +4,10 @@ use super::*;
 
 #[test]
 fn test_parse_session_content() {
-    let sample = "focus\t1\t0\nsidebar\t1\ntouchpad\t0\nwin\t1400\t850\t0\ntab\t0\t0\t1\tdefault\thttps://google.com\ntab\t1\t0\t1\twork\thttps://github.com\n";
+    let sample = "focus\t1\t0\nsidebar\t1\nwin\t1400\t850\t0\ntab\t0\t0\t1\tdefault\thttps://google.com\ntab\t1\t0\t1\twork\thttps://github.com\n";
     let state = parse_session_content(sample);
     assert_eq!(state.focus, (1, 0));
     assert_eq!(state.sidebar_open, Some(true));
-    assert_eq!(state.touchpad_mode, Some(false));
     assert_eq!(state.win_size, Some((1400, 850, false)));
     assert_eq!(state.tabs.len(), 2);
     assert_eq!(state.tabs[0], SessionTabItem {
@@ -35,7 +34,6 @@ fn test_parse_empty_session() {
     assert_eq!(state.tabs.len(), 0);
     assert_eq!(state.focus, (0, 0));
     assert_eq!(state.sidebar_open, None);
-    assert_eq!(state.touchpad_mode, None);
     assert_eq!(state.win_size, None);
 }
 
@@ -142,7 +140,6 @@ fn test_app_settings_roundtrip() {
     let path = dir.join("settings.json");
     let s = AppSettings {
         search_engine: "duckduckgo".to_string(),
-        touchpad_mode: true,
         smooth_scrolling: false,
         webrtc_enabled: true,
         auto_update: false,
@@ -153,7 +150,6 @@ fn test_app_settings_roundtrip() {
     };
     let mut out = String::from("{\n");
     out.push_str(&format!("  \"search_engine\": \"{}\",\n", minijson::escape(&s.search_engine)));
-    out.push_str(&format!("  \"touchpad_navigation\": {},\n", s.touchpad_mode));
     out.push_str(&format!("  \"smooth_scrolling\": {},\n", s.smooth_scrolling));
     out.push_str(&format!("  \"webrtc_enabled\": {}\n", s.webrtc_enabled));
     out.push_str("}\n");
@@ -161,7 +157,6 @@ fn test_app_settings_roundtrip() {
 
     let parsed = minijson::parse(&out).unwrap();
     assert_eq!(parsed.get("search_engine").and_then(|v| v.as_str()), Some("duckduckgo"));
-    assert_eq!(parsed.get("touchpad_navigation").and_then(|v| v.as_bool()), Some(true));
     assert_eq!(parsed.get("smooth_scrolling").and_then(|v| v.as_bool()), Some(false));
     assert_eq!(parsed.get("webrtc_enabled").and_then(|v| v.as_bool()), Some(true));
     let _ = std::fs::remove_dir_all(dir);

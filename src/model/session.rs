@@ -14,7 +14,6 @@ pub(crate) struct SessionTabItem {
 pub(crate) struct SessionState {
     pub(crate) focus: (usize, usize),
     pub(crate) sidebar_open: Option<bool>,
-    pub(crate) touchpad_mode: Option<bool>,
     pub(crate) search_engine: Option<String>,
     pub(crate) win_size: Option<(i32, i32, bool)>,
     pub(crate) tabs: Vec<SessionTabItem>,
@@ -25,7 +24,6 @@ pub(crate) struct SessionState {
 pub(crate) fn parse_session_content(content: &str) -> SessionState {
     let mut focus = (0usize, 0usize);
     let mut sidebar_open = None;
-    let mut touchpad_mode = None;
     let mut search_engine = None;
     let mut win_size = None;
     let mut tabs: Vec<SessionTabItem> = Vec::new();
@@ -44,9 +42,6 @@ pub(crate) fn parse_session_content(content: &str) -> SessionState {
             }
             "sidebar" if parts.len() >= 2 => {
                 sidebar_open = Some(parts[1] == "1");
-            }
-            "touchpad" if parts.len() >= 2 => {
-                touchpad_mode = Some(parts[1] == "1");
             }
             "engine" | "search_engine" if parts.len() >= 2 => {
                 search_engine = Some(parts[1].trim().to_string());
@@ -80,9 +75,7 @@ pub(crate) fn parse_session_content(content: &str) -> SessionState {
     }
     SessionState {
         focus,
-        sidebar_open,
-        touchpad_mode,
-        search_engine,
+        sidebar_open, search_engine,
         win_size,
         tabs,
         stacked,

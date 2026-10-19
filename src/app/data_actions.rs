@@ -142,7 +142,6 @@ impl App {
                 app.save_session_immediate();
                 let mut s = load_app_settings();
                 s.search_engine = app.search_engine.borrow().clone();
-                s.touchpad_mode = app.touchpad_mode.get();
                 save_app_settings(&s);
 
                 let data_dir = rail_data_dir();
@@ -233,10 +232,7 @@ impl App {
                                 match imp_res {
                                     Ok(()) => {
                                         let imported_settings = load_app_settings();
-                                        *app_check.search_engine.borrow_mut() = imported_settings.search_engine.clone();
-                                        app_check.touchpad_mode.set(imported_settings.touchpad_mode);
-                                        app_check.tp_switch.set_active(imported_settings.touchpad_mode);
-                                        reload_customize_from_disk();
+                                        *app_check.search_engine.borrow_mut() = imported_settings.search_engine.clone();                                        reload_customize_from_disk();
                                         app_check.reload_css_editor();
                                         *app_check.profiles.borrow_mut() = ProfileManager::new(rail_data_dir());
                                         app_check.rebuild_profiles_modal_list();
@@ -290,7 +286,6 @@ impl App {
         self.save_session_immediate();
         let mut s = load_app_settings();
         s.search_engine = self.search_engine.borrow().clone();
-        s.touchpad_mode = self.touchpad_mode.get();
         save_app_settings(&s);
         let path_str = self.data_export_entry.text().to_string();
         let path = PathBuf::from(path_str.trim());
@@ -331,9 +326,6 @@ impl App {
                 // Reload settings from imported settings.json
                 let imported_settings = load_app_settings();
                 *self.search_engine.borrow_mut() = imported_settings.search_engine.clone();
-                self.touchpad_mode.set(imported_settings.touchpad_mode);
-                self.tp_switch.set_active(imported_settings.touchpad_mode);
-
                 // Reload profile manager from imported profiles.txt
                 reload_customize_from_disk();
                 self.reload_css_editor();

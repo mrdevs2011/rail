@@ -21,7 +21,6 @@ impl App {
         let mut out = String::new();
         out.push_str(&format!("focus\t{}\t{}\n", self.focus_row.get(), self.focus_col.get()));
         out.push_str(&format!("sidebar\t{}\n", if self.side_open.get() { 1 } else { 0 }));
-        out.push_str(&format!("touchpad\t{}\n", if self.touchpad_mode.get() { 1 } else { 0 }));
         out.push_str(&format!("engine\t{}\n", self.search_engine.borrow()));
         let win_w = self.win.width();
         let win_h = self.win.height();
@@ -105,10 +104,6 @@ impl App {
             }
         }
 
-        if let Some(tp) = state.touchpad_mode {
-            self.touchpad_mode.set(tp);
-            self.tp_switch.set_active(tp);
-        }
 
         if let Some(engine) = state.search_engine {
             *self.search_engine.borrow_mut() = engine;

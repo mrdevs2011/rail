@@ -123,7 +123,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     settings_body.append(&settings_stack);
     settings_modal.append(&settings_body);
 
-    let GeneralPage { engine_buttons, initial_settings, tp_switch } = build_general_page(&settings_stack);
+    let GeneralPage { engine_buttons, initial_settings } = build_general_page(&settings_stack);
     let CustomizePage { css_buffer } = build_customize_page(&settings_stack);
     let ProfilesPage { add_prof_btn, color_btns, new_profile_color_idx, new_profile_entry, new_profile_error_lbl, page_prof_scroll, profiles_list_box } = build_profiles_page(&settings_stack);
     let DataPage { btn_clear_cache, btn_clear_hist, btn_copy_sync_url, btn_export_local, btn_import_local, btn_sync_now, btn_sync_restore, data_export_entry, data_import_entry, data_info_lbl, data_modal_status_lbl, sync_restore_entry, sync_url_result_entry } = build_data_page(&settings_stack);
@@ -140,50 +140,11 @@ pub(crate) fn build(gapp: &gtk::Application) {
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&shell));
     overlay.add_overlay(&load_bar);
-    let touchpad_toast = gtk::Revealer::new();
-    touchpad_toast.set_transition_type(gtk::RevealerTransitionType::SlideUp);
-    touchpad_toast.set_transition_duration(220);
-    touchpad_toast.set_halign(gtk::Align::End);
-    touchpad_toast.set_valign(gtk::Align::End);
-    touchpad_toast.set_margin_end(16);
-    touchpad_toast.set_margin_bottom(16);
-    // Absorb clicks so the page behind is not activated
-    touchpad_toast.set_can_target(true);
-    touchpad_toast.set_reveal_child(false);
-    let tp_card = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    tp_card.add_css_class("update-card");
-    tp_card.set_size_request(270, -1);
-    tp_card.set_can_target(true);
-    let tp_top = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    let tp_kicker = gtk::Label::new(Some(tr("TOUCHPAD SLIDE")));
-    tp_kicker.add_css_class("update-kicker");
-    tp_kicker.set_xalign(0.0);
-    tp_kicker.set_hexpand(true);
-    let tp_close = gtk::Button::with_label("\u{00d7}");
-    tp_close.add_css_class("update-close");
-    tp_close.set_tooltip_text(Some(tr("Dismiss")));
-    tp_close.set_halign(gtk::Align::End);
-    tp_close.set_valign(gtk::Align::Start);
-    tp_top.append(&tp_kicker);
-    tp_top.append(&tp_close);
-    let touchpad_toast_state = gtk::Label::new(None);
-    touchpad_toast_state.add_css_class("update-ver");
-    touchpad_toast_state.set_xalign(0.0);
-    let touchpad_toast_sub = gtk::Label::new(None);
-    touchpad_toast_sub.add_css_class("update-sub");
-    touchpad_toast_sub.set_xalign(0.0);
-    touchpad_toast_sub.set_wrap(true);
-    tp_card.append(&tp_top);
-    tp_card.append(&touchpad_toast_state);
-    tp_card.append(&touchpad_toast_sub);
-    touchpad_toast.set_child(Some(&tp_card));
-
     // Settings overlays the strip only (tab square), not the whole window
     strip_host.add_overlay(&settings_modal);
 
     overlay.add_overlay(&palette);
     overlay.add_overlay(&ov_hint);
-    overlay.add_overlay(&touchpad_toast);
     overlay.add_overlay(&map_container);
     overlay.add_overlay(&devtools_panel);
 
@@ -256,16 +217,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         add_prof_btn: add_prof_btn.clone(),
         new_profile_color_idx,
         color_buttons: RefCell::new(color_btns),
-        touchpad_mode: Cell::new(false),
-        tp_switch: tp_switch.clone(),
-        touchpad_toast,
-        touchpad_toast_state,
-        touchpad_toast_sub,
-        touchpad_toast_gen: Cell::new(0),
-        touchpad_toast_hover: Cell::new(false),
         ss_overlay: RefCell::new(None),
-        page_scrollable: Cell::new(false),
-        last_scroll_us: Cell::new(0),
         last_saved_session: RefCell::new(String::new()),
         save_session_gen: Cell::new(0),
         data_modal_info_lbl: data_info_lbl.clone(),
@@ -293,13 +245,11 @@ pub(crate) fn build(gapp: &gtk::Application) {
         search_engine: RefCell::new(initial_settings.search_engine.clone()),
     });
 
-    app.touchpad_mode.set(initial_settings.touchpad_mode);
-    tp_switch.set_active(initial_settings.touchpad_mode);
     app.select_palette_profile(&initial_prof_id);
 
     wire_minimap(&app, map_close_btn, map_container, map_drawing_area, map_header_row, map_location_btn, overlay);
 
-    wire_settings(&app, add_prof_btn, btn_clear_cache, btn_clear_hist, btn_copy_sync_url, btn_export_local, btn_import_local, btn_sync_now, btn_sync_restore, engine_buttons, layout.clone(), new_profile_entry, settings_close_btn, settings_update_chip, sync_restore_entry, sync_url_result_entry, tab_buttons_vec, tp_switch, win.clone());
+    wire_settings(&app, add_prof_btn, btn_clear_cache, btn_clear_hist, btn_copy_sync_url, btn_export_local, btn_import_local, btn_sync_now, btn_sync_restore, engine_buttons, layout.clone(), new_profile_entry, settings_close_btn, settings_update_chip, sync_restore_entry, sync_url_result_entry, tab_buttons_vec, win.clone());
 
     let a = app.clone();
     layout.connect_resized(move || {
@@ -319,7 +269,6 @@ pub(crate) fn build(gapp: &gtk::Application) {
     }
     app.sync_brand_logo();
 
-    wire_toast(&app, tp_close);
     wire_palette(&app, entry, pill);
 
     wire_gestures(&app, shell, win.clone());

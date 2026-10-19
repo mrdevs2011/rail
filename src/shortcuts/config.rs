@@ -91,7 +91,6 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("zoom_reset", G_PANELS, "Reset zoom (page 100%, overview default)", ["Ctrl+0"]),
     sc!("sidebar", G_PANELS, "Toggle Sidebar", ["Alt+B"]),
     sc!("downloads", G_PANELS, "Open Downloads", ["Ctrl+J"]),
-    sc!("touchpad", G_PANELS, "Toggle Touchpad Canvas Navigation", ["Ctrl+Shift+T"]),
     sc!("fullscreen", G_PANELS, "Toggle Fullscreen", ["F11"]),
     sc!("quit", G_PANELS, "Quit Rail", ["Ctrl+Q"]),
 ];

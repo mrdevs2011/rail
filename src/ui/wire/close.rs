@@ -55,21 +55,4 @@ pub(crate) fn wire_close(app: &Rc<App>, win: gtk::ApplicationWindow) {
             glib::ControlFlow::Continue
         });
     }
-
-    {
-        // Keep the "page can scroll" flag fresh while Touchpad Slide is on
-        let weak = Rc::downgrade(&app);
-        // Never while scrolling or animating: a JS round-trip (forced style/layout) every 200 ms
-        // made normal page scrolling hitch. Only poll when the page has been idle for a while.
-        glib::timeout_add_local(Duration::from_millis(500), move || match weak.upgrade() {
-            Some(a) => {
-                let idle = glib::monotonic_time() - a.last_scroll_us.get() > 700_000;
-                if a.touchpad_mode.get() && idle && !a.animating.get() {
-                    a.refresh_page_scrollable();
-                }
-                glib::ControlFlow::Continue
-            }
-            None => glib::ControlFlow::Break,
-        });
-    }
 }

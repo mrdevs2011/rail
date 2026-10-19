@@ -34,9 +34,7 @@ impl App {
         }
 
         match tab {
-            SettingsTab::General => {
-                self.tp_switch.set_active(self.touchpad_mode.get());
-            }
+            SettingsTab::General => {            }
             SettingsTab::Profiles => {
                 self.rebuild_profiles_modal_list();
                 self.new_profile_entry.set_text("");

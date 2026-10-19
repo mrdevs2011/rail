@@ -25,7 +25,6 @@ pub(crate) fn settings_json_path() -> PathBuf {
 #[derive(Clone, Debug)]
 pub(crate) struct AppSettings {
     pub(crate) search_engine: String,
-    pub(crate) touchpad_mode: bool,
     pub(crate) smooth_scrolling: bool,
     pub(crate) webrtc_enabled: bool,
     /// Launchda yangi versiyani tekshirib o'rnatish
@@ -44,7 +43,6 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             search_engine: "google".to_string(),
-            touchpad_mode: false,
             smooth_scrolling: true,
             webrtc_enabled: true,
             auto_update: false,
@@ -89,9 +87,6 @@ pub(crate) fn load_app_settings() -> AppSettings {
         if let Some(se) = root.get("search_engine").and_then(|v| v.as_str()) {
             s.search_engine = se.to_string();
         }
-        if let Some(tp) = root.get("touchpad_navigation").and_then(|v| v.as_bool()) {
-            s.touchpad_mode = tp;
-        }
         if let Some(ss) = root.get("smooth_scrolling").and_then(|v| v.as_bool()) {
             s.smooth_scrolling = ss;
         }
@@ -124,8 +119,6 @@ pub(crate) fn save_app_settings(s: &AppSettings) -> bool {
 ");
     out.push_str(&format!("  \"search_engine\": \"{}\",
 ", minijson::escape(&s.search_engine)));
-    out.push_str(&format!("  \"touchpad_navigation\": {},
-", s.touchpad_mode));
     out.push_str(&format!("  \"smooth_scrolling\": {},
 ", s.smooth_scrolling));
     out.push_str(&format!("  \"webrtc_enabled\": {},

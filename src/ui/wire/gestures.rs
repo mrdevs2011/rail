@@ -1,4 +1,4 @@
-//! Window gestures: click-away and touchpad / wheel panning of the strip.
+//! Window gestures: click-away and overview touchpad / wheel panning of the strip.
 
 use crate::*;
 
@@ -51,7 +51,6 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
             if !a.ov.get() || a.ov_exiting.get() {
                 return glib::Propagation::Proceed;
             }
-            // Only when Ctrl is held (check via seat) — GestureZoom handles pure pinch.
             let ctrl = gtk::prelude::WidgetExt::display(&a.win)
                 .default_seat()
                 .and_then(|s| s.keyboard())
@@ -70,8 +69,8 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
         shell.add_controller(scroll_z);
     }
 
-    // BOTH_AXES only: KINETIC+DISCRETE on a Capture window controller makes page scroll sticky/janky
-    // (steals momentum from WebKit). Overview + touchpad slide still work via dx/dy deltas.
+    // Overview-only 2D pan (two-finger swipe between tabs/rows). Normal browsing leaves
+    // scroll to WebKit entirely — no Touchpad Slide mode.
     let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
     scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
     let accum_x = Rc::new(Cell::new(0.0f64));
@@ -83,15 +82,8 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
     let ay = accum_y.clone();
     let ls = last_scroll.clone();
     let l_swipe = last_swipe.clone();
-    let panned = Rc::new(Cell::new(false));
-    let panned_c = panned.clone();
-    let tracker = Rc::new(RefCell::new(SwipeTracker::new()));
-    let tracker_c = tracker.clone();
-    let last_ev_us = Rc::new(Cell::new(0i64));
-    let last_ev_c = last_ev_us.clone();
-    scroll.connect_scroll(move |ctl, dx, dy| {
-        // Fast path: normal browsing — do not touch scroll at all (WebKit keeps smooth kinetic scroll)
-        if !a.ov.get() && !a.touchpad_mode.get() {
+    scroll.connect_scroll(move |_ctl, dx, dy| {
+        if !a.ov.get() {
             return glib::Propagation::Proceed;
         }
         if a.settings_modal_open() || a.palette_open() || a.map_open() {
@@ -99,103 +91,58 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
         }
 
         let now = glib::monotonic_time();
-        a.last_scroll_us.set(now);
 
-        // 2. Overview mode: 2D canvas pan navigation on zoomed-out workspace grid
-        if a.ov.get() {
-            // Cooldown prevents jumping across multiple rows/columns in a single swipe stroke
-            if now - l_swipe.get() < 280_000 {
-                ax.set(0.0);
-                ay.set(0.0);
-                return glib::Propagation::Stop;
-            }
-
-            if now - ls.get() > 250_000 {
-                ax.set(0.0);
-                ay.set(0.0);
-            }
-            ls.set(now);
-
-            let nx = ax.get() + dx;
-            let ny = ay.get() + dy;
-            ax.set(nx);
-            ay.set(ny);
-
-            const OV_THRESHOLD: f64 = 6.0;
-            if nx > OV_THRESHOLD {
-                ax.set(0.0);
-                l_swipe.set(now);
-                a.focus_column_right();
-                return glib::Propagation::Stop;
-            } else if nx < -OV_THRESHOLD {
-                ax.set(0.0);
-                l_swipe.set(now);
-                a.focus_column_left();
-                return glib::Propagation::Stop;
-            }
-
-            if ny > OV_THRESHOLD {
-                ay.set(0.0);
-                l_swipe.set(now);
-                a.focus_row_down();
-                return glib::Propagation::Stop;
-            } else if ny < -OV_THRESHOLD {
-                ay.set(0.0);
-                l_swipe.set(now);
-                a.focus_row_up();
-                return glib::Propagation::Stop;
-            }
-            return glib::Propagation::Proceed;
-        }
-
-        // 3. Touchpad slide mode (Ctrl+Shift+T): 1:1 finger tracking, not discrete tab jumps
-        if !a.touchpad_mode.get() {
-            return glib::Propagation::Proceed;
-        }
-
-        // The page can scroll by itself: leave the gesture alone so WebKit scrolls it natively.
-        // Touchpad slide only works on pages that have nothing to scroll.
-        if a.page_scrollable.get() {
-            return glib::Propagation::Proceed;
-        }
-
-        // Only clearly horizontal gestures pan the ribbon; everything else (incl. diagonal
-        // reading scroll) must reach WebKit or the page feels sticky.
-        if dx.abs() > 0.8 && dx.abs() > 2.0 * dy.abs() {
-            ls.set(now);
-            l_swipe.set(now);
-            if !panned_c.get() {
-                tracker_c.borrow_mut().reset();
-            }
-            panned_c.set(true);
-            tracker_c.borrow_mut().push(dx, ctl.current_event_time() as f64 / 1000.0);
-            last_ev_c.set(now);
-            a.pan_canvas_x(dx);
+        // Cooldown prevents jumping across multiple rows/columns in a single swipe stroke
+        if now - l_swipe.get() < 280_000 {
+            ax.set(0.0);
+            ay.set(0.0);
             return glib::Propagation::Stop;
         }
 
+        if now - ls.get() > 250_000 {
+            ax.set(0.0);
+            ay.set(0.0);
+        }
+        ls.set(now);
+
+        let nx = ax.get() + dx;
+        let ny = ay.get() + dy;
+        ax.set(nx);
+        ay.set(ny);
+
+        const OV_THRESHOLD: f64 = 6.0;
+        if nx > OV_THRESHOLD {
+            ax.set(0.0);
+            l_swipe.set(now);
+            a.focus_column_right();
+            return glib::Propagation::Stop;
+        } else if nx < -OV_THRESHOLD {
+            ax.set(0.0);
+            l_swipe.set(now);
+            a.focus_column_left();
+            return glib::Propagation::Stop;
+        }
+
+        if ny > OV_THRESHOLD {
+            ay.set(0.0);
+            l_swipe.set(now);
+            a.focus_row_down();
+            return glib::Propagation::Stop;
+        } else if ny < -OV_THRESHOLD {
+            ay.set(0.0);
+            l_swipe.set(now);
+            a.focus_row_up();
+            return glib::Propagation::Stop;
+        }
         glib::Propagation::Proceed
     });
     let ax2 = accum_x.clone();
     let ay2 = accum_y.clone();
     let l_swipe2 = last_swipe.clone();
     scroll.connect_decelerate(move |_, _vx, _vy| {
-        // The release is handled in scroll_end with our own velocity tracker (niri-style).
         ax2.set(0.0);
         ay2.set(0.0);
         l_swipe2.set(0);
-    });
-    // `decelerate` never fires without the KINETIC flag, so settle on the nearest column here
-    // (only if this gesture actually panned the ribbon).
-    let a_end = app.clone();
-    let panned_end = panned.clone();
-    scroll.connect_scroll_end(move |_| {
-        if panned_end.replace(false) && a_end.touchpad_mode.get() && !a_end.ov.get() {
-            let idle = (glib::monotonic_time() - last_ev_us.get()) as f64 / 1e6;
-            let vel = tracker.borrow_mut().release_velocity(idle);
-            tracker.borrow_mut().reset();
-            a_end.finish_slide(vel);
-        }
     });
     win.add_controller(scroll);
 }

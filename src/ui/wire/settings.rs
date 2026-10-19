@@ -2,7 +2,7 @@
 
 use crate::*;
 
-pub(crate) fn wire_settings(app: &Rc<App>, add_prof_btn: gtk::Button, btn_clear_cache: gtk::Button, btn_clear_hist: gtk::Button, btn_copy_sync_url: gtk::Button, btn_export_local: gtk::Button, btn_import_local: gtk::Button, btn_sync_now: gtk::Button, btn_sync_restore: gtk::Button, engine_buttons: Vec<(String, gtk::Button)>, layout: StripLayout, new_profile_entry: gtk::Entry, settings_close_btn: gtk::Button, settings_update_chip: gtk::Button, sync_restore_entry: gtk::Entry, sync_url_result_entry: gtk::Entry, tab_buttons_vec: Vec<(SettingsTab, gtk::Button)>, tp_switch: gtk::Switch, win: gtk::ApplicationWindow) {
+pub(crate) fn wire_settings(app: &Rc<App>, add_prof_btn: gtk::Button, btn_clear_cache: gtk::Button, btn_clear_hist: gtk::Button, btn_copy_sync_url: gtk::Button, btn_export_local: gtk::Button, btn_import_local: gtk::Button, btn_sync_now: gtk::Button, btn_sync_restore: gtk::Button, engine_buttons: Vec<(String, gtk::Button)>, layout: StripLayout, new_profile_entry: gtk::Entry, settings_close_btn: gtk::Button, settings_update_chip: gtk::Button, sync_restore_entry: gtk::Entry, sync_url_result_entry: gtk::Entry, tab_buttons_vec: Vec<(SettingsTab, gtk::Button)>, win: gtk::ApplicationWindow) {
     let a = app.clone();
     settings_close_btn.connect_clicked(move |_| {
         // X = close the settings tab (same as Ctrl+W), not just hide chrome
@@ -72,14 +72,6 @@ pub(crate) fn wire_settings(app: &Rc<App>, add_prof_btn: gtk::Button, btn_clear_
     btn_clear_cache.connect_clicked(move |_| a.clear_cache_action());
 
     let a = app.clone();
-    tp_switch.connect_state_set(move |_, state| {
-        a.touchpad_mode.set(state);
-        a.schedule_save_session();
-        let mut s = load_app_settings();
-        s.touchpad_mode = state;
-        save_app_settings(&s);
-        glib::Propagation::Proceed
-    });
 
     let a = app.clone();
     btn_sync_now.connect_clicked(move |_| a.prompt_and_execute_sync());

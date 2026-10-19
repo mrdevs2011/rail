@@ -5,7 +5,6 @@ use crate::*;
 pub(crate) struct GeneralPage {
     pub(crate) engine_buttons: Vec<(String, gtk::Button)>,
     pub(crate) initial_settings: AppSettings,
-    pub(crate) tp_switch: gtk::Switch,
 }
 
 pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
@@ -186,18 +185,6 @@ pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
     browse_title.set_xalign(0.0);
     browse_card.append(&browse_title);
 
-    let tp_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let tp_lbl = gtk::Label::new(Some(tr("Touchpad Canvas Navigation (Two-finger swipe navigates 2D canvas)")));
-    tp_lbl.add_css_class("shortcut-desc");
-    tp_lbl.set_hexpand(true);
-    tp_lbl.set_xalign(0.0);
-    let tp_switch = gtk::Switch::new();
-    tp_switch.set_active(false);
-    tp_switch.set_valign(gtk::Align::Center);
-    tp_row.append(&tp_lbl);
-    tp_row.append(&tp_switch);
-    browse_card.append(&tp_row);
-
     let scroll_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     let scroll_lbl = gtk::Label::new(Some(tr("WebKit Smooth Kinetic Scrolling")));
     scroll_lbl.add_css_class("shortcut-desc");
@@ -228,7 +215,7 @@ pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
     page_gen_scroll.set_child(Some(&page_general));
     settings_stack.add_named(&page_gen_scroll, Some("general"));
 
-    GeneralPage { engine_buttons, initial_settings, tp_switch }
+    GeneralPage { engine_buttons, initial_settings }
 }
 
 /// Dropdown row: country flag + language name (flag decoded lazily, only for rows that are shown).
