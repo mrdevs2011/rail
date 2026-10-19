@@ -175,8 +175,18 @@ impl App {
                     // Focused card stays live so the user can read it; hide freeze once painted.
                     continue;
                 }
-                // Settings is GTK-over-black-shell — never suspend (would show solid black card).
+                // Settings is GTK-over-black-shell — never suspend. Capture the full
+                // tab container (WebView + GTK overlay) so the card shows real content.
                 if App::is_settings_tab(tab) {
+                    // Snapshot the whole tab container (includes the settings GTK overlay).
+                    let wp = gtk::WidgetPaintable::new(Some(&tab.container));
+                    let frame = gdk::prelude::PaintableExt::current_image(&wp);
+                    if let Some(tex) = App::durableize_paintable(&frame, true) {
+                        tab.freeze.set_paintable(Some(&tex));
+                    }
+                    if tab.freeze.paintable().is_some() {
+                        tab.freeze.set_visible(true);
+                    }
                     continue;
                 }
                 // Non-focused: suspend web process, show freeze (or soft placeholder).
