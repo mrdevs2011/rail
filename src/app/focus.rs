@@ -118,7 +118,8 @@ impl App {
                         tab.suspended.set(false);
                         let uri = tab.saved_uri.borrow().clone();
                         if !uri.is_empty() {
-                            tab.freeze.set_visible(true); // cover dead WebView until first paint
+                            // Cover dead WebView only when we have a real last-frame picture.
+                            tab.freeze.set_visible(tab.freeze.paintable().is_some());
                             if is_internal_uri(&uri) {
                                 load_internal_page(&tab.view, &uri);
                             } else {

@@ -119,8 +119,8 @@ scrollbar button {
     background: transparent;
 }
 .tab-freeze {
-    /* Suspended tab without a frame: soft charcoal, never pure black hole */
-    background: #121212;
+    /* No placeholder colour — freeze is only visible when a real last-frame texture is set. */
+    background: transparent;
 }
 .tab {
     border-radius: 0;

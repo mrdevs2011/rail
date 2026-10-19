@@ -552,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "rail"
-version = "0.5.98"
+version = "0.5.100"
 dependencies = [
  "gtk4",
  "sha2",

@@ -295,11 +295,18 @@ impl App {
         }
         let wp = gtk::WidgetPaintable::new(Some(view));
         let frame = gdk::prelude::PaintableExt::current_image(&wp);
-        Self::durableize_paintable(&frame)
+        // Internal pages (rail://start) are legitimately near-black: accept their frame,
+        // otherwise such a tab would never get a picture.
+        let allow_black = view.uri().is_some_and(|u| u.starts_with("rail://"));
+        Self::durableize_paintable(&frame, allow_black)
     }
 
-    /// Copy any Paintable into a standalone MemoryTexture (pixel buffer owned by us).
-    pub(crate) fn durableize_paintable(p: &gdk::Paintable) -> Option<gdk::Texture> {
+    /// Max width for suspended-tab freeze frames. Full-res frames cost tens of MB each;
+    /// at 480px a frame is ~0.5–1 MB so every sleeping tab can keep its picture forever.
+    const FREEZE_MAX_W: i32 = 480;
+
+    /// Copy any Paintable into a standalone (optionally downscaled) MemoryTexture.
+    pub(crate) fn durableize_paintable(p: &gdk::Paintable, allow_black: bool) -> Option<gdk::Texture> {
         let tex = p.downcast_ref::<gdk::Texture>()?;
         let w = tex.width();
         let h = tex.height();
@@ -310,8 +317,30 @@ impl App {
         let mut buf = vec![0u8; stride * h as usize];
         tex.download(&mut buf, stride);
         // Reject near-black frames (failed / blank WebKit paint) — keep prior freeze instead.
-        if Self::frame_is_near_black(&buf) {
+        if !allow_black && Self::frame_is_near_black(&buf) {
             return None;
+        }
+        // Downscale so all suspended tabs keep a frame without ballooning RAM.
+        if w > Self::FREEZE_MAX_W {
+            let nw = Self::FREEZE_MAX_W;
+            let nh = ((h as i64 * nw as i64) / w as i64).max(1) as i32;
+            let nstride = nw as usize * 4;
+            let mut out = vec![0u8; nstride * nh as usize];
+            for y in 0..nh as usize {
+                let sy = y * h as usize / nh as usize;
+                let src_row = sy * stride;
+                let dst_row = y * nstride;
+                for x in 0..nw as usize {
+                    let sx = x * w as usize / nw as usize;
+                    let si = src_row + sx * 4;
+                    let di = dst_row + x * 4;
+                    out[di..di + 4].copy_from_slice(&buf[si..si + 4]);
+                }
+            }
+            let bytes = glib::Bytes::from_owned(out);
+            return Some(
+                gdk::MemoryTexture::new(nw, nh, gdk::MemoryFormat::R8g8b8a8, &bytes, nstride).upcast(),
+            );
         }
         let bytes = glib::Bytes::from_owned(buf);
         Some(
@@ -351,8 +380,10 @@ impl App {
         }
     }
 
-    /// Suspend a live tab: keep last durable frame visible, kill web process, free RAM.
-    /// Never leaves a solid black hole — freeze overlay stays up (CSS placeholder if no frame).
+    /// Suspend a live tab: save URL + last frame, kill the web process completely.
+    /// No CSS placeholder — freeze overlay is shown only when a real picture exists.
+    /// Without a frame the process still dies (URL is enough to wake); the card stays
+    /// empty of the charcoal placeholder layer so grey blocks never appear.
     pub(crate) fn suspend_tab(tab: &Tab) {
         if tab.suspended.get() || tab.keep_alive.get() || Self::is_settings_tab(tab) {
             return;
@@ -373,41 +404,15 @@ impl App {
                 tab.freeze.set_paintable(Some(&tex));
             }
         }
-        // Always show freeze layer when suspended — never expose a blank dead WebView.
-        tab.freeze.set_visible(true);
+        // Show freeze only when we have a real picture — never a grey placeholder.
+        if tab.freeze.paintable().is_some() {
+            tab.freeze.set_visible(true);
+        } else {
+            tab.freeze.set_visible(false);
+        }
         tab.suspended.set(true);
+        // Kill the web process hard: only image + URL remain for this tab.
         tab.view.terminate_web_process();
-    }
-
-    /// Drop freeze textures from oldest suspended tabs so RAM does not grow without bound.
-    /// Tab stays suspended; only the pixel buffer is released (CSS placeholder remains).
-    pub(crate) fn prune_freeze_frames(&self) {
-        let Ok(rows) = self.rows.try_borrow() else { return };
-        let max = match suspend_policy() {
-            // low mem / swap pressure path uses SUSPEND_AFTER_SECS + MAX_LIVE_TABS == 3
-            (_, 3) => 3usize,
-            (_, 4) => 5,
-            _ => 10,
-        };
-        let mut held: Vec<(std::time::Instant, usize, usize)> = Vec::new();
-        for (ri, row) in rows.iter().enumerate() {
-            for (ci, tab) in row.tabs.iter().enumerate() {
-                if tab.suspended.get() && tab.freeze.paintable().is_some() {
-                    held.push((tab.last_active.get(), ri, ci));
-                }
-            }
-        }
-        if held.len() <= max {
-            return;
-        }
-        held.sort_by_key(|(t, _, _)| *t); // oldest first
-        let drop_n = held.len() - max;
-        for (_, ri, ci) in held.into_iter().take(drop_n) {
-            if let Some(tab) = rows.get(ri).and_then(|r| r.tabs.get(ci)) {
-                // Keep overlay visible (non-black CSS) but free the texture.
-                tab.freeze.set_paintable(Option::<&gdk::Paintable>::None);
-            }
-        }
     }
 
     /// Davriy tekshiruv:
@@ -487,9 +492,7 @@ impl App {
             }
         }
 
-        // 4) Cap freeze textures so suspended-tab previews cannot bloat RAM.
-        drop(rows);
-        self.prune_freeze_frames();
+        // Frames of suspended tabs are never dropped: no placeholder may ever show.
     }
 
     /// (first tab of the column, first tab of the next column) for tab (r, c).

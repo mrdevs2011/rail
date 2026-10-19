@@ -165,8 +165,8 @@ impl App {
             for (ci, tab) in row.tabs.iter().enumerate() {
                 let is_focus = ri == fr && ci == fc;
                 if tab.suspended.get() {
-                    // Always show freeze layer — durable frame or charcoal placeholder, never pure black hole.
-                    tab.freeze.set_visible(true);
+                    // Show freeze only when a real picture exists — never a grey placeholder.
+                    tab.freeze.set_visible(tab.freeze.paintable().is_some());
                     continue;
                 }
                 // Snapshot live tab into a durable texture while it still has a painted frame.
@@ -188,8 +188,13 @@ impl App {
                 if uri.is_empty() {
                     continue;
                 }
+                // Always kill the process; show freeze only when a real picture exists.
                 *tab.saved_uri.borrow_mut() = uri;
-                tab.freeze.set_visible(true);
+                if tab.freeze.paintable().is_some() {
+                    tab.freeze.set_visible(true);
+                } else {
+                    tab.freeze.set_visible(false);
+                }
                 tab.suspended.set(true);
                 tab.view.terminate_web_process();
             }

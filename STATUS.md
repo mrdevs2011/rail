@@ -16,6 +16,16 @@
 - SHA256: bffa516132776ba823430301351dfff494c98594e335fb9c3e25731944c94055
 
 ---
+### 2026-10-19 18:00
+- Qilindi: Uxlagan tabda kulrang placeholder (#121212) butunlay yoq qilindi.
+  - .tab-freeze background transparent (CSS).
+  - Freeze overlay faqat haqiqiy rasm bolsa korinadi; rasm yoq bolsa process baribir oldiriladi (URL saqlanadi).
+  - Freeze frame endi max 480px kenglikka kichraytiriladi (~0.5-1 MB) — barcha uxlagan tablar rasmini saqlab qolish mumkin, prune yoq.
+  - overview / focus wake xuddi shu qoida.
+- Build: cargo build --release OK.
+- Hali qilinmagan: Tab.view = Option (WebView widgetini ham toliq tashlash) — keyingi bosqich.
+- Git: uncommitted (lifecycle, overview, focus, style.css).
+---
 ### 2026-10-16 13:42
 - Qilindi: v0.5.8 release: suspend (bo'sh tab) xatosi, omnibar inline to'ldirish xatosi tuzatildi, sidebar'dan TO'LIQ belgisi olib tashlandi, workspace tab soni va + hover'da
 - Keyingi qadam: Foydalanuvchi Rail'ni qayta ochib tab almashtirish va omnibar to'ldirishni sinasin
@@ -127,3 +137,10 @@
 - Build: cargo build --release OK.
 - Keyingi: foydalanuvchi bir necha tab ochib uxlatib ko'rsin.
 
+---
+### 2026-10-19 17:47
+- Qilindi: Uxlagan tab / overview kartasida kulrang placeholder (#121212) chiqmasligi uchun: rasmi yo'q tab endi uxlatilmaydi (suspend_tab va overview.rs, tirik qoladi); prune_freeze_frames olib tashlandi (uxlagan tab rasmi hech qachon o'chirilmaydi); rail:// sahifalarining qora kadri endi rad etilmaydi (durableize_paintable allow_black).
+- Build: cargo build --release OK; cargo test --release 57 OK.
+- Hozirgi muammo/blocker: sessiyadan tiklangan (lazy) tablarda bir marta ochilmaguncha rasm yo'q, ular hali kulrang chiqishi mumkin. Rasmlar kichraytirilmaydi, tab ko'p bo'lsa RAM'da ko'proq joy oladi.
+- Keyingi qadam: Alt+O bilan real oynada tekshirish. "Uxlaganda WebView to'liq yopilsin (faqat rasm + URL qolsin)" hali qilinmagan: Tab.view ni Option qilish kerak.
+- Git holati: uncommitted (src/app/lifecycle.rs, src/app/overview.rs)
