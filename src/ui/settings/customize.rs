@@ -133,9 +133,14 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
             };
             ui.is_syncing.set(true);
             prio.set_active(all_on);
-            ui.is_syncing.set(false);
+            // Leave is_syncing true briefly — cleared at end of sc_build via timeout.
             ui.status.set_text("");
-            sc_build(&ui);
+            // Only build if the list is empty (first open). Avoid re-map rebuild storms.
+            if ui.rows.first_child().is_none() {
+                sc_build(&ui);
+            } else {
+                ui.is_syncing.set(false);
+            }
         });
     }
     {

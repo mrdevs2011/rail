@@ -72,18 +72,20 @@ pub(crate) fn sc_build_picker(
     grid.set_margin_end(8);
     pop.set_child(Some(&grid));
 
-    let fill: Rc<dyn Fn(bool)> = {
+    // Build key grid only when the popover opens — never during sc_build (40× keyboard = freeze).
+    {
         let grid = grid.clone();
         let weak = pop.downgrade();
         let pending = pending.clone();
         let sel = sel.clone();
         let on_pick = on_pick.clone();
-        Rc::new(move |only_f: bool| {
+        pop.connect_show(move |_| {
             while let Some(child) = grid.first_child() {
                 grid.remove(&child);
             }
             let cfg = pending.borrow().clone();
             let mod_idx = sel.get();
+            let only_f = mod_idx == 4;
             let make = |label: &str, value: &str| -> gtk::Button {
                 let b = gtk::Button::with_label(label);
                 b.add_css_class("settings-option-item");
@@ -132,12 +134,8 @@ pub(crate) fn sc_build_picker(
             for (i, (l, v)) in arrows.iter().enumerate() {
                 grid.attach(&make(l, v), i as i32, 5, 1, 1);
             }
-        })
-    };
-    fill(sel.get() == 4);
-    let fill2 = fill.clone();
-    let sel2 = sel.clone();
-    pop.connect_show(move |_| fill2(sel2.get() == 4));
+        });
+    }
     pop
 }
 
@@ -157,9 +155,23 @@ pub(crate) fn sc_commit(ui: &ScUi) {
 }
 
 /// Rebuilds the rows after the current event finishes, keeping the scroll position.
+thread_local! {
+    static SC_BUILD_QUEUED: Cell<bool> = const { Cell::new(false) };
+}
+
 pub(crate) fn sc_refresh(ui: &ScUi) {
+    // Coalesce many apply/toggle events into one rebuild (prevents RAM explosion).
+    if SC_BUILD_QUEUED.with(|q| q.replace(true)) {
+        return;
+    }
     let ui = ui.clone();
     glib::idle_add_local_once(move || {
+        SC_BUILD_QUEUED.with(|q| q.set(false));
+        if ui.is_syncing.get() {
+            // Still building — try again next idle.
+            sc_refresh(&ui);
+            return;
+        }
         let adj = ui
             .rows
             .ancestor(gtk::ScrolledWindow::static_type())
@@ -393,6 +405,7 @@ pub(crate) fn sc_build(ui: &ScUi) {
         kb.set_label(&sc_key_label(&key));
         kb.set_size_request(80, -1);
         {
+            // Popover shell only — key grid is built on first show (see sc_build_picker).
             let ui4 = ui.clone();
             let sel = sel.clone();
             let pop = sc_build_picker(
@@ -436,5 +449,9 @@ pub(crate) fn sc_build(ui: &ScUi) {
         container.append(&row);
         i += 1;
     }
-    ui.is_syncing.set(false);
+    // Keep is_syncing true until after GTK drains queued notify signals from DropDown::set_selected.
+    let ui_done = ui.clone();
+    glib::timeout_add_local_once(std::time::Duration::from_millis(80), move || {
+        ui_done.is_syncing.set(false);
+    });
 }
