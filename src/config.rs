@@ -32,6 +32,10 @@ pub(crate) struct AppSettings {
     pub(crate) auto_update: bool,
     /// DevTools oxirgi dock holati: "bottom" | "left" | "right" | "undocked"
     pub(crate) devtools_dock: String,
+    /// Page translation: source language code, "auto" = detect from the page.
+    pub(crate) translate_source_lang: String,
+    /// Page translation: target language code (default "uz").
+    pub(crate) translate_target_lang: String,
 }
 
 impl Default for AppSettings {
@@ -43,6 +47,8 @@ impl Default for AppSettings {
             webrtc_enabled: true,
             auto_update: false,
             devtools_dock: "bottom".to_string(),
+            translate_source_lang: "auto".to_string(),
+            translate_target_lang: "uz".to_string(),
         }
     }
 }
@@ -95,6 +101,12 @@ pub(crate) fn load_app_settings() -> AppSettings {
         if let Some(dd) = root.get("devtools_dock").and_then(|v| v.as_str()) {
             s.devtools_dock = dd.to_string();
         }
+        if let Some(sl) = root.get("translate_source_lang").and_then(|v| v.as_str()) {
+            s.translate_source_lang = clean_lang_code(sl, "auto");
+        }
+        if let Some(tl) = root.get("translate_target_lang").and_then(|v| v.as_str()) {
+            s.translate_target_lang = clean_lang_code(tl, "uz");
+        }
     }
     s
 }
@@ -112,8 +124,9 @@ pub(crate) fn save_app_settings(s: &AppSettings) -> bool {
 ", s.webrtc_enabled));
     out.push_str(&format!("  \"auto_update\": {},
 ", s.auto_update));
-    out.push_str(&format!("  \"devtools_dock\": \"{}\"
-", minijson::escape(&s.devtools_dock)));
+    out.push_str(&format!("  \"devtools_dock\": \"{}\",\n", minijson::escape(&s.devtools_dock)));
+    out.push_str(&format!("  \"translate_source_lang\": \"{}\",\n", minijson::escape(&s.translate_source_lang)));
+    out.push_str(&format!("  \"translate_target_lang\": \"{}\"\n", minijson::escape(&s.translate_target_lang)));
     out.push_str("}
 ");
     let path = settings_json_path();

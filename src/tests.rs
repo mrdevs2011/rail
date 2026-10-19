@@ -147,6 +147,8 @@ fn test_app_settings_roundtrip() {
         webrtc_enabled: true,
         auto_update: false,
         devtools_dock: "right".to_string(),
+        translate_source_lang: "auto".to_string(),
+        translate_target_lang: "uz".to_string(),
     };
     let mut out = String::from("{\n");
     out.push_str(&format!("  \"search_engine\": \"{}\",\n", minijson::escape(&s.search_engine)));
@@ -307,4 +309,98 @@ fn test_zoom_keys_plus_works_without_shift() {
     assert_eq!(App::zoom_dir(gdk::Key::KP_Subtract, 82, false), Some(-1));
     assert_eq!(App::zoom_dir(gdk::Key::_0, 19, false), Some(0));
     assert_eq!(App::zoom_dir(gdk::Key::a, 38, false), None);
+}
+
+#[test]
+fn test_translate_host_escapes_hyphens() {
+    assert_eq!(translate_host("www.example.com"), "www-example-com.translate.goog");
+    assert_eq!(translate_host("my-site.co.uk"), "my--site-co-uk.translate.goog");
+}
+
+#[test]
+fn test_translate_url_building() {
+    assert_eq!(
+        translate_url("https://en.wikipedia.org/wiki/Rust?x=1#top", "auto", "uz").as_deref(),
+        Some("https://en-wikipedia-org.translate.goog/wiki/Rust?x=1&_x_tr_sl=auto&_x_tr_tl=uz&_x_tr_hl=uz#top")
+    );
+    assert_eq!(
+        translate_url("http://example.com", "en", "ru").as_deref(),
+        Some("https://example-com.translate.goog/?_x_tr_sl=en&_x_tr_tl=ru&_x_tr_hl=ru")
+    );
+    // old _x_tr_* params are replaced, not duplicated
+    assert_eq!(
+        translate_url("https://a.com/p?_x_tr_sl=de&q=1", "fr", "uz").as_deref(),
+        Some("https://a-com.translate.goog/p?q=1&_x_tr_sl=fr&_x_tr_tl=uz&_x_tr_hl=uz")
+    );
+    // unsafe language codes fall back to defaults
+    assert_eq!(
+        translate_url("https://a.com/", "x&y=1", "").as_deref(),
+        Some("https://a-com.translate.goog/?_x_tr_sl=auto&_x_tr_tl=uz&_x_tr_hl=uz")
+    );
+}
+
+#[test]
+fn test_translate_url_rejects_untranslatable() {
+    for u in ["rail://start/", "about:blank", "file:///tmp/a.html", "http://localhost:8080/", "http://localhost/", "http://192.168.1.1/", "http://[::1]/", "https://a.com:8443/", "https://a-com.translate.goog/"] {
+        assert!(translate_url(u, "auto", "uz").is_none(), "{u}");
+    }
+}
+
+#[test]
+fn test_untranslate_round_trip() {
+    for u in ["https://en.wikipedia.org/wiki/Rust?x=1#top", "https://my-site.co.uk/a/b", "https://example.com/"] {
+        let t = translate_url(u, "auto", "uz").unwrap();
+        assert!(is_translated_uri(&t));
+        let back = untranslate_url(&t).unwrap();
+        assert_eq!(back, u.replace("?x=1#top", "?x=1#top"));
+    }
+    assert!(untranslate_url("https://example.com/").is_none());
+    assert!(!is_translated_uri("https://example.com/"));
+}
+
+#[test]
+fn test_normalize_detected_lang() {
+    assert_eq!(normalize_detected_lang("en-US"), "en");
+    assert_eq!(normalize_detected_lang("en_US"), "en");
+    assert_eq!(normalize_detected_lang("RU"), "ru");
+    assert_eq!(normalize_detected_lang(""), "auto");
+    assert_eq!(normalize_detected_lang("  "), "auto");
+    assert_eq!(normalize_detected_lang("x"), "auto");
+    assert_eq!(normalize_detected_lang("zh-TW"), "zh-TW");
+    assert_eq!(normalize_detected_lang("zh"), "zh-CN");
+    assert_eq!(normalize_detected_lang("nb-NO"), "no");
+}
+
+#[test]
+fn test_supported_languages_list() {
+    assert_eq!(SUPPORTED_LANGUAGES[0].0, "auto");
+    assert_eq!(SUPPORTED_LANGUAGES[1].0, "uz");
+    let mut seen = std::collections::HashSet::new();
+    for (code, name) in SUPPORTED_LANGUAGES {
+        assert!(seen.insert(*code), "dublikat: {code}");
+        assert_eq!(clean_lang_code(code, "?"), *code, "{code}");
+        assert!(!name.is_empty());
+    }
+    assert_eq!(SUPPORTED_LANGUAGES.len(), 145);
+}
+
+#[test]
+fn test_translate_url_zh_maps_to_zh_cn() {
+    assert_eq!(
+        translate_url("https://a.com/", "auto", "zh").as_deref(),
+        Some("https://a-com.translate.goog/?_x_tr_sl=auto&_x_tr_tl=zh-CN&_x_tr_hl=zh-CN")
+    );
+}
+
+#[test]
+fn test_every_language_has_flag_png() {
+    for (code, _) in SUPPORTED_LANGUAGES {
+        match *code {
+            "auto" | "eo" => assert!(lang_flag_bytes(code).is_none(), "{code}"),
+            _ => {
+                let b = lang_flag_bytes(code).unwrap_or_else(|| panic!("bayroq yo'q: {code}"));
+                assert_eq!(&b[..4], b"\x89PNG", "{code}");
+            }
+        }
+    }
 }

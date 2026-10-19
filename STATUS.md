@@ -74,3 +74,17 @@
 - Qilindi: RAM/exit fix — swap-aware suspend (max 3 live under pressure), tighter defaults (6/4/3), window close kills all WebKit + app.quit, focused reload rate-limit 4s, default WebKit MemoryPressure 768MB kill=0.
 - Tahlil: "yopilgan" Rail aslida tirik edi (~108MB + web process). Tizim swap 4GB to'liq — lockscreen WebKit ham ~157MB yegan. Rail emas, umumiy OOM.
 - Keyingi: push → auto-release v0.5.73
+
+---
+### 2026-10-19 14:41
+- Qilindi: Sahifa tarjimasi sozlamalari to'liq: Settings > General > "Sahifa tarjimasi" (Asl til default auto, Nishon til default uz), config: translate_source_lang / translate_target_lang. Til ro'yxati SUPPORTED_LANGUAGES (145 ta, nav/translate.rs) dropdownlarga ulandi; "zh" Google uchun zh-CN ga o'giriladi. Kontekst menyu "Sahifani tarjima qilish" (Google Translate proxy) oldindan bor edi. Release build OK, 53 test OK.
+- Hozirgi muammo/blocker: yo'q. Ba'zi kodlar (ab, aa, av, kr, kv, ...) Google Translate tomonidan qo'llanmasligi mumkin.
+- Keyingi qadam: real oynada qo'lda tekshirish, keyin commit + push
+- Git holati: uncommitted (config.rs, general.rs, nav/translate.rs, app/translate.rs, i18n_tables.rs, tests.rs ...)
+
+---
+### 2026-10-19 14:50
+- Qilindi: Til dropdownlariga bayroqlar qo'shildi: ~/Downloads/flag-icons-main dan 102 ta bayroq 48x36 PNG qilib assets/flags/ ga (jami ~39 KB, LICENSE bilan), src/ui/flags.rs (til -> bayroq, taxminiy; auto va eo bayroqsiz), general.rs da bayroq+nom factory, CSS .flag-icon. Build OK, 54 test OK.
+- Hozirgi muammo/blocker: yo'q. Real oynada ko'rinishi tekshirilmagan.
+- Keyingi qadam: Rail ni ochib Settings > General > Sahifa tarjimasi ni ko'zdan kechirish, keyin commit + push
+- Git holati: uncommitted

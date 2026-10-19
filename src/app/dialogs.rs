@@ -312,6 +312,9 @@ impl App {
             menu.append(&ContextMenuItem::new_separator());
         }
 
+        // 5b. Translate page (Google Translate)
+        self.append_translate_item(view, menu);
+
         // 6. Developer Tools (Inspect Element / View Source)
         let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_default();
         if !cur_uri.is_empty() && !cur_uri.starts_with("about:") {

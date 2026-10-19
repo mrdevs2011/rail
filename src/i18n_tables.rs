@@ -378,4 +378,11 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Close sidebar", "Yon panelni yopish", "Закрыть боковую панель"),
     ("Close tab (Ctrl+W)", "Tabni yopish (Ctrl+W)", "Закрыть вкладку (Ctrl+W)"),
     ("Dismiss", "Yopish", "Закрыть"),
+    ("Page Translation", "Sahifa tarjimasi", "Перевод страницы"),
+    ("Right-click a page and choose Translate Page. The page address is sent to Google Translate.", "Sahifada sichqonchaning o'ng tugmasini bosib «Sahifani tarjima qilish» ni tanlang. Sahifa manzili Google Translate'ga yuboriladi.", "Нажмите правой кнопкой на странице и выберите «Перевести страницу». Адрес страницы отправляется в Google Translate."),
+    ("Source Language", "Asl til", "Исходный язык"),
+    ("Target Language", "Nishon til", "Язык перевода"),
+    ("Auto-detect", "Avto aniqlash", "Автоопределение"),
+    ("Translate Page", "Sahifani tarjima qilish", "Перевести страницу"),
+    ("Show Original Page", "Asl sahifani ko'rsatish", "Показать оригинал"),
 ];

@@ -1838,3 +1838,9 @@ progressbar.load-bar progress {
     color: #38bdf8;
 }
 
+
+/* language flags in dropdowns */
+.flag-icon {
+    border-radius: 2px;
+    overflow: hidden;
+}

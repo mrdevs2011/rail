@@ -121,6 +121,63 @@ pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
     lang_card.append(&lang_restart);
     page_general.append(&lang_card);
 
+    // Page Translation Card
+    let trl_card = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    trl_card.add_css_class("settings-card");
+    let trl_title = gtk::Label::new(Some(tr("Page Translation")));
+    trl_title.add_css_class("settings-card-title");
+    trl_title.set_xalign(0.0);
+    let trl_desc = gtk::Label::new(Some(tr("Right-click a page and choose Translate Page. The page address is sent to Google Translate.")));
+    trl_desc.add_css_class("settings-card-desc");
+    trl_desc.set_xalign(0.0);
+    trl_desc.set_wrap(true);
+    trl_card.append(&trl_title);
+    trl_card.append(&trl_desc);
+
+    let mut src_codes: Vec<&'static str> = Vec::new();
+    let mut src_names: Vec<&'static str> = Vec::new();
+    let mut tgt_codes: Vec<&'static str> = Vec::new();
+    let mut tgt_names: Vec<&'static str> = Vec::new();
+    for (code, name) in SUPPORTED_LANGUAGES {
+        let name: &'static str = if *code == "auto" { tr("Auto-detect") } else { *name };
+        src_codes.push(*code);
+        src_names.push(name);
+        if *code != "auto" {
+            tgt_codes.push(*code);
+            tgt_names.push(name);
+        }
+    }
+    for (label, names, codes, current, is_source) in [
+        (tr("Source Language"), src_names, src_codes, initial_settings.translate_source_lang.clone(), true),
+        (tr("Target Language"), tgt_names, tgt_codes, initial_settings.translate_target_lang.clone(), false),
+    ] {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        let lbl = gtk::Label::new(Some(label));
+        lbl.add_css_class("shortcut-desc");
+        lbl.set_hexpand(true);
+        lbl.set_xalign(0.0);
+        let rows: Rc<Vec<(&'static str, &'static str)>> = Rc::new(codes.iter().copied().zip(names.iter().copied()).collect());
+        let dd = gtk::DropDown::from_strings(&names);
+        dd.set_factory(Some(&language_row_factory(rows.clone())));
+        dd.set_list_factory(Some(&language_row_factory(rows)));
+        let idx = codes.iter().position(|c| *c == current).unwrap_or(0);
+        dd.set_selected(idx as u32);
+        dd.connect_selected_notify(move |d| {
+            let Some(code) = codes.get(d.selected() as usize) else { return };
+            let mut s = load_app_settings();
+            if is_source {
+                s.translate_source_lang = code.to_string();
+            } else {
+                s.translate_target_lang = code.to_string();
+            }
+            save_app_settings(&s);
+        });
+        row.append(&lbl);
+        row.append(&dd);
+        trl_card.append(&row);
+    }
+    page_general.append(&trl_card);
+
     // Browsing Controls Card
     let browse_card = gtk::Box::new(gtk::Orientation::Vertical, 8);
     browse_card.add_css_class("settings-card");
@@ -172,4 +229,34 @@ pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
     settings_stack.add_named(&page_gen_scroll, Some("general"));
 
     GeneralPage { engine_buttons, initial_settings, tp_switch }
+}
+
+/// Dropdown row: country flag + language name (flag decoded lazily, only for rows that are shown).
+fn language_row_factory(rows: Rc<Vec<(&'static str, &'static str)>>) -> gtk::SignalListItemFactory {
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(|_, obj| {
+        let Some(item) = obj.downcast_ref::<gtk::ListItem>() else { return };
+        let b = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let pic = gtk::Picture::new();
+        pic.add_css_class("flag-icon");
+        pic.set_size_request(24, 18);
+        pic.set_can_shrink(true);
+        pic.set_content_fit(gtk::ContentFit::Fill);
+        pic.set_valign(gtk::Align::Center);
+        let lbl = gtk::Label::new(None);
+        lbl.set_xalign(0.0);
+        b.append(&pic);
+        b.append(&lbl);
+        item.set_child(Some(&b));
+    });
+    factory.connect_bind(move |_, obj| {
+        let Some(item) = obj.downcast_ref::<gtk::ListItem>() else { return };
+        let Some((code, name)) = rows.get(item.position() as usize) else { return };
+        let Some(b) = item.child().and_downcast::<gtk::Box>() else { return };
+        let Some(pic) = b.first_child().and_downcast::<gtk::Picture>() else { return };
+        let Some(lbl) = pic.next_sibling().and_downcast::<gtk::Label>() else { return };
+        pic.set_paintable(lang_flag_texture(*code).as_ref());
+        lbl.set_text(name);
+    });
+    factory
 }

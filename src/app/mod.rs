@@ -23,6 +23,7 @@ mod minimap;
 mod profiles_modal;
 mod overview;
 mod keys;
+mod translate;
 
 pub(crate) struct App {
     pub(crate) win: gtk::ApplicationWindow,
