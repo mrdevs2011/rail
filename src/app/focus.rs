@@ -273,6 +273,29 @@ impl App {
         }
 
         self.settings_modal.set_visible(true);
+        // If a previous suspend left a black freeze over settings, clear it and keep process alive.
+        {
+            let rows = self.rows.borrow();
+            for row in rows.iter() {
+                for tab in &row.tabs {
+                    if tab.view == v {
+                        tab.keep_alive.set(true);
+                        if tab.suspended.get() {
+                            tab.suspended.set(false);
+                            tab.freeze.set_visible(false);
+                            tab.freeze.set_paintable(None::<&gdk::Paintable>);
+                            let uri = tab.saved_uri.borrow().clone();
+                            if uri.starts_with("rail://settings") {
+                                tab.view.load_html(&settings_shell_page(), Some(&uri));
+                            }
+                        } else {
+                            tab.freeze.set_visible(false);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
         // Clicks only when this tab is focused and not in overview (overview picks the card)
         let focused_is_settings = self
             .focused_view()
@@ -280,6 +303,11 @@ impl App {
             .unwrap_or(false);
         self.settings_modal
             .set_can_target(focused_is_settings && !self.ov.get());
+        // GTK Stack/TextView can go blank after tab switches — force a resize when active.
+        if focused_is_settings {
+            self.settings_modal.queue_resize();
+            self.settings_stack.queue_resize();
+        }
     }
 
     /// Focus the neighbouring column, landing on the window at the same height when possible.

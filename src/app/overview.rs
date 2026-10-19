@@ -180,6 +180,10 @@ impl App {
                     // Focused card stays live so the user can read it; hide freeze once painted.
                     continue;
                 }
+                // Settings is GTK-over-black-shell — never suspend (would show solid black card).
+                if App::is_settings_tab(tab) {
+                    continue;
+                }
                 // Non-focused: suspend web process, show freeze (or blank until focus).
                 if tab.keep_alive.get() || tab.view.is_playing_audio() || tab.view.is_loading() {
                     continue;

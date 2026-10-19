@@ -277,9 +277,17 @@ impl App {
         }
     }
 
+    /// Settings UI is a GTK overlay on a black WebView shell. Suspending it freezes only
+    /// the black shell — the overlay is gone → solid black rectangle until reload.
+    pub(crate) fn is_settings_tab(tab: &Tab) -> bool {
+        let live = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
+        let saved = tab.saved_uri.borrow().clone();
+        live.starts_with("rail://settings") || saved.starts_with("rail://settings")
+    }
+
     /// Suspend a live http(s) tab: freeze last frame, kill web process, free RAM.
     pub(crate) fn suspend_tab(tab: &Tab) {
-        if tab.suspended.get() || tab.keep_alive.get() {
+        if tab.suspended.get() || tab.keep_alive.get() || Self::is_settings_tab(tab) {
             return;
         }
         if tab.view.is_loading() || tab.view.is_playing_audio() {

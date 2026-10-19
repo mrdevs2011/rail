@@ -23,6 +23,7 @@ impl App {
             SettingsTab::Update => "update",
             SettingsTab::About => "about",
         };
+        sc_dbg(&format!("open_settings_tab {}", tab_name));
         self.settings_stack.set_visible_child_name(tab_name);
 
         for (btn_tab, btn) in self.settings_tab_buttons.borrow().iter() {
@@ -84,6 +85,7 @@ impl App {
                 self.set_view_saved_uri(&v, settings_uri);
             }
         } else {
+            sc_dbg("open_settings_tab:NEW_WEBVIEW");
             let prof_id = self.profiles.borrow().active_id().to_string();
             let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
             let view = Self::create_web_view(&session, &prof_id);
@@ -94,6 +96,18 @@ impl App {
         self.pill_label.set_text(settings_uri);
         self.refresh_sidebar();
         self.schedule_save_session();
+        // Mark settings WebView keep_alive so suspend never freezes a black empty shell.
+        if let Some(v) = self.focused_view() {
+            let rows = self.rows.borrow();
+            for row in rows.iter() {
+                for tab in &row.tabs {
+                    if tab.view == v {
+                        tab.keep_alive.set(true);
+                        break;
+                    }
+                }
+            }
+        }
         // Attach to the (new) focused tab overlay — not the whole strip
         self.sync_settings_chrome();
     }
