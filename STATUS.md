@@ -95,3 +95,10 @@
 - Hozirgi muammo/blocker: yo'q
 - Keyingi qadam: yangi release o'rnatilgach real sahifada tekshirish
 - Git holati: commit + push
+
+---
+### 2026-10-19 15:01
+- Qilindi: Til dropdownida bayroq o'lchami tuzatildi (gtk::Image pixel_size 24, tugma va ro'yxatda bir xil); "Avto aniqlash" uchun globus SVG ikonka. Release build OK.
+- Hozirgi muammo/blocker: yo'q
+- Keyingi qadam: yangi release o'rnatilgach real oynada tekshirish
+- Git holati: commit + push

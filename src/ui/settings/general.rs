@@ -237,11 +237,11 @@ fn language_row_factory(rows: Rc<Vec<(&'static str, &'static str)>>) -> gtk::Sig
     factory.connect_setup(|_, obj| {
         let Some(item) = obj.downcast_ref::<gtk::ListItem>() else { return };
         let b = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        let pic = gtk::Picture::new();
+        // gtk::Image + pixel_size keeps the same small size in the button and in the popup list
+        let pic = gtk::Image::new();
         pic.add_css_class("flag-icon");
-        pic.set_size_request(24, 18);
-        pic.set_can_shrink(true);
-        pic.set_content_fit(gtk::ContentFit::Fill);
+        pic.set_pixel_size(24);
+        pic.set_size_request(24, 24);
         pic.set_valign(gtk::Align::Center);
         let lbl = gtk::Label::new(None);
         lbl.set_xalign(0.0);
@@ -253,7 +253,7 @@ fn language_row_factory(rows: Rc<Vec<(&'static str, &'static str)>>) -> gtk::Sig
         let Some(item) = obj.downcast_ref::<gtk::ListItem>() else { return };
         let Some((code, name)) = rows.get(item.position() as usize) else { return };
         let Some(b) = item.child().and_downcast::<gtk::Box>() else { return };
-        let Some(pic) = b.first_child().and_downcast::<gtk::Picture>() else { return };
+        let Some(pic) = b.first_child().and_downcast::<gtk::Image>() else { return };
         let Some(lbl) = pic.next_sibling().and_downcast::<gtk::Label>() else { return };
         pic.set_paintable(lang_flag_texture(*code).as_ref());
         lbl.set_text(name);
