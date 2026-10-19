@@ -77,6 +77,10 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
     sc_scroll.set_min_content_height(260);
     sc_scroll.set_child(Some(&sc_rows));
     sc_page.append(&sc_scroll);
+    // Host for the single shared key-picker popover (not one per row).
+    let picker_host = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    picker_host.set_halign(gtk::Align::End);
+    sc_page.append(&picker_host);
 
     let sc_status = gtk::Label::new(None);
     sc_status.add_css_class("settings-card-desc");
@@ -96,6 +100,7 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
         status: sc_status.clone(),
         prio: sc_prio.clone(),
         is_syncing: is_syncing.clone(),
+        picker_host: picker_host.clone(),
     };
     {
         let ui = sc_ui.clone();
@@ -137,7 +142,9 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
             ui.status.set_text("");
             // Only build if the list is empty (first open). Avoid re-map rebuild storms.
             if ui.rows.first_child().is_none() {
-                sc_build(&ui);
+                // Defer off the click stack so Settings stays responsive.
+                let ui2 = ui.clone();
+                glib::idle_add_local_once(move || sc_build(&ui2));
             } else {
                 ui.is_syncing.set(false);
             }

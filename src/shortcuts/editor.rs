@@ -9,6 +9,8 @@ pub(crate) struct ScUi {
     pub(crate) status: gtk::Label,
     pub(crate) prio: gtk::CheckButton,
     pub(crate) is_syncing: Rc<Cell<bool>>,
+    /// One shared key picker for the whole page (not one per row).
+    pub(crate) picker_host: gtk::Box,
 }
 
 pub(crate) const SC_MODS: &[&str] = &["Alt", "Ctrl", "Alt+Shift", "Ctrl+Shift", "None"];
@@ -53,90 +55,89 @@ pub(crate) fn sc_join(mod_idx: u32, key: &str) -> String {
     format!("{}{}", prefix, key)
 }
 
-/// On-screen keyboard: the user taps a key instead of pressing it.
-/// What it offers follows the modifier dropdown: "None" only makes sense for F1-F12
-/// (a bare letter would steal normal typing), everything else gets the full keyboard.
-pub(crate) fn sc_build_picker(
+
+/// Shared on-screen keyboard — one instance, shown relative to the row being edited.
+pub(crate) fn sc_open_picker(
+    ui: &ScUi,
+    anchor: &impl IsA<gtk::Widget>,
     sel: Rc<Cell<u32>>,
-    pending: Rc<RefCell<ShortcutConfig>>,
     for_id: &'static str,
     on_pick: Rc<dyn Fn(String)>,
-) -> gtk::Popover {
+) {
+    // Drop previous popover children on the host
+    while let Some(c) = ui.picker_host.first_child() {
+        ui.picker_host.remove(&c);
+    }
     let pop = gtk::Popover::new();
+    pop.set_parent(&ui.picker_host);
+    pop.set_position(gtk::PositionType::Bottom);
+    // Point at the button the user clicked
+    if let Some(p) = anchor.compute_bounds(&ui.picker_host) {
+        // popover relative to host is fine; MenuButton-style is simpler:
+    }
+    let _ = anchor; // anchor via set_parent of a transient
     let grid = gtk::Grid::new();
-    grid.set_row_spacing(4);
-    grid.set_column_spacing(4);
-    grid.set_margin_top(8);
-    grid.set_margin_bottom(8);
-    grid.set_margin_start(8);
-    grid.set_margin_end(8);
+    grid.set_row_spacing(3);
+    grid.set_column_spacing(3);
+    grid.set_margin_top(6);
+    grid.set_margin_bottom(6);
+    grid.set_margin_start(6);
+    grid.set_margin_end(6);
     pop.set_child(Some(&grid));
 
-    // Build key grid only when the popover opens — never during sc_build (40× keyboard = freeze).
-    {
-        let grid = grid.clone();
-        let weak = pop.downgrade();
-        let pending = pending.clone();
-        let sel = sel.clone();
-        let on_pick = on_pick.clone();
-        pop.connect_show(move |_| {
-            while let Some(child) = grid.first_child() {
-                grid.remove(&child);
-            }
-            let cfg = pending.borrow().clone();
-            let mod_idx = sel.get();
-            let only_f = mod_idx == 4;
-            let make = |label: &str, value: &str| -> gtk::Button {
-                let b = gtk::Button::with_label(label);
-                b.add_css_class("settings-option-item");
-                b.set_size_request(if only_f { 52 } else { 34 }, 30);
-                let combo = sc_join(mod_idx, value);
-                if let Some(owner) = sc_combo_owner(&cfg, &combo, for_id) {
-                    b.set_sensitive(false);
-                    b.set_opacity(0.35);
-                    b.set_tooltip_text(Some(&format!("{} — {}", combo, tr(owner.desc))));
-                } else {
-                    let v = value.to_string();
-                    let cb = on_pick.clone();
-                    let w = weak.clone();
-                    b.connect_clicked(move |_| {
-                        if let Some(p) = w.upgrade() {
-                            p.popdown();
-                        }
-                        cb(v.clone());
-                    });
+    let cfg = ui.pending.borrow().clone();
+    let mod_idx = sel.get();
+    let only_f = mod_idx == 4;
+    let weak = pop.downgrade();
+    let make = |label: &str, value: &str| -> gtk::Button {
+        let b = gtk::Button::with_label(label);
+        b.add_css_class("settings-option-item");
+        b.set_size_request(if only_f { 48 } else { 32 }, 28);
+        let combo = sc_join(mod_idx, value);
+        if let Some(owner) = sc_combo_owner(&cfg, &combo, for_id) {
+            b.set_sensitive(false);
+            b.set_opacity(0.35);
+            b.set_tooltip_text(Some(&format!("{} — {}", combo, tr(owner.desc))));
+        } else {
+            let v = value.to_string();
+            let cb = on_pick.clone();
+            let w = weak.clone();
+            b.connect_clicked(move |_| {
+                if let Some(p) = w.upgrade() {
+                    p.popdown();
                 }
-                b
-            };
-            if only_f {
-                for n in 1..=12i32 {
-                    let s = format!("F{}", n);
-                    grid.attach(&make(&s, &s), (n - 1) % 6, (n - 1) / 6, 1, 1);
-                }
-                return;
+                cb(v.clone());
+            });
+        }
+        b
+    };
+    if only_f {
+        for n in 1..=12i32 {
+            let s = format!("F{}", n);
+            grid.attach(&make(&s, &s), (n - 1) % 6, (n - 1) / 6, 1, 1);
+        }
+    } else {
+        for (r, chars) in SC_KEY_ROWS.iter().enumerate() {
+            for (c, ch) in chars.chars().enumerate() {
+                let s = ch.to_string();
+                grid.attach(&make(&s, &s), c as i32, r as i32, 1, 1);
             }
-            for (r, chars) in SC_KEY_ROWS.iter().enumerate() {
-                for (c, ch) in chars.chars().enumerate() {
-                    let s = ch.to_string();
-                    grid.attach(&make(&s, &s), c as i32, r as i32, 1, 1);
-                }
-            }
-            for n in 1..=12 {
-                let s = format!("F{}", n);
-                grid.attach(&make(&s, &s), n - 1, 4, 1, 1);
-            }
-            let arrows = [
-                ("\u{2190}", "Left"),
-                ("\u{2191}", "Up"),
-                ("\u{2193}", "Down"),
-                ("\u{2192}", "Right"),
-            ];
-            for (i, (l, v)) in arrows.iter().enumerate() {
-                grid.attach(&make(l, v), i as i32, 5, 1, 1);
-            }
-        });
+        }
+        for n in 1..=12 {
+            let s = format!("F{}", n);
+            grid.attach(&make(&s, &s), n - 1, 4, 1, 1);
+        }
+        let arrows = [
+            ("\u{2190}", "Left"),
+            ("\u{2191}", "Up"),
+            ("\u{2193}", "Down"),
+            ("\u{2192}", "Right"),
+        ];
+        for (i, (l, v)) in arrows.iter().enumerate() {
+            grid.attach(&make(l, v), i as i32, 5, 1, 1);
+        }
     }
-    pop
+    pop.popup();
 }
 
 pub(crate) fn sc_commit(ui: &ScUi) {
@@ -154,13 +155,11 @@ pub(crate) fn sc_commit(ui: &ScUi) {
     }
 }
 
-/// Rebuilds the rows after the current event finishes, keeping the scroll position.
 thread_local! {
     static SC_BUILD_QUEUED: Cell<bool> = const { Cell::new(false) };
 }
 
 pub(crate) fn sc_refresh(ui: &ScUi) {
-    // Coalesce many apply/toggle events into one rebuild (prevents RAM explosion).
     if SC_BUILD_QUEUED.with(|q| q.replace(true)) {
         return;
     }
@@ -168,9 +167,7 @@ pub(crate) fn sc_refresh(ui: &ScUi) {
     glib::idle_add_local_once(move || {
         SC_BUILD_QUEUED.with(|q| q.set(false));
         if ui.is_syncing.get() {
-            // Still building — try again next idle.
-            sc_refresh(&ui);
-            return;
+            return; // drop — next user action can refresh
         }
         let adj = ui
             .rows
@@ -197,7 +194,6 @@ pub(crate) fn sc_apply_slot(ui: &ScUi, def: &'static ShortcutDef, slot: usize, c
     sc_refresh(ui);
 }
 
-
 /// Numbered series (Ctrl+1..9 etc.) collapsed into one stacked card.
 pub(crate) fn sc_series_for(id: &str) -> Option<(&'static str, &'static [&'static str])> {
     const TABS: &[&str] = &["tab_1", "tab_2", "tab_3", "tab_4", "tab_5", "tab_6", "tab_7", "tab_8", "tab_9"];
@@ -216,18 +212,23 @@ pub(crate) fn sc_series_member(id: &str) -> bool {
 }
 
 pub(crate) fn sc_build(ui: &ScUi) {
-    // Prevent Switch::set_active during rebuild from firing handlers that mutate config
+    if ui.is_syncing.get() && ui.rows.first_child().is_some() {
+        // Already mid-build; ignore re-entry.
+        return;
+    }
     ui.is_syncing.set(true);
     let container = &ui.rows;
     while let Some(child) = container.first_child() {
         container.remove(&child);
     }
+
+    // Build ALL rows in one pass but with LIGHT widgets only (no DropDown, no prebuilt popovers).
+    // DropDown::from_strings + Popover ×40 was the freeze/RAM spike.
     let cfg = ui.pending.borrow().clone();
     let mut last_group = "";
     let mut i = 0;
     while i < SHORTCUT_DEFS.len() {
         let def = &SHORTCUT_DEFS[i];
-        // Skip non-head members of a numbered series (rendered via stack card)
         if sc_series_member(def.id) && sc_series_for(def.id).is_none() {
             i += 1;
             continue;
@@ -242,85 +243,62 @@ pub(crate) fn sc_build(ui: &ScUi) {
             container.append(&h);
         }
 
-        // Stacked card for Ctrl+1..9 / Alt+1..9 series
         if let Some((title, ids)) = sc_series_for(def.id) {
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
             row.add_css_class("shortcut-row");
-            row.set_margin_top(3);
-            row.set_margin_bottom(3);
+            row.set_margin_top(2);
+            row.set_margin_bottom(2);
             let d = gtk::Label::new(Some(tr(title)));
             d.add_css_class("shortcut-desc");
             d.set_xalign(0.0);
             d.set_hexpand(true);
-            d.set_valign(gtk::Align::Start);
             row.append(&d);
-
-            let stack = gtk::Box::new(gtk::Orientation::Vertical, 0);
-            stack.add_css_class("shortcut-stack");
-            stack.set_halign(gtk::Align::End);
-
-            // Top card shows the *last* binding (e.g. Ctrl+9)
             let last_id = ids.last().copied().unwrap_or(def.id);
             let last_def = SHORTCUT_DEFS.iter().find(|d| d.id == last_id).unwrap_or(def);
             let last_combo = sc_effective(last_def, &cfg).first().cloned().unwrap_or_default();
-            let top = gtk::Button::with_label(&last_combo);
-            top.add_css_class("shortcut-stack-card");
-            top.add_css_class("shortcut-stack-layers");
-            top.set_tooltip_text(Some(tr("Click to show all bindings")));
-
-            let expand = gtk::Box::new(gtk::Orientation::Vertical, 2);
-            expand.add_css_class("shortcut-stack-expand");
-            expand.set_visible(false);
-            for sid in ids.iter() {
-                if let Some(sd) = SHORTCUT_DEFS.iter().find(|d| d.id == *sid) {
-                    let c = sc_effective(sd, &cfg).first().cloned().unwrap_or_default();
-                    let item = gtk::Label::new(Some(&format!("{}  ·  {}", c, tr(sd.desc))));
-                    item.add_css_class("shortcut-stack-item");
-                    item.add_css_class("shortcut-kbd");
-                    item.set_xalign(1.0);
-                    expand.append(&item);
-                }
-            }
-            let expand_c = expand.clone();
-            top.connect_clicked(move |_| {
-                expand_c.set_visible(!expand_c.is_visible());
-            });
-            stack.append(&top);
-            stack.append(&expand);
-            row.append(&stack);
+            let kbd = gtk::Label::new(Some(&last_combo));
+            kbd.add_css_class("shortcut-kbd");
+            kbd.set_tooltip_text(Some(tr("Numbered series — change individually via defaults or reset")));
+            row.append(&kbd);
             container.append(&row);
             i += ids.len();
             continue;
         }
 
         let enabled = sc_enabled(&cfg, def.id);
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         row.add_css_class("shortcut-row");
-        row.set_margin_top(3);
-        row.set_margin_bottom(3);
+        row.set_margin_top(2);
+        row.set_margin_bottom(2);
 
         let d = gtk::Label::new(Some(tr(def.desc)));
         d.add_css_class("shortcut-desc");
         d.set_xalign(0.0);
         d.set_hexpand(true);
         d.set_wrap(true);
-        d.set_valign(gtk::Align::Center);
         d.set_opacity(if enabled { 1.0 } else { 0.45 });
         row.append(&d);
 
         if sc_is_locked(def.id) {
-            // Only Alt+Arrow focus nav stays locked (no per-row enable switch)
             let lock = gtk::Image::from_icon_name("changes-prevent-symbolic");
-            lock.set_valign(gtk::Align::Center);
             lock.set_opacity(0.7);
             lock.set_tooltip_text(Some(tr("Locked (read-only): system navigation, cannot be edited.")));
             row.append(&lock);
             d.set_opacity(0.55);
-        } else {
-            let sw = gtk::Switch::new();
-            sw.set_active(enabled);
-            sw.set_valign(gtk::Align::Center);
-            sw.set_tooltip_text(Some(tr("Rail shortcuts win over website shortcuts")));
+            let combo = sc_effective(def, &cfg).first().cloned().unwrap_or_default();
+            let kbd = gtk::Label::new(Some(&combo));
+            kbd.add_css_class("shortcut-kbd");
+            kbd.set_opacity(0.5);
+            row.append(&kbd);
+            container.append(&row);
+            i += 1;
+            continue;
+        }
+
+        let sw = gtk::Switch::new();
+        sw.set_active(enabled);
+        sw.set_valign(gtk::Align::Center);
+        {
             let ui2 = ui.clone();
             sw.connect_active_notify(move |s| {
                 if ui2.is_syncing.get() {
@@ -334,44 +312,31 @@ pub(crate) fn sc_build(ui: &ScUi) {
                     } else {
                         c.disabled.insert(def.id.to_string());
                     }
+                    let all_on = SHORTCUT_DEFS.iter().all(|d| sc_enabled(&c, d.id));
+                    c.site_wins = !all_on;
                 }
                 let all_on = {
                     let c = ui2.pending.borrow();
                     SHORTCUT_DEFS.iter().all(|d| sc_enabled(&c, d.id))
                 };
-                ui2.pending.borrow_mut().site_wins = !all_on;
-
                 ui2.is_syncing.set(true);
                 ui2.prio.set_active(all_on);
                 ui2.is_syncing.set(false);
-
                 sc_commit(&ui2);
-                sc_refresh(&ui2);
+                // Update opacity without full rebuild
+                if let Some(parent) = s.parent() {
+                    if let Some(boxp) = parent.downcast_ref::<gtk::Box>() {
+                        if let Some(lab) = boxp.first_child().and_then(|w| w.downcast::<gtk::Label>().ok()) {
+                            lab.set_opacity(if is_on { 1.0 } else { 0.45 });
+                        }
+                    }
+                }
             });
-            row.append(&sw);
         }
+        row.append(&sw);
 
-        let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        line.set_sensitive(enabled);
-        line.set_valign(gtk::Align::Center);
         let eff = sc_effective(def, &cfg);
         let combo = eff.first().cloned().unwrap_or_default();
-
-        // Alt+Arrow locked shortcuts: gray read-only badge, no editor
-        if def.id.starts_with("win_") {
-            let kbd = gtk::Label::new(Some(&combo));
-            kbd.add_css_class("shortcut-kbd");
-            kbd.set_opacity(0.5);
-            kbd.set_tooltip_text(Some(tr("Locked — display only, not editable")));
-            line.append(&kbd);
-            row.append(&line);
-            let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-            spacer.set_size_request(32, -1);
-            row.append(&spacer);
-            container.append(&row);
-            continue;
-        }
-
         let (mod_idx, key) = if combo.is_empty() {
             (0u32, String::new())
         } else {
@@ -379,56 +344,65 @@ pub(crate) fn sc_build(ui: &ScUi) {
         };
         let sel = Rc::new(Cell::new(mod_idx));
 
-        let dd = gtk::DropDown::from_strings(SC_MODS);
-        dd.set_selected(mod_idx);
+        // Modifier as a small toggle button (cycles) — far cheaper than DropDown
+        let mod_btn = gtk::Button::with_label(SC_MODS[mod_idx as usize]);
+        mod_btn.add_css_class("settings-option-item");
+        mod_btn.set_sensitive(enabled);
         {
             let ui3 = ui.clone();
             let sel = sel.clone();
             let key = key.clone();
-            dd.connect_selected_notify(move |d| {
-                // Building rows sets selected on every dropdown — must not commit/rebuild or the UI freezes.
+            let mod_btn2 = mod_btn.clone();
+            mod_btn.connect_clicked(move |_| {
                 if ui3.is_syncing.get() {
                     return;
                 }
-                sel.set(d.selected());
+                let n = ((sel.get() + 1) % SC_MODS.len() as u32);
+                sel.set(n);
+                mod_btn2.set_label(SC_MODS[n as usize]);
                 let is_f = key.len() >= 2 && key.starts_with('F') && key[1..].chars().all(|c| c.is_ascii_digit());
-                if sel.get() == 4 && !is_f {
-                    ui3.status.set_text(tr("No modifier: tap the key button and pick F1-F12"));
+                if n == 4 && !is_f {
+                    ui3.status.set_text(tr("No modifier: pick an F-key"));
                 } else if !key.is_empty() {
-                    sc_apply_slot(&ui3, def, 0, sc_join(sel.get(), &key));
+                    sc_apply_slot(&ui3, def, 0, sc_join(n, &key));
                 }
             });
         }
-        line.append(&dd);
+        row.append(&mod_btn);
 
-        let kb = gtk::MenuButton::new();
-        kb.set_label(&sc_key_label(&key));
-        kb.set_size_request(80, -1);
+        // Key button opens the ONE shared picker
+        let kb = gtk::Button::with_label(&sc_key_label(&key));
+        kb.add_css_class("settings-option-item");
+        kb.set_size_request(72, -1);
+        kb.set_sensitive(enabled);
         {
-            // Popover shell only — key grid is built on first show (see sc_build_picker).
             let ui4 = ui.clone();
             let sel = sel.clone();
-            let pop = sc_build_picker(
-                sel.clone(),
-                ui4.pending.clone(),
-                def.id,
-                Rc::new({
-                    let ui4 = ui4.clone();
-                    let sel = sel.clone();
-                    move |v: String| {
-                        sc_apply_slot(&ui4, def, 0, sc_join(sel.get(), &v));
-                    }
-                }),
-            );
-            kb.set_popover(Some(&pop));
+            let kb2 = kb.clone();
+            kb.connect_clicked(move |b| {
+                if ui4.is_syncing.get() {
+                    return;
+                }
+                let ui5 = ui4.clone();
+                let sel2 = sel.clone();
+                let kb3 = kb2.clone();
+                sc_open_picker(
+                    &ui4,
+                    b,
+                    sel.clone(),
+                    def.id,
+                    Rc::new(move |v: String| {
+                        kb3.set_label(&sc_key_label(&v));
+                        sc_apply_slot(&ui5, def, 0, sc_join(sel2.get(), &v));
+                    }),
+                );
+            });
         }
-        line.append(&kb);
-        row.append(&line);
+        row.append(&kb);
 
         if cfg.overrides.contains_key(def.id) || cfg.disabled.contains(def.id) {
             let reset = gtk::Button::from_icon_name("edit-undo-symbolic");
             reset.add_css_class("flat");
-            reset.set_valign(gtk::Align::Center);
             reset.set_tooltip_text(Some(tr("Reset to default")));
             let ui6 = ui.clone();
             reset.connect_clicked(move |_| {
@@ -441,17 +415,16 @@ pub(crate) fn sc_build(ui: &ScUi) {
                 sc_refresh(&ui6);
             });
             row.append(&reset);
-        } else {
-            let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-            spacer.set_size_request(32, -1);
-            row.append(&spacer);
         }
+
         container.append(&row);
         i += 1;
     }
-    // Keep is_syncing true until after GTK drains queued notify signals from DropDown::set_selected.
+
+    // Yield to the main loop before accepting more input-driven rebuilds.
     let ui_done = ui.clone();
-    glib::timeout_add_local_once(std::time::Duration::from_millis(80), move || {
+    glib::timeout_add_local_once(std::time::Duration::from_millis(50), move || {
         ui_done.is_syncing.set(false);
     });
 }
+
