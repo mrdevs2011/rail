@@ -44,6 +44,7 @@ impl App {
         let vh = self.strip.height() as f64;
         if vw <= 1.0 || vh <= 1.0 {
             self.target_zoom.set(OV_ZOOM);
+            self.ensure_overview_previews();
             self.animate();
             return;
         }
@@ -60,6 +61,7 @@ impl App {
         self.target_x.set(fx);
         self.target_y.set(fy);
         self.target_zoom.set(OV_ZOOM);
+        self.ensure_overview_previews();
         self.animate();
     }
 
@@ -148,6 +150,40 @@ impl App {
         };
         self.target_x.set(tx);
         self.target_y.set(ty);
+    }
+
+
+    /// Overview must not be a grid of black cards. Suspended tabs keep their last-frame
+    /// freeze; those without a frame are woken (capped) so WebKit paints a real preview.
+    pub(crate) fn ensure_overview_previews(self: &Rc<Self>) {
+        let Ok(rows) = self.rows.try_borrow() else { return };
+        let mut woke = 0usize;
+        const MAX_WAKE: usize = 10;
+        for row in rows.iter() {
+            for tab in row.tabs.iter() {
+                if tab.suspended.get() {
+                    if tab.freeze.paintable().is_some() {
+                        tab.freeze.set_visible(true);
+                        continue;
+                    }
+                    if woke >= MAX_WAKE {
+                        continue;
+                    }
+                    let uri = tab.saved_uri.borrow().clone();
+                    if uri.is_empty() {
+                        continue;
+                    }
+                    tab.suspended.set(false);
+                    tab.freeze.set_visible(false);
+                    if is_internal_uri(&uri) {
+                        load_internal_page(&tab.view, &uri);
+                    } else {
+                        tab.view.load_uri(&uri);
+                    }
+                    woke += 1;
+
+            }
+        }
     }
 
     pub(crate) fn cancel_overview(self: &Rc<Self>) {

@@ -112,12 +112,11 @@ impl App {
                     tab.view.add_css_class("focused");
                     tab.last_active.set(std::time::Instant::now());
                     // Uyg'otish: sahifani qayta yukla; freeze load tugaguncha turadi
-                    if tab.suspended.get() && !self.ov.get() {
+                    if tab.suspended.get() {
+                        // Wake even in overview: otherwise the zoomed card stays solid black.
                         tab.suspended.set(false);
                         let uri = tab.saved_uri.borrow().clone();
                         if !uri.is_empty() {
-                            // Keep a real last-frame overlay until load finishes; never leave a
-                            // visible freeze with no paintable (that is a solid black tab).
                             if tab.freeze.paintable().is_none() {
                                 tab.freeze.set_visible(false);
                             }

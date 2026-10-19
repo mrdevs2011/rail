@@ -175,15 +175,31 @@ pub(crate) fn wire_settings(app: &Rc<App>, add_prof_btn: gtk::Button, btn_clear_
                         continue;
                     }
                     if visible {
-                        // Live tab coming back on-screen: drop any stale freeze (empty paintable
-                        // + visible freeze == solid black panel).
-                        if !tab.suspended.get() {
-                            tab.freeze.set_visible(false);
-                            tab.freeze.set_paintable(None::<&gdk::Paintable>);
+                        if tab.suspended.get() {
+                            // Overview / slide-in: show last frame if we have one (not a blank panel).
+                            if tab.freeze.paintable().is_some() {
+                                tab.freeze.set_visible(true);
+                            }
+                        } else {
+                            // Live tab remapped: keep last frame over WebKit until it paints again
+                            // (clear_tab_freeze runs when is_loading goes false).
+                            if tab.freeze.paintable().is_some() {
+                                tab.freeze.set_visible(true);
+                            } else {
+                                tab.freeze.set_visible(false);
+                            }
                             tab.view.queue_draw();
+                            // If not loading, drop the cover on the next idle so we do not stick.
+                            if !tab.view.is_loading() {
+                                let view = tab.view.clone();
+                                let app2 = a.clone();
+                                glib::idle_add_local_once(move || {
+                                    app2.clear_tab_freeze(&view);
+                                });
+                            }
                         }
                     } else if !tab.suspended.get() && tab.view.is_mapped() {
-                        // About to unmap: keep last painted frame for a later suspend.
+                        // About to unmap: keep last painted frame for suspend / overview.
                         let wp = gtk::WidgetPaintable::new(Some(&tab.view));
                         let frame = gdk::prelude::PaintableExt::current_image(&wp);
                         tab.freeze.set_paintable(Some(&frame));
