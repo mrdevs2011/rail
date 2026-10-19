@@ -320,6 +320,10 @@ pub fn build_card(win: &gtk::ApplicationWindow) -> gtk::Revealer {
     get.add_css_class("update-get");
     get.set_halign(gtk::Align::Start);
     get.set_margin_top(6);
+    // Matn rangini qora qilish (CSS bilan birga)
+    if let Some(label) = get.label_widget().and_then(|w| w.downcast::<gtk::Label>().ok()) {
+        label.set_markup(&format!("<span color='#000000' weight='bold'>{}</span>", glib::markup_escape_text(tr("Update"))));
+    }
 
     card.append(&top);
     card.append(&ver);

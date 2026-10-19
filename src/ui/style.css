@@ -1634,21 +1634,24 @@ selection {
 button.update-get {
     background: #ffffff;
     background-image: none;
-    color: #000000;
+    color: #000000 !important;
     border: 1px solid #ffffff;
     border-radius: 3px;
     padding: 5px 20px;
     font-weight: 700;
     box-shadow: none;
 }
-button.update-get label {
-    color: #000000;
+button.update-get label,
+button.update-get > label,
+button.update-get label * {
+    color: #000000 !important;
 }
 button.update-get:hover {
     background: #f0f0f0;
 }
-button.update-get:hover label {
-    color: #000000;
+button.update-get:hover label,
+button.update-get:hover > label {
+    color: #000000 !important;
 }
 button.update-get:disabled {
     opacity: 0.6;

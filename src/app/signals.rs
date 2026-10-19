@@ -112,6 +112,11 @@ impl App {
         // Developer context menu (Right-click & 2-finger touchpad tap)
         let app = self.clone();
         view.connect_context_menu(move |v, menu, hit| {
+            // Railning o'z sahifalarida (settings, start, downloads va boshqa rail://) kontekst menyu ochilmasin
+            let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
+            if uri.starts_with("rail://") {
+                return true;
+            }
             if App::is_page_level_hit(hit) {
                 app.show_page_menu(v);
                 return true;
