@@ -3,7 +3,7 @@
 /// How far the strip zooms out in overview (niri uses a similar factor).
 pub(crate) const OV_ZOOM: f64 = 0.4;
 /// Overview zoom in/out duration (fixed, ease-out): zoom, pan and grid land together.
-pub(crate) const OV_ANIM_SECS: f64 = 0.24;
+pub(crate) const OV_ANIM_SECS: f64 = 0.30;
 
 /// Xotira tanqis (yoki RAIL_LOW_MEM=1 yoki swap to'liq): tez uxlatish, 3 ta tirik tab.
 pub(crate) const SUSPEND_AFTER_SECS: u64 = 60;

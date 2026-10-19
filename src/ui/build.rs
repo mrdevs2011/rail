@@ -221,6 +221,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         delete_key: Cell::new(false),
         ov_hint,
         ov: Cell::new(false),
+        ov_exiting: Cell::new(false),
         ov_return: Cell::new((0, 0)),
         ov_saved_x: Cell::new(0.0),
         ov_saved_y: Cell::new(0.0),

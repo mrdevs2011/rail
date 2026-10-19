@@ -50,6 +50,8 @@ pub(crate) struct App {
     pub(crate) ov_hint: gtk::Label,
     /// Overview is active: the strip is zoomed out and tabs ignore the pointer.
     pub(crate) ov: Cell<bool>,
+    /// Zoom-in from overview is running; CSS/ov stay until the camera lands.
+    pub(crate) ov_exiting: Cell<bool>,
     /// Tab coordinates (row, col) that were focused when overview opened; Esc returns here.
     pub(crate) ov_return: Cell<(usize, usize)>,
     /// Scroll position before overview, restored when zooming back in.

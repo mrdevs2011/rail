@@ -17,6 +17,8 @@ impl App {
         if self.ov.get() || self.rows.borrow().is_empty() {
             return;
         }
+        // Cancel an in-flight exit so we don't fight the zoom-in.
+        self.ov_exiting.set(false);
         self.palette.set_visible(false);
         // Settings rides on its tab overlay (like downloads HTML) — keep it visible
         // so the overview card shows real content, not a blank shell.
@@ -51,19 +53,9 @@ impl App {
         self.layout.set_zoom(1.0);
         self.strip.queue_allocate();
 
-        let ox0 = self.target_x.get();
-        let oy0 = self.target_y.get();
-        // World point currently under the viewport center
-        let anchor_x = ox0 + vw * 0.5;
-        let anchor_y = oy0 + vh * 0.5;
-        // Keep that point centered while zooming to OV_ZOOM
-        let tx = anchor_x - (vw * 0.5) / OV_ZOOM;
-        let ty = anchor_y - (vh * 0.5) / OV_ZOOM;
-
         // The zoom-out itself is anchored on the old camera center (see animate()); once the
         // zoom settles the camera glides to the framed position: whole grid centered when it
         // fits, otherwise the active tab centered (clamped at the grid edges).
-        let _ = (tx, ty);
         let (fx, fy) = self.overview_offsets_at_zoom(OV_ZOOM);
         self.target_x.set(fx);
         self.target_y.set(fy);
@@ -71,10 +63,31 @@ impl App {
         self.animate();
     }
 
+    /// Start zoom-in. CSS class and `ov` stay true until the camera lands (see `finish_exit_overview`).
     pub(crate) fn exit_overview(self: &Rc<Self>) {
         if !self.ov.get() {
             return;
         }
+        if self.ov_exiting.get() {
+            // Already zooming in — just retarget the focused tab.
+            self.set_normal_reveal_targets();
+            self.target_zoom.set(1.0);
+            self.animate();
+            return;
+        }
+        self.ov_exiting.set(true);
+        // Keep "zoomed" CSS and ov=true during the animation so borders/layout don't snap.
+        self.target_zoom.set(1.0);
+        self.set_normal_reveal_targets();
+        self.animate();
+    }
+
+    /// Called when zoom-in reaches 1:1 — restore interaction and run the full focus pipeline once.
+    pub(crate) fn finish_exit_overview(self: &Rc<Self>) {
+        if !self.ov_exiting.get() && !self.ov.get() {
+            return;
+        }
+        self.ov_exiting.set(false);
         self.ov.set(false);
         self.strip.remove_css_class("zoomed");
         self.shell.remove_css_class("zoomed");
@@ -84,8 +97,8 @@ impl App {
                 t.view.set_can_target(true);
             }
         }
-        self.target_zoom.set(1.0);
-        // Full focus pipeline once (wakes a suspended tab, sidebar, title, session save, camera)
+        self.settings_modal.set_can_target(true);
+        // Full focus pipeline once the camera is still (wake tab, sidebar, title, session).
         let (fr, fc) = (self.focus_row.get(), self.focus_col.get());
         self.focus_coords(fr, fc);
         self.sync_settings_chrome();
@@ -96,8 +109,50 @@ impl App {
         }
     }
 
+    /// Camera targets for the focused tab at zoom 1.0 (normal strip mode), without side effects.
+    pub(crate) fn set_normal_reveal_targets(&self) {
+        let vw = self.strip.width() as f64;
+        let vh = self.strip.height() as f64;
+        if vw <= 0.0 || vh <= 0.0 {
+            return;
+        }
+        let z = 1.0;
+        let visible_w = vw / z;
+        let g = gap(z);
+        let cur_r = self.focus_row.get();
+        let cur_c = self.focus_col.get();
+        let rows = self.rows.borrow();
+        if rows.is_empty() || cur_r >= rows.len() {
+            return;
+        }
+        let cols = row_cols(&rows[cur_r], vw, g);
+        let active_span = cols
+            .iter()
+            .find(|&&(st, len, _, _)| cur_c >= st && cur_c < st + len)
+            .map(|&(_, _, x, w)| (x, x + w));
+        let active_row_total_w = cols.last().map_or(0.0, |&(_, _, x, w)| x + w);
+        drop(rows);
+
+        let ty = cur_r as f64 * (vh + g);
+        let tx = if let Some((l, r)) = active_span {
+            let max_x = (active_row_total_w - visible_w).max(0.0);
+            let mut t = self.target_x.get().clamp(0.0, max_x);
+            if l < t {
+                t = l;
+            } else if r > t + visible_w {
+                t = r - visible_w;
+            }
+            t.clamp(0.0, max_x)
+        } else {
+            0.0
+        };
+        self.target_x.set(tx);
+        self.target_y.set(ty);
+    }
+
     pub(crate) fn cancel_overview(self: &Rc<Self>) {
         let (r, c) = self.ov_return.get();
+        // Move focus first (while still in overview — lightweight path)
         self.focus_coords(r, c);
         self.exit_overview();
     }

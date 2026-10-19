@@ -137,6 +137,9 @@ impl App {
             self.layout.set_offset_y(self.target_y.get());
             self.layout.set_zoom(self.target_zoom.get());
             self.strip.queue_allocate();
+            if self.ov_exiting.get() {
+                self.finish_exit_overview();
+            }
             return;
         }
         self.animating.set(true);
@@ -162,10 +165,11 @@ impl App {
             let vw = strip.width() as f64;
             let vh = strip.height() as f64;
             let zoom_busy = !near(zc, zt, 0.002);
+            // Any overview zoom transition (in or out), including delayed exit while ov still true.
             let ov_motion = vw > 1.0
                 && vh > 1.0
                 && zoom_busy
-                && ((app.ov.get() && zt < 1.0) || (!app.ov.get() && zt == 1.0));
+                && (app.ov.get() || app.ov_exiting.get() || zc < 0.99 || zt < 0.99);
 
             let nz: f64;
             let mut nx: f64;
@@ -181,22 +185,25 @@ impl App {
                     }
                 };
                 let u = (((now - t0) as f64 / 1e6) / OV_ANIM_SECS).clamp(0.0, 1.0);
-                let e = 1.0 - (1.0 - u).powi(3);
+                let e = 1.0 - (1.0 - u).powi(3); // ease-out cubic, full duration
                 if u >= 1.0 {
                     nz = zt;
                     nx = oxt;
                     ny = oyt;
                 } else {
-                    // log-space zoom: the scale changes at a uniform perceived rate
+                    // log-space zoom: perceived scale rate is uniform
                     nz = (z0.ln() + (zt.ln() - z0.ln()) * e).exp();
-                    // Pure scale around the point that was under the screen center when we started ...
+                    // Pure scale around the point under the screen center at start ...
                     let (ax, ay) = (ox0 + vw * 0.5 / z0, oy0 + vh * 0.5 / z0);
                     let (px, py) = (ax - vw * 0.5 / nz, ay - vh * 0.5 / nz);
-                    // ... blended into the framed (centered) camera for the current zoom, so the
-                    // grid is centered on every frame and pan finishes together with the zoom.
-                    let (ex, ey) = if app.ov.get() { app.overview_offsets_at_zoom(nz) } else { (oxt, oyt) };
-                    let t = (e * 2.0).min(1.0);
-                    let s = t * t * (3.0 - 2.0 * t);
+                    // ... blended to the final framed camera over the SAME ease (not faster).
+                    // Zoom-out: track overview framing at each nz. Zoom-in: go to normal targets.
+                    let (ex, ey) = if zt < 1.0 - 1e-6 {
+                        app.overview_offsets_at_zoom(nz)
+                    } else {
+                        (oxt, oyt)
+                    };
+                    let s = e * e * (3.0 - 2.0 * e); // smoothstep tied to full zoom ease
                     nx = px + (ex - px) * s;
                     ny = py + (ey - py) * s;
                 }
@@ -228,6 +235,10 @@ impl App {
                 app.cam_spring_y.set(None);
                 app.animating.set(false);
                 app.unfreeze_after_anim();
+                // Zoom-in finished: drop overview chrome and run focus side-effects once.
+                if app.ov_exiting.get() {
+                    app.finish_exit_overview();
+                }
                 glib::ControlFlow::Break
             } else {
                 glib::ControlFlow::Continue
