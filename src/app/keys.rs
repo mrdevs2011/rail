@@ -21,12 +21,13 @@ impl App {
                 return true;
             }
             // Ctrl+/- (and keypad): scale the overview grid, not the page.
-            if ctrl && !alt && !shift {
+            if ctrl && !alt {
+                // Shift allowed: physical + is often Shift+= (Ctrl+Shift++)
                 if matches!(k, gdk::Key::plus | gdk::Key::KP_Add) {
                     self.overview_zoom_by(1.12);
                     return true;
                 }
-                if matches!(k, gdk::Key::minus | gdk::Key::KP_Subtract) {
+                if matches!(k, gdk::Key::minus | gdk::Key::KP_Subtract) && !shift {
                     self.overview_zoom_by(1.0 / 1.12);
                     return true;
                 }

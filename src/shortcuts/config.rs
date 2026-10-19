@@ -248,6 +248,13 @@ pub(crate) fn sc_normalize(cfg: &mut ShortcutConfig) {
 
 /// Puts `combo` into slot `slot` of `def`. Takes it away from any other shortcut that
 /// used it. Returns a short note about what moved, or why it was refused.
+/// Who already owns combo (excluding except_id)? Gray those keys on the picker.
+pub(crate) fn sc_combo_owner(cfg: &ShortcutConfig, combo: &str, except_id: &str) -> Option<&'static ShortcutDef> {
+    SHORTCUT_DEFS.iter().find(|d| {
+        d.id != except_id && sc_effective(d, cfg).iter().any(|c| c == combo)
+    })
+}
+
 pub(crate) fn sc_set_slot(
     cfg: &mut ShortcutConfig,
     def: &ShortcutDef,
@@ -267,18 +274,20 @@ pub(crate) fn sc_set_slot(
             return Err(trf("{} is reserved and cannot be reassigned.", &[&combo]));
         }
     }
-    let mut note = String::new();
     for other in SHORTCUT_DEFS {
         if other.id == def.id {
             continue;
         }
-        let eff = sc_effective(other, cfg);
-        if eff.iter().any(|c| c == combo) {
-            let rest: Vec<String> = eff.into_iter().filter(|c| c != combo).collect();
-            cfg.overrides.insert(other.id.to_string(), rest);
-            note = trf("{} was taken from \"{}\".", &[&combo, tr(other.desc)]);
+        if sc_effective(other, cfg).iter().any(|c| c == combo) {
+            return Err(format!(
+                "{} is already used by \"{}\". Pick a free key or free that shortcut first.",
+                combo,
+                tr(other.desc),
+            ));
         }
     }
+    
+    let note = String::new();
     let mut list = sc_effective(def, cfg);
     if slot < list.len() {
         list[slot] = combo.to_string();

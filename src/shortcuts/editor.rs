@@ -56,7 +56,12 @@ pub(crate) fn sc_join(mod_idx: u32, key: &str) -> String {
 /// On-screen keyboard: the user taps a key instead of pressing it.
 /// What it offers follows the modifier dropdown: "None" only makes sense for F1-F12
 /// (a bare letter would steal normal typing), everything else gets the full keyboard.
-pub(crate) fn sc_build_picker(sel: Rc<Cell<u32>>, on_pick: Rc<dyn Fn(String)>) -> gtk::Popover {
+pub(crate) fn sc_build_picker(
+    sel: Rc<Cell<u32>>,
+    pending: Rc<RefCell<ShortcutConfig>>,
+    for_id: &'static str,
+    on_pick: Rc<dyn Fn(String)>,
+) -> gtk::Popover {
     let pop = gtk::Popover::new();
     let grid = gtk::Grid::new();
     grid.set_row_spacing(4);
@@ -67,26 +72,38 @@ pub(crate) fn sc_build_picker(sel: Rc<Cell<u32>>, on_pick: Rc<dyn Fn(String)>) -
     grid.set_margin_end(8);
     pop.set_child(Some(&grid));
 
-    let fill = {
+    let fill: Rc<dyn Fn(bool)> = {
         let grid = grid.clone();
         let weak = pop.downgrade();
-        move |only_f: bool| {
+        let pending = pending.clone();
+        let sel = sel.clone();
+        let on_pick = on_pick.clone();
+        Rc::new(move |only_f: bool| {
             while let Some(child) = grid.first_child() {
                 grid.remove(&child);
             }
+            let cfg = pending.borrow().clone();
+            let mod_idx = sel.get();
             let make = |label: &str, value: &str| -> gtk::Button {
                 let b = gtk::Button::with_label(label);
                 b.add_css_class("settings-option-item");
                 b.set_size_request(if only_f { 52 } else { 34 }, 30);
-                let v = value.to_string();
-                let cb = on_pick.clone();
-                let w = weak.clone();
-                b.connect_clicked(move |_| {
-                    if let Some(p) = w.upgrade() {
-                        p.popdown();
-                    }
-                    cb(v.clone());
-                });
+                let combo = sc_join(mod_idx, value);
+                if let Some(owner) = sc_combo_owner(&cfg, &combo, for_id) {
+                    b.set_sensitive(false);
+                    b.set_opacity(0.35);
+                    b.set_tooltip_text(Some(&format!("{} — {}", combo, tr(owner.desc))));
+                } else {
+                    let v = value.to_string();
+                    let cb = on_pick.clone();
+                    let w = weak.clone();
+                    b.connect_clicked(move |_| {
+                        if let Some(p) = w.upgrade() {
+                            p.popdown();
+                        }
+                        cb(v.clone());
+                    });
+                }
                 b
             };
             if only_f {
@@ -115,10 +132,12 @@ pub(crate) fn sc_build_picker(sel: Rc<Cell<u32>>, on_pick: Rc<dyn Fn(String)>) -
             for (i, (l, v)) in arrows.iter().enumerate() {
                 grid.attach(&make(l, v), i as i32, 5, 1, 1);
             }
-        }
+        })
     };
     fill(sel.get() == 4);
-    pop.connect_show(move |_| fill(sel.get() == 4));
+    let fill2 = fill.clone();
+    let sel2 = sel.clone();
+    pop.connect_show(move |_| fill2(sel2.get() == 4));
     pop
 }
 
@@ -376,9 +395,18 @@ pub(crate) fn sc_build(ui: &ScUi) {
         {
             let ui4 = ui.clone();
             let sel = sel.clone();
-            let pop = sc_build_picker(sel.clone(), Rc::new(move |v: String| {
-                sc_apply_slot(&ui4, def, 0, sc_join(sel.get(), &v));
-            }));
+            let pop = sc_build_picker(
+                sel.clone(),
+                ui4.pending.clone(),
+                def.id,
+                Rc::new({
+                    let ui4 = ui4.clone();
+                    let sel = sel.clone();
+                    move |v: String| {
+                        sc_apply_slot(&ui4, def, 0, sc_join(sel.get(), &v));
+                    }
+                }),
+            );
             kb.set_popover(Some(&pop));
         }
         line.append(&kb);
