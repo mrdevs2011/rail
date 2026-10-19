@@ -63,8 +63,8 @@ pub fn fetch_releases() -> Option<(Vec<String>, Option<UpdateInfo>)> {
     let mut after: Option<String> = None;
 
     // GitHub's Atom feed lists 10 releases per page. Paginate with ?after=<tag>
-    // to collect all historical releases (up to 10 pages / 100 releases).
-    for _ in 0..10 {
+    // to collect all historical releases (up to 100 pages / 1000 releases; stops early on an empty page).
+    for _ in 0..100 {
         let feed_url = match &after {
             Some(a) => format!("https://github.com/{}/releases.atom?after={}", REPO, a),
             None => format!("https://github.com/{}/releases.atom", REPO),
