@@ -191,62 +191,131 @@ impl App {
         pop.popup();
     }
 
-    /// Small modal window with a scannable QR code of the page address.
+    /// Beautiful modal card with a scannable QR code of the page address.
     pub(crate) fn show_qr_window(self: &Rc<Self>, url: &str) {
         let win = gtk::Window::new();
-        win.set_title(Some(tr("Create QR Code for page")));
+        win.set_title(Some(""));
         win.set_transient_for(Some(&self.win));
         win.set_modal(true);
         win.set_resizable(false);
+        win.set_decorated(false);
+        win.add_css_class("qr-win");
 
-        let col = gtk::Box::new(gtk::Orientation::Vertical, 12);
-        col.set_margin_top(18);
-        col.set_margin_bottom(18);
-        col.set_margin_start(18);
-        col.set_margin_end(18);
+        // Outer card
+        let card = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        card.add_css_class("qr-card");
 
+        // ── Top bar: title + close ───────────────────────────────────────────
+        let topbar = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        topbar.add_css_class("qr-topbar");
+
+        let title_lbl = gtk::Label::new(Some(tr("Send to phone")));
+        title_lbl.add_css_class("qr-title");
+        title_lbl.set_hexpand(true);
+        title_lbl.set_xalign(0.0);
+        topbar.append(&title_lbl);
+
+        let close_btn = gtk::Button::new();
+        close_btn.add_css_class("qr-close");
+        close_btn.set_has_frame(false);
+        close_btn.set_focus_on_click(false);
+        let x_label = gtk::Label::new(Some("✕"));
+        close_btn.set_child(Some(&x_label));
+        let wc = win.downgrade();
+        close_btn.connect_clicked(move |_| {
+            if let Some(w) = wc.upgrade() { w.close(); }
+        });
+        topbar.append(&close_btn);
+        card.append(&topbar);
+
+        // ── QR area ─────────────────────────────────────────────────────────
         match crate::qr::encode(url.as_bytes()) {
             Some(code) => {
                 let n = code.size as i32;
-                let scale = (320 / (n + 8)).max(4);
+                let scale = (280 / (n + 8)).max(4);
                 let px = (n + 8) * scale;
+
+                // White rounded frame around the QR
+                let qr_frame = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                qr_frame.add_css_class("qr-frame");
+                qr_frame.set_halign(gtk::Align::Center);
+
                 let area = gtk::DrawingArea::new();
                 area.set_content_width(px);
                 area.set_content_height(px);
                 area.set_halign(gtk::Align::Center);
                 area.set_draw_func(move |_, cr, w, h| {
-                    // White quiet zone + black modules: scanners need real contrast.
                     cr.set_source_rgb(1.0, 1.0, 1.0);
                     let _ = cr.paint();
-                    cr.set_source_rgb(0.0, 0.0, 0.0);
+                    cr.set_source_rgb(0.06, 0.06, 0.08);
                     let ox = ((w - px) / 2 + 4 * scale) as f64;
                     let oy = ((h - px) / 2 + 4 * scale) as f64;
                     for y in 0..code.size {
                         for x in 0..code.size {
                             if code.get(x, y) {
-                                cr.rectangle(ox + (x as i32 * scale) as f64, oy + (y as i32 * scale) as f64, scale as f64, scale as f64);
+                                cr.rectangle(
+                                    ox + (x as i32 * scale) as f64,
+                                    oy + (y as i32 * scale) as f64,
+                                    scale as f64,
+                                    scale as f64,
+                                );
                             }
                         }
                     }
                     let _ = cr.fill();
                 });
-                col.append(&area);
+                qr_frame.append(&area);
+                card.append(&qr_frame);
+
+                // Hint
                 let hint = gtk::Label::new(Some(tr("Scan to open this page on your phone")));
-                hint.add_css_class("dim-label");
-                col.append(&hint);
+                hint.add_css_class("qr-hint");
+                hint.set_halign(gtk::Align::Center);
+                card.append(&hint);
             }
             None => {
-                col.append(&gtk::Label::new(Some(tr("This address is too long for a QR code"))));
+                let err = gtk::Label::new(Some(tr("This address is too long for a QR code")));
+                err.add_css_class("qr-hint");
+                card.append(&err);
             }
         }
 
-        let addr = gtk::Label::new(Some(url));
-        addr.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
-        addr.set_max_width_chars(44);
-        addr.set_selectable(true);
-        col.append(&addr);
+        // ── URL row: truncated label + copy button ───────────────────────────
+        let url_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        url_row.add_css_class("qr-url-row");
 
-        win.set_child(Some(&col));
+        let addr = gtk::Label::new(Some(url));
+        addr.add_css_class("qr-url");
+        addr.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
+        addr.set_max_width_chars(36);
+        addr.set_selectable(true);
+        addr.set_hexpand(true);
+        addr.set_xalign(0.0);
+        url_row.append(&addr);
+
+        let copy_btn = gtk::Button::with_label(tr("Copy"));
+        copy_btn.add_css_class("qr-copy-btn");
+        copy_btn.set_has_frame(false);
+        copy_btn.set_focus_on_click(false);
+        let url_owned = url.to_string();
+        let win_weak = win.downgrade();
+        copy_btn.connect_clicked(move |btn| {
+            if let Some(clip) = gdk::Display::default().map(|d| d.clipboard()) {
+                clip.set_text(&url_owned);
+            }
+            btn.set_label(tr("Copied!"));
+            let btn_weak = btn.downgrade();
+            glib::timeout_add_local_once(std::time::Duration::from_millis(1500), move || {
+                if let Some(b) = btn_weak.upgrade() { b.set_label(tr("Copy")); }
+            });
+            let _ = win_weak;
+        });
+        url_row.append(&copy_btn);
+        card.append(&url_row);
+
+        win.set_child(Some(&card));
+
+        // Close on Escape
         let key = gtk::EventControllerKey::new();
         let w = win.downgrade();
         key.connect_key_pressed(move |_, k, _, _| {
@@ -258,5 +327,6 @@ impl App {
         });
         win.add_controller(key);
         win.present();
+
     }
 }

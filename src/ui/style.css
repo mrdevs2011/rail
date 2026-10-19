@@ -1819,7 +1819,81 @@ popover.ctxm button.ctxm-hdr-btn:disabled {
     opacity: 0.35;
 }
 
+/* ── QR code dialog ─────────────────────────────────────────────────── */
+window.qr-win {
+    background: transparent;
+    box-shadow: none;
+}
+.qr-card {
+    background: @theme_base_color;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.18);
+    padding: 0;
+    min-width: 320px;
+    max-width: 360px;
+    overflow: hidden;
+}
+.qr-topbar {
+    padding: 14px 14px 8px 20px;
+    background: transparent;
+}
+.qr-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: alpha(@theme_fg_color, 0.9);
+}
+.qr-close {
+    border-radius: 50%;
+    padding: 0;
+    min-width: 26px;
+    min-height: 26px;
+    color: alpha(@theme_fg_color, 0.5);
+    background: transparent;
+    transition: background 120ms, color 120ms;
+}
+.qr-close:hover {
+    background: alpha(@theme_fg_color, 0.08);
+    color: @theme_fg_color;
+}
+.qr-frame {
+    background: white;
+    border-radius: 12px;
+    margin: 4px 20px 8px 20px;
+    padding: 14px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+}
+.qr-hint {
+    font-size: 12px;
+    color: alpha(@theme_fg_color, 0.5);
+    margin: 4px 20px 12px 20px;
+}
+.qr-url-row {
+    padding: 8px 12px 14px 20px;
+    border-top: 1px solid alpha(@theme_fg_color, 0.07);
+    margin-top: 2px;
+}
+.qr-url {
+    font-size: 12px;
+    color: alpha(@theme_fg_color, 0.55);
+    font-family: monospace;
+}
+.qr-copy-btn {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 8px;
+    background: alpha(@theme_selected_bg_color, 0.15);
+    color: @theme_selected_bg_color;
+    border: none;
+    transition: background 120ms;
+    min-width: 60px;
+}
+.qr-copy-btn:hover {
+    background: alpha(@theme_selected_bg_color, 0.25);
+}
+
 /* Screenshot overlay — Firefox / Zen Screenshots look */
+
 .ss-overlay {
     background: transparent;
 }

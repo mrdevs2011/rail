@@ -386,6 +386,7 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Show Original Page", "Asl holatga qaytarish", "Показать оригинал"),
     ("Translate to {}", "{} tiliga tarjima qilish", "Перевести на {}"),
     ("Create QR Code for page", "Sahifa uchun QR kod yaratish", "Создать QR-код страницы"),
+    ("Send to phone", "Telefonga yuborish", "Отправить на телефон"),
     ("View Page Source", "Sahifa manba kodini ko'rish", "Исходный код страницы"),
     ("Inspect", "Tekshirish", "Проверить"),
     ("Scan to open this page on your phone", "Sahifani telefonda ochish uchun skanerlang", "Отсканируйте, чтобы открыть страницу на телефоне"),
