@@ -18,6 +18,7 @@ fn svg_data(name: &str) -> Option<&'static [u8]> {
         "source" => include_bytes!("../../icons/svg/source.svg").as_slice(),
         "inspect" => include_bytes!("../../icons/svg/inspect.svg").as_slice(),
         "screenshot" => include_bytes!("../../icons/svg/screenshot.svg").as_slice(),
+        "rail" => include_bytes!("../../icons/svg/rail.svg").as_slice(),
         _ => return None,
     })
 }
@@ -67,6 +68,10 @@ pub(crate) fn create_gear_icon(size: i32) -> gtk::Image {
 
 pub(crate) fn create_user_icon(size: i32) -> gtk::Image {
     load_icon("user", size)
+}
+
+pub(crate) fn create_rail_icon(size: i32) -> gtk::Image {
+    load_icon("rail", size)
 }
 
 thread_local! {

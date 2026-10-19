@@ -419,6 +419,12 @@ impl App {
     }
 
     /// Alt+B / header button: cycle fixed ↔ auto. Auto starts closed; fixed starts open.
+
+    /// Logo only in fixed mode; auto/hover hides it (smooth Crossfade).
+    pub(crate) fn sync_brand_logo(&self) {
+        let show = !self.sidebar_auto.get();
+        self.brand_logo.set_reveal_child(show);
+    }
     pub(crate) fn cycle_sidebar_mode(self: &Rc<Self>) {
         let auto = !self.sidebar_auto.get();
         self.sidebar_auto.set(auto);
@@ -431,6 +437,7 @@ impl App {
         } else {
             self.set_sidebar(true);
         }
+        self.sync_brand_logo();
     }
 
     pub(crate) fn on_shell_pointer_x(self: &Rc<Self>, x: f64) {

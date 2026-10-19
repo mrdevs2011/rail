@@ -19,7 +19,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     let history_mgr = HistoryManager::new(rail_data_dir());
     let initial_prof_id = profile_mgr.active_profile().id;
 
-    let SidebarWidgets { footer_downloads, footer_settings, head_close_side, head_back, head_reload, head_overview, head_more, list, pill, pill_label, side } = build_sidebar();
+    let SidebarWidgets { footer_downloads, footer_settings, head_close_side, head_back, head_forward, head_reload, head_more, brand_logo, list, pill, pill_label, side } = build_sidebar();
 
     let StripWidgets { layout, shell, shell_layout, strip, strip_host } = build_strip(side.clone());
 
@@ -205,6 +205,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         side,
         strip,
         layout: layout.clone(),
+        brand_logo: brand_logo.clone(),
         list: list.clone(),
         pill_label,
         load_bar,
@@ -308,13 +309,14 @@ pub(crate) fn build(gapp: &gtk::Application) {
     });
 
     wire_devtools(&app, devtools_close_btn, devtools_content_box, devtools_detach_btn, devtools_resize_handle, footer_downloads, footer_settings);
-    wire_sidebar_header(&app, head_back, head_reload, head_overview, head_more, head_close_side);
+    wire_sidebar_header(&app, head_back, head_forward, head_reload, head_more, head_close_side);
     // Auto mode: start closed (edge-hover only)
     if app.sidebar_auto.get() {
         app.side_open.set(false);
         app.side.set_visible(false);
         app.shell_layout.set_side(0.0);
     }
+    app.sync_brand_logo();
 
     wire_toast(&app, tp_close);
     wire_palette(&app, entry, pill);

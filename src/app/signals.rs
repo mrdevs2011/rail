@@ -184,6 +184,17 @@ impl App {
                         }
                     }
                 }
+                // Welcome page: always re-inject omnibar state after load (avoids empty bar race)
+                let mut u = v.uri().map(|s| s.to_string()).unwrap_or_default();
+                if u.is_empty() || u.starts_with("about:") {
+                    u = app.saved_uri_of(v);
+                }
+                if u.starts_with("rail://start") {
+                    app.push_start_state(v);
+                    if app.focused_view().as_ref() == Some(v) {
+                        app.focus_welcome_input(false);
+                    }
+                }
             }
         });
         // Site permission prompts (microphone, camera, geolocation, notifications)

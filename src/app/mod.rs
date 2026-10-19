@@ -32,6 +32,8 @@ pub(crate) struct App {
     pub(crate) shell: gtk::Box,
     pub(crate) shell_layout: ShellLayout,
     pub(crate) side: gtk::Box,
+    /// Square Rail logo in sidebar header (fixed mode only).
+    pub(crate) brand_logo: gtk::Revealer,
     pub(crate) strip: gtk::Box,
     pub(crate) layout: StripLayout,
     pub(crate) list: gtk::ListBox,

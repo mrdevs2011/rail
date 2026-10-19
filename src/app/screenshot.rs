@@ -640,30 +640,35 @@ fn crop_texture(tex: &gdk::Texture, r: Rect) -> Option<gdk::Texture> {
 }
 
 fn save_texture_png(tex: &gdk::Texture) {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    let dir = std::path::PathBuf::from(home).join("Downloads");
+    // Rail data dir: ~/.local/share/rail/screenshots/ (or $RAIL_DATA_DIR/screenshots)
+    let dir = rail_data_dir().join("screenshots");
     let _ = std::fs::create_dir_all(&dir);
     let ts = chrono_like_timestamp();
     let path = dir.join(format!("Screenshot {ts}.png"));
-    // gdk::Texture has save_to_png in GTK 4.10+
     if let Err(e) = tex.save_to_png(&path) {
         eprintln!("[rail] save png failed: {e}");
+    } else {
+        eprintln!("[rail] screenshot saved → {}", path.display());
     }
 }
 
 fn chrono_like_timestamp() -> String {
-    // local time YYYY-MM-DD HH-MM-SS without extra deps
+    // Prefer local wall-clock via `date`; fallback to unique epoch-based name.
+    if let Ok(out) = std::process::Command::new("date")
+        .args(["+%Y-%m-%d %H-%M-%S"])
+        .output()
+    {
+        if out.status.success() {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !s.is_empty() {
+                return s;
+            }
+        }
+    }
     use std::time::{SystemTime, UNIX_EPOCH};
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    // crude UTC formatting is fine for filename
-    let days = secs / 86400;
-    let rem = secs % 86400;
-    let hh = rem / 3600;
-    let mm = (rem % 3600) / 60;
-    let ss = rem % 60;
-    // 1970-01-01 + days — good enough for unique names
-    format!("1970-{:05}_{hh:02}-{mm:02}-{ss:02}", days)
+    format!("{secs}")
 }

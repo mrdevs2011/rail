@@ -79,11 +79,30 @@ impl App {
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view.clone(), prof_id.clone(), false);
         self.set_view_saved_uri(&view, "rail://start/");
-        // Show the omnibar fixed under the brand on the welcome page
         self.select_palette_profile(&prof_id);
-        self.show_palette();
+        // In-page omnibar only — never show GTK palette over rail://start
+        if self.palette_open() {
+            self.hide_palette();
+        }
         self.entry.set_text("");
         self.last_entry_len.set(0);
+        // Retry state inject until page JS is ready (covers init race)
+        for ms in [30u64, 120, 350] {
+            let app = self.clone();
+            let v = view.clone();
+            glib::timeout_add_local_once(std::time::Duration::from_millis(ms), move || {
+                let mut u = v.uri().map(|s| s.to_string()).unwrap_or_default();
+                if u.is_empty() || u.starts_with("about:") {
+                    u = app.saved_uri_of(&v);
+                }
+                if u.starts_with("rail://start") {
+                    app.push_start_state(&v);
+                    if app.focused_view().as_ref() == Some(&v) {
+                        app.focus_welcome_input(false);
+                    }
+                }
+            });
+        }
     }
 
     pub(crate) fn split_vertical(self: &Rc<Self>) {
@@ -95,9 +114,22 @@ impl App {
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view, prof_id.clone(), true);
         self.select_palette_profile(&prof_id);
-        self.show_palette();
+        if self.palette_open() {
+            self.hide_palette();
+        }
         self.entry.set_text("");
         self.last_entry_len.set(0);
+        for ms in [30u64, 120, 350] {
+            let app = self.clone();
+            glib::timeout_add_local_once(std::time::Duration::from_millis(ms), move || {
+                if app.focused_is_welcome() {
+                    if let Some(v) = app.focused_view() {
+                        app.push_start_state(&v);
+                        app.focus_welcome_input(false);
+                    }
+                }
+            });
+        }
         self.entry.grab_focus();
     }
 

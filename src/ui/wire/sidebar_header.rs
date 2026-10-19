@@ -5,8 +5,8 @@ use crate::*;
 pub(crate) fn wire_sidebar_header(
     app: &Rc<App>,
     head_back: gtk::Button,
+    head_forward: gtk::Button,
     head_reload: gtk::Button,
-    head_overview: gtk::Button,
     head_more: gtk::Button,
     head_mode: gtk::Button,
 ) {
@@ -20,15 +20,19 @@ pub(crate) fn wire_sidebar_header(
     });
 
     let a = app.clone();
-    head_reload.connect_clicked(move |_| {
+    head_forward.connect_clicked(move |_| {
         if let Some(v) = a.focused_view() {
-            reload_or_start(&v);
+            if v.can_go_forward() {
+                v.go_forward();
+            }
         }
     });
 
     let a = app.clone();
-    head_overview.connect_clicked(move |_| {
-        a.toggle_overview();
+    head_reload.connect_clicked(move |_| {
+        if let Some(v) = a.focused_view() {
+            reload_or_start(&v);
+        }
     });
 
     let a = app.clone();

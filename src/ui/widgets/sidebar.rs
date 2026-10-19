@@ -8,8 +8,9 @@ pub(crate) struct SidebarWidgets {
     pub(crate) head_close_side: gtk::Button,
     pub(crate) head_back: gtk::Button,
     pub(crate) head_reload: gtk::Button,
-    pub(crate) head_overview: gtk::Button,
+    pub(crate) head_forward: gtk::Button,
     pub(crate) head_more: gtk::Button,
+    pub(crate) brand_logo: gtk::Revealer,
     pub(crate) list: gtk::ListBox,
     pub(crate) pill: gtk::Button,
     pub(crate) pill_label: gtk::Label,
@@ -17,29 +18,35 @@ pub(crate) struct SidebarWidgets {
 }
 
 pub(crate) fn build_sidebar() -> SidebarWidgets {
-    // Brand
-    let brand = gtk::Label::new(None);
-    brand.set_markup("<span weight='bold' font_family='monospace' size='large' foreground='#f8fafc'>rail</span><span weight='bold' size='large' foreground='#38bdf8'>.</span>");
-    brand.set_hexpand(true);
-    brand.set_xalign(0.0);
+    // Brand: square Rail logo (visible only in fixed sidebar mode)
+    let brand_img = create_rail_icon(22);
+    brand_img.add_css_class("side-brand-logo");
+    brand_img.set_halign(gtk::Align::Start);
+    brand_img.set_valign(gtk::Align::Center);
+    let brand_logo = gtk::Revealer::new();
+    brand_logo.set_transition_type(gtk::RevealerTransitionType::Crossfade);
+    brand_logo.set_transition_duration(220);
+    brand_logo.set_reveal_child(true); // default fixed mode
+    brand_logo.set_hexpand(true);
+    brand_logo.set_halign(gtk::Align::Start);
+    brand_logo.set_child(Some(&brand_img));
 
-    // Header action row (image-2 style): ···  □  ←  ↻
+    // Header: profile · back · forward · reload · sidebar mode (matches design)
     let head_more = gtk::Button::new();
     head_more.set_child(Some(&create_user_icon(16)));
     head_more.add_css_class("flat-icon");
     head_more.add_css_class("side-head-btn");
     head_more.set_tooltip_text(Some(tr("Profiles")));
 
-    let head_overview = gtk::Button::from_icon_name("view-grid-symbolic");
-    head_overview.add_css_class("flat-icon");
-    head_overview.add_css_class("side-head-btn");
-    head_overview.set_tooltip_text(Some(tr("Overview")));
-    sc_bind_tooltip(&head_overview, "Overview", &["overview"]);
-
     let head_back = gtk::Button::from_icon_name("go-previous-symbolic");
     head_back.add_css_class("flat-icon");
     head_back.add_css_class("side-head-btn");
     head_back.set_tooltip_text(Some(tr("Back")));
+
+    let head_forward = gtk::Button::from_icon_name("go-next-symbolic");
+    head_forward.add_css_class("flat-icon");
+    head_forward.add_css_class("side-head-btn");
+    head_forward.set_tooltip_text(Some(tr("Forward")));
 
     let head_reload = gtk::Button::from_icon_name("view-refresh-symbolic");
     head_reload.add_css_class("flat-icon");
@@ -47,8 +54,8 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
     head_reload.set_tooltip_text(Some(tr("Reload")));
     sc_bind_tooltip(&head_reload, "Reload", &["reload"]);
 
-    // Keep head_close_side as the mode toggle (fixed ↔ auto)
-    let head_close_side = gtk::Button::from_icon_name("pan-start-symbolic");
+    // Sidebar mode toggle (fixed ↔ auto) — dual-pane glyph
+    let head_close_side = gtk::Button::from_icon_name("view-dual-symbolic");
     head_close_side.add_css_class("flat-icon");
     head_close_side.add_css_class("side-head-btn");
     head_close_side.set_tooltip_text(Some(tr("Sidebar mode")));
@@ -57,15 +64,15 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
     let actions = gtk::Box::new(gtk::Orientation::Horizontal, 2);
     actions.add_css_class("side-head-actions");
     actions.append(&head_more);
-    actions.append(&head_overview);
     actions.append(&head_back);
+    actions.append(&head_forward);
     actions.append(&head_reload);
     actions.append(&head_close_side);
 
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 4);
     head.add_css_class("side-head");
     head.set_margin_start(4);
-    head.append(&brand);
+    head.append(&brand_logo);
     head.append(&actions);
 
     let pill_label = gtk::Label::new(Some(tr("Search or enter address")));
@@ -140,8 +147,9 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
         head_close_side,
         head_back,
         head_reload,
-        head_overview,
+        head_forward,
         head_more,
+        brand_logo,
         list,
         pill,
         pill_label,
