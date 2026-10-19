@@ -63,6 +63,8 @@ pub(crate) struct App {
     pub(crate) rows: RefCell<Vec<Row>>,
     pub(crate) focus_row: Cell<usize>,
     pub(crate) focus_col: Cell<usize>,
+    /// Last focused tab index per workspace row (restored when moving up/down between rows).
+    pub(crate) row_last_col: RefCell<std::collections::HashMap<usize, usize>>,
     pub(crate) target_x: Cell<f64>,
     pub(crate) target_y: Cell<f64>,
     pub(crate) animating: Cell<bool>,

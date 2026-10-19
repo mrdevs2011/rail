@@ -105,6 +105,7 @@ impl App {
         let c_clamped = c_idx.min(rows[r_clamped].tabs.len() - 1);
         self.focus_row.set(r_clamped);
         self.focus_col.set(c_clamped);
+        self.row_last_col.borrow_mut().insert(r_clamped, c_clamped);
 
         for (ri, row) in rows.iter().enumerate() {
             for (ci, tab) in row.tabs.iter().enumerate() {
@@ -324,7 +325,36 @@ impl App {
         }
     }
 
-    /// Window above inside a stacked column; at the top of the column: the workspace above.
+    /// Prefer the last tab the user focused in `target_r`; else the same column ordinal as `from_c`.
+    pub(crate) fn col_for_workspace(&self, from_r: usize, from_c: usize, target_r: usize) -> usize {
+        let rows = self.rows.borrow();
+        if target_r >= rows.len() || rows[target_r].tabs.is_empty() {
+            return 0;
+        }
+        let n = rows[target_r].tabs.len();
+        // 1) Last focused tab in that workspace (if still valid)
+        if let Some(&c) = self.row_last_col.borrow().get(&target_r) {
+            if c < n {
+                return c;
+            }
+        }
+        // 2) Same column ordinal + stack depth as the source tab
+        if from_r < rows.len() && from_c < rows[from_r].tabs.len() {
+            let from_cols = rows[from_r].columns();
+            let to_cols = rows[target_r].columns();
+            if let Some(ci) = from_cols.iter().position(|(s, len)| from_c >= *s && from_c < s + len) {
+                let (fs, _) = from_cols[ci];
+                let depth = from_c - fs;
+                if let Some(&(ts, tlen)) = to_cols.get(ci).or_else(|| to_cols.last()) {
+                    return ts + depth.min(tlen.saturating_sub(1));
+                }
+            }
+        }
+        from_c.min(n.saturating_sub(1))
+    }
+
+    /// Window above inside a stacked column; at the top of the column: one workspace up,
+    /// restoring the last focused tab in that workspace.
     pub(crate) fn focus_row_up(self: &Rc<Self>) {
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
@@ -339,14 +369,13 @@ impl App {
             return;
         }
         if cur_r > 0 {
-            let rows = self.rows.borrow();
-            let dest_c = cur_c.min(rows[cur_r - 1].tabs.len().saturating_sub(1));
-            drop(rows);
+            let dest_c = self.col_for_workspace(cur_r, cur_c, cur_r - 1);
             self.focus_coords(cur_r - 1, dest_c);
         }
     }
 
-    /// Window below inside a stacked column; at the bottom of the column: the workspace below.
+    /// Window below inside a stacked column; at the bottom: one workspace down,
+    /// restoring the last focused tab in that workspace.
     pub(crate) fn focus_row_down(self: &Rc<Self>) {
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
@@ -360,23 +389,21 @@ impl App {
             self.focus_coords(cur_r, c);
             return;
         }
-        let rows = self.rows.borrow();
-        if cur_r + 1 < rows.len() {
-            let dest_c = cur_c.min(rows[cur_r + 1].tabs.len().saturating_sub(1));
-            drop(rows);
+        let n_rows = self.rows.borrow().len();
+        if cur_r + 1 < n_rows {
+            let dest_c = self.col_for_workspace(cur_r, cur_c, cur_r + 1);
             self.focus_coords(cur_r + 1, dest_c);
         }
     }
 
     pub(crate) fn focus_row(self: &Rc<Self>, target_r: usize) {
-        let rows = self.rows.borrow();
-        if target_r < rows.len() {
+        let n = self.rows.borrow().len();
+        if target_r < n {
+            let cur_r = self.focus_row.get();
             let cur_c = self.focus_col.get();
-            let dest_c = cur_c.min(rows[target_r].tabs.len().saturating_sub(1));
-            drop(rows);
+            let dest_c = self.col_for_workspace(cur_r, cur_c, target_r);
             self.focus_coords(target_r, dest_c);
-        } else if target_r == rows.len() {
-            drop(rows);
+        } else if target_r == n {
             self.split_vertical();
         }
     }
