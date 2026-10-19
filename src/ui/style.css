@@ -1986,3 +1986,13 @@ button.side-head-btn:hover {
     background: rgba(255, 255, 255, 0.08);
     color: #f4f4f5;
 }
+
+
+/* Square Rail logo in sidebar header (fixed mode) */
+.side-brand-logo {
+  min-width: 24px;
+  min-height: 24px;
+  margin-start: 2px;
+  margin-end: 4px;
+  opacity: 1;
+}

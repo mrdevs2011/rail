@@ -420,10 +420,9 @@ impl App {
 
     /// Alt+B / header button: cycle fixed ↔ auto. Auto starts closed; fixed starts open.
 
-    /// Logo only in fixed mode; auto/hover hides it (smooth Crossfade).
+    /// Rail logo is always visible: fixed mode and the hover-opened (auto) sidebar.
     pub(crate) fn sync_brand_logo(&self) {
-        let show = !self.sidebar_auto.get();
-        self.brand_logo.set_reveal_child(show);
+        self.brand_logo.set_reveal_child(true);
     }
     pub(crate) fn cycle_sidebar_mode(self: &Rc<Self>) {
         let auto = !self.sidebar_auto.get();

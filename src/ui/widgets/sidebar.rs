@@ -18,15 +18,16 @@ pub(crate) struct SidebarWidgets {
 }
 
 pub(crate) fn build_sidebar() -> SidebarWidgets {
-    // Brand: square Rail logo (visible only in fixed sidebar mode)
-    let brand_img = create_rail_icon(22);
+    // Brand: square Rail logo (always visible, fixed and auto/hover modes)
+    let brand_img = create_rail_icon(24);
     brand_img.add_css_class("side-brand-logo");
+    brand_img.set_pixel_size(24);
     brand_img.set_halign(gtk::Align::Start);
     brand_img.set_valign(gtk::Align::Center);
     let brand_logo = gtk::Revealer::new();
     brand_logo.set_transition_type(gtk::RevealerTransitionType::Crossfade);
     brand_logo.set_transition_duration(220);
-    brand_logo.set_reveal_child(true); // default fixed mode
+    brand_logo.set_reveal_child(true);
     brand_logo.set_hexpand(true);
     brand_logo.set_halign(gtk::Align::Start);
     brand_logo.set_child(Some(&brand_img));
