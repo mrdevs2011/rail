@@ -175,10 +175,15 @@ pub(crate) fn wire_settings(app: &Rc<App>, add_prof_btn: gtk::Button, btn_clear_
                         continue;
                     }
                     if visible {
+                        // Live tab coming back on-screen: drop any stale freeze (empty paintable
+                        // + visible freeze == solid black panel).
                         if !tab.suspended.get() {
+                            tab.freeze.set_visible(false);
                             tab.freeze.set_paintable(None::<&gdk::Paintable>);
+                            tab.view.queue_draw();
                         }
                     } else if !tab.suspended.get() && tab.view.is_mapped() {
+                        // About to unmap: keep last painted frame for a later suspend.
                         let wp = gtk::WidgetPaintable::new(Some(&tab.view));
                         let frame = gdk::prelude::PaintableExt::current_image(&wp);
                         tab.freeze.set_paintable(Some(&frame));

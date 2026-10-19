@@ -116,6 +116,11 @@ impl App {
                         tab.suspended.set(false);
                         let uri = tab.saved_uri.borrow().clone();
                         if !uri.is_empty() {
+                            // Keep a real last-frame overlay until load finishes; never leave a
+                            // visible freeze with no paintable (that is a solid black tab).
+                            if tab.freeze.paintable().is_none() {
+                                tab.freeze.set_visible(false);
+                            }
                             if is_internal_uri(&uri) {
                                 load_internal_page(&tab.view, &uri);
                             } else {

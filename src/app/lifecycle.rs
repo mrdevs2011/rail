@@ -237,7 +237,7 @@ impl App {
         let Ok(rows) = self.rows.try_borrow() else { return };
         for row in rows.iter() {
             for tab in &row.tabs {
-                if &tab.view == view && tab.freeze.is_visible() && !tab.suspended.get() {
+                if &tab.view == view && !tab.suspended.get() {
                     tab.freeze.set_visible(false);
                     tab.freeze.set_paintable(Option::<&gdk::Paintable>::None);
                     return;
@@ -292,13 +292,15 @@ impl App {
             return;
         }
         *tab.saved_uri.borrow_mut() = uri;
-        // An unmapped (hidden off-screen) view would snapshot as blank: keep the frame grabbed when it was hidden.
-        if tab.view.is_mapped() || tab.freeze.paintable().is_none() {
+        // Only snapshot while mapped. An unmapped WebView paints blank — that became the
+        // "black tab" bug. Prefer the frame grabbed on hide (connect_visibility); if we still
+        // have none, leave freeze empty (focus will reload and show content).
+        if tab.view.is_mapped() {
             let wp = gtk::WidgetPaintable::new(Some(&tab.view));
             let frame = gdk::prelude::PaintableExt::current_image(&wp);
             tab.freeze.set_paintable(Some(&frame));
         }
-        tab.freeze.set_visible(true);
+        tab.freeze.set_visible(tab.freeze.paintable().is_some());
         tab.suspended.set(true);
         tab.view.terminate_web_process();
     }
@@ -371,6 +373,10 @@ impl App {
                     continue; // never suspend focused
                 }
                 if let Some(tab) = rows.get(ri).and_then(|r| r.tabs.get(ci)) {
+                    // Visible split tabs must stay live — suspending them left a black freeze on screen.
+                    if !in_overview && self.tab_is_visible(tab) {
+                        continue;
+                    }
                     Self::suspend_tab(tab);
                 }
             }
