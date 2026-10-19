@@ -118,8 +118,8 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
                 }
             }
             sc_commit(&ui);
-            // Rebuild rows immediately so every checkbox mirrors the master
-            sc_build(&ui);
+            // Idle rebuild — never block the click handler with a full widget tree rebuild.
+            sc_refresh(&ui);
         });
     }
     {

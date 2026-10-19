@@ -43,7 +43,8 @@ impl App {
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
         if vw <= 1.0 || vh <= 1.0 {
-            self.target_zoom.set(OV_ZOOM);
+            let z = self.ov_user_zoom.get().clamp(OV_ZOOM_MIN, OV_ZOOM_MAX);
+            self.target_zoom.set(z);
             self.ensure_overview_previews();
             self.animate();
             return;
@@ -57,10 +58,11 @@ impl App {
         // The zoom-out itself is anchored on the old camera center (see animate()); once the
         // zoom settles the camera glides to the framed position: whole grid centered when it
         // fits, otherwise the active tab centered (clamped at the grid edges).
-        let (fx, fy) = self.overview_offsets_at_zoom(OV_ZOOM);
+        let z = self.ov_user_zoom.get().clamp(OV_ZOOM_MIN, OV_ZOOM_MAX);
+        let (fx, fy) = self.overview_offsets_at_zoom(z);
         self.target_x.set(fx);
         self.target_y.set(fy);
-        self.target_zoom.set(OV_ZOOM);
+        self.target_zoom.set(z);
         self.ensure_overview_previews();
         self.animate();
     }
@@ -153,38 +155,66 @@ impl App {
     }
 
 
-    /// Overview must not be a grid of black cards. Suspended tabs keep their last-frame
-    /// freeze; those without a frame are woken (capped) so WebKit paints a real preview.
+    /// Overview: show last-frame freeze for every card; keep only the focused tab live.
+    /// No mass-wake (that melted CPU/RAM). Black cards without a frame wake only when focused.
     pub(crate) fn ensure_overview_previews(self: &Rc<Self>) {
+        let fr = self.focus_row.get();
+        let fc = self.focus_col.get();
         let Ok(rows) = self.rows.try_borrow() else { return };
-        let mut woke = 0usize;
-        const MAX_WAKE: usize = 10;
-        for row in rows.iter() {
-            for tab in row.tabs.iter() {
-                if !tab.suspended.get() {
+        for (ri, row) in rows.iter().enumerate() {
+            for (ci, tab) in row.tabs.iter().enumerate() {
+                let is_focus = ri == fr && ci == fc;
+                if tab.suspended.get() {
+                    if tab.freeze.paintable().is_some() {
+                        tab.freeze.set_visible(true);
+                    }
                     continue;
                 }
-                if tab.freeze.paintable().is_some() {
-                    tab.freeze.set_visible(true);
+                // Snapshot live tab while it still has a painted frame.
+                if tab.view.is_mapped() {
+                    let wp = gtk::WidgetPaintable::new(Some(&tab.view));
+                    let frame = gdk::prelude::PaintableExt::current_image(&wp);
+                    tab.freeze.set_paintable(Some(&frame));
+                }
+                if is_focus {
+                    // Focused card stays live so the user can read it; hide freeze once painted.
                     continue;
                 }
-                if woke >= MAX_WAKE {
+                // Non-focused: suspend web process, show freeze (or blank until focus).
+                if tab.keep_alive.get() || tab.view.is_playing_audio() || tab.view.is_loading() {
                     continue;
                 }
-                let uri = tab.saved_uri.borrow().clone();
+                let live = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
+                let uri = if !live.is_empty() { live } else { tab.saved_uri.borrow().clone() };
                 if uri.is_empty() {
                     continue;
                 }
-                tab.suspended.set(false);
-                tab.freeze.set_visible(false);
-                if is_internal_uri(&uri) {
-                    load_internal_page(&tab.view, &uri);
-                } else {
-                    tab.view.load_uri(&uri);
+                *tab.saved_uri.borrow_mut() = uri;
+                if tab.freeze.paintable().is_some() {
+                    tab.freeze.set_visible(true);
                 }
-                woke += 1;
+                tab.suspended.set(true);
+                tab.view.terminate_web_process();
             }
         }
+    }
+
+    /// Ctrl+/- or pinch: change overview scale (clamped), keep framing on the focused tab.
+    pub(crate) fn overview_zoom_by(self: &Rc<Self>, factor: f64) {
+        if !self.ov.get() || self.ov_exiting.get() {
+            return;
+        }
+        let z0 = self.target_zoom.get();
+        let z1 = (z0 * factor).clamp(OV_ZOOM_MIN, OV_ZOOM_MAX);
+        if (z1 - z0).abs() < 0.001 {
+            return;
+        }
+        self.ov_user_zoom.set(z1);
+        self.target_zoom.set(z1);
+        let (fx, fy) = self.overview_offsets_at_zoom(z1);
+        self.target_x.set(fx);
+        self.target_y.set(fy);
+        self.animate();
     }
 
     pub(crate) fn cancel_overview(self: &Rc<Self>) {

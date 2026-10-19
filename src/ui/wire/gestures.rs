@@ -16,6 +16,60 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
     });
     shell.add_controller(click);
 
+    // Overview pinch-to-zoom (trackpad) + Ctrl+wheel zoom
+    {
+        let zoom = gtk::GestureZoom::new();
+        zoom.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let last = Rc::new(Cell::new(1.0f64));
+        let last_b = last.clone();
+        zoom.connect_begin(move |_, _| {
+            last_b.set(1.0);
+        });
+        let a2 = app.clone();
+        zoom.connect_scale_changed(move |_, scale| {
+            if !a2.ov.get() || a2.ov_exiting.get() {
+                return;
+            }
+            let prev = last.replace(scale);
+            if prev <= 0.01 {
+                return;
+            }
+            let factor = scale / prev;
+            if (factor - 1.0).abs() < 0.002 {
+                return;
+            }
+            a2.overview_zoom_by(factor);
+        });
+        shell.add_controller(zoom);
+    }
+    {
+        // Ctrl+scroll over overview adjusts scale (smooth, same path as Ctrl+/-).
+        let scroll_z = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+        scroll_z.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let a = app.clone();
+        scroll_z.connect_scroll(move |_, _dx, dy| {
+            if !a.ov.get() || a.ov_exiting.get() {
+                return glib::Propagation::Proceed;
+            }
+            // Only when Ctrl is held (check via seat) — GestureZoom handles pure pinch.
+            let ctrl = gtk::prelude::WidgetExt::display(&a.win)
+                .default_seat()
+                .and_then(|s| s.keyboard())
+                .map(|k| k.modifier_state().contains(gdk::ModifierType::CONTROL_MASK))
+                .unwrap_or(false);
+            if !ctrl {
+                return glib::Propagation::Proceed;
+            }
+            if dy < 0.0 {
+                a.overview_zoom_by(1.06);
+            } else if dy > 0.0 {
+                a.overview_zoom_by(1.0 / 1.06);
+            }
+            glib::Propagation::Stop
+        });
+        shell.add_controller(scroll_z);
+    }
+
     // BOTH_AXES only: KINETIC+DISCRETE on a Capture window controller makes page scroll sticky/janky
     // (steals momentum from WebKit). Overview + touchpad slide still work via dx/dy deltas.
     let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);

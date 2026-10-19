@@ -20,6 +20,17 @@ impl App {
                 self.cancel_overview();
                 return true;
             }
+            // Ctrl+/- (and keypad): scale the overview grid, not the page.
+            if ctrl && !alt && !shift {
+                if matches!(k, gdk::Key::plus | gdk::Key::equal | gdk::Key::KP_Add) {
+                    self.overview_zoom_by(1.12);
+                    return true;
+                }
+                if matches!(k, gdk::Key::minus | gdk::Key::KP_Subtract) {
+                    self.overview_zoom_by(1.0 / 1.12);
+                    return true;
+                }
+            }
             if !ctrl && !alt && !state.contains(M::SUPER_MASK) {
                 self.ov_key(k, M::empty());
                 return true;

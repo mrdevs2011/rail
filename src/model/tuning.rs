@@ -2,6 +2,8 @@
 
 /// How far the strip zooms out in overview (niri uses a similar factor).
 pub(crate) const OV_ZOOM: f64 = 0.4;
+pub(crate) const OV_ZOOM_MIN: f64 = 0.18;
+pub(crate) const OV_ZOOM_MAX: f64 = 0.85;
 /// Overview zoom in/out duration (fixed, ease-out): zoom, pan and grid land together.
 pub(crate) const OV_ANIM_SECS: f64 = 0.30;
 

@@ -222,6 +222,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         ov_hint,
         ov: Cell::new(false),
         ov_exiting: Cell::new(false),
+        ov_user_zoom: Cell::new(OV_ZOOM),
         ov_return: Cell::new((0, 0)),
         ov_saved_x: Cell::new(0.0),
         ov_saved_y: Cell::new(0.0),

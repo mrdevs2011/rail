@@ -355,6 +355,10 @@ pub(crate) fn sc_build(ui: &ScUi) {
             let sel = sel.clone();
             let key = key.clone();
             dd.connect_selected_notify(move |d| {
+                // Building rows sets selected on every dropdown — must not commit/rebuild or the UI freezes.
+                if ui3.is_syncing.get() {
+                    return;
+                }
                 sel.set(d.selected());
                 let is_f = key.len() >= 2 && key.starts_with('F') && key[1..].chars().all(|c| c.is_ascii_digit());
                 if sel.get() == 4 && !is_f {
