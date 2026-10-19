@@ -4,7 +4,7 @@ use crate::*;
 
 impl App {
     pub(crate) fn show_password_dialog<F>(
-        &self,
+        self: &Rc<Self>,
         title: &'static str,
         prompt_text: &'static str,
         btn_label: &'static str,
@@ -13,16 +13,8 @@ impl App {
     ) where
         F: Fn(String) + 'static,
     {
-        let dialog = gtk::Window::builder()
-            .title(tr(title))
-            .modal(true)
-            .transient_for(&self.win)
-            .default_width(380)
-            .resizable(false)
-            .build();
-        dialog.add_css_class("settings-modal-window");
-
         let vbox = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        vbox.add_css_class("settings-modal-window");
         vbox.set_margin_top(16);
         vbox.set_margin_bottom(16);
         vbox.set_margin_start(18);
@@ -76,12 +68,12 @@ impl App {
         btns_row.append(&btn_ok);
         vbox.append(&btns_row);
 
-        dialog.set_child(Some(&vbox));
+        let vbox_for_dialog = vbox.clone();
+        let closer = self.show_top_dialog(vbox_for_dialog);
+        let closer_cancel = closer.clone();
+        btn_cancel.connect_clicked(move |_| closer_cancel());
 
-        let d = dialog.clone();
-        btn_cancel.connect_clicked(move |_| d.close());
-
-        let d = dialog.clone();
+        let closer_ok = closer.clone();
         let on_confirm = std::rc::Rc::new(on_confirm);
         let ep = entry_pass.clone();
         let ec = entry_confirm.clone();
@@ -102,7 +94,7 @@ impl App {
                     return;
                 }
             }
-            d.close();
+            closer_ok();
             on_confirm(p1);
         };
 
@@ -122,7 +114,6 @@ impl App {
             entry_pass.connect_activate(move |_| ds2());
         }
 
-        dialog.present();
         entry_pass.grab_focus();
     }
 

@@ -974,6 +974,19 @@ button.color-choice.selected {
     transform: scale(1.15);
 }
 
+/* ---- Top-center sliding dialogs ---- */
+.top-dialog-revealer {
+    margin-top: 12px;
+}
+.top-dialog-card {
+    background: #000000;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    min-width: 340px;
+    max-width: 460px;
+}
+
 /* ---- JS script dialogs ---- */
 .js-dialog-window {
     background: #000000;

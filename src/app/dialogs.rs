@@ -3,6 +3,48 @@
 use crate::*;
 
 impl App {
+
+    /// Show content as a top-center card that slides down from the top and slides back up on close.
+    /// Returns a closer closure.
+    pub(crate) fn show_top_dialog(self: &Rc<Self>, content: gtk::Box) -> impl Fn() + Clone + 'static {
+        let revealer = gtk::Revealer::new();
+        revealer.add_css_class("top-dialog-revealer");
+        revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
+        revealer.set_transition_duration(180);
+        revealer.set_halign(gtk::Align::Center);
+        revealer.set_valign(gtk::Align::Start);
+        revealer.set_margin_top(8);
+        revealer.set_reveal_child(false);
+        revealer.set_can_target(true);
+
+        let card = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        card.add_css_class("top-dialog-card");
+        card.append(&content);
+        revealer.set_child(Some(&card));
+
+        // Attach to the main window overlay
+        if let Some(overlay) = self.win.child().and_then(|c| c.downcast::<gtk::Overlay>().ok()) {
+            overlay.add_overlay(&revealer);
+        }
+
+        // Animate in
+        revealer.set_reveal_child(true);
+
+        let revealer_c = revealer.clone();
+        let close = move || {
+            revealer_c.set_reveal_child(false);
+            let r = revealer_c.clone();
+            glib::timeout_add_local_once(std::time::Duration::from_millis(200), move || {
+                if let Some(parent) = r.parent() {
+                    if let Ok(overlay) = parent.downcast::<gtk::Overlay>() {
+                        overlay.remove_overlay(&r);
+                    }
+                }
+            });
+        };
+        close
+    }
+
     pub(crate) fn show_script_dialog(self: &Rc<Self>, view: &WebView, dialog: &ScriptDialog) {
         let dialog_type = dialog.dialog_type();
         let message = dialog.message().map(|s| s.to_string()).unwrap_or_default();
@@ -21,16 +63,8 @@ impl App {
             _ => trf("Message from {}", &[&host]),
         };
 
-        let dlg_win = gtk::Window::builder()
-            .title(&title_text)
-            .transient_for(&self.win)
-            .modal(true)
-            .resizable(false)
-            .default_width(380)
-            .build();
-        dlg_win.add_css_class("js-dialog-window");
-
         let vbox = gtk::Box::new(gtk::Orientation::Vertical, 14);
+        vbox.add_css_class("js-dialog-window");
         vbox.set_margin_top(16);
         vbox.set_margin_bottom(16);
         vbox.set_margin_start(18);
@@ -74,7 +108,6 @@ impl App {
         let close_dialog = {
             let handled = handled.clone();
             let dialog = dialog.clone();
-            let dlg_win = dlg_win.clone();
             let prompt_entry = prompt_entry.clone();
             move |confirmed: bool| {
                 if !handled.get() {
@@ -101,37 +134,58 @@ impl App {
                             dialog.close();
                         }
                     }
-                    dlg_win.close();
+                    // closer will be called below
                 }
             }
         };
 
-        if dialog_type != ScriptDialogType::Alert {
+        let cancel_btn = if dialog_type != ScriptDialogType::Alert {
             let cancel_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm { tr("Stay") } else { tr("Cancel") };
             let cancel_btn = gtk::Button::with_label(cancel_label);
             cancel_btn.add_css_class("js-dialog-btn-cancel");
-            let cd = close_dialog.clone();
-            cancel_btn.connect_clicked(move |_| cd(false));
             btn_row.append(&cancel_btn);
-        }
+            Some(cancel_btn)
+        } else {
+            None
+        };
 
         let ok_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm { tr("Leave") } else { tr("OK") };
         let ok_btn = gtk::Button::with_label(ok_label);
         ok_btn.add_css_class("js-dialog-btn-ok");
-        let cd_ok = close_dialog.clone();
-        ok_btn.connect_clicked(move |_| cd_ok(true));
         btn_row.append(&ok_btn);
 
         vbox.append(&btn_row);
-        dlg_win.set_child(Some(&vbox));
 
+        let vbox_for_dialog = vbox.clone();
+        let closer = self.show_top_dialog(vbox_for_dialog);
+
+        // Wire closer into the existing close_dialog
+        let close_with_anim = {
+            let closer = closer.clone();
+            let close_dialog = close_dialog.clone();
+            move |confirmed: bool| {
+                close_dialog(confirmed);
+                closer();
+            }
+        };
+
+        if let Some(cancel_btn) = &cancel_btn {
+            let cd = close_with_anim.clone();
+            cancel_btn.connect_clicked(move |_| cd(false));
+        }
+        {
+            let cd = close_with_anim.clone();
+            ok_btn.connect_clicked(move |_| cd(true));
+        }
+
+        // Re-bind buttons to the animated closer
         if let Some(entry) = &prompt_entry {
-            let cd_ent = close_dialog.clone();
-            entry.connect_activate(move |_| cd_ent(true));
+            let cd = close_with_anim.clone();
+            entry.connect_activate(move |_| cd(true));
         }
 
         let key_ctl = gtk::EventControllerKey::new();
-        let cd_key = close_dialog.clone();
+        let cd_key = close_with_anim.clone();
         key_ctl.connect_key_pressed(move |_, keyval, _, _| {
             if keyval == gdk::Key::Escape {
                 cd_key(false);
@@ -143,15 +197,8 @@ impl App {
                 glib::Propagation::Proceed
             }
         });
-        dlg_win.add_controller(key_ctl);
+        vbox.add_controller(key_ctl);
 
-        let cd_close = close_dialog.clone();
-        dlg_win.connect_close_request(move |_| {
-            cd_close(false);
-            glib::Propagation::Proceed
-        });
-
-        dlg_win.present();
         if let Some(entry) = &prompt_entry {
             entry.grab_focus();
         } else {
@@ -384,16 +431,8 @@ impl App {
 
     fn show_permission_popup(self: &Rc<Self>, host: String, kind: &'static str, req: webkit6::PermissionRequest) {
         let title_text = trf("{} wants to", &[&host]);
-        let win = gtk::Window::builder()
-            .title(&title_text)
-            .transient_for(&self.win)
-            .modal(true)
-            .resizable(false)
-            .default_width(380)
-            .build();
-        win.add_css_class("js-dialog-window");
-
         let vbox = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        vbox.add_css_class("js-dialog-window");
         vbox.set_margin_top(16);
         vbox.set_margin_bottom(16);
         vbox.set_margin_start(18);
@@ -413,9 +452,10 @@ impl App {
         let done = Rc::new(Cell::new(false));
         let req_close = req.clone();
         let done_close = done.clone();
+        let closer_slot: Rc<RefCell<Option<Box<dyn Fn()>>>> = Rc::new(RefCell::new(None));
         let finish = {
-            let win = win.clone();
             let done = done.clone();
+            let closer_slot = closer_slot.clone();
             move |allow: bool, remember: bool| {
                 if done.replace(true) {
                     return;
@@ -426,7 +466,9 @@ impl App {
                         m.borrow_mut().insert((host.clone(), kind), allow);
                     });
                 }
-                win.close();
+                if let Some(c) = closer_slot.borrow().as_ref() {
+                    c();
+                }
             }
         };
 
@@ -440,7 +482,10 @@ impl App {
         add_btn(tr("Allow while visiting the site"), "js-dialog-btn-ok", true, true);
         add_btn(tr("Allow this time"), "js-dialog-btn-cancel", true, false);
         add_btn(tr("Never allow"), "js-dialog-btn-cancel", false, true);
-        win.set_child(Some(&vbox));
+
+        let vbox_for_dialog = vbox.clone();
+        let closer = self.show_top_dialog(vbox_for_dialog);
+        *closer_slot.borrow_mut() = Some(Box::new(closer));
 
         let key_ctl = gtk::EventControllerKey::new();
         let f_key = finish.clone();
@@ -452,16 +497,6 @@ impl App {
                 glib::Propagation::Proceed
             }
         });
-        win.add_controller(key_ctl);
-
-        // Closed with the window button: deny this one request, remember nothing.
-        win.connect_close_request(move |_| {
-            if !done_close.replace(true) {
-                req_close.deny();
-            }
-            glib::Propagation::Proceed
-        });
-
-        win.present();
+        vbox.add_controller(key_ctl);
     }
 }
