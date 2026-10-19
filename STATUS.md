@@ -102,3 +102,8 @@
 - Hozirgi muammo/blocker: yo'q
 - Keyingi qadam: yangi release o'rnatilgach real oynada tekshirish
 - Git holati: commit + push
+### 2026-10-19 12:59
+- Qilindi: Omnibar takliflari limiti 5 -> 20, scrollbar doim ko`rinadi (overlay o`chirildi), klaviatura bilan tanlaganda ro`yxat qayta chizilmaydi (scroll joyida qoladi, tanlangan qator ko`rinishga o`tadi). Sayt ruxsat so`rovi oynasi qo`shildi (mikrofon/kamera/joylashuv/bildirishnoma: "Allow while visiting the site" / "Allow this time" / "Never allow"), enable_media_stream yoqildi, i18n uz/en/ru.
+- Hozirgi muammo/blocker: yo`q. cargo build --release OK; cargo test: 43 OK, 1 FAIL (update::test_fetch_releases_gets_more_than_ten, tarmoqqa bog`liq, bu o`zgarishga aloqasi yo`q).
+- Keyingi qadam: real oynada qo`lda tekshirish (claude.ai mikrofon so`rovi, uzun tarixli omnibar). "Allow while visiting" / "Never allow" hozircha faqat ilova sessiyasi davomida eslab qolinadi (diskka saqlanmaydi).
+- Git holati: uncommitted (src/app/dialogs.rs, palette.rs, signals.rs, tabs.rs, history.rs, i18n_tables.rs, ui/widgets/palette.rs)

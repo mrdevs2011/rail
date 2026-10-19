@@ -182,6 +182,9 @@ impl App {
                 }
             }
         });
+        // Site permission prompts (microphone, camera, geolocation, notifications)
+        let app = self.clone();
+        view.connect_permission_request(move |v, req| app.handle_permission_request(v, req));
         let app = self.clone();
         view.connect_estimated_load_progress_notify(move |_| app.update_load_bar());
         let app = self.clone();

@@ -365,7 +365,7 @@ impl HistoryManager {
 
         let mut results: Vec<HistorySuggestion> = candidates
             .into_iter()
-            .take(5)
+            .take(20)
             .map(|c| HistorySuggestion {
                 display_title: c.display_title,
                 display_url: c.display_url,

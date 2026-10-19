@@ -40,6 +40,7 @@ impl App {
         settings.set_enable_developer_extras(true);
         settings.set_enable_back_forward_navigation_gestures(true);
         settings.set_enable_webaudio(true);
+        settings.set_enable_media_stream(true); // getUserMedia (mic/camera) still needs the user prompt
         settings.set_enable_html5_local_storage(true);
         settings.set_enable_html5_database(true);
         settings.set_enable_site_specific_quirks(true);

@@ -270,11 +270,47 @@ impl App {
             self.last_entry_len.set(display_text.chars().count());
             self.is_autofilling.set(false);
         }
-        let sugs_clone = sugs.clone();
         drop(sugs);
 
-        self.render_suggestions_ui(&sugs_clone);
+        self.highlight_suggestion(new_idx);
         true
+    }
+
+    /// Move the "selected" highlight in place (no re-render, so the scroll position is kept)
+    /// and scroll the row into view when the list is taller than its viewport.
+    fn highlight_suggestion(&self, idx: usize) {
+        let list = &self.palette_suggestions_box;
+        let mut scroll: Option<gtk::ScrolledWindow> = None;
+        let mut w = list.parent();
+        while let Some(p) = w {
+            if let Ok(sw) = p.clone().downcast::<gtk::ScrolledWindow>() {
+                scroll = Some(sw);
+                break;
+            }
+            w = p.parent();
+        }
+        let mut child = list.first_child();
+        let mut i = 0usize;
+        while let Some(c) = child {
+            if i == idx {
+                c.add_css_class("selected");
+                if let (Some(sw), Some(b)) = (scroll.as_ref(), c.compute_bounds(list)) {
+                    let adj = sw.vadjustment();
+                    let top = list.margin_top() as f64 + b.y() as f64;
+                    let bottom = top + b.height() as f64;
+                    let (value, page) = (adj.value(), adj.page_size());
+                    if top < value {
+                        adj.set_value(top);
+                    } else if bottom > value + page {
+                        adj.set_value(bottom - page);
+                    }
+                }
+            } else {
+                c.remove_css_class("selected");
+            }
+            child = c.next_sibling();
+            i += 1;
+        }
     }
 
     pub(crate) fn accept_autofill_or_next_suggestion(self: &Rc<Self>) -> bool {

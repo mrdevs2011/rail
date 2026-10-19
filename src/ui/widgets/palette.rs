@@ -51,6 +51,7 @@ pub(crate) fn build_palette(profile_mgr: &ProfileManager) -> PaletteWidgets {
     let palette_suggestions_scroll = gtk::ScrolledWindow::new();
     palette_suggestions_scroll.add_css_class("palette-suggestions-scroll");
     palette_suggestions_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    palette_suggestions_scroll.set_overlay_scrolling(false);
     palette_suggestions_scroll.set_min_content_height(0);
     palette_suggestions_scroll.set_max_content_height(220);
     palette_suggestions_scroll.set_child(Some(&palette_suggestions_box));

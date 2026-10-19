@@ -333,3 +333,142 @@ impl App {
         ));
     }
 }
+
+// ---------------------------------------------------------------------------
+// Site permission prompts (microphone, camera, geolocation, notifications)
+// ---------------------------------------------------------------------------
+
+thread_local! {
+    /// Per-app-session decisions: (host, permission kind) -> allowed.
+    static PERMISSION_DECISIONS: std::cell::RefCell<std::collections::HashMap<(String, &'static str), bool>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// Permission kinds Rail asks about. Anything else keeps WebKit's default handling.
+fn permission_kind(req: &webkit6::PermissionRequest) -> Option<&'static str> {
+    if let Some(um) = req.downcast_ref::<webkit6::UserMediaPermissionRequest>() {
+        return match (um.is_for_audio_device(), um.is_for_video_device()) {
+            (true, true) => Some("camera+mic"),
+            (true, false) => Some("mic"),
+            (false, true) => Some("camera"),
+            (false, false) => None,
+        };
+    }
+    if req.is::<webkit6::GeolocationPermissionRequest>() {
+        return Some("geolocation");
+    }
+    if req.is::<webkit6::NotificationPermissionRequest>() {
+        return Some("notifications");
+    }
+    None
+}
+
+fn permission_label(kind: &str) -> &'static str {
+    match kind {
+        "camera+mic" => tr("Use your camera and microphone"),
+        "mic" => tr("Use your microphone"),
+        "camera" => tr("Use your camera"),
+        "geolocation" => tr("Know your location"),
+        _ => tr("Show notifications"),
+    }
+}
+
+impl App {
+    pub(crate) fn handle_permission_request(self: &Rc<Self>, view: &WebView, req: &webkit6::PermissionRequest) -> bool {
+        let Some(kind) = permission_kind(req) else { return false };
+        let host = view.uri()
+            .and_then(|u| glib::Uri::parse(&u, glib::UriFlags::NONE).ok())
+            .and_then(|u| u.host().map(|h| h.to_string()))
+            .unwrap_or_else(|| tr("This page").to_string());
+        let remembered = PERMISSION_DECISIONS.with(|m| m.borrow().get(&(host.clone(), kind)).copied());
+        if let Some(allowed) = remembered {
+            if allowed { req.allow(); } else { req.deny(); }
+            return true;
+        }
+        self.show_permission_popup(host, kind, req.clone());
+        true
+    }
+
+    fn show_permission_popup(self: &Rc<Self>, host: String, kind: &'static str, req: webkit6::PermissionRequest) {
+        let title_text = trf("{} wants to", &[&host]);
+        let win = gtk::Window::builder()
+            .title(&title_text)
+            .transient_for(&self.win)
+            .modal(true)
+            .resizable(false)
+            .default_width(380)
+            .build();
+        win.add_css_class("js-dialog-window");
+
+        let vbox = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        vbox.set_margin_top(16);
+        vbox.set_margin_bottom(16);
+        vbox.set_margin_start(18);
+        vbox.set_margin_end(18);
+
+        let header_lbl = gtk::Label::new(Some(&title_text));
+        header_lbl.add_css_class("js-dialog-title");
+        header_lbl.set_xalign(0.0);
+        vbox.append(&header_lbl);
+
+        let msg_lbl = gtk::Label::new(Some(permission_label(kind)));
+        msg_lbl.add_css_class("js-dialog-message");
+        msg_lbl.set_xalign(0.0);
+        msg_lbl.set_margin_bottom(6);
+        vbox.append(&msg_lbl);
+
+        let done = Rc::new(Cell::new(false));
+        let req_close = req.clone();
+        let done_close = done.clone();
+        let finish = {
+            let win = win.clone();
+            let done = done.clone();
+            move |allow: bool, remember: bool| {
+                if done.replace(true) {
+                    return;
+                }
+                if allow { req.allow(); } else { req.deny(); }
+                if remember {
+                    PERMISSION_DECISIONS.with(|m| {
+                        m.borrow_mut().insert((host.clone(), kind), allow);
+                    });
+                }
+                win.close();
+            }
+        };
+
+        let add_btn = |label: &'static str, class: &str, allow: bool, remember: bool| {
+            let b = gtk::Button::with_label(label);
+            b.add_css_class(class);
+            let f = finish.clone();
+            b.connect_clicked(move |_| f(allow, remember));
+            vbox.append(&b);
+        };
+        add_btn(tr("Allow while visiting the site"), "js-dialog-btn-ok", true, true);
+        add_btn(tr("Allow this time"), "js-dialog-btn-cancel", true, false);
+        add_btn(tr("Never allow"), "js-dialog-btn-cancel", false, true);
+        win.set_child(Some(&vbox));
+
+        let key_ctl = gtk::EventControllerKey::new();
+        let f_key = finish.clone();
+        key_ctl.connect_key_pressed(move |_, keyval, _, _| {
+            if keyval == gdk::Key::Escape {
+                f_key(false, false);
+                glib::Propagation::Stop
+            } else {
+                glib::Propagation::Proceed
+            }
+        });
+        win.add_controller(key_ctl);
+
+        // Closed with the window button: deny this one request, remember nothing.
+        win.connect_close_request(move |_| {
+            if !done_close.replace(true) {
+                req_close.deny();
+            }
+            glib::Propagation::Proceed
+        });
+
+        win.present();
+    }
+}

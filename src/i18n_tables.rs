@@ -385,4 +385,13 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Auto-detect", "Avto aniqlash", "Автоопределение"),
     ("Translate Page", "Sahifani tarjima qilish", "Перевести страницу"),
     ("Show Original Page", "Asl sahifani ko'rsatish", "Показать оригинал"),
+    ("{} wants to", "{} ruxsat so'rayapti:", "{} запрашивает разрешение:"),
+    ("Use your microphone", "Mikrofoningizdan foydalanish", "Использовать микрофон"),
+    ("Use your camera", "Kamerangizdan foydalanish", "Использовать камеру"),
+    ("Use your camera and microphone", "Kamera va mikrofondan foydalanish", "Использовать камеру и микрофон"),
+    ("Know your location", "Joylashuvingizni bilish", "Узнавать ваше местоположение"),
+    ("Show notifications", "Bildirishnomalar ko'rsatish", "Показывать уведомления"),
+    ("Allow while visiting the site", "Sayt ochiq ekan ruxsat berish", "Разрешить, пока открыт сайт"),
+    ("Allow this time", "Bu safar ruxsat berish", "Разрешить в этот раз"),
+    ("Never allow", "Hech qachon ruxsat bermaslik", "Никогда не разрешать"),
 ];

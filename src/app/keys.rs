@@ -43,8 +43,8 @@ impl App {
                 self.cancel_overview();
                 return true;
             }
-            // Ctrl+/-/0 (and keypad): scale the overview grid, not the page.
-            if ctrl && !alt {
+            // Ctrl+/-/0 or Alt+/-/0 (and keypad): scale the overview grid, not the page.
+            if (ctrl || alt) && !(ctrl && alt) {
                 match Self::zoom_dir(k, keycode, shift) {
                     Some(1) => {
                         self.overview_zoom_by(1.12);
