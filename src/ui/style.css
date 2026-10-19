@@ -119,7 +119,8 @@ scrollbar button {
     background: transparent;
 }
 .tab-freeze {
-    background: #000000;
+    /* Suspended tab without a frame: soft charcoal, never pure black hole */
+    background: #121212;
 }
 .tab {
     border-radius: 0;

@@ -257,12 +257,7 @@ pub(crate) fn lang_flag_bytes(lang: &str) -> Option<&'static [u8]> {
     })
 }
 
-/// "Auto-detect" icon (globe, line style, matches the black-and-white UI); 48px raster for crisp HiDPI.
-const AUTO_LANG_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#E6E6E6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="12" cy="12" r="9"/>
-  <ellipse cx="12" cy="12" rx="4" ry="9"/>
-  <path d="M3 12h18M4.5 7.5h15M4.5 16.5h15"/>
-</svg>"##;
+// Auto-detect language icon: icons/svg/auto-lang.svg
 
 thread_local! {
     static FLAG_CACHE: RefCell<HashMap<&'static str, Option<gdk::Texture>>> = RefCell::new(HashMap::new());
@@ -274,7 +269,7 @@ pub(crate) fn lang_flag_texture(lang: &'static str) -> Option<gdk::Texture> {
         c.borrow_mut()
             .entry(lang)
             .or_insert_with(|| {
-                let bytes = if lang == "auto" { AUTO_LANG_SVG.as_bytes() } else { lang_flag_bytes(lang)? };
+                let bytes = if lang == "auto" { svg_bytes("auto-lang")? } else { lang_flag_bytes(lang)? };
                 gdk::Texture::from_bytes(&glib::Bytes::from_static(bytes)).ok()
             })
             .clone()

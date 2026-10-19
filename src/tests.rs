@@ -149,6 +149,7 @@ fn test_app_settings_roundtrip() {
         devtools_dock: "right".to_string(),
         translate_source_lang: "auto".to_string(),
         translate_target_lang: "uz".to_string(),
+        sidebar_mode: "fixed".to_string(),
     };
     let mut out = String::from("{\n");
     out.push_str(&format!("  \"search_engine\": \"{}\",\n", minijson::escape(&s.search_engine)));

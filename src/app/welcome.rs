@@ -208,7 +208,7 @@ impl App {
         format!(
             "{{\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}]}}",
             e(tr("Search Google or enter web address...")),
-            e(GOOGLE_G_SVG),
+            e(std::str::from_utf8(svg_bytes("google").unwrap_or(b"")).unwrap_or("")),
             e(&sc_apply(tr("Enter  go      Esc  cancel      Alt+P  profiles"), &["profiles"])),
             e(tr("Select Profile")),
             e(&sc_apply(tr("Manage Profiles in Settings (Alt+P)"), &["profiles"])),

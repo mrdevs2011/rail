@@ -198,11 +198,9 @@ pub(crate) fn wire_settings(app: &Rc<App>, add_prof_btn: gtk::Button, btn_clear_
                                 });
                             }
                         }
-                    } else if !tab.suspended.get() && tab.view.is_mapped() {
-                        // About to unmap: keep last painted frame for suspend / overview.
-                        let wp = gtk::WidgetPaintable::new(Some(&tab.view));
-                        let frame = gdk::prelude::PaintableExt::current_image(&wp);
-                        tab.freeze.set_paintable(Some(&frame));
+                    } else if !tab.suspended.get() {
+                        // About to unmap: durable last frame for suspend / overview (never live WidgetPaintable).
+                        App::store_tab_frame(tab);
                     }
                     return;
                 }
