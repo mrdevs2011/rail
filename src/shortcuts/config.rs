@@ -86,7 +86,7 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("devtools_dock", G_PANELS, "Cycle DevTools dock position", ["Alt+Shift+D"]),
     sc!("map", G_PANELS, "Toggle Roadmap / Minimap", ["Alt+M"]),
     sc!("overview", G_PANELS, "Toggle Spatial Overview", ["Alt+O"]),
-    sc!("overview_zoom_in", G_PANELS, "Overview zoom in", ["Ctrl+equal"]),
+    sc!("overview_zoom_in", G_PANELS, "Overview zoom in", ["Ctrl+plus"]),
     sc!("overview_zoom_out", G_PANELS, "Overview zoom out", ["Ctrl+minus"]),
     sc!("sidebar", G_PANELS, "Toggle Sidebar", ["Alt+B"]),
     sc!("downloads", G_PANELS, "Open Downloads", ["Ctrl+J"]),

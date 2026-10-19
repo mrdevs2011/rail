@@ -22,7 +22,7 @@ impl App {
             }
             // Ctrl+/- (and keypad): scale the overview grid, not the page.
             if ctrl && !alt && !shift {
-                if matches!(k, gdk::Key::plus | gdk::Key::equal | gdk::Key::KP_Add) {
+                if matches!(k, gdk::Key::plus | gdk::Key::KP_Add) {
                     self.overview_zoom_by(1.12);
                     return true;
                 }
