@@ -77,6 +77,7 @@ Yoki ilovalar ro‘yxatidan (Rofi / Wofi / GNOME / KDE) **Rail** deb qidirib och
 | `Ctrl + L` | Manzil qatori (URL bar) |
 | `Ctrl + W` | Fokusdagi tabni yopish |
 | `Ctrl + R` | Sahifani yangilash (Reload) |
+| `Ctrl + +` / `Ctrl + -` / `Ctrl + 0` | Sahifa masshtabi 20%–500% (overview'da — overview masshtabi), 0 — asl holat |
 | `Alt + F` | To‘liq kenglik / standart kenglik |
 | `Alt + Shift + V` | Yangi ish maydoni (workspace) |
 | `Alt + H` / `Alt + L` | Chap / o‘ng ustunga fokus |

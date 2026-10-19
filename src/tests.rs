@@ -276,3 +276,35 @@ fn test_ui_shortcut_labels_follow_config() {
     assert_eq!(sc_apply("Close DevTools (Esc / F12)", &["devtools"]), "Close DevTools (Esc)");
     assert_eq!(sc_apply("Manage Profiles in Settings (Alt+P)", &["profiles"]), "Manage Profiles in Settings");
 }
+
+#[test]
+fn test_page_zoom_steps_cover_20_to_500() {
+    assert_eq!(next_page_zoom(1.0, 1), 1.10);
+    assert_eq!(next_page_zoom(1.0, -1), 0.90);
+    assert_eq!(next_page_zoom(0.20, -1), 0.20);
+    assert_eq!(next_page_zoom(5.0, 1), 5.0);
+    let mut z = 1.0;
+    for _ in 0..40 {
+        z = next_page_zoom(z, 1);
+    }
+    assert_eq!(z, 5.0);
+    for _ in 0..40 {
+        z = next_page_zoom(z, -1);
+    }
+    assert_eq!(z, 0.20);
+    // off-step value snaps to the neighbouring step
+    assert_eq!(next_page_zoom(1.05, 1), 1.10);
+    assert_eq!(next_page_zoom(1.05, -1), 1.0);
+}
+
+#[test]
+fn test_zoom_keys_plus_works_without_shift() {
+    // Ctrl+= (US layout, no Shift) must zoom in, same as Ctrl+Shift++
+    assert_eq!(App::zoom_dir(gdk::Key::equal, 21, false), Some(1));
+    assert_eq!(App::zoom_dir(gdk::Key::plus, 21, true), Some(1));
+    assert_eq!(App::zoom_dir(gdk::Key::KP_Add, 86, false), Some(1));
+    assert_eq!(App::zoom_dir(gdk::Key::minus, 20, false), Some(-1));
+    assert_eq!(App::zoom_dir(gdk::Key::KP_Subtract, 82, false), Some(-1));
+    assert_eq!(App::zoom_dir(gdk::Key::_0, 19, false), Some(0));
+    assert_eq!(App::zoom_dir(gdk::Key::a, 38, false), None);
+}

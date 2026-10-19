@@ -5,6 +5,29 @@ use crate::*;
 impl App {
     // ---- keys ------------------------------------------------------------
 
+    /// Ctrl zoom keys: `Some(1)` in, `Some(-1)` out, `Some(0)` reset.
+    /// `=` counts as plus (US layout: Ctrl+= without Shift); keypad +/- work too.
+    pub(crate) fn zoom_dir(k: gdk::Key, keycode: u32, shift: bool) -> Option<i32> {
+        if matches!(k, gdk::Key::plus | gdk::Key::equal | gdk::Key::KP_Add) {
+            return Some(1);
+        }
+        if !shift && matches!(k, gdk::Key::minus | gdk::Key::KP_Subtract) {
+            return Some(-1);
+        }
+        // keycode 19 = physical 0 (digit row), like Ctrl+1..9 above
+        if matches!(k, gdk::Key::_0 | gdk::Key::KP_0) || keycode == 19 {
+            return Some(0);
+        }
+        None
+    }
+
+    /// Zoom the focused tab: `dir` > 0 in, < 0 out, 0 reset to 100%.
+    pub(crate) fn page_zoom(self: &Rc<Self>, dir: i32) {
+        let Some(v) = self.focused_view() else { return };
+        let z = if dir == 0 { 1.0 } else { next_page_zoom(v.zoom_level(), dir) };
+        v.set_zoom_level(z);
+    }
+
     pub(crate) fn on_key(self: &Rc<Self>, key: gdk::Key, keycode: u32, state: gdk::ModifierType) -> bool {
         use gdk::ModifierType as M;
         let ctrl = state.contains(M::CONTROL_MASK);
@@ -20,16 +43,22 @@ impl App {
                 self.cancel_overview();
                 return true;
             }
-            // Ctrl+/- (and keypad): scale the overview grid, not the page.
+            // Ctrl+/-/0 (and keypad): scale the overview grid, not the page.
             if ctrl && !alt {
-                // Shift allowed: physical + is often Shift+= (Ctrl+Shift++)
-                if matches!(k, gdk::Key::plus | gdk::Key::KP_Add) {
-                    self.overview_zoom_by(1.12);
-                    return true;
-                }
-                if matches!(k, gdk::Key::minus | gdk::Key::KP_Subtract) && !shift {
-                    self.overview_zoom_by(1.0 / 1.12);
-                    return true;
+                match Self::zoom_dir(k, keycode, shift) {
+                    Some(1) => {
+                        self.overview_zoom_by(1.12);
+                        return true;
+                    }
+                    Some(-1) => {
+                        self.overview_zoom_by(1.0 / 1.12);
+                        return true;
+                    }
+                    Some(_) => {
+                        self.overview_zoom_by(OV_ZOOM / self.target_zoom.get());
+                        return true;
+                    }
+                    None => {}
                 }
             }
             if !ctrl && !alt && !state.contains(M::SUPER_MASK) {
@@ -106,6 +135,14 @@ impl App {
         }
         if self.overview_open() && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
             return true;
+        }
+
+        // Ctrl +/-/0 — page zoom of the focused tab (20%..500%)
+        if ctrl && !alt {
+            if let Some(dir) = Self::zoom_dir(k, keycode, shift) {
+                self.page_zoom(dir);
+                return true;
+            }
         }
 
         // Ctrl+Shift+R — hard refresh (bypass cache), Chrome/Brave bilan bir xil

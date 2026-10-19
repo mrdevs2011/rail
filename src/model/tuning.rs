@@ -4,6 +4,22 @@
 pub(crate) const OV_ZOOM: f64 = 0.4;
 pub(crate) const OV_ZOOM_MIN: f64 = 0.18;
 pub(crate) const OV_ZOOM_MAX: f64 = 0.85;
+/// Page zoom (Ctrl +/-/0): Chrome-style steps, 20%..500%.
+pub(crate) const PAGE_ZOOM_STEPS: [f64; 18] =
+    [0.20, 0.25, 0.33, 0.50, 0.67, 0.75, 0.80, 0.90, 1.0, 1.10, 1.25, 1.50, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0];
+
+/// Next page zoom step above (`dir > 0`) or below (`dir < 0`) `cur`; clamped to 20%..500%.
+pub(crate) fn next_page_zoom(cur: f64, dir: i32) -> f64 {
+    const EPS: f64 = 0.005;
+    let min = PAGE_ZOOM_STEPS[0];
+    let max = PAGE_ZOOM_STEPS[PAGE_ZOOM_STEPS.len() - 1];
+    if dir > 0 {
+        PAGE_ZOOM_STEPS.iter().copied().find(|z| *z > cur + EPS).unwrap_or(max)
+    } else {
+        PAGE_ZOOM_STEPS.iter().rev().copied().find(|z| *z < cur - EPS).unwrap_or(min)
+    }
+}
+
 /// Overview zoom in/out duration (fixed, ease-out): zoom, pan and grid land together.
 pub(crate) const OV_ANIM_SECS: f64 = 0.30;
 
