@@ -263,6 +263,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         touchpad_toast_sub,
         touchpad_toast_gen: Cell::new(0),
         touchpad_toast_hover: Cell::new(false),
+        ss_overlay: RefCell::new(None),
         page_scrollable: Cell::new(false),
         last_scroll_us: Cell::new(0),
         last_saved_session: RefCell::new(String::new()),

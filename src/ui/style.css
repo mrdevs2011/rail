@@ -1750,21 +1750,33 @@ popover.ctxm button.ctxm-row {
     border: none;
     box-shadow: none;
     background: transparent;
-    color: #e4e4e7;
+    color: #fafafa;
     font-size: 12px;
     font-weight: 500;
+}
+popover.ctxm button.ctxm-row label {
+    color: #fafafa;
 }
 popover.ctxm button.ctxm-row:hover {
     background: #1a1a1a;
     color: #ffffff;
 }
+popover.ctxm button.ctxm-row:hover label {
+    color: #ffffff;
+}
 popover.ctxm button.ctxm-row:disabled {
-    opacity: 0.4;
+    opacity: 0.45;
+}
+popover.ctxm button.ctxm-row:disabled label {
+    color: #a1a1aa;
 }
 popover.ctxm .ctxm-sc {
-    color: #71717a;
+    color: #a1a1aa;
     font-family: ui-monospace, 'JetBrains Mono', monospace;
     font-size: 11px;
+}
+popover.ctxm button.ctxm-row:hover .ctxm-sc {
+    color: #d4d4d8;
 }
 popover.ctxm separator {
     background: rgba(39, 39, 42, 0.8);
@@ -1791,70 +1803,76 @@ popover.ctxm button.ctxm-hdr-btn:disabled {
     opacity: 0.35;
 }
 
-/* Screenshot overlay (Zen-style region picker) */
+/* Screenshot overlay — Firefox / Zen Screenshots look */
 .ss-overlay {
     background: transparent;
 }
 .ss-hint {
-    background: rgba(0, 0, 0, 0.72);
-    color: #f4f4f5;
+    background: rgba(0, 0, 0, 0.78);
+    color: #fafafa;
     font-size: 13px;
-    padding: 8px 14px;
-    border-radius: 10px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08);
 }
 .ss-toolbar {
-    background: #18181b;
-    border: 1px solid #27272a;
-    border-radius: 10px;
-    padding: 4px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    background: #1c1c1e;
+    border: 1px solid #3a3a3c;
+    border-radius: 8px;
+    padding: 3px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.55);
 }
 .ss-toolbar button {
     min-height: 32px;
     padding: 0 12px;
-    border-radius: 8px;
+    border-radius: 6px;
     border: none;
     background: transparent;
-    color: #e4e4e7;
+    color: #f5f5f7;
     font-size: 12px;
     font-weight: 500;
 }
 .ss-toolbar button:hover {
-    background: #27272a;
+    background: #2c2c2e;
     color: #fff;
 }
-.ss-topbar {
-    background: #18181b;
-    border: 1px solid #27272a;
-    border-radius: 10px;
-    padding: 4px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+.ss-toolbar button.ss-primary {
+    background: #0a84ff;
+    color: #fff;
 }
-.ss-topbar button {
+.ss-toolbar button.ss-primary:hover {
+    background: #409cff;
+}
+.ss-topbar {
+    background: #1c1c1e;
+    border: 1px solid #3a3a3c;
+    border-radius: 8px;
+    padding: 3px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+}
+.ss-topbar button,
+.ss-topbar button.ss-top-btn {
     min-height: 34px;
     padding: 0 14px;
-    border-radius: 8px;
+    border-radius: 6px;
     border: none;
     background: transparent;
-    color: #e4e4e7;
+    color: #f5f5f7;
     font-size: 12px;
     font-weight: 500;
 }
-.ss-topbar button:hover {
-    background: #27272a;
-    color: #fff;
-}
-.ss-topbar button.ss-active {
-    background: #27272a;
+.ss-topbar button:hover,
+.ss-topbar button.ss-top-btn:hover {
+    background: #2c2c2e;
     color: #fff;
 }
 .ss-size {
-    color: #a1a1aa;
+    color: #fafafa;
     font-size: 11px;
     font-family: ui-monospace, monospace;
-    background: rgba(0,0,0,0.65);
+    background: rgba(0,0,0,0.75);
     padding: 2px 8px;
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
 .tab {

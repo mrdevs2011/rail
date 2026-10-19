@@ -32,10 +32,6 @@ fn menu_row(icon: &str, label: &str, shortcut: &str, enabled: bool) -> gtk::Butt
     b
 }
 
-fn menu_sep() -> gtk::Separator {
-    gtk::Separator::new(gtk::Orientation::Horizontal)
-}
-
 /// "O‘zbek" for "uz", "Ingliz" for "en" (the parenthesized native name is dropped).
 fn target_language_name(code: &str) -> String {
     SUPPORTED_LANGUAGES
@@ -119,8 +115,6 @@ impl App {
         hdr.append(&reload);
 
         col.append(&hdr);
-        col.append(&menu_sep());
-
         // QR code
         let qr = menu_row("qr", tr("Create QR Code for page"), "", is_web_uri(&uri));
         let (app, p, u) = (self.clone(), pop.downgrade(), uri.clone());
@@ -150,8 +144,6 @@ impl App {
             });
             col.append(&row);
         }
-        col.append(&menu_sep());
-
         // Screenshot (Zen-style region + full page)
         let shot = menu_row("screenshot", tr("Take Screenshot"), "", is_web_uri(&uri));
         let (app, p, v) = (self.clone(), pop.downgrade(), view.clone());
@@ -160,8 +152,6 @@ impl App {
             app.start_screenshot_mode(&v);
         });
         col.append(&shot);
-        col.append(&menu_sep());
-
         // Developer
         let src = menu_row("source", tr("View Page Source"), "Ctrl+U", is_web_uri(&uri));
         let (app, p, u) = (self.clone(), pop.downgrade(), uri.clone());

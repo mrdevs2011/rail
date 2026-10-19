@@ -108,6 +108,8 @@ pub(crate) struct App {
     pub(crate) touchpad_toast_sub: gtk::Label,
     pub(crate) touchpad_toast_gen: Cell<u32>,
     pub(crate) touchpad_toast_hover: Cell<bool>,
+    /// Active screenshot overlay (Zen-style); removed on capture/cancel.
+    pub(crate) ss_overlay: RefCell<Option<gtk::Overlay>>,
     /// Cached: can the focused page scroll (either axis)? Touchpad slide yields to the page then.
     pub(crate) page_scrollable: Cell<bool>,
     /// monotonic µs of the last scroll event seen in Touchpad Slide mode (poll only when idle)
