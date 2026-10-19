@@ -155,8 +155,7 @@ impl App {
     }
 
 
-    /// Overview: show last-frame freeze for every card; keep only the focused tab live.
-    /// No mass-wake (that melted CPU/RAM). Black cards without a frame wake only when focused.
+    /// Overview: keep live cards visible; if a tab was already suspended, show its freeze frame.
     pub(crate) fn ensure_overview_previews(self: &Rc<Self>) {
         let fr = self.focus_row.get();
         let fc = self.focus_col.get();
@@ -165,48 +164,20 @@ impl App {
             for (ci, tab) in row.tabs.iter().enumerate() {
                 let is_focus = ri == fr && ci == fc;
                 if tab.suspended.get() {
-                    // Show freeze only when a real picture exists — never a grey placeholder.
+                    // Show freeze only when a real picture exists.
                     tab.freeze.set_visible(tab.freeze.paintable().is_some());
                     continue;
                 }
-                // Snapshot live tab into a durable texture while it still has a painted frame.
-                App::store_tab_frame(tab);
                 if is_focus {
-                    // Focused card stays live so the user can read it; hide freeze once painted.
+                    tab.freeze.set_visible(false);
                     continue;
                 }
-                // Settings is GTK-over-black-shell — never suspend. Capture the full
-                // tab container (WebView + GTK overlay) so the card shows real content.
-                if App::is_settings_tab(tab) {
-                    // Snapshot the whole tab container (includes the settings GTK overlay).
-                    let wp = gtk::WidgetPaintable::new(Some(&tab.container));
-                    let frame = gdk::prelude::PaintableExt::current_image(&wp);
-                    if let Some(tex) = App::durableize_paintable(&frame, true) {
-                        tab.freeze.set_paintable(Some(&tex));
-                    }
-                    if tab.freeze.paintable().is_some() {
-                        tab.freeze.set_visible(true);
-                    }
-                    continue;
-                }
-                // Non-focused: suspend web process, show freeze (or soft placeholder).
-                if tab.keep_alive.get() || tab.view.is_playing_audio() || tab.view.is_loading() {
-                    continue;
-                }
-                let live = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
-                let uri = if !live.is_empty() { live } else { tab.saved_uri.borrow().clone() };
-                if uri.is_empty() {
-                    continue;
-                }
-                // Always kill the process; show freeze only when a real picture exists.
-                *tab.saved_uri.borrow_mut() = uri;
+                // If a tab is already suspended/sleeping, show its freeze. Otherwise leave the live view intact.
                 if tab.freeze.paintable().is_some() {
                     tab.freeze.set_visible(true);
                 } else {
                     tab.freeze.set_visible(false);
                 }
-                tab.suspended.set(true);
-                tab.view.terminate_web_process();
             }
         }
     }
