@@ -146,10 +146,10 @@ impl App {
         self.freeze_for_anim();
         let app = self.clone();
         let last = Cell::new(None::<i64>);
-        // Timed overview zoom: (start time us, start zoom, target zoom, start offset x, start offset y).
+        // Timed overview zoom: (start time us, start zoom, target zoom).
         // A fixed-duration ease-out has no long exponential tail, so zoom, pan and grid land together
         // instead of "zoom first, then slowly slide to the middle".
-        let zanim = Cell::new(None::<(i64, f64, f64, f64, f64)>);
+        let zanim = Cell::new(None::<(i64, f64, f64)>);
         self.strip.add_tick_callback(move |strip, clock| {
             let now = clock.frame_time();
             let dt = last.replace(Some(now)).map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
@@ -175,13 +175,13 @@ impl App {
             let mut nx: f64;
             let mut ny: f64;
             if ov_motion {
-                let (t0, z0, _, ox0, oy0) = match zanim.get() {
-                    Some(a) if (a.2 - zt).abs() < 1e-9 => a,
+                let (t0, z0, _) = match zanim.get() {
+                    Some(a) if (a.2 - zt).abs() < 1e-9 => (a.0, a.1, a.2),
                     _ => {
                         // (re)start from wherever the camera is right now
-                        let a = (now, zc, zt, oxc, oyc);
+                        let a = (now, zc, zt);
                         zanim.set(Some(a));
-                        a
+                        (a.0, a.1, a.2)
                     }
                 };
                 let u = (((now - t0) as f64 / 1e6) / OV_ANIM_SECS).clamp(0.0, 1.0);
@@ -193,10 +193,12 @@ impl App {
                 } else {
                     // log-space zoom: perceived scale rate is uniform
                     nz = (z0.ln() + (zt.ln() - z0.ln()) * e).exp();
-                    // Pure scale around the point under the screen center at start ...
-                    let (ax, ay) = (ox0 + vw * 0.5 / z0, oy0 + vh * 0.5 / z0);
+                    // Anchor the zoom on the *current* screen centre each frame (not the start
+                    // position). This keeps the world point under the centre fixed during the
+                    // pure-scale phase so the animation looks like a perfectly centred zoom.
+                    let (ax, ay) = (oxc + vw * 0.5 / zc, oyc + vh * 0.5 / zc);
                     let (px, py) = (ax - vw * 0.5 / nz, ay - vh * 0.5 / nz);
-                    // ... blended to the final framed camera over the SAME ease (not faster).
+                    // Blend the scale-anchor toward the final framed position.
                     // Zoom-out: track overview framing at each nz. Zoom-in: go to normal targets.
                     let (ex, ey) = if zt < 1.0 - 1e-6 {
                         app.overview_offsets_at_zoom(nz)

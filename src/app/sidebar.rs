@@ -410,12 +410,8 @@ impl App {
     }
 
     pub(crate) fn toggle_sidebar(self: &Rc<Self>) {
-        // In fixed mode: open/close. In auto mode: cycle back to fixed+open.
-        if self.sidebar_auto.get() {
-            self.cycle_sidebar_mode();
-        } else {
-            self.set_sidebar(!self.side_open.get());
-        }
+        // Alt+B and the header button do exactly the same thing: cycle fixed ↔ auto.
+        self.cycle_sidebar_mode();
     }
 
     /// Alt+B / header button: cycle fixed ↔ auto. Auto starts closed; fixed starts open.
