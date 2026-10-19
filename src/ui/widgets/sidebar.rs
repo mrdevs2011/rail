@@ -24,10 +24,11 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
     brand.set_xalign(0.0);
 
     // Header action row (image-2 style): ···  □  ←  ↻
-    let head_more = gtk::Button::from_icon_name("view-more-symbolic");
+    let head_more = gtk::Button::new();
+    head_more.set_child(Some(&create_user_icon(16)));
     head_more.add_css_class("flat-icon");
     head_more.add_css_class("side-head-btn");
-    head_more.set_tooltip_text(Some(tr("More")));
+    head_more.set_tooltip_text(Some(tr("Profiles")));
 
     let head_overview = gtk::Button::from_icon_name("view-grid-symbolic");
     head_overview.add_css_class("flat-icon");
