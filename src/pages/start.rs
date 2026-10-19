@@ -15,5 +15,5 @@ thread_local! {
 pub(crate) fn start_page() -> String {
     START_PAGE
         .replacen("<html lang=\"en\">", &format!("<html lang=\"{}\">", i18n::current().code()), 1)
-        .replacen("keyboard-first browser for developers", tr("keyboard-first browser for developers"), 1)
+        .replacen("fast pages many workspaces with RAIL", tr("fast pages many workspaces with RAIL"), 1)
 }

@@ -250,7 +250,7 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("New tab", "Yangi tab", "Новая вкладка"),
     ("This page", "Bu sahifa", "Эта страница"),
     ("search or enter url", "qidiring yoki manzil kiriting", "поиск или адрес"),
-    ("keyboard-first browser for developers", "dasturchilar uchun klaviaturaga yo'naltirilgan brauzer", "браузер для разработчиков с управлением с клавиатуры"),
+    ("fast pages many workspaces with RAIL", "RAIL yordamida tezkor sahifalar va ko'plab ish maydonlari", "быстрые страницы и много рабочих пространств с RAIL"),
     ("Unchecked: when a page uses the same keys, the page wins and Rail stays out of the way.", "Belgi olib tashlansa: sahifa xuddi shu tugmalardan foydalanganda sahifa ustun bo'ladi va Rail aralashmaydi.", "Если снять флажок: когда страница использует те же клавиши, приоритет у страницы, а Rail не вмешивается."),
     ("Directory: {}\nStatus:    {} open tab(s) in {} workspace(s) | {} profiles (cookies/logins active)", "Papka: {}\nHolat:     {} ta ochiq tab, {} ta ish maydoni | {} ta profil (cookie/loginlar faol)", "Папка: {}\nСтатус:    открыто вкладок: {}, пространств: {} | профилей: {} (cookie/логины активны)"),
     ("Usage: rail [OPTIONS] [URL]", "Ishlatish: rail [PARAMETRLAR] [URL]", "Использование: rail [ПАРАМЕТРЫ] [URL]"),
