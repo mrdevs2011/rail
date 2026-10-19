@@ -88,3 +88,10 @@
 - Hozirgi muammo/blocker: yo'q. Real oynada ko'rinishi tekshirilmagan.
 - Keyingi qadam: Rail ni ochib Settings > General > Sahifa tarjimasi ni ko'zdan kechirish, keyin commit + push
 - Git holati: uncommitted
+
+---
+### 2026-10-19 14:57
+- Qilindi: Tarjima qilingan (*.translate.goog) sahifada ham kontekst menyuda "Sahifani tarjima qilish" chiqadi (asl URL Settings tillari bilan qayta tarjima qilinadi). Release build OK.
+- Hozirgi muammo/blocker: yo'q
+- Keyingi qadam: yangi release o'rnatilgach real sahifada tekshirish
+- Git holati: commit + push

@@ -28,6 +28,19 @@ impl App {
     pub(crate) fn append_translate_item(self: &Rc<Self>, view: &WebView, menu: &ContextMenu) {
         let uri = view.uri().map(|s| s.to_string()).unwrap_or_default();
         if let Some(original) = untranslate_url(&uri) {
+            // Already translated (e.g. opened from Google's "Translate this page"): offer to
+            // translate the ORIGINAL again with the language pair from Settings.
+            let v = view.clone();
+            let orig = original.clone();
+            let again = gio::SimpleAction::new("ctx-translate-page", None);
+            again.connect_activate(move |_, _| {
+                let s = load_app_settings();
+                if let Some(url) = translate_url(&orig, &s.translate_source_lang, &s.translate_target_lang) {
+                    v.load_uri(&url);
+                }
+            });
+            self.win.add_action(&again);
+            menu.append(&ContextMenuItem::from_gaction(&again, tr("Translate Page"), None));
             let v = view.clone();
             let act = gio::SimpleAction::new("ctx-translate-original", None);
             act.connect_activate(move |_, _| v.load_uri(&original));
