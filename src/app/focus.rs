@@ -114,13 +114,11 @@ impl App {
                     tab.last_active.set(std::time::Instant::now());
                     // Uyg'otish: sahifani qayta yukla; freeze load tugaguncha turadi
                     if tab.suspended.get() {
-                        // Wake even in overview: otherwise the zoomed card stays solid black.
+                        // Wake: keep freeze visible until load finishes (clear_tab_freeze on is_loading false).
                         tab.suspended.set(false);
                         let uri = tab.saved_uri.borrow().clone();
                         if !uri.is_empty() {
-                            if tab.freeze.paintable().is_none() {
-                                tab.freeze.set_visible(false);
-                            }
+                            tab.freeze.set_visible(true); // cover dead WebView until first paint
                             if is_internal_uri(&uri) {
                                 load_internal_page(&tab.view, &uri);
                             } else {

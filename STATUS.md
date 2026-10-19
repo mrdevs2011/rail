@@ -116,4 +116,14 @@
 - Build: cargo build --release OK (faqat warning).
 - Keyingi qadam: Foydalanuvchi sahifada o'ng bosib "Skrinshot olish" ni sinasin; overlay joylashuvi
   webview ustida to'g'ri tushmasa parent/overlay ni sozlash kerak bo'lishi mumkin.
+---
+### 2026-10-19 16:55
+- Qilindi: Uxlagan tab hech qachon qop-qora bo'lmasin.
+  - Oxirgi kadr MemoryTexture (durable) ga ko'chiriladi — web process o'lgach ham o'chmaydi.
+  - Bo'sh/qora kadr rad etiladi, oldingi yaxshi frame saqlanadi.
+  - Suspend paytida freeze overlay har doim yoqiladi; frame yo'q bo'lsa #121212 placeholder.
+  - prune_freeze_frames: xotira holatiga qarab max 3/5/10 ta texture, eskilar olib tashlanadi.
+  - Visibility hide, overview, anim, focus wake pathlari yangilandi.
+- Build: cargo build --release OK.
+- Keyingi: foydalanuvchi bir necha tab ochib uxlatib ko'rsin.
 

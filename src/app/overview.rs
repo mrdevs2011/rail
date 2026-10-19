@@ -165,17 +165,12 @@ impl App {
             for (ci, tab) in row.tabs.iter().enumerate() {
                 let is_focus = ri == fr && ci == fc;
                 if tab.suspended.get() {
-                    if tab.freeze.paintable().is_some() {
-                        tab.freeze.set_visible(true);
-                    }
+                    // Always show freeze layer — durable frame or charcoal placeholder, never pure black hole.
+                    tab.freeze.set_visible(true);
                     continue;
                 }
-                // Snapshot live tab while it still has a painted frame.
-                if tab.view.is_mapped() {
-                    let wp = gtk::WidgetPaintable::new(Some(&tab.view));
-                    let frame = gdk::prelude::PaintableExt::current_image(&wp);
-                    tab.freeze.set_paintable(Some(&frame));
-                }
+                // Snapshot live tab into a durable texture while it still has a painted frame.
+                App::store_tab_frame(tab);
                 if is_focus {
                     // Focused card stays live so the user can read it; hide freeze once painted.
                     continue;
@@ -184,7 +179,7 @@ impl App {
                 if App::is_settings_tab(tab) {
                     continue;
                 }
-                // Non-focused: suspend web process, show freeze (or blank until focus).
+                // Non-focused: suspend web process, show freeze (or soft placeholder).
                 if tab.keep_alive.get() || tab.view.is_playing_audio() || tab.view.is_loading() {
                     continue;
                 }
@@ -194,9 +189,7 @@ impl App {
                     continue;
                 }
                 *tab.saved_uri.borrow_mut() = uri;
-                if tab.freeze.paintable().is_some() {
-                    tab.freeze.set_visible(true);
-                }
+                tab.freeze.set_visible(true);
                 tab.suspended.set(true);
                 tab.view.terminate_web_process();
             }
