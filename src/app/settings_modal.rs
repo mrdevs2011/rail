@@ -23,7 +23,6 @@ impl App {
             SettingsTab::Update => "update",
             SettingsTab::About => "about",
         };
-        sc_dbg(&format!("open_settings_tab {}", tab_name));
         self.settings_stack.set_visible_child_name(tab_name);
 
         for (btn_tab, btn) in self.settings_tab_buttons.borrow().iter() {
@@ -85,7 +84,6 @@ impl App {
                 self.set_view_saved_uri(&v, settings_uri);
             }
         } else {
-            sc_dbg("open_settings_tab:NEW_WEBVIEW");
             let prof_id = self.profiles.borrow().active_id().to_string();
             let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
             let view = Self::create_web_view(&session, &prof_id);
@@ -117,7 +115,28 @@ impl App {
     }
 
     pub(crate) fn toggle_settings_modal(self: &Rc<Self>) {
-        if self.settings_modal_open() {
+        // Already on settings → close that tab (do NOT replace with start/new-tab page).
+        let on_settings = self
+            .focused_view()
+            .and_then(|v| v.uri())
+            .map(|u| u.starts_with("rail://settings"))
+            .unwrap_or(false)
+            || self
+                .focused_view()
+                .map(|v| self.saved_uri_of(&v).starts_with("rail://settings"))
+                .unwrap_or(false);
+        if self.settings_modal_open() || on_settings {
+            if let Some(v) = self.focused_view() {
+                let is_settings = v
+                    .uri()
+                    .map(|u| u.starts_with("rail://settings"))
+                    .unwrap_or(false)
+                    || self.saved_uri_of(&v).starts_with("rail://settings");
+                if is_settings {
+                    self.close_view(&v);
+                    return;
+                }
+            }
             self.hide_settings_modal();
         } else {
             self.open_settings_tab(self.current_settings_tab.get());
@@ -126,15 +145,8 @@ impl App {
 
     pub(crate) fn hide_settings_modal(self: &Rc<Self>) {
         self.settings_modal.set_visible(false);
-        // Avoid leaving a blank shell: if this tab is settings, go back to start page
-        // so Alt+S toggle does not show an empty black area.
+        // Do not navigate the tab to start page — that felt like "new tab" after Alt+S.
         if let Some(v) = self.focused_view() {
-            let uri = v.uri().map(|s| s.to_string()).unwrap_or_default();
-            if uri.starts_with("rail://settings") {
-                v.load_html(&start_page(), Some("rail://start/"));
-                self.set_view_saved_uri(&v, "rail://start/");
-                self.pill_label.set_text("rail://start/");
-            }
             v.grab_focus();
         }
         self.refresh_sidebar();
