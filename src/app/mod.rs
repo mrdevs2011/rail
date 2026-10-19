@@ -24,6 +24,8 @@ mod profiles_modal;
 mod overview;
 mod keys;
 mod translate;
+mod ctxmenu;
+mod screenshot;
 
 pub(crate) struct App {
     pub(crate) win: gtk::ApplicationWindow,
@@ -79,6 +81,8 @@ pub(crate) struct App {
     /// Animatsiya paytida freeze-kadrga almashtirilgan tablar; animatsiya tugagach jonliga qaytariladi.
     pub(crate) anim_frozen: RefCell<Vec<(gtk::Picture, WebView)>>,
     pub(crate) side_open: Cell<bool>,
+    /// true = edge-hover auto mode; false = fixed (Claude-style always visible when open).
+    pub(crate) sidebar_auto: Cell<bool>,
     pub(crate) side_gen: Cell<u32>,
     /// A just-created tab that has never navigated; Esc discards it.
     pub(crate) fresh: RefCell<Option<WebView>>,

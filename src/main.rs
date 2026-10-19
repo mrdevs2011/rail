@@ -22,6 +22,7 @@ mod i18n_tables;
 mod update;
 mod sync;
 mod spring;
+mod qr;
 use i18n::{tr, trf};
 
 use gtk::glib;

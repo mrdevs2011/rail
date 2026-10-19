@@ -45,3 +45,34 @@ pub(crate) fn create_gear_icon(size: i32) -> gtk::Image {
         }
     }
 }
+
+/// "Translate" glyph (A / 文) for the page context menu. Same geometry as the original
+/// SVG Repo icon, with the stroke inlined as attributes (no <style>) so every renderer agrees.
+pub(crate) const TRANSLATE_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#9a9996" stroke-width="1.92" stroke-miterlimit="10">
+  <line x1="0.5" y1="3.35" x2="12" y2="3.35"/>
+  <line x1="6.25" y1="0.48" x2="6.25" y2="3.35"/>
+  <path d="M9.12,3.35c0,3.52-3.28,8.2-7.66,10.55"/>
+  <path d="M4.51,7.37A16.4,16.4,0,0,0,11,13.9"/>
+  <polyline points="12.96 22.52 16.79 11.98 17.75 11.98 21.58 22.52"/>
+  <line x1="20.43" y1="18.69" x2="15.07" y2="18.69"/>
+  <line x1="11.04" y1="22.52" x2="14.88" y2="22.52"/>
+  <line x1="19.67" y1="22.52" x2="23.5" y2="22.52"/>
+</svg>"##;
+
+thread_local! {
+    static TRANSLATE_ICON_READY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Serialized GIcon ("rail-translate") for GMenu items. The SVG is written once to
+/// ~/.cache/rail/icons and that folder is added to the GTK icon search path (unthemed icon).
+pub(crate) fn translate_icon_variant() -> Option<glib::Variant> {
+    if !TRANSLATE_ICON_READY.with(|r| r.get()) {
+        let dir = glib::user_cache_dir().join("rail").join("icons");
+        std::fs::create_dir_all(&dir).ok()?;
+        std::fs::write(dir.join("rail-translate.svg"), TRANSLATE_SVG).ok()?;
+        let display = gdk::Display::default()?;
+        gtk::IconTheme::for_display(&display).add_search_path(&dir);
+        TRANSLATE_ICON_READY.with(|r| r.set(true));
+    }
+    gio::Icon::serialize(gio::ThemedIcon::new("rail-translate").upcast_ref::<gio::Icon>())
+}

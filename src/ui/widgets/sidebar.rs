@@ -6,6 +6,10 @@ pub(crate) struct SidebarWidgets {
     pub(crate) footer_downloads: gtk::Button,
     pub(crate) footer_settings: gtk::Button,
     pub(crate) head_close_side: gtk::Button,
+    pub(crate) head_back: gtk::Button,
+    pub(crate) head_reload: gtk::Button,
+    pub(crate) head_overview: gtk::Button,
+    pub(crate) head_more: gtk::Button,
     pub(crate) list: gtk::ListBox,
     pub(crate) pill: gtk::Button,
     pub(crate) pill_label: gtk::Label,
@@ -13,19 +17,55 @@ pub(crate) struct SidebarWidgets {
 }
 
 pub(crate) fn build_sidebar() -> SidebarWidgets {
-    // ---- sidebar ----
+    // Brand
     let brand = gtk::Label::new(None);
     brand.set_markup("<span weight='bold' font_family='monospace' size='large' foreground='#f8fafc'>rail</span><span weight='bold' size='large' foreground='#38bdf8'>.</span>");
     brand.set_hexpand(true);
     brand.set_xalign(0.0);
-    let head_close_side = gtk::Button::from_icon_name("go-previous-symbolic");
+
+    // Header action row (image-2 style): ···  □  ←  ↻
+    let head_more = gtk::Button::from_icon_name("view-more-symbolic");
+    head_more.add_css_class("flat-icon");
+    head_more.add_css_class("side-head-btn");
+    head_more.set_tooltip_text(Some(tr("More")));
+
+    let head_overview = gtk::Button::from_icon_name("view-grid-symbolic");
+    head_overview.add_css_class("flat-icon");
+    head_overview.add_css_class("side-head-btn");
+    head_overview.set_tooltip_text(Some(tr("Overview")));
+    sc_bind_tooltip(&head_overview, "Overview", &["overview"]);
+
+    let head_back = gtk::Button::from_icon_name("go-previous-symbolic");
+    head_back.add_css_class("flat-icon");
+    head_back.add_css_class("side-head-btn");
+    head_back.set_tooltip_text(Some(tr("Back")));
+
+    let head_reload = gtk::Button::from_icon_name("view-refresh-symbolic");
+    head_reload.add_css_class("flat-icon");
+    head_reload.add_css_class("side-head-btn");
+    head_reload.set_tooltip_text(Some(tr("Reload")));
+    sc_bind_tooltip(&head_reload, "Reload", &["reload"]);
+
+    // Keep head_close_side as the mode toggle (fixed ↔ auto)
+    let head_close_side = gtk::Button::from_icon_name("pan-start-symbolic");
     head_close_side.add_css_class("flat-icon");
-    head_close_side.set_tooltip_text(Some(tr("Close sidebar")));
+    head_close_side.add_css_class("side-head-btn");
+    head_close_side.set_tooltip_text(Some(tr("Sidebar mode")));
     sc_bind_tooltip(&head_close_side, "Toggle Sidebar", &["sidebar"]);
+
+    let actions = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+    actions.add_css_class("side-head-actions");
+    actions.append(&head_more);
+    actions.append(&head_overview);
+    actions.append(&head_back);
+    actions.append(&head_reload);
+    actions.append(&head_close_side);
+
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    head.add_css_class("side-head");
     head.set_margin_start(4);
     head.append(&brand);
-    head.append(&head_close_side);
+    head.append(&actions);
 
     let pill_label = gtk::Label::new(Some(tr("Search or enter address")));
     pill_label.set_xalign(0.0);
@@ -56,7 +96,6 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
     list_scroll.set_overflow(gtk::Overflow::Hidden);
     list_scroll.set_child(Some(&list));
 
-    // Sidebar footer: Downloads + Settings (Chrome-style)
     let footer_dl_lbl = gtk::Label::new(Some(tr("Downloads")));
     footer_dl_lbl.set_xalign(0.0);
     footer_dl_lbl.set_hexpand(true);
@@ -94,5 +133,17 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
     side.append(&list_scroll);
     side.append(&side_footer);
 
-    SidebarWidgets { footer_downloads, footer_settings, head_close_side, list, pill, pill_label, side }
+    SidebarWidgets {
+        footer_downloads,
+        footer_settings,
+        head_close_side,
+        head_back,
+        head_reload,
+        head_overview,
+        head_more,
+        list,
+        pill,
+        pill_label,
+        side,
+    }
 }

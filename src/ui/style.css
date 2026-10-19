@@ -1732,6 +1732,130 @@ popover.menu separator {
     margin: 4px 2px;
 }
 
+/* Page context menu (src/app/ctxmenu.rs) */
+popover.ctxm > contents {
+    background: #000000;
+    border: 1px solid #222222;
+    border-radius: 12px;
+    padding: 6px 0;
+    min-width: 256px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.8);
+}
+popover.ctxm button.ctxm-row {
+    min-height: 34px;
+    padding: 0 12px;
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    color: #e4e4e7;
+    font-size: 12px;
+    font-weight: 500;
+}
+popover.ctxm button.ctxm-row:hover {
+    background: #1a1a1a;
+    color: #ffffff;
+}
+popover.ctxm button.ctxm-row:disabled {
+    opacity: 0.4;
+}
+popover.ctxm .ctxm-sc {
+    color: #71717a;
+    font-family: ui-monospace, 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+popover.ctxm separator {
+    background: rgba(39, 39, 42, 0.8);
+    min-height: 1px;
+    margin: 6px 0;
+}
+popover.ctxm .ctxm-hdr {
+    padding: 2px 4px 4px 4px;
+}
+popover.ctxm button.ctxm-hdr-btn {
+    min-height: 36px;
+    min-width: 40px;
+    padding: 0;
+    margin: 0;
+    border-radius: 8px;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+}
+popover.ctxm button.ctxm-hdr-btn:hover {
+    background: #1a1a1a;
+}
+popover.ctxm button.ctxm-hdr-btn:disabled {
+    opacity: 0.35;
+}
+
+/* Screenshot overlay (Zen-style region picker) */
+.ss-overlay {
+    background: transparent;
+}
+.ss-hint {
+    background: rgba(0, 0, 0, 0.72);
+    color: #f4f4f5;
+    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 10px;
+}
+.ss-toolbar {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    padding: 4px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+}
+.ss-toolbar button {
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #e4e4e7;
+    font-size: 12px;
+    font-weight: 500;
+}
+.ss-toolbar button:hover {
+    background: #27272a;
+    color: #fff;
+}
+.ss-topbar {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    padding: 4px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+}
+.ss-topbar button {
+    min-height: 34px;
+    padding: 0 14px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #e4e4e7;
+    font-size: 12px;
+    font-weight: 500;
+}
+.ss-topbar button:hover {
+    background: #27272a;
+    color: #fff;
+}
+.ss-topbar button.ss-active {
+    background: #27272a;
+    color: #fff;
+}
+.ss-size {
+    color: #a1a1aa;
+    font-size: 11px;
+    font-family: ui-monospace, monospace;
+    background: rgba(0,0,0,0.65);
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
 .tab {
     border: 1px solid #1a1a1a;
     box-shadow: none;
@@ -1843,4 +1967,21 @@ progressbar.load-bar progress {
 .flag-icon {
     border-radius: 2px;
     overflow: hidden;
+}
+
+
+/* Sidebar header action buttons */
+.side-head-actions {
+    spacing: 2px;
+}
+button.side-head-btn {
+    min-width: 28px;
+    min-height: 28px;
+    padding: 4px;
+    border-radius: 6px;
+    color: #a1a1aa;
+}
+button.side-head-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #f4f4f5;
 }

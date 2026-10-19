@@ -36,6 +36,8 @@ pub(crate) struct AppSettings {
     pub(crate) translate_source_lang: String,
     /// Page translation: target language code (default "uz").
     pub(crate) translate_target_lang: String,
+    /// Sidebar behavior: "fixed" (always open when shown) or "auto" (edge-hover).
+    pub(crate) sidebar_mode: String,
 }
 
 impl Default for AppSettings {
@@ -49,6 +51,7 @@ impl Default for AppSettings {
             devtools_dock: "bottom".to_string(),
             translate_source_lang: "auto".to_string(),
             translate_target_lang: "uz".to_string(),
+            sidebar_mode: "fixed".to_string(),
         }
     }
 }
@@ -107,6 +110,11 @@ pub(crate) fn load_app_settings() -> AppSettings {
         if let Some(tl) = root.get("translate_target_lang").and_then(|v| v.as_str()) {
             s.translate_target_lang = clean_lang_code(tl, "uz");
         }
+        if let Some(sm) = root.get("sidebar_mode").and_then(|v| v.as_str()) {
+            if sm == "auto" || sm == "fixed" {
+                s.sidebar_mode = sm.to_string();
+            }
+        }
     }
     s
 }
@@ -126,7 +134,8 @@ pub(crate) fn save_app_settings(s: &AppSettings) -> bool {
 ", s.auto_update));
     out.push_str(&format!("  \"devtools_dock\": \"{}\",\n", minijson::escape(&s.devtools_dock)));
     out.push_str(&format!("  \"translate_source_lang\": \"{}\",\n", minijson::escape(&s.translate_source_lang)));
-    out.push_str(&format!("  \"translate_target_lang\": \"{}\"\n", minijson::escape(&s.translate_target_lang)));
+    out.push_str(&format!("  \"translate_target_lang\": \"{}\",\n", minijson::escape(&s.translate_target_lang)));
+    out.push_str(&format!("  \"sidebar_mode\": \"{}\"\n", minijson::escape(&s.sidebar_mode)));
     out.push_str("}
 ");
     let path = settings_json_path();

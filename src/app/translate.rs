@@ -9,7 +9,7 @@ fn open_translated(view: &WebView, source: &str, target: &str) {
     }
 }
 
-fn translate_page(view: &WebView) {
+pub(super) fn translate_page(view: &WebView) {
     let s = load_app_settings();
     if s.translate_source_lang != "auto" {
         open_translated(view, &s.translate_source_lang, &s.translate_target_lang);
@@ -28,19 +28,7 @@ impl App {
     pub(crate) fn append_translate_item(self: &Rc<Self>, view: &WebView, menu: &ContextMenu) {
         let uri = view.uri().map(|s| s.to_string()).unwrap_or_default();
         if let Some(original) = untranslate_url(&uri) {
-            // Already translated (e.g. opened from Google's "Translate this page"): offer to
-            // translate the ORIGINAL again with the language pair from Settings.
-            let v = view.clone();
-            let orig = original.clone();
-            let again = gio::SimpleAction::new("ctx-translate-page", None);
-            again.connect_activate(move |_, _| {
-                let s = load_app_settings();
-                if let Some(url) = translate_url(&orig, &s.translate_source_lang, &s.translate_target_lang) {
-                    v.load_uri(&url);
-                }
-            });
-            self.win.add_action(&again);
-            menu.append(&ContextMenuItem::from_gaction(&again, tr("Translate Page"), None));
+            // Already translated: only offer the way back (Translate Page comes back on the original).
             let v = view.clone();
             let act = gio::SimpleAction::new("ctx-translate-original", None);
             act.connect_activate(move |_, _| v.load_uri(&original));
@@ -58,5 +46,60 @@ impl App {
         self.win.add_action(&act);
         menu.append(&ContextMenuItem::from_gaction(&act, tr("Translate Page"), None));
         menu.append(&ContextMenuItem::new_separator());
+    }
+}
+
+/// Sets the "icon" attribute on every menu item whose label is in `labels`. Recurses into sections.
+fn add_menu_icons(model: &gio::MenuModel, icon: &glib::Variant, labels: &[&str]) -> bool {
+    let mut changed = false;
+    for i in 0..model.n_items() {
+        if let Some(sec) = model.item_link(i, "section") {
+            changed |= add_menu_icons(&sec, icon, labels);
+            continue;
+        }
+        let label = model
+            .item_attribute_value(i, "label", None)
+            .and_then(|v| v.str().map(|s| s.to_string()))
+            .unwrap_or_default();
+        if !labels.iter().any(|l| *l == label) {
+            continue;
+        }
+        if model.item_attribute_value(i, "icon", None).is_some() {
+            continue;
+        }
+        if let Some(menu) = model.downcast_ref::<gio::Menu>() {
+            let item = gio::MenuItem::from_model(model, i);
+            item.set_attribute_value("icon", Some(icon));
+            menu.remove(i);
+            menu.insert_item(i, &item);
+            changed = true;
+        }
+    }
+    changed
+}
+
+impl App {
+    /// WebKit builds the context-menu popover (a GtkPopoverMenu child of the view) after the
+    /// `context-menu` signal returns, so look for it a few times and add the translate icon.
+    pub(crate) fn decorate_context_menu_icons(view: &WebView) {
+        let Some(icon) = translate_icon_variant() else { return };
+        let v = view.downgrade();
+        let tries = std::rc::Rc::new(std::cell::Cell::new(0u8));
+        glib::timeout_add_local(std::time::Duration::from_millis(10), move || {
+            let Some(v) = v.upgrade() else { return glib::ControlFlow::Break };
+            tries.set(tries.get() + 1);
+            let labels = [tr("Translate Page"), tr("Show Original Page")];
+            let mut any = false;
+            let mut child = v.first_child();
+            while let Some(w) = child {
+                if let Some(pm) = w.downcast_ref::<gtk::PopoverMenu>() {
+                    if let Some(m) = pm.menu_model() {
+                        any |= add_menu_icons(&m, &icon, &labels);
+                    }
+                }
+                child = w.next_sibling();
+            }
+            if any || tries.get() >= 20 { glib::ControlFlow::Break } else { glib::ControlFlow::Continue }
+        });
     }
 }

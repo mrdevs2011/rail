@@ -410,8 +410,52 @@ impl App {
     }
 
     pub(crate) fn toggle_sidebar(self: &Rc<Self>) {
-        self.set_sidebar(!self.side_open.get());
+        // In fixed mode: open/close. In auto mode: cycle back to fixed+open.
+        if self.sidebar_auto.get() {
+            self.cycle_sidebar_mode();
+        } else {
+            self.set_sidebar(!self.side_open.get());
+        }
     }
+
+    /// Alt+B / header button: cycle fixed ↔ auto. Auto starts closed; fixed starts open.
+    pub(crate) fn cycle_sidebar_mode(self: &Rc<Self>) {
+        let auto = !self.sidebar_auto.get();
+        self.sidebar_auto.set(auto);
+        let mut s = load_app_settings();
+        s.sidebar_mode = if auto { "auto".into() } else { "fixed".into() };
+        save_app_settings(&s);
+        if auto {
+            // auto: hide until edge hover
+            self.set_sidebar(false);
+        } else {
+            self.set_sidebar(true);
+        }
+    }
+
+    pub(crate) fn on_shell_pointer_x(self: &Rc<Self>, x: f64) {
+        if !self.sidebar_auto.get() {
+            return;
+        }
+        // Left edge strip ~8px opens; past SIDE_W + margin closes.
+        if x <= 8.0 {
+            if !self.side_open.get() {
+                self.set_sidebar(true);
+            }
+        } else if x > (SIDE_W as f64 + 24.0) {
+            if self.side_open.get() {
+                self.set_sidebar(false);
+            }
+        }
+    }
+
+    pub(crate) fn on_shell_pointer_leave(self: &Rc<Self>) {
+        if self.sidebar_auto.get() && self.side_open.get() {
+            self.set_sidebar(false);
+        }
+    }
+
+
 
     /// Open rail://downloads in a **new tab** (target=_blank style).
     pub(crate) fn open_downloads(self: &Rc<Self>) {

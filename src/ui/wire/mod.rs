@@ -8,6 +8,7 @@ mod palette;
 mod gestures;
 mod keys;
 mod close;
+mod sidebar_header;
 
 pub(crate) use minimap::*;
 pub(crate) use settings::*;
@@ -17,3 +18,4 @@ pub(crate) use palette::*;
 pub(crate) use gestures::*;
 pub(crate) use keys::*;
 pub(crate) use close::*;
+pub(crate) use sidebar_header::*;

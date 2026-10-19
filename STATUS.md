@@ -107,3 +107,13 @@
 - Hozirgi muammo/blocker: yo`q. cargo build --release OK; cargo test: 43 OK, 1 FAIL (update::test_fetch_releases_gets_more_than_ten, tarmoqqa bog`liq, bu o`zgarishga aloqasi yo`q).
 - Keyingi qadam: real oynada qo`lda tekshirish (claude.ai mikrofon so`rovi, uzun tarixli omnibar). "Allow while visiting" / "Never allow" hozircha faqat ilova sessiyasi davomida eslab qolinadi (diskka saqlanmaydi).
 - Git holati: uncommitted (src/app/dialogs.rs, palette.rs, signals.rs, tabs.rs, history.rs, i18n_tables.rs, ui/widgets/palette.rs)
+---
+### 2026-10-19 16:30
+- Qilindi: Context menu header (Back/Forward/Reload bir qatorda) + Zen-uslubidagi Take Screenshot:
+  element hover outline (JS), click-to-scope, resizable region, auto-scroll pastga/tepaga,
+  Save visible / Save full page, Copy / Download. WebKit snapshot API.
+  Fayllar: src/app/screenshot.rs (yangi), ctxmenu.rs, style.css, i18n_tables.rs, mod.rs.
+- Build: cargo build --release OK (faqat warning).
+- Keyingi qadam: Foydalanuvchi sahifada o'ng bosib "Skrinshot olish" ni sinasin; overlay joylashuvi
+  webview ustida to'g'ri tushmasa parent/overlay ni sozlash kerak bo'lishi mumkin.
+

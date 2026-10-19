@@ -315,22 +315,15 @@ impl App {
         // 5b. Translate page (Google Translate)
         self.append_translate_item(view, menu);
 
-        // 6. Developer Tools (Inspect Element / View Source)
-        let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_default();
-        if !cur_uri.is_empty() && !cur_uri.starts_with("about:") {
-            let app_src = self.clone();
-            let act_src = gio::SimpleAction::new("ctx-view-source", None);
-            act_src.connect_activate(move |_, _| {
-                app_src.show_devtools();
-            });
-            self.win.add_action(&act_src);
-            menu.append(&ContextMenuItem::from_gaction(&act_src, &sc_apply(tr("View Page Source  (F12)"), &["devtools"]), None));
-        }
-
+        // 6. Developer Tools: ONE item, always last. "Inspect Element" opens the same
+        // devtools as F12 / View Source (see signals.rs), so a separate View Source entry is redundant.
         menu.append(&ContextMenuItem::from_stock_action_with_label(
             ContextMenuAction::InspectElement,
             &sc_apply(tr("Inspect Element  (F12)"), &["devtools"]),
         ));
+
+        // WebKit's ContextMenuItem has no icon API: decorate the popover's GMenu after it is built.
+        Self::decorate_context_menu_icons(view);
     }
 }
 

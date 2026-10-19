@@ -112,6 +112,10 @@ impl App {
         // Developer context menu (Right-click & 2-finger touchpad tap)
         let app = self.clone();
         view.connect_context_menu(move |v, menu, hit| {
+            if App::is_page_level_hit(hit) {
+                app.show_page_menu(v);
+                return true;
+            }
             app.customize_context_menu(v, menu, hit);
             false
         });
@@ -188,7 +192,28 @@ impl App {
         let app = self.clone();
         view.connect_estimated_load_progress_notify(move |_| app.update_load_bar());
         let app = self.clone();
-        view.connect_create(move |v, _| {
+        view.connect_create(move |v, nav| {
+            // Chrome/Brave parity: plain left-click navigates in the same tab.
+            // Only middle-click, Ctrl/Cmd+click, or scripted window.open() open a new tab.
+            let btn = nav.mouse_button();
+            let mods = gdk::ModifierType::from_bits_truncate(nav.modifiers());
+            let want_new = btn == 2
+                || mods.contains(gdk::ModifierType::CONTROL_MASK)
+                || mods.contains(gdk::ModifierType::META_MASK)
+                || (btn == 0 && nav.is_user_gesture());
+
+            if !want_new {
+                if let Some(req) = nav.request() {
+                    if let Some(uri) = req.uri() {
+                        let u = uri.to_string();
+                        if !u.is_empty() && u != "about:blank" {
+                            v.load_uri(&u);
+                        }
+                    }
+                }
+                return None;
+            }
+
             let parent_prof = app.find_view_profile(v).unwrap_or_else(|| app.profiles.borrow().active_profile().id);
             let nv = WebView::builder().related_view(v).build();
             app.add_view(nv.clone(), parent_prof, false);
