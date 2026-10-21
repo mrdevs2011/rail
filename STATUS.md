@@ -144,3 +144,9 @@
 - Hozirgi muammo/blocker: sessiyadan tiklangan (lazy) tablarda bir marta ochilmaguncha rasm yo'q, ular hali kulrang chiqishi mumkin. Rasmlar kichraytirilmaydi, tab ko'p bo'lsa RAM'da ko'proq joy oladi.
 - Keyingi qadam: Alt+O bilan real oynada tekshirish. "Uxlaganda WebView to'liq yopilsin (faqat rasm + URL qolsin)" hali qilinmagan: Tab.view ni Option qilish kerak.
 - Git holati: uncommitted (src/app/lifecycle.rs, src/app/overview.rs)
+
+---
+### 2026-10-21 13:50
+- Qilindi: Overview zoom-in endi markaziy nuqta atrofida sof zoom (scroll.rs animate): oxirida tepaga surilish/oynab qaytish yo`q. Release build OK.
+- Blocker: video (YouTube iframe) ishlamasligi sababi tizimda gst-libav / gst-plugins-bad yo`qligi (avdec_h264, avdec_aac). Drag-drop, paste, upload sababi hali aniqlanmagan.
+- Keyingi qadam: real oynada zoom-in ni tekshirish; drag-drop/upload/paste ni qayta ishlab chiqarib sababini topish.
