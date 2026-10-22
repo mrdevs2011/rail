@@ -2104,3 +2104,19 @@ button.side-head-btn:hover {
   margin-end: 4px;
   opacity: 1;
 }
+
+/* ---- square icon buttons / dots / swatches -> circles ---- */
+button.btn-add-tab,
+button.flat-icon,
+.tab-close,
+.btn-ws-add,
+button.profile-circle-btn,
+.profile-item-dot,
+button.profile-item-btn .profile-item-dot,
+.profile-avatar-circle,
+button.color-choice {
+    border-radius: 50%;
+}
+.profile-badge-mini {
+    border-radius: 999px;
+}
