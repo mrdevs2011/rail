@@ -82,7 +82,7 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("settings", G_PANELS, "Toggle Settings panel", ["Alt+S"]),
     sc!("profiles", G_PANELS, "Profiles / profile switcher", ["Alt+P"]),
     sc!("data", G_PANELS, "Data & Backup", ["Alt+I"]),
-    sc!("devtools", G_PANELS, "Toggle DevTools", ["F12"]),
+    sc!("devtools", G_PANELS, "Toggle DevTools", ["F12", "Ctrl+Shift+I"]),
     sc!("devtools_dock", G_PANELS, "Cycle DevTools dock position", ["Alt+Shift+D"]),
     sc!("map", G_PANELS, "Toggle Roadmap / Minimap", ["Alt+M"]),
     sc!("overview", G_PANELS, "Toggle Spatial Overview", ["Alt+O"]),

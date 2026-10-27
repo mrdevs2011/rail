@@ -156,3 +156,8 @@
 - Qilindi: kvadrat ikonka tugmalar (btn-add-tab, flat-icon, tab-close, btn-ws-add), profil doira/nuqta/avatar (profile-circle-btn, profile-item-dot, profile-avatar-circle), color-choice va profile-badge-mini endi doira/kapsula (style.css oxiriga override blok). Panel, qator, modal va tab kartalari o`zgarmadi (to`rtburchak).
 - Build: cargo build --release OK.
 - Keyingi qadam: real oynada ko`zdan kechirish (tab-close/hover holatlari).
+
+---
+### 2026-10-27
+- Qilindi: DevTools ochish/yopish uchun `Ctrl+Shift+I` kombinatsiyasi qo'shildi (`F12` bilan birga). `src/shortcuts/config.rs` va `docs/shortcuts/index.html` yangilandi.
+- Build: cargo build --release OK (GUI o'tkazilmadi — xvfb mavjud emas, Ctrl+Shift+I yo'li kod orqali tekshirildi).
