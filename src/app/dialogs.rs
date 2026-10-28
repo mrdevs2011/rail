@@ -499,4 +499,22 @@ impl App {
         });
         vbox.add_controller(key_ctl);
     }
+
+    /// Open File dialog (Ctrl+O) to view local HTML, PDF, image, video, audio or text files
+    pub(crate) fn open_file_dialog(self: &Rc<Self>) {
+        let dialog = gtk::FileDialog::builder()
+            .title(tr("Open File"))
+            .build();
+        let app = self.clone();
+        dialog.open(Some(&self.win), gio::Cancellable::NONE, move |res| {
+            if let Ok(file) = res {
+                let uri = file.uri();
+                if !uri.is_empty() {
+                    app.navigate(&uri);
+                } else if let Some(path) = file.path() {
+                    app.navigate(&format!("file://{}", path.display()));
+                }
+            }
+        });
+    }
 }

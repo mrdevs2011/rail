@@ -150,4 +150,20 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
         l_swipe2.set(0);
     });
     win.add_controller(scroll);
+
+    // Drag-and-drop local files or URLs directly into Rail
+    let drop = gtk::DropTarget::new(gdk::FileList::static_type(), gdk::DragAction::COPY);
+    let a_drop = app.clone();
+    drop.connect_drop(move |_target, val, _x, _y| {
+        if let Ok(file_list) = val.get::<gdk::FileList>() {
+            let files = file_list.files();
+            if let Some(first) = files.first() {
+                let uri = first.uri();
+                a_drop.navigate(&uri);
+                return true;
+            }
+        }
+        false
+    });
+    win.add_controller(drop);
 }

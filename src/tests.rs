@@ -82,6 +82,9 @@ fn test_to_uri_search_engines() {
     assert_eq!(to_uri("https://github.com", "google"), "https://github.com");
     assert_eq!(to_uri("github.com", "duckduckgo"), "https://github.com");
     assert_eq!(to_uri("/home/user/page.html", "google"), "file:///home/user/page.html");
+    assert_eq!(to_uri("home/muhamad/computer-analysis/index.html", "google"), "file:///home/muhamad/computer-analysis/index.html");
+    assert_eq!(to_uri("tmp/test.html", "google"), "file:///tmp/test.html");
+    assert_eq!(to_uri("etc/hosts", "google"), "file:///etc/hosts");
     assert_eq!(to_uri("file:///tmp/test.html", "google"), "file:///tmp/test.html");
     assert_eq!(to_uri("file:/tmp/test.html", "google"), "file:///tmp/test.html");
     assert_eq!(to_uri("localhost:3000", "google"), "http://localhost:3000");

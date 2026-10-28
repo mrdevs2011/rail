@@ -200,6 +200,10 @@ impl App {
                 self.show_palette();
                 return true;
             }
+            if k == gdk::Key::o || keycode == 32 {
+                self.open_file_dialog();
+                return true;
+            }
             if k == gdk::Key::w || keycode == 25 {
                 if !self.palette_open() {
                     if let Some(v) = self.focused_view() {

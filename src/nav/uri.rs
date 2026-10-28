@@ -54,21 +54,47 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
     if s.starts_with("./") || s.starts_with("../") {
         if let Ok(cur) = std::env::current_dir() {
             let full = cur.join(s);
+            if let Ok(canon) = std::fs::canonicalize(&full) {
+                return format!("file://{}", canon.display());
+            }
             return format!("file://{}", full.display());
         }
     }
-    if (s.ends_with(".html")
-        || s.ends_with(".htm")
-        || s.ends_with(".xhtml")
-        || s.ends_with(".svg")
-        || s.ends_with(".pdf")
-        || s.ends_with(".txt")
-        || s.ends_with(".json")
-        || s.ends_with(".xml"))
-        && std::path::Path::new(s).is_file()
-    {
-        if let Ok(canon) = std::fs::canonicalize(s) {
+
+    // Check if `s` exists directly on the filesystem (e.g. "analyze.py", "index.html")
+    let direct_path = std::path::Path::new(s);
+    if direct_path.exists() {
+        if let Ok(canon) = std::fs::canonicalize(direct_path) {
             return format!("file://{}", canon.display());
+        }
+        return format!("file://{}", direct_path.display());
+    }
+
+    // Check if `/{s}` exists on the filesystem (e.g. user typed "home/muhamad/computer-analysis/index.html")
+    let abs_candidate = format!("/{s}");
+    let abs_path = std::path::Path::new(&abs_candidate);
+    if abs_path.exists() {
+        if let Ok(canon) = std::fs::canonicalize(abs_path) {
+            return format!("file://{}", canon.display());
+        }
+        return format!("file://{abs_candidate}");
+    }
+
+    // Check if relative to user home directory (e.g. "computer-analysis/index.html", "Downloads/file.pdf")
+    let home_dir = glib::home_dir();
+    let home_candidate = home_dir.join(s);
+    if home_candidate.exists() {
+        if let Ok(canon) = std::fs::canonicalize(&home_candidate) {
+            return format!("file://{}", canon.display());
+        }
+        return format!("file://{}", home_candidate.display());
+    }
+
+    // Common Linux root paths without leading slash (e.g. "home/...", "tmp/...", "etc/...")
+    let lower_s = s.to_ascii_lowercase();
+    for prefix in &["home/", "etc/", "usr/", "var/", "opt/", "tmp/", "mnt/", "media/", "root/", "dev/"] {
+        if lower_s.starts_with(prefix) {
+            return format!("file:///{s}");
         }
     }
 
@@ -98,9 +124,18 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
     }
 
     // 4. Domains (e.g. google.com, github.com/user/repo)
-    if !s.contains(' ') && s.contains('.') {
-        return format!("https://{s}");
+    if !s.contains(' ') {
+        let (host_part, _) = if let Some(idx) = s.find('/') {
+            (&s[..idx], &s[idx..])
+        } else {
+            (s, "")
+        };
+
+        if is_likely_domain(host_part) {
+            return format!("https://{s}");
+        }
     }
+
     let encoded = glib::Uri::escape_string(s, None, false);
     let engine_id = canonical_search_engine(search_engine);
     for &(id, _, template) in SEARCH_ENGINE_LIST {
@@ -109,6 +144,39 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
         }
     }
     format!("https://www.google.com/search?q={}", encoded)
+}
+
+fn is_likely_domain(host: &str) -> bool {
+    let host = host.split(':').next().unwrap_or(host).trim();
+    if !host.contains('.') || host.starts_with('.') || host.ends_with('.') {
+        return false;
+    }
+    let tld = host.rsplit('.').next().unwrap_or("");
+    if tld.is_empty() {
+        return false;
+    }
+    const NON_DOMAIN_EXTS: &[&str] = &[
+        "html", "htm", "shtml", "xhtml", "php", "asp", "aspx", "jsp",
+        "txt", "md", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+        "png", "jpg", "jpeg", "gif", "svg", "webp", "ico",
+        "mp3", "mp4", "webm", "wav", "ogg", "flac", "mkv", "avi",
+        "css", "js", "ts", "json", "xml", "yaml", "yml", "toml",
+        "zip", "tar", "gz", "bz2", "xz", "7z", "zst",
+        "c", "cpp", "h", "hpp", "rs", "py", "go", "java", "rb", "sh",
+        "exe", "bin", "deb", "rpm", "pkg",
+    ];
+    let lower_tld = tld.to_ascii_lowercase();
+    if NON_DOMAIN_EXTS.contains(&lower_tld.as_str()) {
+        return false;
+    }
+    if host.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        let parts: Vec<&str> = host.split('.').collect();
+        return parts.len() == 4 && parts.iter().all(|p| p.parse::<u8>().is_ok());
+    }
+    if lower_tld.starts_with("xn--") {
+        return true;
+    }
+    lower_tld.len() >= 2 && lower_tld.chars().all(|c| c.is_ascii_alphabetic())
 }
 
 pub(crate) fn host_of(uri: &str) -> Option<String> {

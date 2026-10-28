@@ -177,6 +177,7 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Confirm from {}", "{} tasdig'i", "Подтверждение от {}"),
     ("Prompt from {}", "{} so'rovi", "Запрос от {}"),
     ("Message from {}", "{} dan xabar", "Сообщение от {}"),
+    ("Open File", "Faylni ochish", "Открыть файл"),
     ("Open Link in New Tab", "Havolani yangi tabda ochish", "Открыть ссылку в новой вкладке"),
     ("Open Link in Split View", "Havolani bo'lingan ko'rinishda ochish", "Открыть ссылку в разделённом виде"),
     ("Copy Link Address", "Havola manzilini nusxalash", "Копировать адрес ссылки"),
