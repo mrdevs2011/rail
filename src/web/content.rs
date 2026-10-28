@@ -142,3 +142,88 @@ pub(crate) fn save_css_editor(buffer: &gtk::TextBuffer, btn: &gtk::Button) {
     let b = btn.clone();
     glib::timeout_add_local_once(Duration::from_millis(1500), move || b.set_label(tr("Save")));
 }
+
+/// Injects high-performance media & smooth scrolling handlers across web views:
+/// - Replaces YouTube's heavy, sluggish wheel threshold with responsive, light snapping on Shorts
+/// - Avoids heavy CPU-bound AV1 software decoding; prioritizes hardware-accelerated VP9/H.264
+pub(crate) fn inject_web_optimizations(ucm: &webkit6::UserContentManager) {
+    let script_code = r#"
+(function() {
+  if (window.__railWebOptimized) return;
+  window.__railWebOptimized = true;
+
+  var isYT = location.hostname.indexOf('youtube.com') !== -1;
+  if (isYT) {
+    // 1. Avoid heavy AV1 software decoding; prefer hardware-friendly VP9 / AVC1 (H.264).
+    if (window.MediaSource && MediaSource.isTypeSupported) {
+      var origIsTypeSupported = MediaSource.isTypeSupported.bind(MediaSource);
+      MediaSource.isTypeSupported = function(type) {
+        if (typeof type === 'string' && type.indexOf('av01') !== -1) {
+          return false;
+        }
+        return origIsTypeSupported(type);
+      };
+    }
+
+    // 2. YouTube Shorts Smooth & Light Sliding
+    var lastSlideTime = 0;
+    var accumulatedDelta = 0;
+    var resetTimer = null;
+
+    window.addEventListener('wheel', function(e) {
+      if (location.pathname.indexOf('/shorts') === -1) return;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+
+      var now = Date.now();
+      if (now - lastSlideTime < 280) {
+        e.preventDefault();
+        return;
+      }
+
+      accumulatedDelta += e.deltaY;
+      clearTimeout(resetTimer);
+      resetTimer = setTimeout(function() { accumulatedDelta = 0; }, 140);
+
+      // Light, responsive threshold (20px instead of YouTube's heavy 60-100px)
+      if (accumulatedDelta > 20) {
+        lastSlideTime = now;
+        accumulatedDelta = 0;
+        e.preventDefault();
+        e.stopPropagation();
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
+      } else if (accumulatedDelta < -20) {
+        lastSlideTime = now;
+        accumulatedDelta = 0;
+        e.preventDefault();
+        e.stopPropagation();
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38, which: 38, bubbles: true }));
+      }
+    }, { passive: false, capture: true });
+  }
+})();
+"#;
+
+    let script = webkit6::UserScript::new(
+        script_code,
+        webkit6::UserContentInjectedFrames::AllFrames,
+        webkit6::UserScriptInjectionTime::Start,
+        &[],
+        &[],
+    );
+    ucm.add_script(&script);
+
+    let css = r#"
+ytd-shorts, #shorts-container {
+  scroll-behavior: smooth !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+"#;
+    let sheet = webkit6::UserStyleSheet::new(
+        css,
+        webkit6::UserContentInjectedFrames::AllFrames,
+        webkit6::UserStyleLevel::User,
+        &[],
+        &[],
+    );
+    ucm.add_style_sheet(&sheet);
+}

@@ -133,7 +133,7 @@ impl App {
         self.strip.add_tick_callback(move |strip, clock| {
             let now = clock.frame_time();
             let dt = last.replace(Some(now)).map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
-            let k = (dt / 0.045).min(1.0);
+            let k = (1.0 - (-dt / 0.038).exp()).clamp(0.04, 1.0);
 
             let oxc = app.layout.offset_x();
             let oyc = app.layout.offset_y();

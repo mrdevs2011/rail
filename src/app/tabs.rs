@@ -37,6 +37,7 @@ impl App {
         settings.set_enable_dns_prefetching(false);
         settings.set_enable_smooth_scrolling(true);
         settings.set_enable_webgl(true); // needed for smooth compositing on many sites
+        settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_mediasource(true);
         settings.set_enable_media_capabilities(true);
         // Widevine CDM is absent on desktop Linux WebKitGTK; enabling EME causes YouTube to request DRM/ClearKey and fail
@@ -70,6 +71,7 @@ impl App {
             ucm.add_style_sheet(&user_style_sheet(&html_css));
         }
         apply_extensions_to_ucm(&ucm);
+        crate::web::inject_web_optimizations(&ucm);
         STYLE_MANAGERS.with(|l| l.borrow_mut().push(ucm.downgrade()));
         ADBLOCK_FILTER.with(|f| {
             if let Some(f) = f.borrow().as_ref() {

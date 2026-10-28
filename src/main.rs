@@ -86,6 +86,25 @@ fn main() -> glib::ExitCode {
             std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
             std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
         }
+    } else {
+        // Smooth 60/120 FPS GPU hardware acceleration defaults:
+        if std::env::var_os("WEBKIT_FORCE_COMPOSITING_MODE").is_none() {
+            unsafe {
+                std::env::set_var("WEBKIT_FORCE_COMPOSITING_MODE", "1");
+            }
+        }
+        if std::env::var_os("LIBVA_DRIVER_NAME").is_none()
+            && std::path::Path::new("/usr/lib/dri/iHD_drv_video.so").exists()
+        {
+            unsafe {
+                std::env::set_var("LIBVA_DRIVER_NAME", "iHD");
+            }
+        }
+        if std::env::var_os("GSK_RENDERER").is_none() {
+            unsafe {
+                std::env::set_var("GSK_RENDERER", "ngl");
+            }
+        }
     }
     if std::env::var_os("RAIL_LOW_MEM").is_some_and(|v| v != "0") {
         // Extreme low-RAM mode only: small limit, aggressive reclaim
