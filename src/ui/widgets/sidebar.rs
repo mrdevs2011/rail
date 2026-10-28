@@ -9,7 +9,7 @@ pub(crate) struct SidebarWidgets {
     pub(crate) head_back: gtk::Button,
     pub(crate) head_reload: gtk::Button,
     pub(crate) head_forward: gtk::Button,
-    pub(crate) head_more: gtk::Button,
+    pub(crate) head_ext: gtk::Button,
     pub(crate) brand_logo: gtk::Revealer,
     pub(crate) list: gtk::ListBox,
     pub(crate) pill: gtk::Button,
@@ -33,12 +33,12 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
     brand_logo.set_halign(gtk::Align::Start);
     brand_logo.set_child(Some(&brand_img));
 
-    // Header: profile · back · forward · reload · sidebar mode (matches design)
-    let head_more = gtk::Button::new();
-    head_more.set_child(Some(&create_user_icon(16)));
-    head_more.add_css_class("flat-icon");
-    head_more.add_css_class("side-head-btn");
-    head_more.set_tooltip_text(Some(tr("Profiles")));
+    // Header: extensions · back · forward · reload · sidebar mode (matches design)
+    let head_ext = gtk::Button::new();
+    head_ext.set_child(Some(&create_extension_icon(16)));
+    head_ext.add_css_class("flat-icon");
+    head_ext.add_css_class("side-head-btn");
+    head_ext.set_tooltip_text(Some(tr("Extensions")));
 
     let head_back = gtk::Button::from_icon_name("go-previous-symbolic");
     head_back.add_css_class("flat-icon");
@@ -65,7 +65,7 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
 
     let actions = gtk::Box::new(gtk::Orientation::Horizontal, 2);
     actions.add_css_class("side-head-actions");
-    actions.append(&head_more);
+    actions.append(&head_ext);
     actions.append(&head_back);
     actions.append(&head_forward);
     actions.append(&head_reload);
@@ -151,7 +151,7 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
         head_back,
         head_reload,
         head_forward,
-        head_more,
+        head_ext,
         brand_logo,
         list,
         pill,

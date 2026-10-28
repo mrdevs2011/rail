@@ -52,6 +52,7 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Load unpacked extension", "Mahalliy kengaytma yuklash", "Загрузить распакованное расширение"),
     ("Make Active", "Faol qilish", "Сделать активным"),
     ("Manage Profiles in Settings (Alt+P)", "Profillarni Sozlamalarda boshqarish (Alt+P)", "Управление профилями в настройках (Alt+P)"),
+    ("Manage extensions", "Kengaytmalarni boshqarish", "Управление расширениями"),
     ("Manage local unpacked Chrome and WebExtension add-ons", "Mahalliy (unpacked) Chrome va WebExtension kengaytmalarini boshqarish", "Управление локальными распакованными расширениями Chrome и WebExtension"),
     ("Network Leak Protections", "Tarmoq sizib chiqishidan himoya", "Защита от сетевых утечек"),
     ("New tab  (Ctrl+T)", "Yangi tab  (Ctrl+T)", "Новая вкладка  (Ctrl+T)"),
