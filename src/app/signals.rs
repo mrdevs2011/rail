@@ -29,21 +29,30 @@ impl App {
             let app_insp = self.clone();
             let view_weak = view.downgrade();
             insp.connect_open_window(move |_| {
-                // Menyudan "Inspect Element" ham F12 / Alt+Shift+D bilan bir xil ochilsin:
-                // WebKit alohida oyna so'raganda majburan Undocked qilmaymiz, balki eslab qolingan
-                // dock tomoniga (pastda/chapda/o'ngda) darhol joylaymiz.
                 if let Some(v) = view_weak.upgrade() {
                     DT_VIEW.with(|c| *c.borrow_mut() = Some(v));
                 }
-                let side = app_insp.devtools_dock_side.get();
+                let side = match app_insp.devtools_dock_side.get() {
+                    DevToolsDockSide::Undocked => DevToolsDockSide::Bottom,
+                    s => s,
+                };
+                app_insp.devtools_dock_side.set(side);
                 app_insp.set_devtools_dock_side(side);
                 true
             });
             let app_detach = self.clone();
             insp.connect_detach(move |_| {
-                if app_detach.devtools_dock_side.get() != DevToolsDockSide::Undocked {
-                    app_detach.set_devtools_dock_side(DevToolsDockSide::Undocked);
+                // Do not allow spontaneous WebKit detach to turn into a separate floating window.
+                // Keep it docked in the bottom panel unless explicitly detached by the user via toggle_devtools_undocked.
+                if app_detach.devtools_dock_side.get() == DevToolsDockSide::Undocked {
+                    return true;
                 }
+                let side = match app_detach.devtools_dock_side.get() {
+                    DevToolsDockSide::Undocked => DevToolsDockSide::Bottom,
+                    s => s,
+                };
+                app_detach.devtools_dock_side.set(side);
+                app_detach.set_devtools_dock_side(side);
                 true
             });
             let app_attach = self.clone();

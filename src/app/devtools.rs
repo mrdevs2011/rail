@@ -258,6 +258,15 @@ impl App {
             return;
         }
         DT_VIEW.with(|v| *v.borrow_mut() = Some(view.clone()));
+
+        // Always ensure DevTools docks into the bottom panel (or saved side) by default, never float
+        let side = match self.devtools_dock_side.get() {
+            DevToolsDockSide::Undocked => DevToolsDockSide::Bottom,
+            s => s,
+        };
+        self.devtools_dock_side.set(side);
+        self.set_devtools_dock_side(side);
+
         insp.show();
 
         // Update URL and host badge in devtools header if ever needed
@@ -265,8 +274,6 @@ impl App {
         let host = host_of(&cur_uri).unwrap_or_else(|| "localhost".to_string());
         self.devtools_url_lbl.set_markup(&format!("<span foreground='#fafafa'>{}</span> <span color='#64748b'>•</span> <span color='#94a3b8'>{}</span>", glib::markup_escape_text(&host), glib::markup_escape_text(&cur_uri)));
 
-        let side = self.devtools_dock_side.get();
-        self.set_devtools_dock_side(side);
         IN_SHOW_DEVTOOLS.with(|f| f.set(false));
     }
 
