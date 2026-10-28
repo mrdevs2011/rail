@@ -54,6 +54,9 @@ impl App {
         settings.set_allow_universal_access_from_file_urls(true);
         // Always: smooth page scroll/compositing; falls back when GPU unavailable
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
+        // Ensure images, web icons, fonts, and inline SVGs load unconditionally
+        settings.set_auto_load_images(true);
+        settings.set_load_icons_ignoring_image_load_setting(true);
         // Back/forward uses the page cache: instant history navigation instead of a reload
         settings.set_enable_page_cache(true);
 

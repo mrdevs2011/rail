@@ -58,7 +58,18 @@ pub(crate) fn customize_dir() -> PathBuf {
 pub(crate) fn load_html_css() -> String {
     let path = html_css_path();
     match std::fs::read_to_string(&path) {
-        Ok(text) => text,
+        Ok(text) => {
+            // Migrate away from legacy Chrome UA reset dump which forced `color: black;`
+            // on buttons/inputs and broke dark mode icons (e.g. YouTube mic and create buttons).
+            if text.contains("font: -webkit-small-control")
+                || text.contains("/* ===== form controls ===== */")
+                || text.contains("Sites that set their own CSS still win; this layer only replaces the defaults.")
+            {
+                let _ = std::fs::write(&path, DEFAULT_HTML_CSS);
+                return DEFAULT_HTML_CSS.to_string();
+            }
+            text
+        }
         Err(_) => {
             if let Some(dir) = path.parent() {
                 let _ = std::fs::create_dir_all(dir);
@@ -67,6 +78,14 @@ pub(crate) fn load_html_css() -> String {
             let legacy = rail_data_dir().join("html.css");
             let initial =
                 std::fs::read_to_string(&legacy).unwrap_or_else(|_| DEFAULT_HTML_CSS.to_string());
+            let initial = if initial.contains("font: -webkit-small-control")
+                || initial.contains("/* ===== form controls ===== */")
+                || initial.contains("Sites that set their own CSS still win; this layer only replaces the defaults.")
+            {
+                DEFAULT_HTML_CSS.to_string()
+            } else {
+                initial
+            };
             let _ = std::fs::write(&path, &initial);
             if legacy.exists() {
                 let _ = std::fs::remove_file(&legacy);
@@ -98,6 +117,7 @@ pub(crate) fn apply_html_css(css: &str) -> usize {
                 if !css.trim().is_empty() {
                     ucm.add_style_sheet(&user_style_sheet(css));
                 }
+                apply_extensions_to_ucm(&ucm);
                 applied += 1;
             }
         }
