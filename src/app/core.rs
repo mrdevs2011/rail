@@ -226,4 +226,49 @@ impl App {
         self.layout.set_col_ids(col_ids);
         self.strip.queue_allocate();
     }
+
+    pub(crate) fn show_copied_toast(&self, title: &str, msg: &str) {
+        let Some(overlay) = self.win.child().and_then(|c| c.downcast::<gtk::Overlay>().ok()) else { return };
+        let rev = gtk::Revealer::new();
+        rev.set_transition_type(gtk::RevealerTransitionType::SlideUp);
+        rev.set_halign(gtk::Align::End);
+        rev.set_valign(gtk::Align::End);
+        rev.set_margin_end(16);
+        rev.set_margin_bottom(16);
+
+        let card = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        card.add_css_class("copied-toast");
+        card.set_size_request(240, -1);
+
+        let top = gtk::Label::new(Some(title));
+        top.add_css_class("copied-toast-title");
+        top.set_xalign(0.0);
+
+        let body = gtk::Label::new(Some(msg));
+        body.add_css_class("copied-toast-body");
+        body.set_xalign(0.0);
+        body.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
+
+        card.append(&top);
+        card.append(&body);
+        rev.set_child(Some(&card));
+
+        overlay.add_overlay(&rev);
+        rev.set_reveal_child(true);
+
+        let rev_weak = rev.downgrade();
+        let overlay_weak = overlay.downgrade();
+        glib::timeout_add_local_once(std::time::Duration::from_millis(2200), move || {
+            if let Some(r) = rev_weak.upgrade() {
+                r.set_reveal_child(false);
+                let r2 = r.clone();
+                let ov2 = overlay_weak.clone();
+                glib::timeout_add_local_once(std::time::Duration::from_millis(400), move || {
+                    if let Some(ov) = ov2.upgrade() {
+                        ov.remove_overlay(&r2);
+                    }
+                });
+            }
+        });
+    }
 }

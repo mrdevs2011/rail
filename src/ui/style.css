@@ -1131,17 +1131,32 @@ button.color-choice.selected {
 }
 
 /* ---- html.css editor (Settings > Customize) ---- */
+.css-editor-frame {
+    border: 1px solid #222222;
+    border-radius: 0;
+    background: #000000;
+}
+.css-editor-gutter {
+    background-color: #080808;
+    color: #52525b;
+    border-right: 1px solid #1c1c1c;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
+    font-size: 12px;
+    line-height: 1.45;
+}
+.css-editor-gutter text {
+    background-color: #080808;
+    color: #52525b;
+}
 .css-editor {
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 12px;
+    background-color: #000000;
+    line-height: 1.45;
 }
 .css-editor text {
-    background-color: #070707;
-    color: #d4d4d4;
-}
-.css-editor-frame {
-    border: 1px solid #191919;
-    border-radius: 3px;
+    background-color: #000000;
+    color: #e4e4e7;
 }
 
 /* ---- settings page fills the tab like downloads (no floating card) ---- */
@@ -1959,32 +1974,63 @@ window.qr-win {
     background: #080808;
     border-radius: 0;
     margin-top: 2px;
+    cursor: pointer;
 }
 .qr-url {
     font-size: 12px;
     color: #d4d4d4;
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
 }
 .qr-copy-btn {
     font-size: 12px;
     font-weight: 700;
     padding: 6px 14px;
     border-radius: 0;
-    background: #ffffff;
-    color: #000000;
+    background: #ffffff !important;
+    color: #000000 !important;
     border: 1px solid #ffffff;
     transition: all 120ms ease;
     min-width: 60px;
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
 }
+.qr-copy-btn label {
+    color: #000000 !important;
+    font-weight: 700;
+}
 .qr-copy-btn:hover {
-    background: #e5e5e5;
-    color: #000000;
+    background: #e5e5e5 !important;
+    color: #000000 !important;
     border-color: #ffffff;
 }
+.qr-copy-btn:hover label {
+    color: #000000 !important;
+}
 .qr-copy-btn:active {
-    background: #cccccc;
-    color: #000000;
+    background: #cccccc !important;
+    color: #000000 !important;
+}
+
+.copied-toast {
+    background: #111111;
+    border: 1px solid #ffffff;
+    border-radius: 0;
+    padding: 10px 16px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.95);
+}
+.copied-toast-title {
+    color: #ffffff;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+}
+.copied-toast-body {
+    color: #a1a1aa;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    font-size: 12px;
 }
 
 /* Screenshot overlay — Firefox / Zen Screenshots look */

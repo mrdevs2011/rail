@@ -25,41 +25,21 @@ impl App {
             return (0.0, 0.0);
         }
 
-        let total_h = rows.len() as f64 * vh + (rows.len().saturating_sub(1) as f64) * g;
-        let mut max_w: f64 = 0.0;
         let mut active_span: Option<(f64, f64)> = None;
-
-        for (ri, row) in rows.iter().enumerate() {
+        if let Some(row) = rows.get(cur_r) {
             let cols = row_cols(row, vw, g);
-            if ri == cur_r {
-                active_span = cols
-                    .iter()
-                    .find(|&&(st, len, _, _)| cur_c >= st && cur_c < st + len)
-                    .map(|&(_, _, x, w)| (x, x + w));
-            }
-            let row_w = cols.last().map_or(0.0, |&(_, _, x, w)| x + w);
-            if row_w > max_w {
-                max_w = row_w;
-            }
+            active_span = cols
+                .iter()
+                .find(|&&(st, len, _, _)| cur_c >= st && cur_c < st + len)
+                .map(|&(_, _, x, w)| (x, x + w));
         }
         drop(rows);
 
-        // Equal margins when the whole grid fits; otherwise center on the focused tab.
-        let ty = if total_h <= visible_h {
-            -(visible_h - total_h) / 2.0
-        } else {
-            let row_center_y = cur_r as f64 * (vh + g) + vh / 2.0;
-            let max_y = (total_h - visible_h).max(0.0);
-            (row_center_y - visible_h / 2.0).clamp(0.0, max_y)
-        };
-
-        let tx = if max_w <= visible_w {
-            -(visible_w - max_w) / 2.0
-        } else {
-            let max_x = (max_w - visible_w).max(0.0);
-            let col_center_x = active_span.map_or(0.0, |(l, r)| (l + r) / 2.0);
-            (col_center_x - visible_w / 2.0).clamp(0.0, max_x)
-        };
+        // Niri-style: focused tab is always framed in the exact center of the screen
+        let row_center_y = cur_r as f64 * (vh + g) + vh / 2.0;
+        let col_center_x = active_span.map_or(vw / 2.0, |(l, r)| (l + r) / 2.0);
+        let tx = col_center_x - visible_w / 2.0;
+        let ty = row_center_y - visible_h / 2.0;
         (tx, ty)
     }
 
@@ -191,37 +171,10 @@ impl App {
                     nx = oxt;
                     ny = oyt;
                 } else {
-                    // log-space zoom: perceived scale rate is uniform
+                    // Pure Niri-style direct zoom: centered smooth transition without drift
                     nz = (z0.ln() + (zt.ln() - z0.ln()) * e).exp();
-                    if zt >= 1.0 - 1e-6 && z0 < 0.99 {
-                        // Zoom-in is a pure scale about one fixed screen point: the final viewport
-                        // (world origin = target offsets) grows out of where it sits in the overview,
-                        // so there is no sideways/upward drift or wobble at the end.
-                        let pin = |t: f64, o0: f64| {
-                            let s0 = (t - o0) * z0;
-                            let f = s0 / (1.0 - z0);
-                            let sc = f + (s0 - f) * nz / z0;
-                            t - sc / nz
-                        };
-                        nx = pin(oxt, ox0);
-                        ny = pin(oyt, oy0);
-                    } else {
-                        // Anchor the zoom on the *current* screen centre each frame (not the start
-                        // position). This keeps the world point under the centre fixed during the
-                        // pure-scale phase so the animation looks like a perfectly centred zoom.
-                        let (ax, ay) = (oxc + vw * 0.5 / zc, oyc + vh * 0.5 / zc);
-                        let (px, py) = (ax - vw * 0.5 / nz, ay - vh * 0.5 / nz);
-                        // Blend the scale-anchor toward the final framed position.
-                        // Zoom-out: track overview framing at each nz. Zoom-in: go to normal targets.
-                        let (ex, ey) = if zt < 1.0 - 1e-6 {
-                            app.overview_offsets_at_zoom(nz)
-                        } else {
-                            (oxt, oyt)
-                        };
-                        let s = e * e * (3.0 - 2.0 * e); // smoothstep tied to full zoom ease
-                        nx = px + (ex - px) * s;
-                        ny = py + (ey - py) * s;
-                    }
+                    nx = ox0 + (oxt - ox0) * e;
+                    ny = oy0 + (oyt - oy0) * e;
                 }
                 app.cam_spring_x.set(None);
                 app.cam_spring_y.set(None);

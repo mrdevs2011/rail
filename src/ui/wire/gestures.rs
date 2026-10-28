@@ -82,24 +82,51 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
     let ay = accum_y.clone();
     let ls = last_scroll.clone();
     let l_swipe = last_swipe.clone();
-    scroll.connect_scroll(move |_ctl, dx, dy| {
+    scroll.connect_scroll(move |ctl, dx, dy| {
+        let now = glib::monotonic_time();
+
+        // 1. Normal mode: mouse wheel horizontal panning across columns on the strip
         if !a.ov.get() {
+            let is_shift = ctl.current_event_state().contains(gdk::ModifierType::SHIFT_MASK);
+            let h_delta = if dx.abs() > 0.05 {
+                dx
+            } else if is_shift && dy.abs() > 0.05 {
+                dy
+            } else {
+                0.0
+            };
+            if h_delta.abs() > 0.05 {
+                if now - l_swipe.get() < 120_000 {
+                    return glib::Propagation::Stop;
+                }
+                let nx = ax.get() + h_delta;
+                if nx > 0.8 {
+                    ax.set(0.0);
+                    l_swipe.set(now);
+                    a.focus_column_right();
+                    return glib::Propagation::Stop;
+                } else if nx < -0.8 {
+                    ax.set(0.0);
+                    l_swipe.set(now);
+                    a.focus_column_left();
+                    return glib::Propagation::Stop;
+                }
+                ax.set(nx);
+            }
             return glib::Propagation::Proceed;
         }
+
+        // 2. Overview mode: smooth 2D navigation (touchpad 2-finger swipe & mouse wheel)
         if a.settings_modal_open() || a.palette_open() || a.map_open() {
             return glib::Propagation::Proceed;
         }
 
-        let now = glib::monotonic_time();
-
-        // Cooldown prevents jumping across multiple rows/columns in a single swipe stroke
-        if now - l_swipe.get() < 280_000 {
-            ax.set(0.0);
-            ay.set(0.0);
+        // Cooldown prevents jumping multiple tabs in a single continuous swipe
+        if now - l_swipe.get() < 130_000 {
             return glib::Propagation::Stop;
         }
 
-        if now - ls.get() > 250_000 {
+        if now - ls.get() > 180_000 {
             ax.set(0.0);
             ay.set(0.0);
         }
@@ -110,25 +137,29 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
         ax.set(nx);
         ay.set(ny);
 
-        const OV_THRESHOLD: f64 = 6.0;
+        const OV_THRESHOLD: f64 = 1.2;
         if nx > OV_THRESHOLD {
             ax.set(0.0);
+            ay.set(0.0);
             l_swipe.set(now);
             a.focus_column_right();
             return glib::Propagation::Stop;
         } else if nx < -OV_THRESHOLD {
             ax.set(0.0);
+            ay.set(0.0);
             l_swipe.set(now);
             a.focus_column_left();
             return glib::Propagation::Stop;
         }
 
         if ny > OV_THRESHOLD {
+            ax.set(0.0);
             ay.set(0.0);
             l_swipe.set(now);
             a.focus_row_down();
             return glib::Propagation::Stop;
         } else if ny < -OV_THRESHOLD {
+            ax.set(0.0);
             ay.set(0.0);
             l_swipe.set(now);
             a.focus_row_up();

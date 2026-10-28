@@ -135,31 +135,15 @@ impl App {
         }
 
         let mut loaded_tabs: Vec<(usize, Tab)> = Vec::new();
-        // Lazy restore: only the focused tab and its nearest neighbours in the same row load now.
-        // Every other web tab stays suspended (no process, no network) and wakes when focused.
-        // Loading dozens of tabs at once is what made startup freeze.
-        let (focus_r, focus_c) = state.focus;
-        let mut row_pos: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
         for item in tab_items {
-            let pos = {
-                let e = row_pos.entry(item.row).or_insert(0);
-                let v = *e;
-                *e += 1;
-                v
-            };
-            let lazy = item.url.starts_with("http")
-                && !(item.row == focus_r && pos.abs_diff(focus_c) <= 2);
             let session = self.profiles.borrow_mut().get_or_create_session(&item.profile_id);
             let view = Self::create_web_view(&session, &item.profile_id);
-            if lazy {
-                // no load_uri: the page is fetched on first focus (see focus_coords)
-            } else if item.url.is_empty() || item.url.starts_with("about:") || item.url.starts_with("rail://start") {
+            if item.url.is_empty() || item.url.starts_with("about:") || item.url.starts_with("rail://start") {
                 view.load_html(&start_page(), Some("rail://start/"));
             } else if item.url.starts_with("rail://settings") {
                 view.load_html(&settings_shell_page(), Some(&item.url));
             } else if item.url.starts_with("rail://downloads") {
-                // downloads is pure HTML; will be refreshed later if needed
-                view.load_html(&start_page(), Some("rail://downloads")); // placeholder; real content loaded on focus/refresh
+                view.load_html(&start_page(), Some("rail://downloads"));
             } else {
                 view.load_uri(&item.url);
             }
@@ -175,10 +159,6 @@ impl App {
                 &tw.dt_handle,
                 &tw.dt_box,
             );
-            if lazy {
-                // free the idle web process WebKit may have spawned for the empty view
-                view.terminate_web_process();
-            }
             loaded_tabs.push((item.row, Tab {
                 container: tw.container,
                 view,
@@ -189,9 +169,9 @@ impl App {
                 custom_height: Cell::new(None),
                 col_id: Cell::new(new_col_id()),
                 saved_uri: RefCell::new(if item.url.starts_with("http") || item.url.starts_with("rail://") { item.url.clone() } else if item.url.is_empty() || item.url.starts_with("about:") { "rail://start/".to_string() } else { String::new() }),
-                suspended: Cell::new(lazy),
+                suspended: Cell::new(false),
                 keep_alive: Cell::new(false),
-                last_active: Cell::new(if lazy { std::time::Instant::now().checked_sub(Duration::from_secs(SUSPEND_AFTER_SECS + 1)).unwrap_or_else(std::time::Instant::now) } else { std::time::Instant::now() }),
+                last_active: Cell::new(std::time::Instant::now()),
                 dt_box: tw.dt_box,
                 dt_handle: tw.dt_handle,
                 dt_open: Cell::new(false),

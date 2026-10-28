@@ -317,7 +317,8 @@ impl App {
         addr.add_css_class("qr-url");
         addr.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
         addr.set_max_width_chars(36);
-        addr.set_selectable(true);
+        addr.set_selectable(false);
+        addr.set_cursor_from_name(Some("pointer"));
         addr.set_hexpand(true);
         addr.set_xalign(0.0);
         url_row.append(&addr);
@@ -327,16 +328,40 @@ impl App {
         copy_btn.set_has_frame(false);
         copy_btn.set_focus_on_click(false);
         let url_owned = url.to_string();
-        copy_btn.connect_clicked(move |btn| {
-            if let Some(clip) = gdk::Display::default().map(|d| d.clipboard()) {
-                clip.set_text(&url_owned);
+
+        let do_copy = {
+            let app_c = Rc::downgrade(self);
+            let btn_c = copy_btn.downgrade();
+            let url_c = url_owned.clone();
+            move || {
+                if let Some(clip) = gdk::Display::default().map(|d| d.clipboard()) {
+                    clip.set_text(&url_c);
+                }
+                if let Some(btn) = btn_c.upgrade() {
+                    btn.set_label(tr("Copied!"));
+                    let b = btn.downgrade();
+                    glib::timeout_add_local_once(std::time::Duration::from_millis(1500), move || {
+                        if let Some(btn) = b.upgrade() {
+                            btn.set_label(tr("Copy"));
+                        }
+                    });
+                }
+                if let Some(app) = app_c.upgrade() {
+                    app.show_copied_toast(tr("Copied!"), &url_c);
+                }
             }
-            btn.set_label(tr("Copied!"));
-            let btn_weak = btn.downgrade();
-            glib::timeout_add_local_once(std::time::Duration::from_millis(1500), move || {
-                if let Some(b) = btn_weak.upgrade() { b.set_label(tr("Copy")); }
-            });
-        });
+        };
+
+        {
+            let dc = do_copy.clone();
+            copy_btn.connect_clicked(move |_| dc());
+        }
+        {
+            let dc = do_copy.clone();
+            let click_addr = gtk::GestureClick::new();
+            click_addr.connect_released(move |_, _, _, _| dc());
+            url_row.add_controller(click_addr);
+        }
         url_row.append(&copy_btn);
         card.append(&url_row);
 
