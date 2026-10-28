@@ -165,4 +165,5 @@
 ---
 ### 2026-10-28
 - Qilindi: `src/app/keys.rs` da `Ctrl+Shift+I` orqali to'g'ridan-to'g'ri DevTools ochish/yopish qo'llab-quvvatlandi. `test_no_duplicate_default_shortcuts` yangilandi va `test_devtools_shortcuts` testi qo'shildi.
+- Qilindi: Niri window gap (5px) va ekran devorida auto sidebar yopilib ketishi tuzatildi (`on_shell_pointer_leave` chap tomonda yopmaydi, trigger zonasi 16px ga kengaytirildi, `connect_enter` qo'shildi).
 - Build & Test: `cargo test --release` (58/58 test muvaffaqiyatli o'tdi) va `cargo build --release` OK.

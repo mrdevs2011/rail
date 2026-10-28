@@ -10,6 +10,9 @@ impl App {
         click.set_button(0); // Listen to any mouse click
         click.set_propagation_phase(gtk::PropagationPhase::Capture);
         click.connect_pressed(move |_, _, _, _| {
+            if app.sidebar_auto.get() && app.side_open.get() {
+                app.set_sidebar(false);
+            }
             if !app.ov.get() {
                 let Some(v) = v.upgrade() else { return };
                 if let Some((r, c)) = app.find_view_coords(&v) {

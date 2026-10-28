@@ -439,8 +439,8 @@ impl App {
         if !self.sidebar_auto.get() {
             return;
         }
-        // Left edge strip ~8px opens; past SIDE_W + margin closes.
-        if x <= 8.0 {
+        // Left edge strip ~16px opens (comfortable for fast swipe / gaps); past SIDE_W + margin closes.
+        if x <= 16.0 {
             if !self.side_open.get() {
                 self.set_sidebar(true);
             }
@@ -451,8 +451,14 @@ impl App {
         }
     }
 
-    pub(crate) fn on_shell_pointer_leave(self: &Rc<Self>) {
-        if self.sidebar_auto.get() && self.side_open.get() {
+    pub(crate) fn on_shell_pointer_leave(self: &Rc<Self>, last_x: f64) {
+        if !self.sidebar_auto.get() || !self.side_open.get() {
+            return;
+        }
+        // If cursor left on the left side (at or outside the left window edge / Niri gap),
+        // do NOT close the sidebar so the user can reach the monitor wall without it collapsing.
+        // Only close if cursor explicitly moved away to the right (past sidebar area).
+        if last_x > (SIDE_W as f64 + 24.0) {
             self.set_sidebar(false);
         }
     }

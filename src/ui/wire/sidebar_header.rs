@@ -49,13 +49,33 @@ pub(crate) fn wire_sidebar_header(
 
     // Edge-hover for auto mode: motion on the shell.
     let motion = gtk::EventControllerMotion::new();
-    let a = app.clone();
-    motion.connect_motion(move |_, x, _y| {
-        a.on_shell_pointer_x(x);
+    let last_x = std::rc::Rc::new(std::cell::Cell::new(0.0f64));
+
+    let a_enter = app.clone();
+    let last_x_enter = last_x.clone();
+    motion.connect_enter(move |_, x, _y| {
+        last_x_enter.set(x);
+        a_enter.on_shell_pointer_x(x);
     });
-    let a = app.clone();
+
+    let a_motion = app.clone();
+    let last_x_motion = last_x.clone();
+    motion.connect_motion(move |_, x, _y| {
+        last_x_motion.set(x);
+        a_motion.on_shell_pointer_x(x);
+    });
+
+    let a_leave = app.clone();
+    let last_x_leave = last_x.clone();
     motion.connect_leave(move |_| {
-        a.on_shell_pointer_leave();
+        a_leave.on_shell_pointer_leave(last_x_leave.get());
     });
     app.shell.add_controller(motion);
+
+    let a_active = app.clone();
+    app.win.connect_is_active_notify(move |w| {
+        if !w.is_active() && a_active.sidebar_auto.get() && a_active.side_open.get() {
+            a_active.set_sidebar(false);
+        }
+    });
 }
