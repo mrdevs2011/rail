@@ -49,7 +49,8 @@ impl App {
             self.animate();
             return;
         }
-        // Snap camera so the anchor is not mid-ease
+        // Align normal camera targets to the focused tab and snap so anchor is precise
+        self.set_normal_reveal_targets();
         self.layout.set_offset_x(self.target_x.get());
         self.layout.set_offset_y(self.target_y.get());
         self.layout.set_zoom(1.0);

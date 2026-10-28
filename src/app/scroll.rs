@@ -126,10 +126,10 @@ impl App {
         self.freeze_for_anim();
         let app = self.clone();
         let last = Cell::new(None::<i64>);
-        // Timed overview zoom: (start time us, start zoom, target zoom).
-        // A fixed-duration ease-out has no long exponential tail, so zoom, pan and grid land together
-        // instead of "zoom first, then slowly slide to the middle".
-        let zanim = Cell::new(None::<(i64, f64, f64, f64, f64)>);
+        // Timed overview zoom: (start time us, start zoom, target zoom, start_wcx, start_wcy, target_wcx, target_wcy).
+        // Anchoring on world camera centers eliminates the nonlinear horizontal drift/swing
+        // that occurs when offset_x and zoom are interpolated independently.
+        let zanim = Cell::new(None::<(i64, f64, f64, f64, f64, f64, f64)>);
         self.strip.add_tick_callback(move |strip, clock| {
             let now = clock.frame_time();
             let dt = last.replace(Some(now)).map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
@@ -155,29 +155,47 @@ impl App {
             let mut nx: f64;
             let mut ny: f64;
             if ov_motion {
-                let (t0, z0, ox0, oy0) = match zanim.get() {
-                    Some(a) if (a.2 - zt).abs() < 1e-9 => (a.0, a.1, a.3, a.4),
+                let zc_safe = zc.max(0.01);
+                let zt_safe = zt.max(0.01);
+                let target_wcx = oxt + vw / (2.0 * zt_safe);
+                let target_wcy = oyt + vh / (2.0 * zt_safe);
+
+                let (t0, z0, wcx0, wcy0, wcxt, wcyt) = match zanim.get() {
+                    Some(a)
+                        if (a.2 - zt).abs() < 1e-9
+                            && (a.5 - target_wcx).abs() < 1.0
+                            && (a.6 - target_wcy).abs() < 1.0 =>
+                    {
+                        (a.0, a.1, a.3, a.4, a.5, a.6)
+                    }
                     _ => {
-                        // (re)start from wherever the camera is right now
-                        let a = (now, zc, zt, oxc, oyc);
+                        let wcx_start = oxc + vw / (2.0 * zc_safe);
+                        let wcy_start = oyc + vh / (2.0 * zc_safe);
+                        let a = (now, zc, zt, wcx_start, wcy_start, target_wcx, target_wcy);
                         zanim.set(Some(a));
-                        (a.0, a.1, a.3, a.4)
+                        (a.0, a.1, a.3, a.4, a.5, a.6)
                     }
                 };
                 let u = (((now - t0) as f64 / 1e6) / OV_ANIM_SECS).clamp(0.0, 1.0);
-                let e = 1.0 - (1.0 - u).powi(3); // ease-out cubic, full duration
+                // Ease-out quad: responsive, fast, and flat/even (tekkiz) without sluggish tail
+                let e = 1.0 - (1.0 - u) * (1.0 - u);
                 if u >= 1.0 {
                     nz = zt;
                     nx = oxt;
                     ny = oyt;
                 } else {
-                    // Pure Niri-style direct zoom: centered smooth transition without drift
-                    nz = (z0.ln() + (zt.ln() - z0.ln()) * e).exp();
-                    nx = ox0 + (oxt - ox0) * e;
-                    ny = oy0 + (oyt - oy0) * e;
+                    // Logarithmic zoom for perceptually uniform field-of-view scaling
+                    nz = (z0.max(0.01).ln() + (zt.max(0.01).ln() - z0.max(0.01).ln()) * e).exp();
+                    // Coupled world center interpolation: guarantees zero horizontal/vertical wobble or drift!
+                    let cur_wcx = wcx0 + (wcxt - wcx0) * e;
+                    let cur_wcy = wcy0 + (wcyt - wcy0) * e;
+                    let nz_safe = nz.max(0.01);
+                    nx = cur_wcx - vw / (2.0 * nz_safe);
+                    ny = cur_wcy - vh / (2.0 * nz_safe);
                 }
                 app.cam_spring_x.set(None);
                 app.cam_spring_y.set(None);
+                app.cam_v0_x.set(0.0);
             } else {
                 zanim.set(None);
                 let mut z = zc + (zt - zc) * k;

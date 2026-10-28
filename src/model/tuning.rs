@@ -21,7 +21,7 @@ pub(crate) fn next_page_zoom(cur: f64, dir: i32) -> f64 {
 }
 
 /// Overview zoom in/out duration (fixed, ease-out): zoom, pan and grid land together.
-pub(crate) const OV_ANIM_SECS: f64 = 0.30;
+pub(crate) const OV_ANIM_SECS: f64 = 0.18;
 
 /// Xotira tanqis (yoki RAIL_LOW_MEM=1 yoki swap to'liq): tez uxlatish, 3 ta tirik tab.
 pub(crate) const SUSPEND_AFTER_SECS: u64 = 60;
