@@ -284,11 +284,15 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
     }
 
     updateBackdrop();
-    updateToolbarPos();
+    if (!isMouseDown && !isDragging && !isMoving && !isResizing) {
+      updateToolbarPos();
+    } else {
+      toolbar.style.display = 'none';
+    }
   }
 
   function updateToolbarPos() {
-    if (!hasSelection) {
+    if (!hasSelection || isMouseDown || isDragging || isMoving || isResizing) {
       toolbar.style.display = 'none';
       return;
     }
@@ -454,6 +458,8 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
       return;
     }
 
+    toolbar.style.display = 'none';
+
     mouseDownPos = { x: e.pageX, y: e.pageY };
 
     const handle = e.target.closest ? e.target.closest('.rail-ss-handle') : null;
@@ -506,6 +512,7 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
         hasSelection = true;
         hoverBox.style.display = 'none';
         updateSelectionView();
+        updateToolbarPos();
         return;
       }
 
@@ -514,10 +521,12 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
         hasSelection = true;
         hoverBox.style.display = 'none';
         updateSelectionView();
+        updateToolbarPos();
       } else {
         hasSelection = false;
         sel = { left: 0, top: 0, width: 0, height: 0 };
         updateSelectionView();
+        toolbar.style.display = 'none';
       }
     }
   }
