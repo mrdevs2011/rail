@@ -81,6 +81,12 @@ fn test_to_uri_search_engines() {
     assert_eq!(to_uri("rust lang", "kagi"), "https://kagi.com/search?q=rust%20lang");
     assert_eq!(to_uri("https://github.com", "google"), "https://github.com");
     assert_eq!(to_uri("github.com", "duckduckgo"), "https://github.com");
+    assert_eq!(to_uri("/home/user/page.html", "google"), "file:///home/user/page.html");
+    assert_eq!(to_uri("file:///tmp/test.html", "google"), "file:///tmp/test.html");
+    assert_eq!(to_uri("file:/tmp/test.html", "google"), "file:///tmp/test.html");
+    assert_eq!(to_uri("localhost:3000", "google"), "http://localhost:3000");
+    assert_eq!(to_uri("127.0.0.1:8080", "google"), "http://127.0.0.1:8080");
+    assert_eq!(to_uri("192.168.1.1", "google"), "http://192.168.1.1");
 }
 
 #[test]

@@ -49,6 +49,9 @@ impl App {
         settings.set_enable_html5_database(true);
         settings.set_enable_site_specific_quirks(true);
         settings.set_javascript_can_access_clipboard(true);
+        // Allow local offline files (e.g. index.html) to load relative CSS, JS and images like Chrome / Firefox
+        settings.set_allow_file_access_from_file_urls(true);
+        settings.set_allow_universal_access_from_file_urls(true);
         // Always: smooth page scroll/compositing; falls back when GPU unavailable
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
         // Back/forward uses the page cache: instant history navigation instead of a reload

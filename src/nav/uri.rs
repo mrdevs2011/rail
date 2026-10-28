@@ -35,12 +35,69 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
         let rest = s.trim_start_matches("rail:").trim_start_matches('/');
         return format!("rail://{rest}");
     }
-    if s.contains("://") || s.starts_with("about:") || s.starts_with("file:") {
+
+    // 1. Local filesystem files (file://, /absolute/path, ~/relative/to/home, ./relative)
+    if s.starts_with("file://") {
         return s.into();
     }
-    if s.starts_with("localhost") || s.starts_with("127.0.0.1") {
+    if s.starts_with("file:") {
+        let path = s.trim_start_matches("file:").trim_start_matches('/');
+        return format!("file:///{path}");
+    }
+    if s.starts_with('/') {
+        return format!("file://{s}");
+    }
+    if s.starts_with("~/") {
+        let home = glib::home_dir();
+        return format!("file://{}/{}", home.display(), &s[2..]);
+    }
+    if s.starts_with("./") || s.starts_with("../") {
+        if let Ok(cur) = std::env::current_dir() {
+            let full = cur.join(s);
+            return format!("file://{}", full.display());
+        }
+    }
+    if (s.ends_with(".html")
+        || s.ends_with(".htm")
+        || s.ends_with(".xhtml")
+        || s.ends_with(".svg")
+        || s.ends_with(".pdf")
+        || s.ends_with(".txt")
+        || s.ends_with(".json")
+        || s.ends_with(".xml"))
+        && std::path::Path::new(s).is_file()
+    {
+        if let Ok(canon) = std::fs::canonicalize(s) {
+            return format!("file://{}", canon.display());
+        }
+    }
+
+    // 2. Protocols (http, https, about, data, blob)
+    if s.contains("://") || s.starts_with("about:") || s.starts_with("data:") || s.starts_with("blob:") {
+        return s.into();
+    }
+
+    // 3. Localhost, IP addresses and development ports (e.g. localhost:3000, 127.0.0.1:8080, 192.168.1.1, 0.0.0.0:5000)
+    let lower = s.to_ascii_lowercase();
+    if lower.starts_with("localhost")
+        || lower.starts_with("127.0.0.1")
+        || lower.starts_with("0.0.0.0")
+        || lower.starts_with("192.168.")
+        || lower.starts_with("10.")
+        || (lower.starts_with("172.")
+            && lower
+                .split('.')
+                .nth(1)
+                .and_then(|n| n.parse::<u8>().ok())
+                .map_or(false, |b| (16..=31).contains(&b)))
+        || (s.contains(':')
+            && !s.contains(' ')
+            && s.split(':').nth(1).map_or(false, |p| p.chars().all(|c| c.is_ascii_digit())))
+    {
         return format!("http://{s}");
     }
+
+    // 4. Domains (e.g. google.com, github.com/user/repo)
     if !s.contains(' ') && s.contains('.') {
         return format!("https://{s}");
     }
