@@ -240,8 +240,10 @@ impl App {
 
     pub(crate) fn sync_settings_responsive(&self) {
         let w = self.settings_modal.width();
-        let w = if w > 0 { w } else { self.win.width() };
-        let is_narrow = w > 0 && w < 520;
+        let w = if w > 50 { w } else { self.win.width() };
+        // Desktop (>= 820px): tabs on the left
+        // Tablet / Mobile (< 820px): tabs on top
+        let is_narrow = w > 0 && w < 820;
         if is_narrow {
             self.settings_modal.add_css_class("responsive-narrow");
             self.settings_body.set_orientation(gtk::Orientation::Vertical);

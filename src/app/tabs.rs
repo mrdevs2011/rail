@@ -31,7 +31,11 @@ impl App {
         attach_download_handlers_once(session);
 
         let settings = webkit6::Settings::new();
-        // Real WebKitGTK user agent: Rail does not spoof UA, platform, GPU or any other browser property.
+        // Modern Chrome User-Agent ensures YouTube, web video players, codecs and
+        // web apps serve compatible HTML5 MSE / VP9 / WebM pipelines on Linux.
+        settings.set_user_agent(Some(
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        ));
         settings.set_enable_webrtc(webrtc_allowed());
         settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_dns_prefetching(false);

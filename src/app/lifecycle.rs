@@ -235,10 +235,7 @@ impl App {
                 continue;
             }
             pic.set_visible(false);
-            // yashirilgan (unmapped) tabning kadri suspend uchun kerak — faqat ko'rinayotganini tozalaymiz
-            if tab.view.is_mapped() {
-                pic.set_paintable(Option::<&gdk::Paintable>::None);
-            }
+            pic.set_paintable(Option::<&gdk::Paintable>::None);
         }
     }
 
@@ -443,23 +440,26 @@ impl App {
                 tab.freeze.set_paintable(Some(&tex));
             }
         }
-        // Show freeze only when we have a real picture — never a grey placeholder.
+        // ONLY suspend and terminate web process if a durable snapshot actually exists.
+        // Terminating without a snapshot turns the tab into a pitch black crashed rectangle!
         if tab.freeze.paintable().is_some() {
             tab.freeze.set_visible(true);
+            tab.suspended.set(true);
+            tab.view.terminate_web_process();
         } else {
             tab.freeze.set_visible(false);
         }
-        tab.suspended.set(true);
-        // Kill the web process hard: only image + URL remain for this tab.
-        tab.view.terminate_web_process();
     }
 
     /// Davriy tekshiruv:
+    /// - Overview rejimida tablarni o'ldirmaymiz (foydalanuvchi galereyaga qarayapti)
     /// - faqat fokus / haqiqiy viewport kesishuvi `last_active` ni yangilaydi
-    ///   (overview endi BARCHA tablarni "tirik" ushlab turmaydi)
     /// - SUSPEND_AFTER_SECS dan beri ko'rinmagan → suspend
     /// - MAX_LIVE_TABS dan oshsa eng eski non-focused tablar majburiy suspend
     pub(crate) fn suspend_hidden_tabs(&self) {
+        if self.ov.get() {
+            return;
+        }
         let Ok(rows) = self.rows.try_borrow() else { return };
         let fr = self.focus_row.get();
         let fc = self.focus_col.get();

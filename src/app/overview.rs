@@ -162,27 +162,16 @@ impl App {
 
     /// Overview: keep live cards visible; if a tab was already suspended, show its freeze frame.
     pub(crate) fn ensure_overview_previews(self: &Rc<Self>) {
-        let fr = self.focus_row.get();
-        let fc = self.focus_col.get();
         let Ok(rows) = self.rows.try_borrow() else { return };
-        for (ri, row) in rows.iter().enumerate() {
-            for (ci, tab) in row.tabs.iter().enumerate() {
-                let is_focus = ri == fr && ci == fc;
+        for row in rows.iter() {
+            for tab in row.tabs.iter() {
                 if tab.suspended.get() {
                     // Show freeze only when a real picture exists.
                     tab.freeze.set_visible(tab.freeze.paintable().is_some());
                     continue;
                 }
-                if is_focus {
-                    tab.freeze.set_visible(false);
-                    continue;
-                }
-                // If a tab is already suspended/sleeping, show its freeze. Otherwise leave the live view intact.
-                if tab.freeze.paintable().is_some() {
-                    tab.freeze.set_visible(true);
-                } else {
-                    tab.freeze.set_visible(false);
-                }
+                // Live tab: always leave the live view visible, hide any leftover freeze
+                tab.freeze.set_visible(false);
             }
         }
     }
