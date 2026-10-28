@@ -53,6 +53,7 @@ mod shortcuts;
 mod ui;
 mod web;
 mod extensions;
+mod pwa;
 
 use app::App;
 use cli::*;
@@ -207,6 +208,16 @@ fn main() -> glib::ExitCode {
         } else if arg.starts_with("--data-dir=") {
             i += 1;
             continue;
+        } else if arg == "--app" {
+            if i + 1 < args.len() {
+                let _ = PWA_APP_URL.set(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else if arg.starts_with("--app=") {
+            let _ = PWA_APP_URL.set(arg["--app=".len()..].to_string());
+            i += 1;
+            continue;
         } else if !arg.starts_with('-') && target_url.is_none() {
             target_url = Some(arg.clone());
         }
@@ -243,9 +254,19 @@ fn main() -> glib::ExitCode {
         }
     }
 
-    app.connect_activate(build);
+    app.connect_activate(|gapp| {
+        if let Some(app_url) = PWA_APP_URL.get() {
+            crate::pwa::open_pwa_window(gapp, app_url, None);
+            return;
+        }
+        build(gapp);
+    });
     app.connect_command_line(|gapp, cmdline| {
         let args: Vec<String> = cmdline.arguments().iter().map(|a| a.to_string_lossy().into_owned()).collect();
+        if let Some(app_url) = parse_cli_app(&args) {
+            crate::pwa::open_pwa_window(gapp, &app_url, None);
+            return glib::ExitCode::SUCCESS;
+        }
         let url = parse_cli_url(&args);
         let existing = MAIN_APP.with(|m| m.borrow().clone());
         match existing {
@@ -289,8 +310,33 @@ fn parse_cli_url(args: &[String]) -> Option<String> {
             i += 2;
             continue;
         }
+        if a == "--app" {
+            i += 2;
+            continue;
+        }
+        if a.starts_with("--app=") {
+            i += 1;
+            continue;
+        }
         if !a.starts_with('-') {
             return Some(a.clone());
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Standalone PWA app argument: `--app="https://..."` or `--app https://...`
+fn parse_cli_app(args: &[String]) -> Option<String> {
+    let mut i = 1;
+    while i < args.len() {
+        let a = &args[i];
+        if a == "--app" {
+            if i + 1 < args.len() {
+                return Some(args[i + 1].clone());
+            }
+        } else if a.starts_with("--app=") {
+            return Some(a["--app=".len()..].to_string());
         }
         i += 1;
     }

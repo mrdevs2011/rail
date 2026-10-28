@@ -20,7 +20,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     let history_mgr = HistoryManager::new(rail_data_dir());
     let initial_prof_id = profile_mgr.active_profile().id;
 
-    let SidebarWidgets { footer_downloads, footer_settings, head_close_side, head_back, head_forward, head_reload, head_ext, brand_logo, list, pill, pill_label, pill_engine_icon, side } = build_sidebar();
+    let SidebarWidgets { footer_downloads, footer_settings, head_close_side, head_back, head_forward, head_reload, head_ext, brand_logo, list, pill, pill_label, pill_engine_icon, pill_pwa_btn, side } = build_sidebar();
 
     let StripWidgets { layout, shell, shell_layout, strip, strip_host } = build_strip(side.clone());
 
@@ -180,6 +180,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         list: list.clone(),
         pill_label,
         pill_engine_icon,
+        pill_pwa_btn: pill_pwa_btn.clone(),
         load_bar,
         palette,
         palette_engine_icon,
@@ -215,6 +216,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         anim_frozen: RefCell::new(Vec::new()),
         side_open: Cell::new(true),
         sidebar_auto: Cell::new(load_app_settings().sidebar_mode == "auto"),
+        sidebar_locked: Cell::new(false),
         side_gen: Cell::new(0),
         side_open_timer: RefCell::new(None),
         side_close_timer: RefCell::new(None),
@@ -283,6 +285,12 @@ pub(crate) fn build(gapp: &gtk::Application) {
 
     wire_devtools(&app, devtools_close_btn, devtools_content_box, devtools_detach_btn, devtools_resize_handle, footer_downloads, footer_settings);
     wire_sidebar_header(&app, head_back, head_forward, head_reload, head_ext, head_close_side);
+
+    let a_pwa = app.clone();
+    app.pill_pwa_btn.connect_clicked(move |_| {
+        a_pwa.prompt_install_current_pwa();
+    });
+
     // Auto mode: start closed (edge-hover only)
     app.shell_layout.set_overlay(app.sidebar_auto.get());
     if app.sidebar_auto.get() {

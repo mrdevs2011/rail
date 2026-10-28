@@ -111,6 +111,13 @@ impl App {
         });
         win.add_controller(key_ctl);
 
+        self.sidebar_locked.set(true);
+        let a_lock = self.clone();
+        win.connect_close_request(move |_| {
+            a_lock.sidebar_locked.set(false);
+            glib::Propagation::Proceed
+        });
+
         win.present();
     }
 

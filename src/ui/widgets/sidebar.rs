@@ -15,6 +15,7 @@ pub(crate) struct SidebarWidgets {
     pub(crate) pill: gtk::Button,
     pub(crate) pill_label: gtk::Label,
     pub(crate) pill_engine_icon: gtk::Image,
+    pub(crate) pill_pwa_btn: gtk::Button,
     pub(crate) side: gtk::Box,
 }
 
@@ -92,6 +93,12 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
     sc_bind_chip(&pill_chip, "focus_url");
     pill_chip.add_css_class("pill-chip");
     pill_inner.append(&pill_chip);
+    let pill_pwa_btn = gtk::Button::from_icon_name("system-software-install-symbolic");
+    pill_pwa_btn.add_css_class("flat-icon");
+    pill_pwa_btn.add_css_class("pill-pwa-btn");
+    pill_pwa_btn.set_visible(false);
+    pill_pwa_btn.set_tooltip_text(Some(tr("Install this site as desktop app")));
+    pill_inner.append(&pill_pwa_btn);
     let pill = gtk::Button::new();
     pill.add_css_class("pill");
     pill.set_child(Some(&pill_inner));
@@ -157,6 +164,7 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
         pill,
         pill_label,
         pill_engine_icon,
+        pill_pwa_btn,
         side,
     }
 }

@@ -466,3 +466,19 @@ fn test_every_language_has_flag_png() {
         }
     }
 }
+
+#[test]
+fn test_pwa_slugify_and_cli_app() {
+    assert_eq!(crate::pwa::slugify("YouTube"), "youtube");
+    assert_eq!(crate::pwa::slugify("Telegram Web"), "telegram-web");
+    assert_eq!(crate::pwa::slugify("SpaceMR — App!"), "spacemr-app");
+
+    let args1 = vec!["rail".into(), "--app=https://youtube.com".into()];
+    assert_eq!(crate::parse_cli_app(&args1), Some("https://youtube.com".into()));
+
+    let args2 = vec!["rail".into(), "--app".into(), "https://spacemr.vercel.app".into()];
+    assert_eq!(crate::parse_cli_app(&args2), Some("https://spacemr.vercel.app".into()));
+
+    let args3 = vec!["rail".into(), "https://google.com".into()];
+    assert_eq!(crate::parse_cli_app(&args3), None);
+}

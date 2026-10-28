@@ -39,6 +39,7 @@ pub(crate) struct App {
     pub(crate) list: gtk::ListBox,
     pub(crate) pill_label: gtk::Label,
     pub(crate) pill_engine_icon: gtk::Image,
+    pub(crate) pill_pwa_btn: gtk::Button,
     pub(crate) load_bar: gtk::ProgressBar,
     pub(crate) palette: gtk::Box,
     pub(crate) palette_engine_icon: gtk::Image,
@@ -87,6 +88,8 @@ pub(crate) struct App {
     pub(crate) side_open: Cell<bool>,
     /// true = edge-hover auto mode; false = fixed (Claude-style always visible when open).
     pub(crate) sidebar_auto: Cell<bool>,
+    /// When true (e.g. extension popover or dialog is open), sidebar auto-close is locked/prevented.
+    pub(crate) sidebar_locked: Cell<bool>,
     pub(crate) side_gen: Cell<u32>,
     pub(crate) side_open_timer: RefCell<Option<glib::SourceId>>,
     pub(crate) side_close_timer: RefCell<Option<glib::SourceId>>,

@@ -230,12 +230,19 @@ pub(crate) fn wire_sidebar_header(
     ext_popover.set_has_arrow(true);
     ext_popover.set_position(gtk::PositionType::Bottom);
 
+    let app_lock = app.clone();
+    ext_popover.connect_closed(move |_| {
+        app_lock.sidebar_locked.set(false);
+    });
+
     let app_click = app.clone();
     let pop_click = ext_popover.clone();
     head_ext.connect_clicked(move |_| {
         if pop_click.is_visible() {
             pop_click.popdown();
+            app_click.sidebar_locked.set(false);
         } else {
+            app_click.sidebar_locked.set(true);
             rebuild_extensions_popover(&app_click, &pop_click);
             pop_click.popup();
         }
@@ -275,7 +282,7 @@ pub(crate) fn wire_sidebar_header(
 
     let a_active = app.clone();
     app.win.connect_is_active_notify(move |w| {
-        if !w.is_active() && a_active.sidebar_auto.get() && a_active.side_open.get() {
+        if !w.is_active() && a_active.sidebar_auto.get() && a_active.side_open.get() && !a_active.sidebar_locked.get() {
             a_active.set_sidebar(false);
         }
     });

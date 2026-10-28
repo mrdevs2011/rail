@@ -406,7 +406,27 @@ impl App {
         self.list.append(&new_ws_box);
 
         SIDEBAR_ITEMS.with(|s| *s.borrow_mut() = (ws_headers, tab_items_registry.borrow().clone()));
-        self.pill_label.set_text(&self.focused_display_uri());
+        let disp_uri = self.focused_display_uri();
+        self.pill_label.set_text(&disp_uri);
+        let is_web = disp_uri.starts_with("http://") || disp_uri.starts_with("https://");
+        self.pill_pwa_btn.set_visible(is_web);
+    }
+
+    pub(crate) fn prompt_install_current_pwa(self: &Rc<Self>) {
+        if let Some(view) = self.focused_view() {
+            let u = view.uri().map(|s| s.to_string()).unwrap_or_default();
+            let t = view.title().map(|s| s.to_string()).unwrap_or_else(|| u.clone());
+            if !u.is_empty() && (u.starts_with("http://") || u.starts_with("https://")) {
+                let info = crate::pwa::PwaAppInfo {
+                    id: crate::pwa::slugify(&t),
+                    name: t,
+                    url: u,
+                    icon_url: None,
+                    theme_color: None,
+                };
+                crate::pwa::prompt_install_pwa_dialog(self, &info);
+            }
+        }
     }
 
     pub(crate) fn toggle_sidebar(self: &Rc<Self>) {
@@ -444,6 +464,12 @@ impl App {
 
     pub(crate) fn on_shell_pointer_x(self: &Rc<Self>, x: f64) {
         if !self.sidebar_auto.get() {
+            return;
+        }
+        if self.sidebar_locked.get() {
+            if let Some(source) = self.side_close_timer.borrow_mut().take() {
+                source.remove();
+            }
             return;
         }
 
@@ -501,6 +527,12 @@ impl App {
 
     pub(crate) fn on_shell_pointer_leave(self: &Rc<Self>, last_x: f64) {
         if !self.sidebar_auto.get() {
+            return;
+        }
+        if self.sidebar_locked.get() {
+            if let Some(source) = self.side_close_timer.borrow_mut().take() {
+                source.remove();
+            }
             return;
         }
         // Cancel pending open dwell if cursor leaves the window

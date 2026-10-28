@@ -4,6 +4,7 @@ use crate::*;
 
 pub(crate) static CUSTOM_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 pub(crate) static TARGET_URL: OnceLock<String> = OnceLock::new();
+pub(crate) static PWA_APP_URL: OnceLock<String> = OnceLock::new();
 
 pub(crate) fn rail_data_dir() -> PathBuf {
     if let Some(dir) = CUSTOM_DATA_DIR.get() {

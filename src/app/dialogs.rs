@@ -238,10 +238,15 @@ impl App {
                 self.win.add_action(&act_split);
                 menu.append(&ContextMenuItem::from_gaction(&act_split, tr("Open Link in Split View"), None));
 
-                menu.append(&ContextMenuItem::from_stock_action_with_label(
-                    ContextMenuAction::CopyLinkToClipboard,
-                    tr("Copy Link Address"),
-                ));
+                let uri_c = uri.clone();
+                let act_copy = gio::SimpleAction::new("ctx-copy-link", None);
+                act_copy.connect_activate(move |_, _| {
+                    if let Some(display) = gdk::Display::default() {
+                        display.clipboard().set_text(&uri_c);
+                    }
+                });
+                self.win.add_action(&act_copy);
+                menu.append(&ContextMenuItem::from_gaction(&act_copy, tr("Copy Link Address"), None));
 
                 menu.append(&ContextMenuItem::from_stock_action_with_label(
                     ContextMenuAction::DownloadLinkToDisk,
@@ -264,10 +269,15 @@ impl App {
                 self.win.add_action(&act_img);
                 menu.append(&ContextMenuItem::from_gaction(&act_img, tr("Open Image in New Tab"), None));
 
-                menu.append(&ContextMenuItem::from_stock_action_with_label(
-                    ContextMenuAction::CopyImageUrlToClipboard,
-                    tr("Copy Image Address"),
-                ));
+                let img_c = img_url.clone();
+                let act_copy_img = gio::SimpleAction::new("ctx-copy-img-url", None);
+                act_copy_img.connect_activate(move |_, _| {
+                    if let Some(display) = gdk::Display::default() {
+                        display.clipboard().set_text(&img_c);
+                    }
+                });
+                self.win.add_action(&act_copy_img);
+                menu.append(&ContextMenuItem::from_gaction(&act_copy_img, tr("Copy Image Address"), None));
 
                 menu.append(&ContextMenuItem::from_stock_action_with_label(
                     ContextMenuAction::CopyImageToClipboard,
@@ -361,6 +371,31 @@ impl App {
 
         // 5b. Translate page (Google Translate)
         self.append_translate_item(view, menu);
+
+        // 5c. Install as Desktop App (PWA)
+        if !is_link && !is_editable && !is_selection {
+            let cur_uri = view.uri().map(|s| s.to_string()).unwrap_or_default();
+            if cur_uri.starts_with("http://") || cur_uri.starts_with("https://") {
+                let app_pwa = self.clone();
+                let v_pwa = view.clone();
+                let act_pwa = gio::SimpleAction::new("ctx-install-pwa", None);
+                act_pwa.connect_activate(move |_, _| {
+                    let u = v_pwa.uri().map(|s| s.to_string()).unwrap_or_default();
+                    let t = v_pwa.title().map(|s| s.to_string()).unwrap_or_else(|| u.clone());
+                    let pwa_info = crate::pwa::PwaAppInfo {
+                        id: crate::pwa::slugify(&t),
+                        name: t,
+                        url: u,
+                        icon_url: None,
+                        theme_color: None,
+                    };
+                    crate::pwa::prompt_install_pwa_dialog(&app_pwa, &pwa_info);
+                });
+                self.win.add_action(&act_pwa);
+                menu.append(&ContextMenuItem::from_gaction(&act_pwa, tr("Install Page as Desktop App..."), None));
+                menu.append(&ContextMenuItem::new_separator());
+            }
+        }
 
         // 6. Developer Tools: ONE item, always last. "Inspect Element" opens the same
         // devtools as F12 / View Source (see signals.rs), so a separate View Source entry is redundant.

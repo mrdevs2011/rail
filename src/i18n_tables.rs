@@ -417,4 +417,12 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Drag or click on the page to select a region. Press ESC to cancel.", "Hududni tanlash uchun sahifani bosing yoki torting. Bekor qilish — ESC.", "Перетащите или щёлкните, чтобы выбрать область. ESC — отмена."),
     ("Screenshot copied!", "Skrinshot nusxalandi!", "Скриншот скопирован!"),
     ("Screenshot saved", "Skrinshot saqlandi", "Скриншот сохранён"),
+    ("Install App", "Ilovani o'rnatish", "Установить приложение"),
+    ("Install as Desktop App?", "Ish stoli ilovasi sifatida o'rnatilsinmi?", "Установить как приложение для рабочего стола?"),
+    ("The app will open in a fast standalone window and be added to your system application launcher.", "Ilova tezkor alohida oynada ochiladi va tizim ilovalar menyusiga qo'shiladi.", "Приложение откроется в отдельном окне и появится в меню приложений."),
+    ("App name", "Ilova nomi", "Название приложения"),
+    ("Install Page as Desktop App...", "Sahifani ish stoli ilovasi sifatida o'rnatish...", "Установить страницу как приложение..."),
+    ("Install this site as desktop app", "Ushbu saytni ish stoli ilovasi sifatida o'rnatish", "Установить этот сайт как приложение"),
+    ("Copy Page Address", "Sahifa manzilini nusxalash", "Скопировать адрес страницы"),
+    ("App installed successfully! Opening standalone window...", "Ilova muvaffaqiyatli o'rnatildi! Alohida oyna ochilmoqda...", "Приложение успешно установлено! Открывается отдельное окно..."),
 ];
