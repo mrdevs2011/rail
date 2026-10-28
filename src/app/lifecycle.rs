@@ -15,7 +15,7 @@ impl App {
 
     pub(crate) fn add_view(self: &Rc<Self>, view: WebView, profile_id: String, new_row: bool) {
         view.set_can_target(!self.ov.get());
-        let (container, resize_handle, height_handle, freeze) = Self::create_tab_widget(&view);
+        let tw = Self::create_tab_widget(&view);
 
         let (target_r, target_c) = {
             let mut rows = self.rows.borrow_mut();
@@ -28,7 +28,24 @@ impl App {
                 while rows.len() <= next_r {
                     rows.push(Row { tabs: Vec::new() });
                 }
-                rows[next_r].tabs.push(Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), height_handle: height_handle.clone(), profile_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+                rows[next_r].tabs.push(Tab {
+                    container: tw.container.clone(),
+                    view: view.clone(),
+                    freeze: tw.freeze.clone(),
+                    height_handle: tw.height_handle.clone(),
+                    profile_id,
+                    custom_width: Cell::new(None),
+                    custom_height: Cell::new(None),
+                    col_id: Cell::new(new_col_id()),
+                    saved_uri: RefCell::new(String::new()),
+                    suspended: Cell::new(false),
+                    keep_alive: Cell::new(false),
+                    last_active: Cell::new(std::time::Instant::now()),
+                    dt_box: tw.dt_box.clone(),
+                    dt_handle: tw.dt_handle.clone(),
+                    dt_open: Cell::new(false),
+                    dt_height: Cell::new(self.default_devtools_height.get()),
+                });
                 let c_idx = rows[next_r].tabs.len() - 1;
                 (next_r, c_idx)
             } else {
@@ -40,12 +57,36 @@ impl App {
                     // a new tab opens in a column of its own, right after the focused column
                     rows[cur_r].col_span(cur_c.min(rows[cur_r].tabs.len() - 1)).1
                 };
-                rows[cur_r].tabs.insert(col_idx, Tab { container: container.clone(), view: view.clone(), freeze: freeze.clone(), height_handle: height_handle.clone(), profile_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(String::new()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+                rows[cur_r].tabs.insert(col_idx, Tab {
+                    container: tw.container.clone(),
+                    view: view.clone(),
+                    freeze: tw.freeze.clone(),
+                    height_handle: tw.height_handle.clone(),
+                    profile_id,
+                    custom_width: Cell::new(None),
+                    custom_height: Cell::new(None),
+                    col_id: Cell::new(new_col_id()),
+                    saved_uri: RefCell::new(String::new()),
+                    suspended: Cell::new(false),
+                    keep_alive: Cell::new(false),
+                    last_active: Cell::new(std::time::Instant::now()),
+                    dt_box: tw.dt_box.clone(),
+                    dt_handle: tw.dt_handle.clone(),
+                    dt_open: Cell::new(false),
+                    dt_height: Cell::new(self.default_devtools_height.get()),
+                });
                 (cur_r, col_idx)
             }
         };
 
-        self.setup_tab_signals(&container, &view, &resize_handle, &height_handle);
+        self.setup_tab_signals(
+            &tw.container,
+            &view,
+            &tw.resize_handle,
+            &tw.height_handle,
+            &tw.dt_handle,
+            &tw.dt_box,
+        );
         self.sync_strip();
         self.focus_coords(target_r, target_c);
     }

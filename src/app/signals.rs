@@ -24,67 +24,45 @@ impl App {
         });
         view.add_controller(click);
 
-        // Track developer tools window state & auto-dock to Rail panel
+        // Track developer tools window state & auto-dock to per-tab container
         if let Some(insp) = view.inspector() {
             let app_insp = self.clone();
             let view_weak = view.downgrade();
             insp.connect_open_window(move |_| {
                 if let Some(v) = view_weak.upgrade() {
-                    DT_VIEW.with(|c| *c.borrow_mut() = Some(v));
+                    app_insp.show_view_devtools(&v);
                 }
-                let side = match app_insp.devtools_dock_side.get() {
-                    DevToolsDockSide::Undocked => DevToolsDockSide::Bottom,
-                    s => s,
-                };
-                app_insp.devtools_dock_side.set(side);
-                app_insp.set_devtools_dock_side(side);
                 true
             });
             let app_detach = self.clone();
+            let v_detach = view.downgrade();
             insp.connect_detach(move |_| {
-                // Do not allow spontaneous WebKit detach to turn into a separate floating window.
-                // Keep it docked in the bottom panel unless explicitly detached by the user via toggle_devtools_undocked.
-                if app_detach.devtools_dock_side.get() == DevToolsDockSide::Undocked {
-                    return true;
+                if let Some(v) = v_detach.upgrade() {
+                    app_detach.show_view_devtools(&v);
                 }
-                let side = match app_detach.devtools_dock_side.get() {
-                    DevToolsDockSide::Undocked => DevToolsDockSide::Bottom,
-                    s => s,
-                };
-                app_detach.devtools_dock_side.set(side);
-                app_detach.set_devtools_dock_side(side);
                 true
             });
             let app_attach = self.clone();
+            let v_attach = view.downgrade();
             insp.connect_attach(move |_| {
-                let cur = app_attach.devtools_dock_side.get();
-                let slot = LAST_DT_SLOT.with(|c| c.replace(-1));
-                // Visible dock buttons sit after the close button, in order Left, Bottom, Right, minus the current side.
-                let visible: Vec<DevToolsDockSide> = [DevToolsDockSide::Left, DevToolsDockSide::Bottom, DevToolsDockSide::Right]
-                    .into_iter()
-                    .filter(|d| *d != cur)
-                    .collect();
-                let target = if slot >= 1 && ((slot - 1) as usize) < visible.len() && cur != DevToolsDockSide::Undocked {
-                    visible[(slot - 1) as usize]
-                } else if cur == DevToolsDockSide::Undocked {
-                    DevToolsDockSide::Bottom
-                } else {
-                    cur
-                };
-                eprintln!("[rail] inspector attach: slot={} cur={:?} -> {:?}", slot, cur, target);
-                // Same side: WebKit still emits attach; re-docking would unparent the webview and drop the click.
-                if target != cur || !app_attach.devtools_open.get() {
-                    app_attach.set_devtools_dock_side(target);
+                if let Some(v) = v_attach.upgrade() {
+                    app_attach.show_view_devtools(&v);
                 }
                 true
             });
             let a_closed = self.clone();
+            let v_closed = view.downgrade();
             insp.connect_closed(move |_| {
-                a_closed.hide_devtools_impl(false);
+                if let Some(v) = v_closed.upgrade() {
+                    a_closed.hide_view_devtools(&v);
+                }
             });
             let app_front = self.clone();
+            let v_front = view.downgrade();
             insp.connect_bring_to_front(move |_| {
-                app_front.show_devtools();
+                if let Some(v) = v_front.upgrade() {
+                    app_front.show_view_devtools(&v);
+                }
                 true
             });
         }
@@ -285,8 +263,57 @@ impl App {
         });
     }
 
-    pub(crate) fn setup_tab_signals(self: &Rc<Self>, container: &gtk::Box, view: &WebView, resize_handle: &gtk::Box, height_handle: &gtk::Box) {
+    pub(crate) fn setup_tab_signals(
+        self: &Rc<Self>,
+        container: &gtk::Box,
+        view: &WebView,
+        resize_handle: &gtk::Box,
+        height_handle: &gtk::Box,
+        dt_handle: &gtk::Box,
+        dt_box: &gtk::Box,
+    ) {
         self.setup_view_signals(view);
+
+        // Per-tab DevTools inspector vertical resize drag gesture
+        let dt_drag = gtk::GestureDrag::new();
+        dt_drag.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let start_h = Rc::new(Cell::new(0i32));
+        let dt_box_weak = dt_box.downgrade();
+        let app_dt = self.clone();
+        let v_dt = view.downgrade();
+        let s_h_begin = start_h.clone();
+        let b_weak_begin = dt_box_weak.clone();
+        dt_drag.connect_drag_begin(move |g, _, _| {
+            g.set_state(gtk::EventSequenceState::Claimed);
+            if let Some(b) = b_weak_begin.upgrade() {
+                s_h_begin.set(b.height());
+            }
+        });
+        let s_h_update = start_h.clone();
+        let b_weak_update = dt_box_weak.clone();
+        let v_weak_update = v_dt.clone();
+        let app_dt_update = app_dt.clone();
+        dt_drag.connect_drag_update(move |_, _, offset_y| {
+            let Some(b) = b_weak_update.upgrade() else { return };
+            let Some(v) = v_weak_update.upgrade() else { return };
+            let base = s_h_update.get() as f64;
+            let tab_total_h = (v.height() + b.height()) as f64;
+            let max_h = (tab_total_h - 100.0).max(160.0);
+            let nh = (base - offset_y).clamp(120.0, max_h) as i32;
+            b.set_height_request(nh);
+            if let Some((r, c)) = app_dt_update.find_view_coords(&v) {
+                let rows = app_dt_update.rows.borrow();
+                if let Some(t) = rows.get(r).and_then(|row| row.tabs.get(c)) {
+                    t.dt_height.set(nh);
+                }
+            }
+            app_dt_update.default_devtools_height.set(nh);
+            b.queue_allocate();
+        });
+        dt_drag.connect_drag_end(move |g, _, _| {
+            g.set_state(gtk::EventSequenceState::None);
+        });
+        dt_handle.add_controller(dt_drag);
 
         // Welcome page search box (a real <input> in the page) talks to us through this handler.
         // Connected here (not in add_view) so EVERY tab creation path gets it, including

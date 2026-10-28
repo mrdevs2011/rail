@@ -1499,8 +1499,20 @@ button.settings-engine-btn.active {
     box-shadow: -16px 0 48px rgba(0, 0, 0, 0.85);
 }
 .devtools-resize-handle {
+    min-height: 8px;
     background: #0d0d0d;
+    border-top: 1px solid #222222;
+    cursor: ns-resize;
     transition: background 0.12s ease, border-color 0.12s ease;
+}
+.devtools-resize-handle:hover,
+.devtools-resize-handle.dragging {
+    background: #3b82f6;
+    border-color: #60a5fa;
+}
+.devtools-tab-dock {
+    background: #000000;
+    border-top: 1px solid #181818;
 }
 .devtools-panel.dock-bottom .devtools-resize-handle {
     min-height: 8px;
@@ -1989,32 +2001,51 @@ window.qr-win {
     border: 1px solid rgba(255,255,255,0.08);
 }
 .ss-toolbar {
-    background: #1c1c1e;
-    border: 1px solid #3a3a3c;
-    border-radius: 8px;
-    padding: 3px;
-    box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    padding: 4px 6px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.65);
 }
 .ss-toolbar button {
     min-height: 32px;
     padding: 0 12px;
     border-radius: 6px;
     border: none;
-    background: transparent;
-    color: #f5f5f7;
-    font-size: 12px;
+    background: #27272a;
+    color: #f4f4f5;
+    font-size: 13px;
     font-weight: 500;
 }
 .ss-toolbar button:hover {
-    background: #2c2c2e;
-    color: #fff;
+    background: #3f3f46;
+    color: #ffffff;
 }
-.ss-toolbar button.ss-primary {
-    background: #0a84ff;
-    color: #fff;
+.ss-toolbar button.ss-btn-close {
+    min-width: 32px;
+    padding: 0;
+    font-size: 14px;
 }
-.ss-toolbar button.ss-primary:hover {
-    background: #409cff;
+.ss-toolbar button.ss-btn-copy {
+    padding: 0 12px;
+}
+.ss-toolbar button.ss-primary,
+.ss-toolbar button.ss-btn-dl {
+    background: #93c5fd;
+    color: #0f172a;
+    border: 2px solid #3b82f6;
+    font-weight: 600;
+    padding: 0 14px;
+}
+.ss-toolbar button.ss-primary:hover,
+.ss-toolbar button.ss-btn-dl:hover {
+    background: #bfdbfe;
+    color: #0f172a;
+    border-color: #60a5fa;
+}
+.ss-toolbar button.ss-btn-dl image,
+.ss-toolbar button.ss-btn-dl label {
+    color: #0f172a;
 }
 .ss-topbar {
     background: #1c1c1e;

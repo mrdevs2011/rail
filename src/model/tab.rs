@@ -22,6 +22,11 @@ pub(crate) struct Tab {
     /// Popup (window.open) bilan bog'langan tablar bitta web process'ni bo'lishadi: ularni to'xtatib bo'lmaydi
     pub(crate) keep_alive: Cell<bool>,
     pub(crate) last_active: Cell<std::time::Instant>,
+    /// Per-tab docked DevTools inspector container
+    pub(crate) dt_box: gtk::Box,
+    pub(crate) dt_handle: gtk::Box,
+    pub(crate) dt_open: Cell<bool>,
+    pub(crate) dt_height: Cell<i32>,
 }
 
 impl Tab {

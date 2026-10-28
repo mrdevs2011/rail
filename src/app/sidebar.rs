@@ -440,12 +440,12 @@ impl App {
         if !self.sidebar_auto.get() {
             return;
         }
-        // Left edge strip: generous 28px zone for fast flick / window gap; past SIDE_W + margin closes.
+        // Left edge strip: generous 28px zone for fast flick / window gap; past SIDE_W closes.
         if x <= 28.0 {
             if !self.side_open.get() {
                 self.set_sidebar(true);
             }
-        } else if x > (SIDE_W as f64 + 28.0) {
+        } else if x > (SIDE_W as f64) {
             if self.side_open.get() {
                 self.set_sidebar(false);
             }
@@ -456,10 +456,8 @@ impl App {
         if !self.sidebar_auto.get() || !self.side_open.get() {
             return;
         }
-        // If cursor left on the left side (at or outside the left window edge / Niri gap),
-        // do NOT close the sidebar so the user can reach the monitor wall without it collapsing.
-        // Only close if cursor explicitly moved away to the right (past sidebar area).
-        if last_x > (SIDE_W as f64 + 28.0) {
+        // If cursor left anywhere to the right of the extreme left edge, close immediately.
+        if last_x > 4.0 {
             self.set_sidebar(false);
         }
     }

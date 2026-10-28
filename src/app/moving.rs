@@ -177,11 +177,35 @@ impl App {
             let view = Self::create_web_view(&session, &prof_id);
             view.load_html(&start_page(), Some("rail://start/"));
             view.set_can_target(!self.ov.get());
-            let (container, resize_handle, height_handle, freeze) = Self::create_tab_widget(&view);
-            self.setup_tab_signals(&container, &view, &resize_handle, &height_handle);
+            let tw = Self::create_tab_widget(&view);
+            self.setup_tab_signals(
+                &tw.container,
+                &view,
+                &tw.resize_handle,
+                &tw.height_handle,
+                &tw.dt_handle,
+                &tw.dt_box,
+            );
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, freeze, height_handle, profile_id: prof_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new("rail://start/".to_string()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+            rows[0].tabs.push(Tab {
+                container: tw.container,
+                view,
+                freeze: tw.freeze,
+                height_handle: tw.height_handle,
+                profile_id: prof_id,
+                custom_width: Cell::new(None),
+                custom_height: Cell::new(None),
+                col_id: Cell::new(new_col_id()),
+                saved_uri: RefCell::new("rail://start/".to_string()),
+                suspended: Cell::new(false),
+                keep_alive: Cell::new(false),
+                last_active: Cell::new(std::time::Instant::now()),
+                dt_box: tw.dt_box,
+                dt_handle: tw.dt_handle,
+                dt_open: Cell::new(false),
+                dt_height: Cell::new(self.default_devtools_height.get()),
+            });
             drop(rows);
         } else if cur_row_empty && cur_r > 0 {
             let mut rows = self.rows.borrow_mut();
@@ -224,11 +248,35 @@ impl App {
             let view = Self::create_web_view(&session, &prof_id);
             view.load_html(&start_page(), Some("rail://start/"));
             view.set_can_target(!self.ov.get());
-            let (container, resize_handle, height_handle, freeze) = Self::create_tab_widget(&view);
-            self.setup_tab_signals(&container, &view, &resize_handle, &height_handle);
+            let tw = Self::create_tab_widget(&view);
+            self.setup_tab_signals(
+                &tw.container,
+                &view,
+                &tw.resize_handle,
+                &tw.height_handle,
+                &tw.dt_handle,
+                &tw.dt_box,
+            );
 
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab { container, view, freeze, height_handle, profile_id: prof_id, custom_width: Cell::new(None), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new("rail://start/".to_string()), suspended: Cell::new(false), keep_alive: Cell::new(false), last_active: Cell::new(std::time::Instant::now()) });
+            rows[0].tabs.push(Tab {
+                container: tw.container,
+                view,
+                freeze: tw.freeze,
+                height_handle: tw.height_handle,
+                profile_id: prof_id,
+                custom_width: Cell::new(None),
+                custom_height: Cell::new(None),
+                col_id: Cell::new(new_col_id()),
+                saved_uri: RefCell::new("rail://start/".to_string()),
+                suspended: Cell::new(false),
+                keep_alive: Cell::new(false),
+                last_active: Cell::new(std::time::Instant::now()),
+                dt_box: tw.dt_box,
+                dt_handle: tw.dt_handle,
+                dt_open: Cell::new(false),
+                dt_height: Cell::new(self.default_devtools_height.get()),
+            });
             drop(rows);
         } else if cur_row_empty && from_r > 0 {
             let mut rows = self.rows.borrow_mut();

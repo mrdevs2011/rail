@@ -2,6 +2,15 @@
 
 use crate::*;
 
+pub(crate) struct TabWidgets {
+    pub(crate) container: gtk::Box,
+    pub(crate) resize_handle: gtk::Box,
+    pub(crate) height_handle: gtk::Box,
+    pub(crate) freeze: gtk::Picture,
+    pub(crate) dt_box: gtk::Box,
+    pub(crate) dt_handle: gtk::Box,
+}
+
 impl App {
     pub(crate) fn focused_view(&self) -> Option<WebView> {
         let rows = self.rows.borrow();
@@ -63,7 +72,7 @@ impl App {
         self.ov.get()
     }
 
-    pub(crate) fn create_tab_widget(view: &WebView) -> (gtk::Box, gtk::Box, gtk::Box, gtk::Picture) {
+    pub(crate) fn create_tab_widget(view: &WebView) -> TabWidgets {
         view.add_css_class("tab");
         view.set_overflow(gtk::Overflow::Hidden);
         view.set_vexpand(true);
@@ -93,6 +102,25 @@ impl App {
         overlay.add_overlay(&freeze);
         overlay.add_overlay(&height_handle);
 
+        let dt_handle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        dt_handle.add_css_class("devtools-resize-handle");
+        dt_handle.set_cursor_from_name(Some("ns-resize"));
+        dt_handle.set_visible(false);
+
+        let dt_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        dt_box.add_css_class("devtools-content-area");
+        dt_box.add_css_class("devtools-tab-dock");
+        dt_box.set_hexpand(true);
+        dt_box.set_vexpand(false);
+        dt_box.set_visible(false);
+
+        let tab_vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        tab_vbox.set_hexpand(true);
+        tab_vbox.set_vexpand(true);
+        tab_vbox.append(&overlay);
+        tab_vbox.append(&dt_handle);
+        tab_vbox.append(&dt_box);
+
         let container = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         container.add_css_class("rail-col");
         container.add_css_class("full");
@@ -103,9 +131,17 @@ impl App {
         resize_handle.add_css_class("tab-resize-handle");
         resize_handle.set_cursor_from_name(Some("col-resize"));
 
-        container.append(&overlay);
+        container.append(&tab_vbox);
         container.append(&resize_handle);
-        (container, resize_handle, height_handle, freeze)
+
+        TabWidgets {
+            container,
+            resize_handle,
+            height_handle,
+            freeze,
+            dt_box,
+            dt_handle,
+        }
     }
 
     pub(crate) fn set_tab_width(&self, r: usize, c: usize, width: f64) {

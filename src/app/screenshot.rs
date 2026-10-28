@@ -134,18 +134,36 @@ impl App {
         size_lbl.set_valign(gtk::Align::Start);
         size_lbl.set_visible(false);
 
-        // Floating toolbar under selection: Cancel · Copy · Download
-        let toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+        // Floating toolbar under selection: Cancel · Copy · Download (styled like design)
+        let toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         toolbar.add_css_class("ss-toolbar");
         toolbar.set_halign(gtk::Align::Start);
         toolbar.set_valign(gtk::Align::Start);
         toolbar.set_visible(false);
 
-        let btn_close = gtk::Button::with_label("✕");
+        let btn_close = gtk::Button::from_icon_name("window-close-symbolic");
+        btn_close.add_css_class("ss-btn-close");
         btn_close.set_tooltip_text(Some(tr("Cancel")));
-        let btn_copy = gtk::Button::with_label(tr("Copy"));
-        let btn_dl = gtk::Button::with_label(tr("Download"));
+
+        let btn_copy = gtk::Button::new();
+        btn_copy.add_css_class("ss-btn-copy");
+        let copy_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let copy_icon = gtk::Image::from_icon_name("edit-copy-symbolic");
+        let copy_lbl = gtk::Label::new(Some(tr("Copy")));
+        copy_box.append(&copy_icon);
+        copy_box.append(&copy_lbl);
+        btn_copy.set_child(Some(&copy_box));
+
+        let btn_dl = gtk::Button::new();
         btn_dl.add_css_class("ss-primary");
+        btn_dl.add_css_class("ss-btn-dl");
+        let dl_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let dl_icon = gtk::Image::from_icon_name("document-save-symbolic");
+        let dl_lbl = gtk::Label::new(Some(tr("Download")));
+        dl_box.append(&dl_icon);
+        dl_box.append(&dl_lbl);
+        btn_dl.set_child(Some(&dl_box));
+
         toolbar.append(&btn_close);
         toolbar.append(&btn_copy);
         toolbar.append(&btn_dl);
@@ -218,17 +236,19 @@ impl App {
                 size_lbl.set_visible(true);
                 // Size just above the selection
                 size_lbl.set_margin_start(r.x.max(0.0) as i32);
-                size_lbl.set_margin_top((r.y - 22.0).max(4.0) as i32);
+                size_lbl.set_margin_top((r.y - 24.0).max(4.0) as i32);
 
-                toolbar.set_visible(true);
                 let aw = area.width() as f64;
                 let ah = area.height() as f64;
-                let tw = 200.0; // approximate toolbar width
-                let th = 40.0;
-                let mut tx = r.x + (r.w - tw) / 2.0;
-                let mut ty = r.y + r.h + 10.0;
+                let tw = 220.0;
+                let th = 42.0;
+                let mut tx = r.x + r.w - tw;
+                if tx < 4.0 {
+                    tx = r.x.max(4.0);
+                }
+                let mut ty = r.y + r.h + 8.0;
                 if ty + th > ah - 4.0 {
-                    ty = (r.y - th - 10.0).max(4.0);
+                    ty = (r.y - th - 8.0).max(4.0);
                 }
                 tx = tx.clamp(4.0, (aw - tw - 4.0).max(4.0));
                 toolbar.set_margin_start(tx as i32);
@@ -244,13 +264,16 @@ impl App {
         let view_c = view.clone();
         let hint_c = hint.clone();
         let pos_c = position_chrome.clone();
+        let tb_c = toolbar.clone();
         click.connect_pressed(move |_, _, x, y| {
+            tb_c.set_visible(false);
             match st_c.mode.get() {
                 Mode::Picking => {
                     let st2 = st_c.clone();
                     let area2 = area_c.clone();
                     let hint2 = hint_c.clone();
                     let pos2 = pos_c.clone();
+                    let tb2 = tb_c.clone();
                     let ox = x;
                     let oy = y;
                     let js = format!(
@@ -275,7 +298,14 @@ impl App {
                                     }
                                 }
                             }
-                            if !used_el {
+                            if used_el {
+                                st2.mode.set(Mode::Region);
+                                hint2.set_visible(false);
+                                if let Some(r) = st2.region.get() {
+                                    pos2(r);
+                                    tb2.set_visible(true);
+                                }
+                            } else {
                                 st2.drag_origin.set(Some((ox, oy)));
                                 st2.region.set(Some(Rect {
                                     x: ox,
@@ -283,11 +313,9 @@ impl App {
                                     w: 0.0,
                                     h: 0.0,
                                 }));
-                            }
-                            st2.mode.set(Mode::Region);
-                            hint2.set_visible(false);
-                            if let Some(r) = st2.region.get() {
-                                pos2(r);
+                                st2.mode.set(Mode::Region);
+                                hint2.set_visible(false);
+                                tb2.set_visible(false);
                             }
                             area2.queue_draw();
                         },
@@ -331,19 +359,26 @@ impl App {
         let st_r = state.clone();
         let area_r = area.clone();
         let pos_r = position_chrome.clone();
+        let tb_r = toolbar.clone();
+        let hint_r = hint.clone();
         click.connect_released(move |_, _, _, _| {
             st_r.drag_origin.set(None);
             st_r.resize_edge.set(None);
             st_r.move_offset.set(None);
             if let Some(r) = st_r.region.get().map(|r| r.normalized()) {
-                if r.w < 4.0 || r.h < 4.0 {
+                if r.w < 10.0 || r.h < 10.0 {
                     st_r.region.set(None);
                     st_r.mode.set(Mode::Picking);
-                    // show hint again handled by caller visibility — leave region none
+                    tb_r.set_visible(false);
+                    hint_r.set_visible(true);
                 } else {
                     st_r.region.set(Some(r));
                     pos_r(r);
+                    tb_r.set_visible(true);
+                    hint_r.set_visible(false);
                 }
+            } else {
+                tb_r.set_visible(false);
             }
             area_r.queue_draw();
         });
@@ -355,6 +390,7 @@ impl App {
         let area_m = area.clone();
         let view_m = view.clone();
         let pos_m = position_chrome.clone();
+        let tb_m = toolbar.clone();
         motion.connect_motion(move |_, x, y| {
             match st_m.mode.get() {
                 Mode::Picking => {
@@ -386,6 +422,12 @@ impl App {
                     );
                 }
                 Mode::Region => {
+                    let is_active_drag = st_m.drag_origin.get().is_some()
+                        || st_m.resize_edge.get().is_some()
+                        || st_m.move_offset.get().is_some();
+                    if is_active_drag {
+                        tb_m.set_visible(false);
+                    }
                     let vh = area_m.height() as f64;
                     let vw = area_m.width() as f64;
                     // Edge auto-scroll while resizing/drawing
@@ -635,15 +677,17 @@ impl App {
         overlay.add_controller(key);
 
         // Mount over the webview's Overlay parent (tab widget)
-        if let Some(p) = view.parent() {
-            if let Some(ov) = p.downcast_ref::<gtk::Overlay>() {
+        let mut attached = false;
+        let mut cur = view.parent();
+        while let Some(w) = cur {
+            if let Some(ov) = w.downcast_ref::<gtk::Overlay>() {
                 ov.add_overlay(&overlay);
-            } else {
-                self.shell.append(&overlay);
-                overlay.set_hexpand(true);
-                overlay.set_vexpand(true);
+                attached = true;
+                break;
             }
-        } else {
+            cur = w.parent();
+        }
+        if !attached {
             self.shell.append(&overlay);
             overlay.set_hexpand(true);
             overlay.set_vexpand(true);

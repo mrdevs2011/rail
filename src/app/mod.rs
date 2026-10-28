@@ -119,6 +119,7 @@ pub(crate) struct App {
     pub(crate) map_state: RefCell<MinimapState>,
     // DevTools Panel (F12 / Alt+Shift+I / Alt+Shift+D)
     pub(crate) devtools_open: Cell<bool>,
+    pub(crate) default_devtools_height: Cell<i32>,
     pub(crate) devtools_dock_side: Cell<DevToolsDockSide>,
     pub(crate) devtools_panel: gtk::Box,
     pub(crate) devtools_content_box: gtk::Box,

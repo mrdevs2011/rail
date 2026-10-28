@@ -163,16 +163,40 @@ impl App {
             } else {
                 view.load_uri(&item.url);
             }
-            let (container, resize_handle, height_handle, freeze) = Self::create_tab_widget(&view);
+            let tw = Self::create_tab_widget(&view);
             if !item.full {
-                container.remove_css_class("full");
+                tw.container.remove_css_class("full");
             }
-            self.setup_tab_signals(&container, &view, &resize_handle, &height_handle);
+            self.setup_tab_signals(
+                &tw.container,
+                &view,
+                &tw.resize_handle,
+                &tw.height_handle,
+                &tw.dt_handle,
+                &tw.dt_box,
+            );
             if lazy {
                 // free the idle web process WebKit may have spawned for the empty view
                 view.terminate_web_process();
             }
-            loaded_tabs.push((item.row, Tab { container, view, freeze, height_handle, profile_id: item.profile_id, custom_width: Cell::new(item.custom_width), custom_height: Cell::new(None), col_id: Cell::new(new_col_id()), saved_uri: RefCell::new(if item.url.starts_with("http") || item.url.starts_with("rail://") { item.url.clone() } else if item.url.is_empty() || item.url.starts_with("about:") { "rail://start/".to_string() } else { String::new() }), suspended: Cell::new(lazy), keep_alive: Cell::new(false), last_active: Cell::new(if lazy { std::time::Instant::now().checked_sub(Duration::from_secs(SUSPEND_AFTER_SECS + 1)).unwrap_or_else(std::time::Instant::now) } else { std::time::Instant::now() }) }));
+            loaded_tabs.push((item.row, Tab {
+                container: tw.container,
+                view,
+                freeze: tw.freeze,
+                height_handle: tw.height_handle,
+                profile_id: item.profile_id,
+                custom_width: Cell::new(item.custom_width),
+                custom_height: Cell::new(None),
+                col_id: Cell::new(new_col_id()),
+                saved_uri: RefCell::new(if item.url.starts_with("http") || item.url.starts_with("rail://") { item.url.clone() } else if item.url.is_empty() || item.url.starts_with("about:") { "rail://start/".to_string() } else { String::new() }),
+                suspended: Cell::new(lazy),
+                keep_alive: Cell::new(false),
+                last_active: Cell::new(if lazy { std::time::Instant::now().checked_sub(Duration::from_secs(SUSPEND_AFTER_SECS + 1)).unwrap_or_else(std::time::Instant::now) } else { std::time::Instant::now() }),
+                dt_box: tw.dt_box,
+                dt_handle: tw.dt_handle,
+                dt_open: Cell::new(false),
+                dt_height: Cell::new(self.default_devtools_height.get()),
+            }));
         }
 
         let mut rows = self.rows.borrow_mut();
