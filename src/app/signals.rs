@@ -151,15 +151,24 @@ impl App {
                 if let Some(v) = view_weak.upgrade() {
                     app_insp.show_view_devtools(&v);
                 }
-                true
+                false
             });
             let app_detach = self.clone();
             let v_detach = view.downgrade();
             insp.connect_detach(move |_| {
                 if let Some(v) = v_detach.upgrade() {
-                    app_detach.show_view_devtools(&v);
+                    let Some((r, c)) = app_detach.find_view_coords(&v) else { return false };
+                    let rows = app_detach.rows.borrow();
+                    if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) {
+                        tab.dt_open.set(false);
+                        tab.dt_box.set_visible(false);
+                        tab.dt_handle.set_visible(false);
+                        while let Some(ch) = tab.dt_box.first_child() {
+                            tab.dt_box.remove(&ch);
+                        }
+                    }
                 }
-                true
+                false
             });
             let app_attach = self.clone();
             let v_attach = view.downgrade();
@@ -180,7 +189,9 @@ impl App {
             let v_front = view.downgrade();
             insp.connect_bring_to_front(move |_| {
                 if let Some(v) = v_front.upgrade() {
-                    app_front.show_view_devtools(&v);
+                    if let Some((r, c)) = app_front.find_view_coords(&v) {
+                        app_front.focus_coords(r, c);
+                    }
                 }
                 true
             });
@@ -334,29 +345,16 @@ impl App {
         });
         let app = self.clone();
         view.connect_create(move |v, nav| {
-            // Chrome/Brave parity: plain left-click navigates in the same tab.
-            // Only middle-click, Ctrl/Cmd+click, or scripted window.open() open a new tab.
-            let btn = nav.mouse_button();
-            let mods = gdk::ModifierType::from_bits_truncate(nav.modifiers());
-            let want_new = btn == 2
-                || mods.contains(gdk::ModifierType::CONTROL_MASK)
-                || mods.contains(gdk::ModifierType::META_MASK)
-                || (btn == 0 && nav.is_user_gesture());
-
-            if !want_new {
-                if let Some(req) = nav.request() {
-                    if let Some(uri) = req.uri() {
-                        let u = uri.to_string();
-                        if !u.is_empty() && u != "about:blank" {
-                            v.load_uri(&u);
-                        }
-                    }
-                }
-                return None;
-            }
-
             let parent_prof = app.find_view_profile(v).unwrap_or_else(|| app.profiles.borrow().active_profile().id);
             let nv = WebView::builder().related_view(v).build();
+            if let Some(req) = nav.request() {
+                if let Some(uri) = req.uri() {
+                    let u = uri.to_string();
+                    if !u.is_empty() && u != "about:blank" {
+                        app.set_view_saved_uri(&nv, &u);
+                    }
+                }
+            }
             app.add_view(nv.clone(), parent_prof, false);
             app.mark_keep_alive(v);
             app.mark_keep_alive(&nv);

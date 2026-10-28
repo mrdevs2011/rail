@@ -39,6 +39,17 @@ impl App {
     }
 
     pub(crate) fn show_view_devtools(&self, view: &WebView) {
+        if IN_SHOW_DEVTOOLS.with(|f| f.replace(true)) {
+            return;
+        }
+        struct Guard;
+        impl Drop for Guard {
+            fn drop(&mut self) {
+                IN_SHOW_DEVTOOLS.with(|f| f.set(false));
+            }
+        }
+        let _guard = Guard;
+
         let Some((r, c)) = self.find_view_coords(view) else { return };
         let rows = self.rows.borrow();
         let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) else { return };
@@ -90,6 +101,9 @@ impl App {
         tab.dt_open.set(false);
         tab.dt_box.set_visible(false);
         tab.dt_handle.set_visible(false);
+        while let Some(ch) = tab.dt_box.first_child() {
+            tab.dt_box.remove(&ch);
+        }
         if let Some(insp) = view.inspector() {
             insp.close();
         }
