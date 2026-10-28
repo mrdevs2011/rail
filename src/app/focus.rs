@@ -306,6 +306,7 @@ impl App {
         if focused_is_settings {
             self.settings_modal.queue_resize();
             self.settings_stack.queue_resize();
+            self.sync_settings_responsive();
         }
     }
 

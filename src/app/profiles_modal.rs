@@ -151,11 +151,15 @@ impl App {
             let name_lbl = gtk::Label::new(Some(&p.display_name()));
             name_lbl.add_css_class("profile-card-name");
             name_lbl.set_xalign(0.0);
+            name_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            name_lbl.set_wrap(false);
 
             let sub_text = trf("@{} - isolated storage", &[&p.id]);
             let sub_lbl = gtk::Label::new(Some(&sub_text));
             sub_lbl.add_css_class("profile-card-sub");
             sub_lbl.set_xalign(0.0);
+            sub_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            sub_lbl.set_wrap(false);
 
             info_box.append(&name_lbl);
             info_box.append(&sub_lbl);

@@ -261,7 +261,7 @@ pub(crate) fn build_data_page(settings_stack: &gtk::Stack) -> DataPage {
     page_data.append(&data_modal_status_lbl);
 
     let page_data_scroll = gtk::ScrolledWindow::new();
-    page_data_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_data_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     page_data_scroll.set_child(Some(&page_data));
     settings_stack.add_named(&page_data_scroll, Some("data"));
 

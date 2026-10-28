@@ -1153,24 +1153,31 @@ button.color-choice.selected {
     margin: 0;
 }
 /* desktop / tablet / mobile breakpoints for settings layout */
-.settings-modal.responsive-narrow .settings-body {
-    flex-direction: column;
+.settings-sidebar-scroll {
+    background: #090909;
+}
+.settings-modal.responsive-narrow .settings-sidebar-scroll {
+    border-bottom: 1px solid #151515;
+    border-right: none;
+    min-height: 48px;
+    max-height: 52px;
 }
 .settings-modal.responsive-narrow .settings-sidebar {
     border-right: none;
-    border-bottom: 1px solid #151515;
+    border-bottom: none;
     min-width: 0;
-    flex-direction: row;
-    flex-wrap: wrap;
-    padding: 8px;
-    max-height: none;
+    padding: 6px 8px;
 }
 .settings-modal.responsive-narrow .settings-tab-btn {
-    margin: 2px;
-    padding: 8px 10px;
+    margin: 0 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+}
+.settings-modal.responsive-narrow .settings-tab-btn.active {
+    box-shadow: inset 0 -2px 0 0 #ededed;
 }
 .settings-modal.responsive-narrow .settings-content-page {
-    padding: 14px 16px;
+    padding: 12px 14px;
 }
 .settings-header {
     background: #0e0e0e;

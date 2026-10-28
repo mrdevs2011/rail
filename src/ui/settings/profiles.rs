@@ -42,7 +42,9 @@ pub(crate) fn build_profiles_page(settings_stack: &gtk::Stack) -> ProfilesPage {
     add_prof_btn.set_valign(gtk::Align::Center);
 
     let color_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    color_box.add_css_class("color-choice-box");
     color_box.set_valign(gtk::Align::Center);
+    color_box.set_hexpand(true);
     let mut color_btns = Vec::new();
     let new_profile_color_idx = Cell::new(0usize);
 
@@ -60,6 +62,7 @@ pub(crate) fn build_profiles_page(settings_stack: &gtk::Stack) -> ProfilesPage {
     }
 
     let create_bottom_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    create_bottom_row.add_css_class("profile-create-bottom");
     create_bottom_row.set_margin_top(4);
     create_bottom_row.append(&color_box);
     let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -77,6 +80,7 @@ pub(crate) fn build_profiles_page(settings_stack: &gtk::Stack) -> ProfilesPage {
     sc_bind_text(&prof_page_subtitle, "Isolated workspaces, sessions & cookie storage  (Alt+P)", &["profiles"]);
     prof_page_subtitle.add_css_class("settings-page-subtitle");
     prof_page_subtitle.set_xalign(0.0);
+    prof_page_subtitle.set_wrap(true);
 
     page_profiles.append(&prof_page_title);
     page_profiles.append(&prof_page_subtitle);
@@ -88,7 +92,7 @@ pub(crate) fn build_profiles_page(settings_stack: &gtk::Stack) -> ProfilesPage {
     page_profiles.append(&create_bottom_row);
 
     let page_prof_scroll = gtk::ScrolledWindow::new();
-    page_prof_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_prof_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     page_prof_scroll.set_vexpand(true);
     page_prof_scroll.set_hexpand(true);
     page_prof_scroll.set_child(Some(&page_profiles));

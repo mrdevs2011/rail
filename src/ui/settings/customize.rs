@@ -72,7 +72,7 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
 
     let sc_rows = gtk::Box::new(gtk::Orientation::Vertical, 2);
     let sc_scroll = gtk::ScrolledWindow::new();
-    sc_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    sc_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     sc_scroll.set_vexpand(true);
     sc_scroll.set_min_content_height(260);
     sc_scroll.set_child(Some(&sc_rows));

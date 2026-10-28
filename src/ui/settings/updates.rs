@@ -137,7 +137,7 @@ pub(crate) fn build_updates_page(settings_stack: &gtk::Stack) {
     page_update.append(&update_card);
 
     let page_update_scroll = gtk::ScrolledWindow::new();
-    page_update_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_update_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     page_update_scroll.set_child(Some(&page_update));
     settings_stack.add_named(&page_update_scroll, Some("update"));
 

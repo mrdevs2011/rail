@@ -118,8 +118,14 @@ pub(crate) fn build(gapp: &gtk::Application) {
     sidebar_spacer.set_vexpand(true);
     settings_sidebar.append(&sidebar_spacer);
 
+    let settings_sidebar_scroll = gtk::ScrolledWindow::new();
+    settings_sidebar_scroll.add_css_class("settings-sidebar-scroll");
+    settings_sidebar_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    settings_sidebar_scroll.set_child(Some(&settings_sidebar));
+    settings_sidebar_scroll.set_vexpand(true);
+
     // Settings is a tab — no "Esc to close" hint
-    settings_body.append(&settings_sidebar);
+    settings_body.append(&settings_sidebar_scroll);
     settings_body.append(&settings_stack);
     settings_modal.append(&settings_body);
 
@@ -238,6 +244,9 @@ pub(crate) fn build(gapp: &gtk::Application) {
         devtools_url_lbl: devtools_url_lbl.clone(),
         devtools_window: RefCell::new(None),
         settings_modal: settings_modal.clone(),
+        settings_body: settings_body.clone(),
+        settings_sidebar: settings_sidebar.clone(),
+        settings_sidebar_scroll: settings_sidebar_scroll.clone(),
         settings_stack: settings_stack.clone(),
         settings_tab_buttons: RefCell::new(tab_buttons_vec.clone()),
         current_settings_tab: Cell::new(SettingsTab::General),
@@ -256,6 +265,9 @@ pub(crate) fn build(gapp: &gtk::Application) {
         a.reveal_focus();
         if a.palette_open() {
             a.update_palette_size();
+        }
+        if a.settings_modal_open() {
+            a.sync_settings_responsive();
         }
     });
 

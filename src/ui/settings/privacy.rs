@@ -13,6 +13,7 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     let priv_subtitle = gtk::Label::new(Some(tr("Container isolation and network leak prevention")));
     priv_subtitle.add_css_class("settings-page-subtitle");
     priv_subtitle.set_xalign(0.0);
+    priv_subtitle.set_wrap(true);
     page_privacy.append(&priv_title);
     page_privacy.append(&priv_subtitle);
 
@@ -41,6 +42,7 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     webrtc_lbl.add_css_class("shortcut-desc");
     webrtc_lbl.set_hexpand(true);
     webrtc_lbl.set_xalign(0.0);
+    webrtc_lbl.set_wrap(true);
     let webrtc_switch = gtk::Switch::new();
     webrtc_switch.set_active(true);
     webrtc_switch.set_valign(gtk::Align::Center);
@@ -53,6 +55,7 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     dns_lbl.add_css_class("shortcut-desc");
     dns_lbl.set_hexpand(true);
     dns_lbl.set_xalign(0.0);
+    dns_lbl.set_wrap(true);
     let dns_badge = gtk::Label::new(Some(tr("Shielded")));
     dns_badge.add_css_class("shortcut-kbd");
     dns_row.append(&dns_lbl);
@@ -64,6 +67,7 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     ping_lbl.add_css_class("shortcut-desc");
     ping_lbl.set_hexpand(true);
     ping_lbl.set_xalign(0.0);
+    ping_lbl.set_wrap(true);
     let ping_badge = gtk::Label::new(Some(tr("Blocked")));
     ping_badge.add_css_class("shortcut-kbd");
     ping_row.append(&ping_lbl);
@@ -73,7 +77,7 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     page_privacy.append(&leak_card);
 
     let page_priv_scroll = gtk::ScrolledWindow::new();
-    page_priv_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_priv_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     page_priv_scroll.set_child(Some(&page_privacy));
     settings_stack.add_named(&page_priv_scroll, Some("privacy"));
 }

@@ -18,6 +18,7 @@ pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
     let gen_subtitle = gtk::Label::new(Some(tr("Configure default search engine, new tab behavior, and browsing controls")));
     gen_subtitle.add_css_class("settings-page-subtitle");
     gen_subtitle.set_xalign(0.0);
+    gen_subtitle.set_wrap(true);
     page_general.append(&gen_title);
     page_general.append(&gen_subtitle);
 
@@ -31,6 +32,7 @@ pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
     sc_bind_text(&engine_desc, "Applied when searching via the Omnibar (Ctrl+T / Ctrl+L)", &["new_tab", "focus_url"]);
     engine_desc.add_css_class("settings-card-desc");
     engine_desc.set_xalign(0.0);
+    engine_desc.set_wrap(true);
     engine_card.append(&engine_title);
     engine_card.append(&engine_desc);
 
@@ -211,7 +213,7 @@ pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
     page_general.append(&browse_card);
 
     let page_gen_scroll = gtk::ScrolledWindow::new();
-    page_gen_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_gen_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     page_gen_scroll.set_child(Some(&page_general));
     settings_stack.add_named(&page_gen_scroll, Some("general"));
 

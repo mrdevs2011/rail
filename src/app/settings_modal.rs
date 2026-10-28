@@ -61,12 +61,7 @@ impl App {
         }
 
         // Responsive: narrow windows get stacked sidebar (tablet/mobile)
-        let w = self.win.width();
-        if w > 0 && w < 900 {
-            self.settings_modal.add_css_class("responsive-narrow");
-        } else {
-            self.settings_modal.remove_css_class("responsive-narrow");
-        }
+        self.sync_settings_responsive();
 
         // Settings page: new tab unless focused tab is already any rail://settings*
         let settings_uri = settings_uri_for_tab(tab);
@@ -211,5 +206,26 @@ impl App {
             &[&dir.display().to_string(), &total_tabs.to_string(), &ws_count.to_string(), &prof_count.to_string()],
         );
         self.data_modal_info_lbl.set_text(&info_text);
+    }
+
+    pub(crate) fn sync_settings_responsive(&self) {
+        let w = self.settings_modal.width();
+        let w = if w > 0 { w } else { self.win.width() };
+        let is_narrow = w > 0 && w < 720;
+        if is_narrow {
+            self.settings_modal.add_css_class("responsive-narrow");
+            self.settings_body.set_orientation(gtk::Orientation::Vertical);
+            self.settings_sidebar.set_orientation(gtk::Orientation::Horizontal);
+            self.settings_sidebar_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Never);
+            self.settings_sidebar_scroll.set_hexpand(true);
+            self.settings_sidebar_scroll.set_vexpand(false);
+        } else {
+            self.settings_modal.remove_css_class("responsive-narrow");
+            self.settings_body.set_orientation(gtk::Orientation::Horizontal);
+            self.settings_sidebar.set_orientation(gtk::Orientation::Vertical);
+            self.settings_sidebar_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+            self.settings_sidebar_scroll.set_hexpand(false);
+            self.settings_sidebar_scroll.set_vexpand(true);
+        }
     }
 }

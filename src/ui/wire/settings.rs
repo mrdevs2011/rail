@@ -208,4 +208,13 @@ pub(crate) fn wire_settings(app: &Rc<App>, add_prof_btn: gtk::Button, btn_clear_
             }
         });
     }
+
+    {
+        let a = app.clone();
+        win.connect_default_width_notify(move |_| {
+            if a.settings_modal_open() {
+                a.sync_settings_responsive();
+            }
+        });
+    }
 }

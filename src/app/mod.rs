@@ -125,6 +125,9 @@ pub(crate) struct App {
     pub(crate) devtools_window: RefCell<Option<gtk::Window>>,
     // Floating Settings Panel (Alt+Shift+S / Alt+P / Alt+I)
     pub(crate) settings_modal: gtk::Box,
+    pub(crate) settings_body: gtk::Box,
+    pub(crate) settings_sidebar: gtk::Box,
+    pub(crate) settings_sidebar_scroll: gtk::ScrolledWindow,
     pub(crate) settings_stack: gtk::Stack,
     pub(crate) settings_tab_buttons: RefCell<Vec<(SettingsTab, gtk::Button)>>,
     pub(crate) current_settings_tab: Cell<SettingsTab>,

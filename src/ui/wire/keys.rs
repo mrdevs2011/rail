@@ -40,6 +40,15 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
             }
         }
 
+        // WebKit DevTools (Web Inspector): Ctrl+Shift+I or F12
+        // Intercept right here in capture phase and stop propagation so GTK Inspector never opens!
+        if (ctrl && state.contains(M::SHIFT_MASK) && !alt && (key == gdk::Key::i || key == gdk::Key::I || keycode == 31))
+            || (!ctrl && !state.contains(M::SHIFT_MASK) && !alt && key == gdk::Key::F12)
+        {
+            a.toggle_devtools();
+            return glib::Propagation::Stop;
+        }
+
         let combo = shortcut_combo(key, keycode, state);
         let handled = match combo.as_deref().map(sc_resolve) {
             Some(ScResolve::Action(def_combo)) => {

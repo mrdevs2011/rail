@@ -13,6 +13,7 @@ pub(crate) fn build_about_page(settings_stack: &gtk::Stack) {
     let about_subtitle = gtk::Label::new(Some(tr("High-performance native browser engineered in Rust")));
     about_subtitle.add_css_class("settings-page-subtitle");
     about_subtitle.set_xalign(0.0);
+    about_subtitle.set_wrap(true);
     page_about.append(&about_title);
     page_about.append(&about_subtitle);
 
@@ -44,8 +45,10 @@ pub(crate) fn build_about_page(settings_stack: &gtk::Stack) {
         k.add_css_class("shortcut-desc");
         k.set_xalign(0.0);
         k.set_hexpand(true);
+        k.set_wrap(true);
         let v = gtk::Label::new(Some(v_txt));
         v.add_css_class("shortcut-kbd");
+        v.set_wrap(true);
         row.append(&k);
         row.append(&v);
         about_card.append(&row);
@@ -53,7 +56,7 @@ pub(crate) fn build_about_page(settings_stack: &gtk::Stack) {
     page_about.append(&about_card);
 
     let page_about_scroll = gtk::ScrolledWindow::new();
-    page_about_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    page_about_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     page_about_scroll.set_child(Some(&page_about));
     settings_stack.add_named(&page_about_scroll, Some("about"));
 }

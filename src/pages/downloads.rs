@@ -90,8 +90,10 @@ pub(crate) fn downloads_page() -> String {
             };
             html.push_str(&format!(
                 r#"<div class="dl-row">
-  <div class="dl-name">{fname}</div>
-  <div class="dl-meta">{size} · <span class="{cls}">{status}</span></div>
+  <div class="dl-header">
+    <div class="dl-name">{fname}</div>
+    <div class="dl-meta">{size} · <span class="{cls}">{status}</span></div>
+  </div>
   <div class="dl-bar"><div class="dl-fill" style="width:{pct}%"></div></div>
   <div class="dl-url">{url}</div>
 </div>"#,
@@ -115,31 +117,102 @@ r#"<!doctype html>
 <style>
   * {{ box-sizing: border-box; }}
   body {{
-    margin: 0; padding: 32px 28px 48px;
-    background: #000000; color: #e8e8e8;
+    margin: 0;
+    padding: clamp(16px, 4vw, 36px) clamp(14px, 4vw, 32px);
+    background: #000000;
+    color: #e8e8e8;
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', ui-monospace, monospace;
+    display: flex;
+    justify-content: center;
   }}
-  h1 {{ font-size: 22px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em; }}
-  .sub {{ color: #737373; font-size: 12px; margin-bottom: 22px; }}
-  .empty {{ color: #666; padding: 40px 0; text-align: center; font-size: 13px; }}
+  .container {{
+    width: 100%;
+    max-width: 860px;
+  }}
+  h1 {{
+    font-size: clamp(18px, 4vw, 24px);
+    font-weight: 700;
+    margin: 0 0 6px;
+    letter-spacing: -0.02em;
+    color: #fafafa;
+  }}
+  .sub {{
+    color: #737373;
+    font-size: clamp(10.5px, 2.5vw, 12px);
+    margin-bottom: 22px;
+    word-break: break-word;
+  }}
+  .empty {{
+    color: #666;
+    padding: 60px 16px;
+    text-align: center;
+    font-size: 13px;
+    border: 1px dashed #1c1c1c;
+    border-radius: 4px;
+  }}
   .dl-row {{
-    border: 1px solid #1a1a1a; background: #111; border-radius: 0;
-    padding: 12px 14px; margin-bottom: 10px;
+    border: 1px solid #1a1a1a;
+    background: #0e0e0e;
+    border-radius: 4px;
+    padding: clamp(10px, 3vw, 14px) clamp(12px, 3vw, 16px);
+    margin-bottom: 10px;
+    transition: border-color 120ms ease;
   }}
-  .dl-name {{ font-size: 13px; font-weight: 600; color: #f4f4f4; }}
-  .dl-meta {{ font-size: 11px; color: #888; margin-top: 4px; }}
-  .dl-meta .ok {{ color: #4ade80; }}
-  .dl-meta .err {{ color: #f87171; }}
-  .dl-meta .run {{ color: #93b4ff; }}
-  .dl-bar {{ height: 3px; background: #1a1a1a; border-radius: 2px; margin-top: 8px; overflow: hidden; }}
-  .dl-fill {{ height: 100%; background: #2f6bff; }}
-  .dl-url {{ font-size: 10px; color: #555; margin-top: 6px; word-break: break-all; }}
+  .dl-row:hover {{
+    border-color: #2c2c2c;
+  }}
+  .dl-header {{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px;
+  }}
+  .dl-name {{
+    font-size: clamp(12.5px, 2.8vw, 13.5px);
+    font-weight: 600;
+    color: #f4f4f4;
+    word-break: break-word;
+  }}
+  .dl-meta {{
+    font-size: clamp(10.5px, 2.4vw, 11.5px);
+    color: #888;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+  }}
+  .dl-meta .ok {{ color: #4ade80; font-weight: 600; }}
+  .dl-meta .err {{ color: #f87171; font-weight: 600; }}
+  .dl-meta .run {{ color: #38bdf8; font-weight: 600; }}
+  .dl-bar {{
+    height: 4px;
+    background: #181818;
+    border-radius: 2px;
+    margin-top: 10px;
+    overflow: hidden;
+  }}
+  .dl-fill {{
+    height: 100%;
+    background: #38bdf8;
+    border-radius: 2px;
+    transition: width 150ms ease;
+  }}
+  .dl-url {{
+    font-size: clamp(9.5px, 2.2vw, 10.5px);
+    color: #525252;
+    margin-top: 6px;
+    word-break: break-all;
+  }}
 </style>
 </head>
 <body>
-  <h1>{title}</h1>
-  <div class="sub">rail://downloads · {hint}</div>
-  {rows}
+  <div class="container">
+    <h1>{title}</h1>
+    <div class="sub">rail://downloads · {hint}</div>
+    {rows}
+  </div>
 </body>
 </html>"#,
         lang = i18n::current().code(),

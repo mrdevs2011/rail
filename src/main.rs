@@ -209,6 +209,17 @@ fn main() -> glib::ExitCode {
         .application_id(app_id.as_str())
         .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE)
         .build();
+
+    // Disable GTK Inspector default shortcut (Ctrl+Shift+I) so it never intercepts Rail's WebKit DevTools
+    if let Some(source) = gio::SettingsSchemaSource::default() {
+        for schema in ["org.gtk.gtk4.Settings.Debug", "org.gtk.Settings.Debug"] {
+            if source.lookup(schema, true).is_some() {
+                let settings = gio::Settings::new(schema);
+                let _ = settings.set_boolean("enable-inspector-keybinding", false);
+            }
+        }
+    }
+
     app.connect_activate(build);
     app.connect_command_line(|gapp, cmdline| {
         let args: Vec<String> = cmdline.arguments().iter().map(|a| a.to_string_lossy().into_owned()).collect();
