@@ -421,6 +421,12 @@ impl App {
         self.brand_logo.set_reveal_child(true);
     }
     pub(crate) fn cycle_sidebar_mode(self: &Rc<Self>) {
+        if let Some(source) = self.side_open_timer.borrow_mut().take() {
+            source.remove();
+        }
+        if let Some(source) = self.side_close_timer.borrow_mut().take() {
+            source.remove();
+        }
         let auto = !self.sidebar_auto.get();
         self.sidebar_auto.set(auto);
         self.shell_layout.set_overlay(auto);
@@ -428,7 +434,7 @@ impl App {
         s.sidebar_mode = if auto { "auto".into() } else { "fixed".into() };
         save_app_settings(&s);
         if auto {
-            // auto: hide until edge hover
+            // auto: hide until intentional edge hover
             self.set_sidebar(false);
         } else {
             self.set_sidebar(true);
@@ -440,25 +446,88 @@ impl App {
         if !self.sidebar_auto.get() {
             return;
         }
-        // Left edge strip: generous 28px zone for fast flick / window gap; past SIDE_W closes.
-        if x <= 28.0 {
-            if !self.side_open.get() {
-                self.set_sidebar(true);
+
+        // Cancel pending close if pointer is back inside or near sidebar
+        if x <= (SIDE_W as f64) + 16.0 {
+            if let Some(source) = self.side_close_timer.borrow_mut().take() {
+                source.remove();
             }
-        } else if x > (SIDE_W as f64) {
-            if self.side_open.get() {
-                self.set_sidebar(false);
+        }
+
+        if !self.side_open.get() {
+            // Sidebar is closed.
+            // Only initiate opening if cursor is at the extreme left edge (x <= 5.0).
+            // A short dwell (160ms) ensures casual sweeps across the edge do not flap open.
+            if x <= 5.0 {
+                if self.side_open_timer.borrow().is_none() {
+                    let app = self.clone();
+                    let source = glib::timeout_add_local_once(
+                        Duration::from_millis(160),
+                        move || {
+                            app.side_open_timer.borrow_mut().take();
+                            if app.sidebar_auto.get() && !app.side_open.get() {
+                                app.set_sidebar(true);
+                            }
+                        },
+                    );
+                    *self.side_open_timer.borrow_mut() = Some(source);
+                }
+            } else {
+                // Moved away from the extreme edge before dwell completed: cancel immediately
+                if let Some(source) = self.side_open_timer.borrow_mut().take() {
+                    source.remove();
+                }
+            }
+        } else {
+            // Sidebar is open.
+            // If pointer moves past sidebar width plus grace margin, start debounce close timer.
+            if x > (SIDE_W as f64) + 24.0 {
+                if self.side_close_timer.borrow().is_none() {
+                    let app = self.clone();
+                    let source = glib::timeout_add_local_once(
+                        Duration::from_millis(200),
+                        move || {
+                            app.side_close_timer.borrow_mut().take();
+                            if app.sidebar_auto.get() && app.side_open.get() {
+                                app.set_sidebar(false);
+                            }
+                        },
+                    );
+                    *self.side_close_timer.borrow_mut() = Some(source);
+                }
             }
         }
     }
 
     pub(crate) fn on_shell_pointer_leave(self: &Rc<Self>, last_x: f64) {
-        if !self.sidebar_auto.get() || !self.side_open.get() {
+        if !self.sidebar_auto.get() {
             return;
         }
-        // If cursor left anywhere to the right of the extreme left edge, close immediately.
+        // Cancel pending open dwell if cursor leaves the window
+        if let Some(source) = self.side_open_timer.borrow_mut().take() {
+            source.remove();
+        }
+
+        if !self.side_open.get() {
+            return;
+        }
+
+        // Pointer left the window: give a short grace period (160ms) before closing
+        // so quick flicks to window borders don't abruptly snap the sidebar away.
         if last_x > 4.0 {
-            self.set_sidebar(false);
+            if self.side_close_timer.borrow().is_none() {
+                let app = self.clone();
+                let source = glib::timeout_add_local_once(
+                    Duration::from_millis(160),
+                    move || {
+                        app.side_close_timer.borrow_mut().take();
+                        if app.sidebar_auto.get() && app.side_open.get() {
+                            app.set_sidebar(false);
+                        }
+                    },
+                );
+                *self.side_close_timer.borrow_mut() = Some(source);
+            }
         }
     }
 
@@ -492,6 +561,15 @@ impl App {
     }
 
     pub(crate) fn set_sidebar(self: &Rc<Self>, open: bool) {
+        if open {
+            if let Some(source) = self.side_close_timer.borrow_mut().take() {
+                source.remove();
+            }
+        } else {
+            if let Some(source) = self.side_open_timer.borrow_mut().take() {
+                source.remove();
+            }
+        }
         self.side_open.set(open);
         self.schedule_save_session();
         if self.win.is_fullscreen() {

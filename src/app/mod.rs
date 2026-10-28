@@ -87,6 +87,8 @@ pub(crate) struct App {
     /// true = edge-hover auto mode; false = fixed (Claude-style always visible when open).
     pub(crate) sidebar_auto: Cell<bool>,
     pub(crate) side_gen: Cell<u32>,
+    pub(crate) side_open_timer: RefCell<Option<glib::SourceId>>,
+    pub(crate) side_close_timer: RefCell<Option<glib::SourceId>>,
     /// A just-created tab that has never navigated; Esc discards it.
     pub(crate) fresh: RefCell<Option<WebView>>,
     // Profiles

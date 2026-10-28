@@ -216,6 +216,8 @@ pub(crate) fn build(gapp: &gtk::Application) {
         side_open: Cell::new(true),
         sidebar_auto: Cell::new(load_app_settings().sidebar_mode == "auto"),
         side_gen: Cell::new(0),
+        side_open_timer: RefCell::new(None),
+        side_close_timer: RefCell::new(None),
         fresh: RefCell::new(None),
         profiles: RefCell::new(profile_mgr),
         selected_palette_profile: RefCell::new(initial_prof_id.clone()),
