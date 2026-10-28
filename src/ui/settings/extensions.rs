@@ -2,7 +2,7 @@
 //!
 //! Manage unpacked / local Chrome and WebExtension add-ons.
 
-use crate::extensions::{self, register_unpacked_extension, remove_extension, toggle_extension};
+use crate::extensions::{self, register_unpacked_extension, register_unpacked_or_archive, remove_extension, toggle_extension};
 use crate::*;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -120,12 +120,14 @@ pub(crate) fn build_extensions_page(settings_stack: &gtk::Stack, win: gtk::Appli
     page_ext.append(&title);
     page_ext.append(&subtitle);
 
-    // Top action card: Load unpacked extension
-    let action_card = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    // Top action card: Load unpacked extension / .zip / .crx
+    let action_card = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     action_card.add_css_class("settings-card");
 
-    let btn_load = gtk::Button::with_label(tr("Load unpacked extension"));
+    let btn_load = gtk::Button::with_label(tr("Load unpacked folder"));
     btn_load.add_css_class("suggested-action");
+
+    let btn_zip = gtk::Button::with_label(tr("Install .zip / .crx"));
 
     let status_lbl = gtk::Label::new(None);
     status_lbl.add_css_class("shortcut-desc");
@@ -133,6 +135,7 @@ pub(crate) fn build_extensions_page(settings_stack: &gtk::Stack, win: gtk::Appli
     status_lbl.set_xalign(0.0);
 
     action_card.append(&btn_load);
+    action_card.append(&btn_zip);
     action_card.append(&status_lbl);
     page_ext.append(&action_card);
 
@@ -169,6 +172,45 @@ pub(crate) fn build_extensions_page(settings_stack: &gtk::Stack, win: gtk::Appli
                 Ok(file) => {
                     if let Some(path) = file.path() {
                         match register_unpacked_extension(&path) {
+                            Ok(ext) => {
+                                status.set_text(&format!("{}: {}!", ext.name, tr("Saved")));
+                                refresh();
+                            }
+                            Err(e) => {
+                                status.set_text(&format!("Error: {e}"));
+                            }
+                        }
+                    }
+                }
+                Err(_) => {}
+            }
+        });
+    });
+
+    // Wire Install .zip / .crx button
+    let win_weak_zip = win.downgrade();
+    let status_zip = status_lbl.clone();
+    let refresh_zip = Rc::clone(&refresh_fn);
+    btn_zip.connect_clicked(move |_| {
+        let Some(w) = win_weak_zip.upgrade() else { return };
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some("Extension Packages (*.zip, *.crx)"));
+        filter.add_pattern("*.zip");
+        filter.add_pattern("*.crx");
+        let filters = gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+
+        let dialog = gtk::FileDialog::builder()
+            .title(tr("Select .zip or .crx extension archive"))
+            .filters(&filters)
+            .build();
+        let status = status_zip.clone();
+        let refresh = Rc::clone(&refresh_zip);
+        dialog.open(Some(&w), gio::Cancellable::NONE, move |res| {
+            match res {
+                Ok(file) => {
+                    if let Some(path) = file.path() {
+                        match register_unpacked_or_archive(&path) {
                             Ok(ext) => {
                                 status.set_text(&format!("{}: {}!", ext.name, tr("Saved")));
                                 refresh();
