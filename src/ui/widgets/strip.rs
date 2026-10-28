@@ -34,8 +34,8 @@ pub(crate) fn build_strip(side: gtk::Box) -> StripWidgets {
     shell.set_overflow(gtk::Overflow::Hidden);
     shell.set_hexpand(true);
     shell.set_vexpand(true);
-    shell.append(&side);
     shell.append(&strip_host);
+    shell.append(&side);
 
     StripWidgets { layout, shell, shell_layout, strip, strip_host }
 }

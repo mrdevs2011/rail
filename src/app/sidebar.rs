@@ -423,6 +423,7 @@ impl App {
     pub(crate) fn cycle_sidebar_mode(self: &Rc<Self>) {
         let auto = !self.sidebar_auto.get();
         self.sidebar_auto.set(auto);
+        self.shell_layout.set_overlay(auto);
         let mut s = load_app_settings();
         s.sidebar_mode = if auto { "auto".into() } else { "fixed".into() };
         save_app_settings(&s);
@@ -439,12 +440,12 @@ impl App {
         if !self.sidebar_auto.get() {
             return;
         }
-        // Left edge strip ~16px opens (comfortable for fast swipe / gaps); past SIDE_W + margin closes.
-        if x <= 16.0 {
+        // Left edge strip: generous 28px zone for fast flick / window gap; past SIDE_W + margin closes.
+        if x <= 28.0 {
             if !self.side_open.get() {
                 self.set_sidebar(true);
             }
-        } else if x > (SIDE_W as f64 + 24.0) {
+        } else if x > (SIDE_W as f64 + 28.0) {
             if self.side_open.get() {
                 self.set_sidebar(false);
             }
@@ -458,7 +459,7 @@ impl App {
         // If cursor left on the left side (at or outside the left window edge / Niri gap),
         // do NOT close the sidebar so the user can reach the monitor wall without it collapsing.
         // Only close if cursor explicitly moved away to the right (past sidebar area).
-        if last_x > (SIDE_W as f64 + 24.0) {
+        if last_x > (SIDE_W as f64 + 28.0) {
             self.set_sidebar(false);
         }
     }

@@ -37,27 +37,40 @@ pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
     engine_card.append(&engine_desc);
 
     let initial_settings = load_app_settings();
-    let initial_engine = initial_settings.search_engine.clone();
+    let initial_engine = canonical_search_engine(&initial_settings.search_engine);
 
-    let engines_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    let engine_choices = [
-        ("google", "Google"),
-        ("duckduckgo", "DuckDuckGo"),
-        ("brave", "Brave"),
-        ("bing", "Bing"),
-        ("ecosia", "Ecosia"),
-    ];
+    let engines_flow = gtk::FlowBox::new();
+    engines_flow.set_selection_mode(gtk::SelectionMode::None);
+    engines_flow.set_max_children_per_line(5);
+    engines_flow.set_min_children_per_line(1);
+    engines_flow.set_row_spacing(8);
+    engines_flow.set_column_spacing(8);
+    engines_flow.set_homogeneous(true);
+    engines_flow.add_css_class("settings-engines-flow");
+
     let mut engine_buttons: Vec<(String, gtk::Button)> = Vec::new();
-    for (id, label) in engine_choices {
-        let btn = gtk::Button::with_label(label);
-        btn.add_css_class("settings-option-item");
+    for &(id, label, _) in SEARCH_ENGINE_LIST {
+        let btn = gtk::Button::new();
+        btn.add_css_class("settings-engine-btn");
+        let btn_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        btn_box.set_halign(gtk::Align::Center);
+        btn_box.set_valign(gtk::Align::Center);
+        let icon = load_search_engine_icon(id, 18);
+        icon.add_css_class("settings-engine-icon");
+        let lbl = gtk::Label::new(Some(label));
+        lbl.add_css_class("settings-engine-label");
+        lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        btn_box.append(&icon);
+        btn_box.append(&lbl);
+        btn.set_child(Some(&btn_box));
+        btn.set_tooltip_text(Some(&format!("{label} ({id})")));
         if id == initial_engine {
             btn.add_css_class("active");
         }
-        engines_row.append(&btn);
+        engines_flow.append(&btn);
         engine_buttons.push((id.to_string(), btn));
     }
-    engine_card.append(&engines_row);
+    engine_card.append(&engines_flow);
     page_general.append(&engine_card);
 
     // Language Card

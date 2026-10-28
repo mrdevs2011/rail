@@ -407,6 +407,8 @@ mod shell_imp {
     pub struct ShellLayout {
         /// Currently visible sidebar width, 0..=SIDE_W.
         pub side: Cell<f64>,
+        /// Whether sidebar acts as a floating overlay (Zen browser style) without resizing tab content.
+        pub is_overlay: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -425,12 +427,22 @@ mod shell_imp {
 
         fn allocate(&self, widget: &gtk::Widget, width: i32, height: i32, _baseline: i32) {
             let sw = self.side.get().round() as i32;
-            let Some(side) = widget.first_child() else { return };
-            if side.is_visible() {
-                let t = gsk::Transform::new().translate(&graphene::Point::new((sw - SIDE_W) as f32, 0.0));
-                side.allocate(SIDE_W, height, -1, Some(t));
-            }
-            if let Some(main) = side.next_sibling() {
+            let Some(main) = widget.first_child() else { return };
+            let Some(side) = main.next_sibling() else { return };
+
+            if self.is_overlay.get() {
+                // Floating overlay mode: tab content stays at full window width and never jitters.
+                main.allocate(width, height, -1, None);
+                if side.is_visible() {
+                    let t = gsk::Transform::new().translate(&graphene::Point::new((sw - SIDE_W) as f32, 0.0));
+                    side.allocate(SIDE_W, height, -1, Some(t));
+                }
+            } else {
+                // Fixed pinned mode: sidebar docks alongside main content.
+                if side.is_visible() {
+                    let t = gsk::Transform::new().translate(&graphene::Point::new((sw - SIDE_W) as f32, 0.0));
+                    side.allocate(SIDE_W, height, -1, Some(t));
+                }
                 let t = gsk::Transform::new().translate(&graphene::Point::new(sw as f32, 0.0));
                 main.allocate((width - sw).max(0), height, -1, Some(t));
             }
@@ -451,6 +463,12 @@ impl ShellLayout {
     }
     pub fn set_side(&self, v: f64) {
         self.imp().side.set(v);
+    }
+    pub fn is_overlay(&self) -> bool {
+        self.imp().is_overlay.get()
+    }
+    pub fn set_overlay(&self, v: bool) {
+        self.imp().is_overlay.set(v);
     }
 }
 

@@ -6,6 +6,20 @@ use crate::*;
 fn svg_data(name: &str) -> Option<&'static [u8]> {
     Some(match name {
         "google" => include_bytes!("../../icons/svg/google.svg").as_slice(),
+        "bing" => include_bytes!("../../icons/svg/bing.svg").as_slice(),
+        "duckduckgo" => include_bytes!("../../icons/svg/duckduckgo.svg").as_slice(),
+        "yandex" => include_bytes!("../../icons/svg/yandex.svg").as_slice(),
+        "yahoo" => include_bytes!("../../icons/svg/yahoo.svg").as_slice(),
+        "brave" => include_bytes!("../../icons/svg/brave.svg").as_slice(),
+        "baidu" => include_bytes!("../../icons/svg/baidu.svg").as_slice(),
+        "ecosia" => include_bytes!("../../icons/svg/ecosia.svg").as_slice(),
+        "startpage" => include_bytes!("../../icons/svg/startpage.svg").as_slice(),
+        "qwant" => include_bytes!("../../icons/svg/qwant.svg").as_slice(),
+        "perplexity" => include_bytes!("../../icons/svg/perplexity.svg").as_slice(),
+        "searxng" => include_bytes!("../../icons/svg/searxng.svg").as_slice(),
+        "kagi" => include_bytes!("../../icons/svg/kagi.svg").as_slice(),
+        "naver" => include_bytes!("../../icons/svg/naver.svg").as_slice(),
+        "ask" => include_bytes!("../../icons/svg/ask.svg").as_slice(),
         "gear" => include_bytes!("../../icons/svg/gear.svg").as_slice(),
         "translate" => include_bytes!("../../icons/svg/translate.svg").as_slice(),
         "user" => include_bytes!("../../icons/svg/user.svg").as_slice(),
@@ -56,6 +70,56 @@ pub(crate) fn load_icon(name: &str, size: i32) -> gtk::Image {
 /// Raw SVG bytes for a known name (e.g. flag auto-detect, translate theme install).
 pub(crate) fn svg_bytes(name: &str) -> Option<&'static [u8]> {
     svg_data(name)
+}
+
+pub(crate) fn canonical_search_engine(engine: &str) -> &'static str {
+    match engine.to_lowercase().as_str() {
+        "google" => "google",
+        "bing" => "bing",
+        "duckduckgo" | "ddg" => "duckduckgo",
+        "yandex" => "yandex",
+        "yahoo" => "yahoo",
+        "brave" => "brave",
+        "baidu" => "baidu",
+        "ecosia" => "ecosia",
+        "startpage" => "startpage",
+        "qwant" => "qwant",
+        "perplexity" => "perplexity",
+        "searxng" | "searx" => "searxng",
+        "kagi" => "kagi",
+        "naver" => "naver",
+        "ask" => "ask",
+        _ => "google",
+    }
+}
+
+pub(crate) fn search_engine_display_name(engine: &str) -> &'static str {
+    match engine.to_lowercase().as_str() {
+        "google" => "Google",
+        "bing" => "Microsoft Bing",
+        "duckduckgo" | "ddg" => "DuckDuckGo",
+        "yandex" => "Yandex",
+        "yahoo" => "Yahoo!",
+        "brave" => "Brave Search",
+        "baidu" => "Baidu",
+        "ecosia" => "Ecosia",
+        "startpage" => "Startpage",
+        "qwant" => "Qwant",
+        "perplexity" => "Perplexity",
+        "searxng" | "searx" => "SearXNG",
+        "kagi" => "Kagi",
+        "naver" => "Naver",
+        "ask" => "Ask.com",
+        _ => "Google",
+    }
+}
+
+pub(crate) fn search_engine_svg_bytes(engine: &str) -> &'static [u8] {
+    svg_data(canonical_search_engine(engine)).unwrap_or(b"")
+}
+
+pub(crate) fn load_search_engine_icon(engine: &str, size: i32) -> gtk::Image {
+    load_icon(canonical_search_engine(engine), size)
 }
 
 pub(crate) fn create_google_icon(size: i32) -> gtk::Image {

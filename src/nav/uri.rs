@@ -2,6 +2,24 @@
 
 use crate::*;
 
+pub(crate) const SEARCH_ENGINE_LIST: &[(&str, &str, &str)] = &[
+    ("google", "Google", "https://www.google.com/search?q={}"),
+    ("bing", "Bing", "https://www.bing.com/search?q={}"),
+    ("duckduckgo", "DuckDuckGo", "https://duckduckgo.com/?q={}"),
+    ("yandex", "Yandex", "https://yandex.com/search/?text={}"),
+    ("yahoo", "Yahoo!", "https://search.yahoo.com/search?p={}"),
+    ("brave", "Brave", "https://search.brave.com/search?q={}"),
+    ("baidu", "Baidu", "https://www.baidu.com/s?wd={}"),
+    ("ecosia", "Ecosia", "https://www.ecosia.org/search?q={}"),
+    ("startpage", "Startpage", "https://www.startpage.com/sp/search?query={}"),
+    ("qwant", "Qwant", "https://www.qwant.com/?q={}"),
+    ("perplexity", "Perplexity", "https://www.perplexity.ai/search?q={}"),
+    ("searxng", "SearXNG", "https://searx.be/search?q={}"),
+    ("kagi", "Kagi", "https://kagi.com/search?q={}"),
+    ("naver", "Naver", "https://search.naver.com/search.naver?query={}"),
+    ("ask", "Ask.com", "https://www.ask.com/web?q={}"),
+];
+
 pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
     let s = input.trim();
     let s = s.strip_prefix("view-source:").unwrap_or(s).trim();
@@ -27,13 +45,13 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
         return format!("https://{s}");
     }
     let encoded = glib::Uri::escape_string(s, None, false);
-    match search_engine.to_lowercase().as_str() {
-        "duckduckgo" | "ddg" => format!("https://duckduckgo.com/?q={}", encoded),
-        "brave" => format!("https://search.brave.com/search?q={}", encoded),
-        "bing" => format!("https://www.bing.com/search?q={}", encoded),
-        "ecosia" => format!("https://www.ecosia.org/search?q={}", encoded),
-        _ => format!("https://www.google.com/search?q={}", encoded),
+    let engine_id = canonical_search_engine(search_engine);
+    for &(id, _, template) in SEARCH_ENGINE_LIST {
+        if id == engine_id {
+            return template.replace("{}", &encoded);
+        }
     }
+    format!("https://www.google.com/search?q={}", encoded)
 }
 
 pub(crate) fn host_of(uri: &str) -> Option<String> {

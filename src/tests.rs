@@ -75,6 +75,10 @@ fn test_to_uri_search_engines() {
     assert_eq!(to_uri("rust lang", "brave"), "https://search.brave.com/search?q=rust%20lang");
     assert_eq!(to_uri("rust lang", "bing"), "https://www.bing.com/search?q=rust%20lang");
     assert_eq!(to_uri("rust lang", "ecosia"), "https://www.ecosia.org/search?q=rust%20lang");
+    assert_eq!(to_uri("rust lang", "yandex"), "https://yandex.com/search/?text=rust%20lang");
+    assert_eq!(to_uri("rust lang", "yahoo"), "https://search.yahoo.com/search?p=rust%20lang");
+    assert_eq!(to_uri("rust lang", "perplexity"), "https://www.perplexity.ai/search?q=rust%20lang");
+    assert_eq!(to_uri("rust lang", "kagi"), "https://kagi.com/search?q=rust%20lang");
     assert_eq!(to_uri("https://github.com", "google"), "https://github.com");
     assert_eq!(to_uri("github.com", "duckduckgo"), "https://github.com");
 }

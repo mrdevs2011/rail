@@ -37,8 +37,10 @@ pub(crate) struct App {
     pub(crate) layout: StripLayout,
     pub(crate) list: gtk::ListBox,
     pub(crate) pill_label: gtk::Label,
+    pub(crate) pill_engine_icon: gtk::Image,
     pub(crate) load_bar: gtk::ProgressBar,
     pub(crate) palette: gtk::Box,
+    pub(crate) palette_engine_icon: gtk::Image,
     pub(crate) entry: gtk::Entry,
     pub(crate) palette_for_new_tab: Cell<bool>,
     /// True while the palette is pinned under the brand on a welcome (rail://start) tab.

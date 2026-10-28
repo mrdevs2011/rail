@@ -47,8 +47,9 @@ pub(crate) fn wire_sidebar_header(
         a.cycle_sidebar_mode();
     });
 
-    // Edge-hover for auto mode: motion on the shell.
+    // Edge-hover for auto mode: motion on the window captured before WebKit consumes it.
     let motion = gtk::EventControllerMotion::new();
+    motion.set_propagation_phase(gtk::PropagationPhase::Capture);
     let last_x = std::rc::Rc::new(std::cell::Cell::new(0.0f64));
 
     let a_enter = app.clone();
@@ -70,7 +71,7 @@ pub(crate) fn wire_sidebar_header(
     motion.connect_leave(move |_| {
         a_leave.on_shell_pointer_leave(last_x_leave.get());
     });
-    app.shell.add_controller(motion);
+    app.win.add_controller(motion);
 
     let a_active = app.clone();
     app.win.connect_is_active_notify(move |w| {

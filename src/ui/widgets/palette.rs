@@ -6,19 +6,23 @@ pub(crate) struct PaletteWidgets {
     pub(crate) entry: gtk::Entry,
     pub(crate) palette: gtk::Box,
     pub(crate) palette_suggestions_box: gtk::Box,
+    pub(crate) palette_engine_icon: gtk::Image,
     pub(crate) profile_btn: gtk::Button,
     pub(crate) profile_btn_lbl: gtk::Label,
     pub(crate) profile_popover: gtk::Popover,
 }
 
 pub(crate) fn build_palette(profile_mgr: &ProfileManager) -> PaletteWidgets {
+    let initial_settings = load_app_settings();
+    let engine_name = search_engine_display_name(&initial_settings.search_engine);
+
     // ---- address palette ----
     let entry = gtk::Entry::new();
     entry.add_css_class("palette-entry");
     entry.set_hexpand(true);
-    entry.set_placeholder_text(Some(tr("Search Google or enter web address...")));
+    entry.set_placeholder_text(Some(&format!("{} {}...", tr("Search with"), engine_name)));
 
-    let sicon = create_google_icon(20);
+    let palette_engine_icon = load_search_engine_icon(&initial_settings.search_engine, 20);
 
     let profile_btn = gtk::Button::new();
     profile_btn.add_css_class("profile-circle-btn");
@@ -41,7 +45,7 @@ pub(crate) fn build_palette(profile_mgr: &ProfileManager) -> PaletteWidgets {
     profile_popover.set_has_arrow(true);
 
     let prow = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    prow.append(&sicon);
+    prow.append(&palette_engine_icon);
     prow.append(&entry);
     prow.append(&profile_btn);
 
@@ -80,5 +84,5 @@ pub(crate) fn build_palette(profile_mgr: &ProfileManager) -> PaletteWidgets {
         pop_c.popup();
     });
 
-    PaletteWidgets { entry, palette, palette_suggestions_box, profile_btn, profile_btn_lbl, profile_popover }
+    PaletteWidgets { entry, palette, palette_suggestions_box, palette_engine_icon, profile_btn, profile_btn_lbl, profile_popover }
 }

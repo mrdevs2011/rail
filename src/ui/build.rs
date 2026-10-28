@@ -19,11 +19,11 @@ pub(crate) fn build(gapp: &gtk::Application) {
     let history_mgr = HistoryManager::new(rail_data_dir());
     let initial_prof_id = profile_mgr.active_profile().id;
 
-    let SidebarWidgets { footer_downloads, footer_settings, head_close_side, head_back, head_forward, head_reload, head_more, brand_logo, list, pill, pill_label, side } = build_sidebar();
+    let SidebarWidgets { footer_downloads, footer_settings, head_close_side, head_back, head_forward, head_reload, head_more, brand_logo, list, pill, pill_label, pill_engine_icon, side } = build_sidebar();
 
     let StripWidgets { layout, shell, shell_layout, strip, strip_host } = build_strip(side.clone());
 
-    let PaletteWidgets { entry, palette, palette_suggestions_box, profile_btn, profile_btn_lbl, profile_popover } = build_palette(&profile_mgr);
+    let PaletteWidgets { entry, palette, palette_suggestions_box, palette_engine_icon, profile_btn, profile_btn_lbl, profile_popover } = build_palette(&profile_mgr);
 
     // ---- settings page in the tab square (Alt+S) — rail://settings, not window fullscreen ----
     let settings_modal = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -175,8 +175,10 @@ pub(crate) fn build(gapp: &gtk::Application) {
         brand_logo: brand_logo.clone(),
         list: list.clone(),
         pill_label,
+        pill_engine_icon,
         load_bar,
         palette,
+        palette_engine_icon,
         entry: entry.clone(),
         palette_for_new_tab: Cell::new(false),
         welcome_palette: Cell::new(false),
@@ -274,6 +276,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     wire_devtools(&app, devtools_close_btn, devtools_content_box, devtools_detach_btn, devtools_resize_handle, footer_downloads, footer_settings);
     wire_sidebar_header(&app, head_back, head_forward, head_reload, head_more, head_close_side);
     // Auto mode: start closed (edge-hover only)
+    app.shell_layout.set_overlay(app.sidebar_auto.get());
     if app.sidebar_auto.get() {
         app.side_open.set(false);
         app.side.set_visible(false);

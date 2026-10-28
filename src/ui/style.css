@@ -204,8 +204,9 @@ scrollbar button {
 /* ---- sidebar (Modern Obsidian Acrylic) ---- */
 .side-bar {
     background: #000000;
-    border-right: 1px solid #121212;
+    border-right: 1px solid #141414;
     padding-right: 2px;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.75);
 }
 .side-footer {
     padding: 6px 2px 2px 2px;
@@ -1305,6 +1306,49 @@ button.color-choice.selected {
     border-color: #ededed;
     color: #ededed;
     font-weight: 600;
+}
+.settings-engines-flow {
+    background: transparent;
+    margin-top: 8px;
+}
+.settings-engines-flow flowboxchild {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    outline: none;
+    border: none;
+}
+button.settings-engine-btn {
+    min-width: 140px;
+    min-height: 42px;
+    padding: 8px 12px;
+    background: #000000;
+    border: 1px solid #1c1c1c;
+    border-radius: 4px;
+    color: #d4d4d4;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 120ms ease;
+}
+button.settings-engine-btn:hover {
+    background: #141414;
+    border-color: #3b82f6;
+    color: #ffffff;
+}
+button.settings-engine-btn.active {
+    background: rgba(59, 130, 246, 0.14);
+    border-color: #3b82f6;
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+}
+.settings-engine-icon {
+    min-width: 18px;
+    min-height: 18px;
+}
+.settings-engine-label {
+    font-weight: 500;
+    color: inherit;
 }
 .shortcut-row {
     padding: 6px 10px;

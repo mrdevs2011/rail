@@ -205,10 +205,13 @@ impl App {
                 )
             })
             .collect();
+        let engine = self.search_engine.borrow().clone();
+        let display_name = search_engine_display_name(&engine);
+        let svg_str = std::str::from_utf8(search_engine_svg_bytes(&engine)).unwrap_or("");
         format!(
             "{{\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}]}}",
-            e(tr("Search Google or enter web address...")),
-            e(std::str::from_utf8(svg_bytes("google").unwrap_or(b"")).unwrap_or("")),
+            e(&format!("{} {}...", tr("Search with"), display_name)),
+            e(svg_str),
             e(&sc_apply(tr("Enter  go      Esc  cancel      Alt+P  profiles"), &["profiles"])),
             e(tr("Select Profile")),
             e(&sc_apply(tr("Manage Profiles in Settings (Alt+P)"), &["profiles"])),
@@ -218,6 +221,32 @@ impl App {
             e(&tab_prof),
             profs.join(",")
         )
+    }
+
+    pub(crate) fn sync_search_engine_ui(self: &Rc<Self>) {
+        let engine = self.search_engine.borrow().clone();
+        let display_name = search_engine_display_name(&engine);
+        let placeholder = format!("{} {}...", tr("Search with"), display_name);
+
+        self.entry.set_placeholder_text(Some(&placeholder));
+
+        let pal_icon = load_search_engine_icon(&engine, 20);
+        self.palette_engine_icon.set_paintable(pal_icon.paintable().as_ref());
+
+        let pill_icon = load_search_engine_icon(&engine, 18);
+        self.pill_engine_icon.set_paintable(pill_icon.paintable().as_ref());
+
+        if let Ok(rows) = self.rows.try_borrow() {
+            for row in rows.iter() {
+                for tab in &row.tabs {
+                    let u = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
+                    let s = tab.saved_uri.borrow().clone();
+                    if u.starts_with("rail://start") || s.starts_with("rail://start") {
+                        self.push_start_state(&tab.view);
+                    }
+                }
+            }
+        }
     }
 
     pub(crate) fn push_start_state(&self, view: &WebView) {

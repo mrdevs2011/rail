@@ -14,6 +14,7 @@ pub(crate) struct SidebarWidgets {
     pub(crate) list: gtk::ListBox,
     pub(crate) pill: gtk::Button,
     pub(crate) pill_label: gtk::Label,
+    pub(crate) pill_engine_icon: gtk::Image,
     pub(crate) side: gtk::Box,
 }
 
@@ -82,9 +83,10 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
     pill_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
     pill_label.set_width_chars(1);
     let pill_inner = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    let s_icon = create_google_icon(18);
-    s_icon.add_css_class("pill-icon");
-    pill_inner.append(&s_icon);
+    let initial_settings = load_app_settings();
+    let pill_engine_icon = load_search_engine_icon(&initial_settings.search_engine, 18);
+    pill_engine_icon.add_css_class("pill-icon");
+    pill_inner.append(&pill_engine_icon);
     pill_inner.append(&pill_label);
     let pill_chip = gtk::Label::new(None);
     sc_bind_chip(&pill_chip, "focus_url");
@@ -154,6 +156,7 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
         list,
         pill,
         pill_label,
+        pill_engine_icon,
         side,
     }
 }

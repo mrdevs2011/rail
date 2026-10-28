@@ -58,6 +58,7 @@ pub(crate) fn wire_settings(app: &Rc<App>, add_prof_btn: gtk::Button, btn_clear_
                     b.remove_css_class("active");
                 }
             }
+            a.sync_search_engine_ui();
             a.save_session_immediate();
             let mut s = load_app_settings();
             s.search_engine = id_str.clone();

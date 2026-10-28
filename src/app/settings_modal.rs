@@ -63,15 +63,28 @@ impl App {
         // Responsive: narrow windows get stacked sidebar (tablet/mobile)
         self.sync_settings_responsive();
 
-        // Settings page: new tab unless focused tab is already any rail://settings*
+        // Settings page: switch to existing settings tab or create a new one
         let settings_uri = settings_uri_for_tab(tab);
         self.exit_overview();
-        let on_settings = self
-            .focused_view()
-            .and_then(|v| v.uri())
-            .map(|u| u.starts_with("rail://settings"))
-            .unwrap_or(false);
-        if on_settings {
+
+        let existing_settings = {
+            let rows = self.rows.borrow();
+            let mut found = None;
+            'outer: for (r_idx, row) in rows.iter().enumerate() {
+                for (c_idx, tab_item) in row.tabs.iter().enumerate() {
+                    let u = tab_item.view.uri().map(|s| s.to_string()).unwrap_or_default();
+                    let s = tab_item.saved_uri.borrow().clone();
+                    if u.starts_with("rail://settings") || s.starts_with("rail://settings") {
+                        found = Some((r_idx, c_idx));
+                        break 'outer;
+                    }
+                }
+            }
+            found
+        };
+
+        if let Some((r, c)) = existing_settings {
+            self.focus_coords(r, c);
             if let Some(v) = self.focused_view() {
                 v.load_html(&settings_shell_page(), Some(settings_uri));
                 self.set_view_saved_uri(&v, settings_uri);
@@ -86,6 +99,8 @@ impl App {
         }
         self.pill_label.set_text(settings_uri);
         self.refresh_sidebar();
+        self.sync_sidebar_active();
+        self.reveal_focus();
         self.schedule_save_session();
         // Mark settings WebView keep_alive so suspend never freezes a black empty shell.
         if let Some(v) = self.focused_view() {
@@ -151,8 +166,22 @@ impl App {
     }
 
     pub(crate) fn toggle_profiles_modal(self: &Rc<Self>) {
-        if self.settings_modal_open() && self.current_settings_tab.get() == SettingsTab::Profiles {
-            self.hide_settings_modal();
+        let is_on_profiles = self
+            .focused_view()
+            .map(|v| {
+                let u = v.uri().map(|s| s.to_string()).unwrap_or_default();
+                let s = self.saved_uri_of(&v);
+                (u.starts_with("rail://settings") || s.starts_with("rail://settings"))
+                    && self.current_settings_tab.get() == SettingsTab::Profiles
+            })
+            .unwrap_or(false);
+
+        if is_on_profiles && self.settings_modal_open() {
+            if let Some(v) = self.focused_view() {
+                self.close_view(&v);
+            } else {
+                self.hide_settings_modal();
+            }
         } else {
             self.open_settings_tab(SettingsTab::Profiles);
         }
