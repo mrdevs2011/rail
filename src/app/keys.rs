@@ -106,7 +106,8 @@ impl App {
                 self.hide_devtools();
                 return true;
             }
-            if !ctrl && !shift && !alt && k == gdk::Key::F12 {
+            if (!ctrl && !shift && !alt && k == gdk::Key::F12)
+                || (ctrl && shift && !alt && (k == gdk::Key::i || k == gdk::Key::I)) {
                 self.hide_devtools();
                 return true;
             }
@@ -117,7 +118,8 @@ impl App {
             return true;
         }
 
-        if !ctrl && !shift && !alt && k == gdk::Key::F12 {
+        if (!ctrl && !shift && !alt && k == gdk::Key::F12)
+            || (ctrl && shift && !alt && (k == gdk::Key::i || k == gdk::Key::I)) {
             self.toggle_devtools();
             return true;
         }

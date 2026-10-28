@@ -235,15 +235,34 @@ fn test_stack_shortcuts() {
     assert_eq!(sc_synth("Alt+]").map(|(k, _)| k), Some(gdk::Key::bracketright));
 }
 
-/// One action = one shortcut, and one shortcut = one action.
+/// One action = one shortcut, and one shortcut = one action (or multiple non-conflicting default shortcuts).
 #[test]
 fn test_no_duplicate_default_shortcuts() {
     let mut seen: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
     for def in SHORTCUT_DEFS {
-        assert_eq!(def.defaults.len(), 1, "\"{}\" must have exactly one default shortcut", def.id);
-        if let Some(prev) = seen.insert(def.defaults[0], def.id) {
-            panic!("{} is bound to both \"{}\" and \"{}\"", def.defaults[0], prev, def.id);
+        assert!(!def.defaults.is_empty(), "\"{}\" must have at least one default shortcut", def.id);
+        for d in def.defaults {
+            if let Some(prev) = seen.insert(*d, def.id) {
+                panic!("{} is bound to both \"{}\" and \"{}\"", d, prev, def.id);
+            }
         }
+    }
+}
+
+#[test]
+fn test_devtools_shortcuts() {
+    let def = SHORTCUT_DEFS.iter().find(|d| d.id == "devtools").expect("devtools shortcut exists");
+    assert!(def.defaults.contains(&"F12"));
+    assert!(def.defaults.contains(&"Ctrl+Shift+I"));
+    let res = sc_resolve("Ctrl+Shift+I");
+    match res {
+        ScResolve::Action(action) => assert_eq!(action, "F12"),
+        _ => panic!("Expected Action(\"F12\"), got non-action"),
+    }
+    let res_f12 = sc_resolve("F12");
+    match res_f12 {
+        ScResolve::Action(action) => assert_eq!(action, "F12"),
+        _ => panic!("Expected Action(\"F12\"), got non-action"),
     }
 }
 

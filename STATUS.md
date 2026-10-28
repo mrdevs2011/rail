@@ -161,3 +161,8 @@
 ### 2026-10-27
 - Qilindi: DevTools ochish/yopish uchun `Ctrl+Shift+I` kombinatsiyasi qo'shildi (`F12` bilan birga). `src/shortcuts/config.rs` va `docs/shortcuts/index.html` yangilandi.
 - Build: cargo build --release OK (GUI o'tkazilmadi — xvfb mavjud emas, Ctrl+Shift+I yo'li kod orqali tekshirildi).
+
+---
+### 2026-10-28
+- Qilindi: `src/app/keys.rs` da `Ctrl+Shift+I` orqali to'g'ridan-to'g'ri DevTools ochish/yopish qo'llab-quvvatlandi. `test_no_duplicate_default_shortcuts` yangilandi va `test_devtools_shortcuts` testi qo'shildi.
+- Build & Test: `cargo test --release` (58/58 test muvaffaqiyatli o'tdi) va `cargo build --release` OK.
