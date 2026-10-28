@@ -238,16 +238,31 @@ fn main() -> glib::ExitCode {
         let url = parse_cli_url(&args);
         let existing = MAIN_APP.with(|m| m.borrow().clone());
         match existing {
-            // Already running: open the URL in a new tab and raise the window.
+            // Already running: open the URL in a new tab (or reuse empty start tab) and raise the window.
             Some(a) => {
                 if let Some(u) = url {
-                    a.new_tab();
-                    a.navigate(&u);
+                    let uri = to_uri(&u, &a.search_engine.borrow());
+                    let can_reuse = {
+                        let rows = a.rows.borrow();
+                        rows.len() == 1
+                            && rows[0].tabs.len() == 1
+                            && rows[0].tabs[0].real_uri().is_empty()
+                    };
+                    if can_reuse {
+                        a.navigate(&uri);
+                    } else {
+                        a.new_tab_with_url(&uri);
+                    }
                 }
                 a.win.present();
             }
-            // First launch: build() uses TARGET_URL parsed in main().
-            None => gapp.activate(),
+            // First launch: populate TARGET_URL and activate.
+            None => {
+                if let Some(u) = url {
+                    let _ = TARGET_URL.set(u);
+                }
+                gapp.activate();
+            }
         }
         glib::ExitCode::SUCCESS
     });

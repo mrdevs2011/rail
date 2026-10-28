@@ -302,11 +302,17 @@ pub(crate) fn build(gapp: &gtk::Application) {
 
     let restored = app.restore_session();
     if let Some(url) = TARGET_URL.get() {
-        if restored {
-            app.new_tab();
-            app.navigate(url);
+        let uri = to_uri(url, &app.search_engine.borrow());
+        let can_reuse = {
+            let rows = app.rows.borrow();
+            rows.len() == 1
+                && rows[0].tabs.len() == 1
+                && rows[0].tabs[0].real_uri().is_empty()
+        };
+        if can_reuse {
+            app.navigate(&uri);
         } else {
-            app.navigate(url);
+            app.new_tab_with_url(&uri);
         }
     } else if !restored {
         app.new_tab();

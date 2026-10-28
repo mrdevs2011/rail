@@ -142,7 +142,12 @@ impl App {
         self.exit_overview();
         let session = self.profiles.borrow_mut().get_or_create_session(profile_id);
         let view = Self::create_web_view(&session, profile_id);
-        view.load_uri(url);
+        if is_internal_uri(url) {
+            load_internal_page(&view, url);
+        } else {
+            view.load_uri(url);
+        }
+        self.set_view_saved_uri(&view, url);
         self.add_view(view, profile_id.to_string(), false);
     }
 
