@@ -369,6 +369,13 @@ impl App {
                 let Some(v) = wv.upgrade() else { return };
                 app.on_start_search(&v, val.to_str().as_str());
             });
+
+            let app_ss = self.clone();
+            let wv_ss = view.downgrade();
+            ucm.connect_script_message_received(Some("railScreenshot"), move |_, val| {
+                let Some(v) = wv_ss.upgrade() else { return };
+                app_ss.on_screenshot_message(&v, val.to_str().as_str());
+            });
         }
 
         let app = self.clone();

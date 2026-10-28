@@ -1,47 +1,570 @@
-//! Zen / Firefox-style page screenshot.
+//! In-page continuous scroll screenshot with element picker & brutalist toolbar.
 //!
-//! Flow (matches Firefox Screenshots / Zen):
-//! 1. Dim overlay + instructions.
-//! 2. Top-right **Save visible** / **Save full page** capture immediately.
-//! 3. Hover highlights page elements; click picks that element.
-//! 4. Drag draws a free region; handles resize; drag inside moves.
-//! 5. Floating bar under the selection: Cancel · Copy · Download.
-//! 6. Esc cancels; C copies; S downloads.
+//! Selection lives directly inside the webpage DOM (document coordinates),
+//! not as a floating GTK overlay. When the page scrolls (e.g. YouTube),
+//! the selection and element borders scroll together with the page.
 
 use crate::*;
-use std::cell::Cell;
 
-/// Element hover without mutating the page (no outline on DOM — drawn on our overlay).
-const HOVER_JS: &str = r#"
-(function(){
-  function pick(x, y) {
-    let el = document.elementFromPoint(x, y);
-    if (!el || el === document.documentElement || el === document.body) return null;
+/// JavaScript injected into the webpage for in-page selection.
+const IN_PAGE_SCREENSHOT_JS: &str = r##"
+(function() {
+  if (window.__railScreenshotCleanup) {
+    try { window.__railScreenshotCleanup(); } catch(e) {}
+  }
+
+  const docEl = document.documentElement;
+  const body = document.body || docEl;
+
+  const root = document.createElement('div');
+  root.id = '__rail_ss_root';
+  root.style.cssText = 'position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2147483647; overflow: visible; margin: 0; padding: 0;';
+
+  const style = document.createElement('style');
+  style.textContent = `
+    #__rail_ss_root * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
+    .rail-ss-mask { position: absolute; background: rgba(0, 0, 0, 0.45); pointer-events: none; display: none; z-index: 2147483645; }
+    #__rail_ss_hover {
+      position: absolute;
+      border: 2px solid #60a5fa;
+      background: rgba(96, 165, 250, 0.22);
+      border-radius: 4px;
+      pointer-events: none;
+      display: none;
+      z-index: 2147483646;
+      transition: all 0.04s ease-out;
+    }
+    #__rail_ss_selection {
+      position: absolute;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65);
+      pointer-events: auto;
+      display: none;
+      z-index: 2147483647;
+      cursor: move;
+    }
+    .rail-ss-handle {
+      position: absolute;
+      width: 9px;
+      height: 9px;
+      background: #ffffff;
+      border: 1.5px solid #18191c;
+      border-radius: 2px;
+      pointer-events: auto;
+    }
+    .rail-ss-h-nw { top: -5px; left: -5px; cursor: nwse-resize; }
+    .rail-ss-h-ne { top: -5px; right: -5px; cursor: nesw-resize; }
+    .rail-ss-h-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+    .rail-ss-h-se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+    .rail-ss-h-n  { top: -5px; left: calc(50% - 4.5px); cursor: ns-resize; }
+    .rail-ss-h-s  { bottom: -5px; left: calc(50% - 4.5px); cursor: ns-resize; }
+    .rail-ss-h-w  { top: calc(50% - 4.5px); left: -5px; cursor: ew-resize; }
+    .rail-ss-h-e  { top: calc(50% - 4.5px); right: -5px; cursor: ew-resize; }
+    #__rail_ss_size {
+      position: absolute;
+      left: 0;
+      top: -24px;
+      background: rgba(18, 19, 22, 0.9);
+      color: #ffffff;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      pointer-events: none;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    #__rail_ss_topbar {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #18191c;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #e4e4e7;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 2147483647;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      pointer-events: auto;
+    }
+    #__rail_ss_toolbar {
+      position: absolute;
+      z-index: 2147483647;
+      display: none;
+      background: #18191c;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 4px;
+      gap: 6px;
+      align-items: center;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.65);
+      pointer-events: auto;
+    }
+    .rail-ss-btn {
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.12s ease;
+    }
+    .rail-ss-btn-close {
+      background: #2b2d30;
+      color: #e4e4e7;
+      width: 32px;
+      height: 32px;
+      font-size: 14px;
+    }
+    .rail-ss-btn-close:hover { background: #383a40; }
+    .rail-ss-btn-copy {
+      background: #2b2d30;
+      color: #ffffff;
+      padding: 6px 14px;
+      height: 32px;
+    }
+    .rail-ss-btn-copy:hover { background: #383a40; }
+    .rail-ss-btn-dl {
+      background: #93c5fd;
+      color: #0f172a;
+      border: 1.5px solid #60a5fa;
+      padding: 6px 16px;
+      height: 32px;
+      font-weight: 700;
+    }
+    .rail-ss-btn-dl:hover { background: #bfdbfe; }
+    .rail-ss-top-btn {
+      background: #2b2d30;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 5px;
+      padding: 3px 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .rail-ss-top-btn:hover { background: #383a40; }
+  `;
+  root.appendChild(style);
+
+  const maskTop = document.createElement('div'); maskTop.className = 'rail-ss-mask';
+  const maskBottom = document.createElement('div'); maskBottom.className = 'rail-ss-mask';
+  const maskLeft = document.createElement('div'); maskLeft.className = 'rail-ss-mask';
+  const maskRight = document.createElement('div'); maskRight.className = 'rail-ss-mask';
+  root.appendChild(maskTop);
+  root.appendChild(maskBottom);
+  root.appendChild(maskLeft);
+  root.appendChild(maskRight);
+
+  const hoverBox = document.createElement('div');
+  hoverBox.id = '__rail_ss_hover';
+  root.appendChild(hoverBox);
+
+  const selBox = document.createElement('div');
+  selBox.id = '__rail_ss_selection';
+
+  const sizeLbl = document.createElement('div');
+  sizeLbl.id = '__rail_ss_size';
+  selBox.appendChild(sizeLbl);
+
+  ['nw', 'ne', 'sw', 'se', 'n', 's', 'w', 'e'].forEach(dir => {
+    const h = document.createElement('div');
+    h.className = `rail-ss-handle rail-ss-h-${dir}`;
+    h.dataset.dir = dir;
+    selBox.appendChild(h);
+  });
+  root.appendChild(selBox);
+
+  const topbar = document.createElement('div');
+  topbar.id = '__rail_ss_topbar';
+  topbar.innerHTML = `
+    <span>Maydonni belgilang yoki element ustiga bosing</span>
+    <button class="rail-ss-top-btn" id="__rail_ss_top_full">To'liq sahifa</button>
+    <span style="opacity: 0.6; font-size: 11px;">ESC: bekor qilish</span>
+  `;
+  root.appendChild(topbar);
+
+  const toolbar = document.createElement('div');
+  toolbar.id = '__rail_ss_toolbar';
+  toolbar.innerHTML = `
+    <button class="rail-ss-btn rail-ss-btn-close" id="__rail_ss_close" title="Bekor qilish">✕</button>
+    <button class="rail-ss-btn rail-ss-btn-copy" id="__rail_ss_copy" title="Nusxalash">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      <span>Copy</span>
+    </button>
+    <button class="rail-ss-btn rail-ss-btn-dl" id="__rail_ss_dl" title="Yuklab olish">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      <span>Download</span>
+    </button>
+  `;
+  root.appendChild(toolbar);
+
+  (document.body || docEl).appendChild(root);
+
+  let hasSelection = false;
+  let sel = { left: 0, top: 0, width: 0, height: 0 };
+  let isMouseDown = false;
+  let isDragging = false;
+  let isMoving = false;
+  let isResizing = false;
+  let resizeHandle = null;
+  let startX = 0, startY = 0;
+  let moveOffsetX = 0, moveOffsetY = 0;
+  let resizeInitial = null;
+  let hoveredRect = null;
+  let mouseDownPos = { x: 0, y: 0 };
+
+  const origCursor = document.body ? document.body.style.cursor : '';
+  if (document.body) document.body.style.cursor = 'crosshair';
+
+  function updateBackdrop() {
+    if (!hasSelection || sel.width <= 0 || sel.height <= 0) {
+      maskTop.style.display = 'none';
+      maskBottom.style.display = 'none';
+      maskLeft.style.display = 'none';
+      maskRight.style.display = 'none';
+      return;
+    }
+    const docW = Math.max(docEl.scrollWidth, window.innerWidth);
+    const docH = Math.max(docEl.scrollHeight, window.innerHeight);
+
+    maskTop.style.left = '0px';
+    maskTop.style.top = '0px';
+    maskTop.style.width = docW + 'px';
+    maskTop.style.height = Math.max(0, sel.top) + 'px';
+    maskTop.style.display = 'block';
+
+    maskBottom.style.left = '0px';
+    maskBottom.style.top = (sel.top + sel.height) + 'px';
+    maskBottom.style.width = docW + 'px';
+    maskBottom.style.height = Math.max(0, docH - (sel.top + sel.height)) + 'px';
+    maskBottom.style.display = 'block';
+
+    maskLeft.style.left = '0px';
+    maskLeft.style.top = sel.top + 'px';
+    maskLeft.style.width = Math.max(0, sel.left) + 'px';
+    maskLeft.style.height = sel.height + 'px';
+    maskLeft.style.display = 'block';
+
+    maskRight.style.left = (sel.left + sel.width) + 'px';
+    maskRight.style.top = sel.top + 'px';
+    maskRight.style.width = Math.max(0, docW - (sel.left + sel.width)) + 'px';
+    maskRight.style.height = sel.height + 'px';
+    maskRight.style.display = 'block';
+  }
+
+  function updateSelectionView() {
+    if (!hasSelection) {
+      selBox.style.display = 'none';
+      toolbar.style.display = 'none';
+      updateBackdrop();
+      return;
+    }
+    selBox.style.left = sel.left + 'px';
+    selBox.style.top = sel.top + 'px';
+    selBox.style.width = sel.width + 'px';
+    selBox.style.height = sel.height + 'px';
+    selBox.style.display = 'block';
+
+    sizeLbl.textContent = `${Math.round(sel.width)} × ${Math.round(sel.height)}`;
+    if (sel.top - window.scrollY < 26) {
+      sizeLbl.style.top = '4px';
+      sizeLbl.style.left = '4px';
+    } else {
+      sizeLbl.style.top = '-24px';
+      sizeLbl.style.left = '0px';
+    }
+
+    updateBackdrop();
+    updateToolbarPos();
+  }
+
+  function updateToolbarPos() {
+    if (!hasSelection) {
+      toolbar.style.display = 'none';
+      return;
+    }
+    toolbar.style.display = 'inline-flex';
+    const tw = 226;
+    const th = 42;
+    const margin = 10;
+
+    let tx = sel.left + sel.width - tw;
+    let ty = sel.top + sel.height + 8;
+
+    const minX = window.scrollX + margin;
+    const maxX = window.scrollX + window.innerWidth - tw - margin;
+    tx = Math.max(minX, Math.min(tx, maxX));
+
+    const minY = window.scrollY + margin;
+    const maxY = window.scrollY + window.innerHeight - th - margin;
+    if (ty > maxY) {
+      if (sel.top - th - 8 >= minY) {
+        ty = sel.top - th - 8;
+      } else {
+        ty = maxY;
+      }
+    }
+    toolbar.style.left = tx + 'px';
+    toolbar.style.top = ty + 'px';
+  }
+
+  function postMsg(action) {
+    root.style.display = 'none';
+    const payload = {
+      action: action,
+      x: Math.round(sel.left),
+      y: Math.round(sel.top),
+      w: Math.round(sel.width),
+      h: Math.round(sel.height),
+      docW: Math.round(docEl.scrollWidth),
+      docH: Math.round(docEl.scrollHeight),
+      scrollX: Math.round(window.scrollX),
+      scrollY: Math.round(window.scrollY),
+      viewportW: Math.round(window.innerWidth),
+      viewportH: Math.round(window.innerHeight),
+      devicePixelRatio: window.devicePixelRatio || 1
+    };
+    try {
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railScreenshot) {
+        window.webkit.messageHandlers.railScreenshot.postMessage(JSON.stringify(payload));
+      }
+    } catch(e) {}
+  }
+
+  document.getElementById('__rail_ss_close').onclick = (e) => {
+    e.stopPropagation();
+    cleanup();
+    try {
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railScreenshot) {
+        window.webkit.messageHandlers.railScreenshot.postMessage(JSON.stringify({ action: "cancel" }));
+      }
+    } catch(e) {}
+  };
+
+  document.getElementById('__rail_ss_copy').onclick = (e) => {
+    e.stopPropagation();
+    postMsg('copy');
+  };
+
+  document.getElementById('__rail_ss_dl').onclick = (e) => {
+    e.stopPropagation();
+    postMsg('download');
+  };
+
+  document.getElementById('__rail_ss_top_full').onclick = (e) => {
+    e.stopPropagation();
+    postMsg('full_page');
+  };
+
+  function onMouseMove(e) {
+    if (isDragging) {
+      const currX = e.pageX;
+      const currY = e.pageY;
+      sel.left = Math.min(startX, currX);
+      sel.top = Math.min(startY, currY);
+      sel.width = Math.abs(currX - startX);
+      sel.height = Math.abs(currY - startY);
+      hasSelection = true;
+      updateSelectionView();
+
+      if (e.clientY > window.innerHeight - 45) {
+        window.scrollBy({ top: 32, behavior: 'instant' });
+      } else if (e.clientY < 45) {
+        window.scrollBy({ top: -32, behavior: 'instant' });
+      }
+      return;
+    }
+
+    if (isMoving) {
+      const docW = Math.max(docEl.scrollWidth, window.innerWidth);
+      const docH = Math.max(docEl.scrollHeight, window.innerHeight);
+      sel.left = Math.max(0, Math.min(e.pageX - moveOffsetX, docW - sel.width));
+      sel.top = Math.max(0, Math.min(e.pageY - moveOffsetY, docH - sel.height));
+      updateSelectionView();
+      return;
+    }
+
+    if (isResizing) {
+      const dx = e.pageX - resizeInitial.pageX;
+      const dy = e.pageY - resizeInitial.pageY;
+      let { left, top, width, height } = resizeInitial.sel;
+      const d = resizeHandle;
+      if (d.includes('e')) width += dx;
+      if (d.includes('s')) height += dy;
+      if (d.includes('w')) { left += dx; width -= dx; }
+      if (d.includes('n')) { top += dy; height -= dy; }
+      if (width < 10) { width = 10; }
+      if (height < 10) { height = 10; }
+      sel = { left, top, width, height };
+      updateSelectionView();
+      return;
+    }
+
+    if (hasSelection) {
+      hoverBox.style.display = 'none';
+      return;
+    }
+
+    hoverBox.style.display = 'none';
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || el === document.body || el === docEl || (el.closest && el.closest('#__rail_ss_root'))) {
+      hoverBox.style.display = 'none';
+      hoveredRect = null;
+      return;
+    }
+
     let curr = el;
-    while (curr && curr.parentElement && curr.parentElement !== document.body && curr.parentElement !== document.documentElement) {
+    while (curr && curr.parentElement && curr.parentElement !== document.body && curr.parentElement !== docEl) {
       const r = curr.getBoundingClientRect();
-      if (r.width >= 16 && r.height >= 14) break;
+      if (r.width >= 24 && r.height >= 18) break;
       curr = curr.parentElement;
     }
     const r = (curr || el).getBoundingClientRect();
-    return { x: r.left, y: r.top, w: r.width, h: r.height };
+    if (r.width < 10 || r.height < 10) {
+      hoverBox.style.display = 'none';
+      hoveredRect = null;
+      return;
+    }
+
+    hoveredRect = {
+      left: r.left + window.scrollX,
+      top: r.top + window.scrollY,
+      width: r.width,
+      height: r.height
+    };
+    hoverBox.style.left = hoveredRect.left + 'px';
+    hoverBox.style.top = hoveredRect.top + 'px';
+    hoverBox.style.width = hoveredRect.width + 'px';
+    hoverBox.style.height = hoveredRect.height + 'px';
+    hoverBox.style.display = 'block';
   }
-  window.__railSs = { pick };
+
+  function onMouseDown(e) {
+    if (e.button !== 0) return;
+    if (e.target.closest && (e.target.closest('#__rail_ss_toolbar') || e.target.closest('#__rail_ss_topbar'))) {
+      return;
+    }
+
+    mouseDownPos = { x: e.pageX, y: e.pageY };
+
+    const handle = e.target.closest ? e.target.closest('.rail-ss-handle') : null;
+    if (handle && hasSelection) {
+      isResizing = true;
+      resizeHandle = handle.dataset.dir;
+      resizeInitial = { pageX: e.pageX, pageY: e.pageY, sel: { ...sel } };
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    if (hasSelection && e.target.closest && e.target.closest('#__rail_ss_selection')) {
+      isMoving = true;
+      moveOffsetX = e.pageX - sel.left;
+      moveOffsetY = e.pageY - sel.top;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    isMouseDown = true;
+    startX = e.pageX;
+    startY = e.pageY;
+    e.preventDefault();
+  }
+
+  function onMouseUp(e) {
+    if (e.button !== 0) return;
+
+    if (isResizing) {
+      isResizing = false;
+      resizeHandle = null;
+      updateToolbarPos();
+      return;
+    }
+
+    if (isMoving) {
+      isMoving = false;
+      updateToolbarPos();
+      return;
+    }
+
+    if (isMouseDown) {
+      isMouseDown = false;
+      const dist = Math.hypot(e.pageX - mouseDownPos.x, e.pageY - mouseDownPos.y);
+
+      if (dist < 6 && hoveredRect && !isDragging) {
+        sel = { ...hoveredRect };
+        hasSelection = true;
+        hoverBox.style.display = 'none';
+        updateSelectionView();
+        return;
+      }
+
+      isDragging = false;
+      if (sel.width > 12 && sel.height > 12) {
+        hasSelection = true;
+        hoverBox.style.display = 'none';
+        updateSelectionView();
+      } else {
+        hasSelection = false;
+        sel = { left: 0, top: 0, width: 0, height: 0 };
+        updateSelectionView();
+      }
+    }
+  }
+
+  function onKeyDown(e) {
+    if (e.key === 'Escape') {
+      cleanup();
+      try {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railScreenshot) {
+          window.webkit.messageHandlers.railScreenshot.postMessage(JSON.stringify({ action: "cancel" }));
+        }
+      } catch(e) {}
+    }
+  }
+
+  function onScroll() {
+    updateToolbarPos();
+  }
+
+  window.addEventListener('mousemove', onMouseMove, true);
+  window.addEventListener('mousedown', onMouseDown, true);
+  window.addEventListener('mouseup', onMouseUp, true);
+  window.addEventListener('keydown', onKeyDown, true);
+  window.addEventListener('scroll', onScroll, true);
+
+  function cleanup() {
+    window.removeEventListener('mousemove', onMouseMove, true);
+    window.removeEventListener('mousedown', onMouseDown, true);
+    window.removeEventListener('mouseup', onMouseUp, true);
+    window.removeEventListener('keydown', onKeyDown, true);
+    window.removeEventListener('scroll', onScroll, true);
+    if (document.body) document.body.style.cursor = origCursor;
+    root.remove();
+    window.__railScreenshotCleanup = null;
+  }
+
+  window.__railScreenshotCleanup = cleanup;
 })();
-"#;
+"##;
 
 const CLEANUP_JS: &str = r#"
-(function(){
-  if (!window.__railSs) return;
-  delete window.__railSs;
+(function() {
+  if (window.__railScreenshotCleanup) {
+    try { window.__railScreenshotCleanup(); } catch(e) {}
+  }
 })();
 "#;
-
-#[derive(Clone, Copy, PartialEq)]
-enum Mode {
-    Picking,
-    Region,
-}
 
 #[derive(Clone, Copy)]
 struct Rect {
@@ -51,672 +574,142 @@ struct Rect {
     h: f64,
 }
 
-impl Rect {
-    fn normalized(self) -> Self {
-        let (mut x, mut y, mut w, mut h) = (self.x, self.y, self.w, self.h);
-        if w < 0.0 {
-            x += w;
-            w = -w;
-        }
-        if h < 0.0 {
-            y += h;
-            h = -h;
-        }
-        Self { x, y, w, h }
-    }
-    fn contains(self, px: f64, py: f64) -> bool {
-        let r = self.normalized();
-        px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h
-    }
-}
-
-struct State {
-    mode: Cell<Mode>,
-    region: Cell<Option<Rect>>,
-    drag_origin: Cell<Option<(f64, f64)>>,
-    /// When moving an existing region: pointer offset from region top-left.
-    move_offset: Cell<Option<(f64, f64)>>,
-    resize_edge: Cell<Option<&'static str>>,
-    hover_el: Cell<Option<Rect>>,
-}
-
 impl App {
+    /// Launches the in-page screenshot selector on the given WebView.
     pub(crate) fn start_screenshot_mode(self: &Rc<Self>, view: &WebView) {
-        // One session at a time: remove any leftover overlay.
         self.end_screenshot_overlay();
 
-        let overlay = gtk::Overlay::new();
-        overlay.add_css_class("ss-overlay");
-        overlay.set_can_target(true);
-        overlay.set_focusable(true);
+        if let Some(ucm) = view.user_content_manager() {
+            let _ = ucm.register_script_message_handler("railScreenshot", None);
+        }
 
-        let area = gtk::DrawingArea::new();
-        area.set_hexpand(true);
-        area.set_vexpand(true);
-        area.set_cursor_from_name(Some("crosshair"));
-
-        let state = Rc::new(State {
-            mode: Cell::new(Mode::Picking),
-            region: Cell::new(None),
-            drag_origin: Cell::new(None),
-            move_offset: Cell::new(None),
-            resize_edge: Cell::new(None),
-            hover_el: Cell::new(None),
-        });
-
-        // --- Top-right: Save visible / Save full page (immediate capture, Zen style) ---
-        let topbar = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-        topbar.add_css_class("ss-topbar");
-        topbar.set_halign(gtk::Align::End);
-        topbar.set_valign(gtk::Align::Start);
-        topbar.set_margin_top(12);
-        topbar.set_margin_end(12);
-
-        let btn_vis = gtk::Button::with_label(tr("Save visible"));
-        let btn_full = gtk::Button::with_label(tr("Save full page"));
-        btn_vis.add_css_class("ss-top-btn");
-        btn_full.add_css_class("ss-top-btn");
-        topbar.append(&btn_vis);
-        topbar.append(&btn_full);
-
-        // Hint (center) — only while picking
-        let hint = gtk::Label::new(Some(tr(
-            "Drag or click on the page to select a region. Press ESC to cancel.",
-        )));
-        hint.add_css_class("ss-hint");
-        hint.set_halign(gtk::Align::Center);
-        hint.set_valign(gtk::Align::Center);
-
-        // Size badge — placed over the selection via margins in motion handler
-        let size_lbl = gtk::Label::new(None);
-        size_lbl.add_css_class("ss-size");
-        size_lbl.set_halign(gtk::Align::Start);
-        size_lbl.set_valign(gtk::Align::Start);
-        size_lbl.set_visible(false);
-
-        // Floating toolbar under selection: Cancel · Copy · Download (styled like design)
-        let toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-        toolbar.add_css_class("ss-toolbar");
-        toolbar.set_halign(gtk::Align::Start);
-        toolbar.set_valign(gtk::Align::Start);
-        toolbar.set_visible(false);
-
-        let btn_close = gtk::Button::from_icon_name("window-close-symbolic");
-        btn_close.add_css_class("ss-btn-close");
-        btn_close.set_tooltip_text(Some(tr("Cancel")));
-
-        let btn_copy = gtk::Button::new();
-        btn_copy.add_css_class("ss-btn-copy");
-        let copy_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        let copy_icon = gtk::Image::from_icon_name("edit-copy-symbolic");
-        let copy_lbl = gtk::Label::new(Some(tr("Copy")));
-        copy_box.append(&copy_icon);
-        copy_box.append(&copy_lbl);
-        btn_copy.set_child(Some(&copy_box));
-
-        let btn_dl = gtk::Button::new();
-        btn_dl.add_css_class("ss-primary");
-        btn_dl.add_css_class("ss-btn-dl");
-        let dl_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        let dl_icon = gtk::Image::from_icon_name("document-save-symbolic");
-        let dl_lbl = gtk::Label::new(Some(tr("Download")));
-        dl_box.append(&dl_icon);
-        dl_box.append(&dl_lbl);
-        btn_dl.set_child(Some(&dl_box));
-
-        toolbar.append(&btn_close);
-        toolbar.append(&btn_copy);
-        toolbar.append(&btn_dl);
-
-        overlay.set_child(Some(&area));
-        overlay.add_overlay(&topbar);
-        overlay.add_overlay(&hint);
-        overlay.add_overlay(&size_lbl);
-        overlay.add_overlay(&toolbar);
-
-        view.evaluate_javascript(HOVER_JS, None, None, None::<&gio::Cancellable>, |_| {});
-
-        // --- Draw: dim + hole + border + handles / hover highlight ---
-        let st_d = state.clone();
-        area.set_draw_func(move |_, cr, w, h| {
-            let ww = w as f64;
-            let hh = h as f64;
-            cr.set_source_rgba(0.0, 0.0, 0.0, 0.55);
-            let _ = cr.paint();
-
-            if let Some(r) = st_d.region.get().map(|r| r.normalized()) {
-                // Clear the selection hole so the page shows through
-                cr.set_operator(gtk::cairo::Operator::Clear);
-                cr.rectangle(r.x, r.y, r.w.max(1.0), r.h.max(1.0));
-                let _ = cr.fill();
-                cr.set_operator(gtk::cairo::Operator::Over);
-
-                // White solid border (Firefox style)
-                cr.set_source_rgba(1.0, 1.0, 1.0, 1.0);
-                cr.set_line_width(2.0);
-                cr.rectangle(r.x, r.y, r.w, r.h);
-                let _ = cr.stroke();
-
-                // Corner + edge handles
-                let hs = 7.0;
-                cr.set_source_rgb(1.0, 1.0, 1.0);
-                for (cx, cy) in [
-                    (r.x, r.y),
-                    (r.x + r.w, r.y),
-                    (r.x, r.y + r.h),
-                    (r.x + r.w, r.y + r.h),
-                    (r.x + r.w / 2.0, r.y),
-                    (r.x + r.w / 2.0, r.y + r.h),
-                    (r.x, r.y + r.h / 2.0),
-                    (r.x + r.w, r.y + r.h / 2.0),
-                ] {
-                    cr.rectangle(cx - hs / 2.0, cy - hs / 2.0, hs, hs);
-                    let _ = cr.fill();
+        view.evaluate_javascript(
+            IN_PAGE_SCREENSHOT_JS,
+            None,
+            None,
+            None::<&gio::Cancellable>,
+            |res| {
+                if let Err(e) = res {
+                    eprintln!("[rail] failed to inject screenshot script: {e}");
                 }
-            } else if let Some(r) = st_d.hover_el.get() {
-                // Soft blue highlight like Firefox element picker
-                cr.set_source_rgba(0.15, 0.55, 0.95, 0.22);
-                cr.rectangle(r.x, r.y, r.w, r.h);
-                let _ = cr.fill();
-                cr.set_source_rgba(0.15, 0.55, 0.95, 0.95);
-                cr.set_line_width(2.0);
-                cr.rectangle(r.x, r.y, r.w, r.h);
-                let _ = cr.stroke();
-            }
-            let _ = (ww, hh);
-        });
+            },
+        );
+    }
 
-        let position_chrome = {
-            let size_lbl = size_lbl.clone();
-            let toolbar = toolbar.clone();
-            let area = area.clone();
-            move |r: Rect| {
-                let r = r.normalized();
-                size_lbl.set_text(&format!("{} × {}", r.w.round() as i32, r.h.round() as i32));
-                size_lbl.set_visible(true);
-                // Size just above the selection
-                size_lbl.set_margin_start(r.x.max(0.0) as i32);
-                size_lbl.set_margin_top((r.y - 24.0).max(4.0) as i32);
+    /// Handles messages from the in-page screenshot script.
+    pub(crate) fn on_screenshot_message(self: &Rc<Self>, view: &WebView, payload: &str) {
+        let action = get_json_str(payload, "action").unwrap_or_default();
+        if action == "cancel" {
+            cleanup_screenshot(view);
+            return;
+        }
 
-                let aw = area.width() as f64;
-                let ah = area.height() as f64;
-                let tw = 220.0;
-                let th = 42.0;
-                let mut tx = r.x + r.w - tw;
-                if tx < 4.0 {
-                    tx = r.x.max(4.0);
-                }
-                let mut ty = r.y + r.h + 8.0;
-                if ty + th > ah - 4.0 {
-                    ty = (r.y - th - 8.0).max(4.0);
-                }
-                tx = tx.clamp(4.0, (aw - tw - 4.0).max(4.0));
-                toolbar.set_margin_start(tx as i32);
-                toolbar.set_margin_top(ty as i32);
-            }
-        };
+        if action == "full_page" {
+            let app = self.clone();
+            let view_c = view.clone();
+            view.snapshot(
+                webkit6::SnapshotRegion::FullDocument,
+                webkit6::SnapshotOptions::empty(),
+                None::<&gio::Cancellable>,
+                move |res| {
+                    match res {
+                        Ok(tex) => finish_capture(&app, &tex, false),
+                        Err(e) => eprintln!("[rail] full page screenshot error: {e}"),
+                    }
+                    cleanup_screenshot(&view_c);
+                },
+            );
+            return;
+        }
 
-        // --- Pointer: press ---
-        let click = gtk::GestureClick::new();
-        click.set_button(1);
-        let st_c = state.clone();
-        let area_c = area.clone();
+        let x = get_json_num(payload, "x").unwrap_or(0.0);
+        let y = get_json_num(payload, "y").unwrap_or(0.0);
+        let w = get_json_num(payload, "w").unwrap_or(0.0);
+        let h = get_json_num(payload, "h").unwrap_or(0.0);
+        let doc_w = get_json_num(payload, "docW").unwrap_or(1920.0).max(1.0);
+        let doc_h = get_json_num(payload, "docH").unwrap_or(1080.0).max(1.0);
+        let scroll_x = get_json_num(payload, "scrollX").unwrap_or(0.0);
+        let scroll_y = get_json_num(payload, "scrollY").unwrap_or(0.0);
+        let vp_w = get_json_num(payload, "viewportW").unwrap_or(1920.0).max(1.0);
+        let vp_h = get_json_num(payload, "viewportH").unwrap_or(1080.0).max(1.0);
+
+        if w < 2.0 || h < 2.0 {
+            cleanup_screenshot(view);
+            return;
+        }
+
+        let to_clipboard = action == "copy";
+        let is_visible = y >= scroll_y
+            && (y + h) <= (scroll_y + vp_h + 1.5)
+            && x >= scroll_x
+            && (x + w) <= (scroll_x + vp_w + 1.5);
+
+        let app = self.clone();
         let view_c = view.clone();
-        let hint_c = hint.clone();
-        let pos_c = position_chrome.clone();
-        let tb_c = toolbar.clone();
-        click.connect_pressed(move |_, _, x, y| {
-            tb_c.set_visible(false);
-            match st_c.mode.get() {
-                Mode::Picking => {
-                    let st2 = st_c.clone();
-                    let area2 = area_c.clone();
-                    let hint2 = hint_c.clone();
-                    let pos2 = pos_c.clone();
-                    let tb2 = tb_c.clone();
-                    let ox = x;
-                    let oy = y;
-                    let js = format!(
-                        "window.__railSs && window.__railSs.pick({}, {}) ? JSON.stringify(window.__railSs.pick({}, {})) : null",
-                        ox, oy, ox, oy
-                    );
-                    view_c.evaluate_javascript(
-                        &js,
-                        None,
-                        None,
-                        None::<&gio::Cancellable>,
-                        move |res| {
-                            let mut used_el = false;
-                            if let Ok(val) = res {
-                                let s = val.to_string();
-                                if s != "null" && s.len() > 2 {
-                                    if let Some(r) = parse_js_rect(&s) {
-                                        if r.w >= 4.0 && r.h >= 4.0 {
-                                            st2.region.set(Some(r));
-                                            used_el = true;
-                                        }
-                                    }
-                                }
-                            }
-                            if used_el {
-                                st2.mode.set(Mode::Region);
-                                hint2.set_visible(false);
-                                if let Some(r) = st2.region.get() {
-                                    pos2(r);
-                                    tb2.set_visible(true);
-                                }
-                            } else {
-                                st2.drag_origin.set(Some((ox, oy)));
-                                st2.region.set(Some(Rect {
-                                    x: ox,
-                                    y: oy,
-                                    w: 0.0,
-                                    h: 0.0,
-                                }));
-                                st2.mode.set(Mode::Region);
-                                hint2.set_visible(false);
-                                tb2.set_visible(false);
-                            }
-                            area2.queue_draw();
-                        },
-                    );
-                    view_c.evaluate_javascript(
-                        "if(window.__railSs) window.__railSs.clicked=null",
-                        None,
-                        None,
-                        None::<&gio::Cancellable>,
-                        |_| {},
-                    );
-                }
-                Mode::Region => {
-                    if let Some(r) = st_c.region.get().map(|r| r.normalized()) {
-                        if let Some(edge) = hit_handle(r, x, y) {
-                            st_c.resize_edge.set(Some(edge));
-                            st_c.move_offset.set(None);
-                            st_c.drag_origin.set(None);
-                        } else if r.contains(x, y) {
-                            // Move whole region
-                            st_c.move_offset.set(Some((x - r.x, y - r.y)));
-                            st_c.resize_edge.set(None);
-                            st_c.drag_origin.set(None);
-                        } else {
-                            // New drag outside
-                            st_c.drag_origin.set(Some((x, y)));
-                            st_c.region.set(Some(Rect {
-                                x,
-                                y,
-                                w: 0.0,
-                                h: 0.0,
-                            }));
-                            st_c.resize_edge.set(None);
-                            st_c.move_offset.set(None);
-                        }
-                    }
-                }
-            }
-        });
 
-        let st_r = state.clone();
-        let area_r = area.clone();
-        let pos_r = position_chrome.clone();
-        let tb_r = toolbar.clone();
-        let hint_r = hint.clone();
-        click.connect_released(move |_, _, _, _| {
-            st_r.drag_origin.set(None);
-            st_r.resize_edge.set(None);
-            st_r.move_offset.set(None);
-            if let Some(r) = st_r.region.get().map(|r| r.normalized()) {
-                if r.w < 10.0 || r.h < 10.0 {
-                    st_r.region.set(None);
-                    st_r.mode.set(Mode::Picking);
-                    tb_r.set_visible(false);
-                    hint_r.set_visible(true);
-                } else {
-                    st_r.region.set(Some(r));
-                    pos_r(r);
-                    tb_r.set_visible(true);
-                    hint_r.set_visible(false);
-                }
-            } else {
-                tb_r.set_visible(false);
-            }
-            area_r.queue_draw();
-        });
-        area.add_controller(click);
-
-        // --- Motion ---
-        let motion = gtk::EventControllerMotion::new();
-        let st_m = state.clone();
-        let area_m = area.clone();
-        let view_m = view.clone();
-        let pos_m = position_chrome.clone();
-        let tb_m = toolbar.clone();
-        motion.connect_motion(move |_, x, y| {
-            match st_m.mode.get() {
-                Mode::Picking => {
-                    let st3 = st_m.clone();
-                    let a3 = area_m.clone();
-                    let js = format!(
-                        "window.__railSs && window.__railSs.pick({}, {}) ? JSON.stringify(window.__railSs.pick({}, {})) : null",
-                        x, y, x, y
-                    );
-                    view_m.evaluate_javascript(
-                        &js,
-                        None,
-                        None,
-                        None::<&gio::Cancellable>,
-                        move |res| {
-                            if let Ok(val) = res {
-                                let s = val.to_string();
-                                if s != "null" && s.len() > 2 {
-                                    if let Some(r) = parse_js_rect(&s) {
-                                        st3.hover_el.set(Some(r));
-                                        a3.queue_draw();
-                                        return;
-                                    }
-                                }
-                            }
-                            st3.hover_el.set(None);
-                            a3.queue_draw();
-                        },
-                    );
-                }
-                Mode::Region => {
-                    let is_active_drag = st_m.drag_origin.get().is_some()
-                        || st_m.resize_edge.get().is_some()
-                        || st_m.move_offset.get().is_some();
-                    if is_active_drag {
-                        tb_m.set_visible(false);
-                    }
-                    let vh = area_m.height() as f64;
-                    let vw = area_m.width() as f64;
-                    // Edge auto-scroll while resizing/drawing
-                    let edge_zone = 28.0;
-                    if y > vh - edge_zone {
-                        view_m.evaluate_javascript(
-                            "window.scrollBy(0, 48)",
-                            None,
-                            None,
-                            None::<&gio::Cancellable>,
-                            |_| {},
-                        );
-                    } else if y < edge_zone {
-                        view_m.evaluate_javascript(
-                            "window.scrollBy(0, -48)",
-                            None,
-                            None,
-                            None::<&gio::Cancellable>,
-                            |_| {},
-                        );
-                    }
-                    if x > vw - edge_zone {
-                        view_m.evaluate_javascript(
-                            "window.scrollBy(48, 0)",
-                            None,
-                            None,
-                            None::<&gio::Cancellable>,
-                            |_| {},
-                        );
-                    } else if x < edge_zone {
-                        view_m.evaluate_javascript(
-                            "window.scrollBy(-48, 0)",
-                            None,
-                            None,
-                            None::<&gio::Cancellable>,
-                            |_| {},
-                        );
-                    }
-
-                    if let Some((ox, oy)) = st_m.drag_origin.get() {
-                        st_m.region.set(Some(Rect {
-                            x: ox,
-                            y: oy,
-                            w: x - ox,
-                            h: y - oy,
-                        }));
-                    } else if let (Some((off_x, off_y)), Some(r0)) =
-                        (st_m.move_offset.get(), st_m.region.get().map(|r| r.normalized()))
-                    {
-                        let mut r = r0;
-                        r.x = (x - off_x).clamp(0.0, (vw - r.w).max(0.0));
-                        r.y = (y - off_y).clamp(0.0, (vh - r.h).max(0.0));
-                        st_m.region.set(Some(r));
-                    } else if let (Some(edge), Some(mut r)) =
-                        (st_m.resize_edge.get(), st_m.region.get().map(|r| r.normalized()))
-                    {
-                        match edge {
-                            "nw" => {
-                                r.w += r.x - x;
-                                r.h += r.y - y;
-                                r.x = x;
-                                r.y = y;
-                            }
-                            "ne" => {
-                                r.w = x - r.x;
-                                r.h += r.y - y;
-                                r.y = y;
-                            }
-                            "sw" => {
-                                r.w += r.x - x;
-                                r.x = x;
-                                r.h = y - r.y;
-                            }
-                            "se" => {
-                                r.w = x - r.x;
-                                r.h = y - r.y;
-                            }
-                            "n" => {
-                                r.h += r.y - y;
-                                r.y = y;
-                            }
-                            "s" => {
-                                r.h = y - r.y;
-                            }
-                            "w" => {
-                                r.w += r.x - x;
-                                r.x = x;
-                            }
-                            "e" => {
-                                r.w = x - r.x;
-                            }
-                            _ => {}
-                        }
-                        st_m.region.set(Some(r));
-                    }
-                    if let Some(r) = st_m.region.get() {
-                        pos_m(r);
-                    }
-                    area_m.queue_draw();
-                }
-            }
-        });
-        area.add_controller(motion);
-
-        // --- Scroll on page while picking / selecting ---
-        let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
-        let view_scroll = view.clone();
-        let area_scroll = area.clone();
-        let st_scroll = state.clone();
-        scroll.connect_scroll(move |_, _, dy| {
-            let px = dy * 70.0;
-            let js = format!("window.scrollBy({{ top: {}, behavior: 'instant' }})", px);
-            let st_sc = st_scroll.clone();
-            let a_sc = area_scroll.clone();
-            view_scroll.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, move |_| {
-                if st_sc.mode.get() == Mode::Picking {
-                    st_sc.hover_el.set(None);
-                    a_sc.queue_draw();
-                }
-            });
-            glib::Propagation::Stop
-        });
-        area.add_controller(scroll);
-
-        // --- Capture helpers ---
-        let dismiss = {
-            let app = self.clone();
-            let view = view.clone();
-            move || {
-                cleanup_screenshot(&view);
-                app.end_screenshot_overlay();
-            }
-        };
-
-        let capture_region = {
-            let app = self.clone();
-            let view = view.clone();
-            let state = state.clone();
-            let dismiss = dismiss.clone();
-            move |to_clipboard: bool| {
-                let region = webkit6::SnapshotRegion::Visible;
-                let opts = webkit6::SnapshotOptions::empty();
-                let app2 = app.clone();
-                let st2 = state.clone();
-                let view2 = view.clone();
-                let dismiss2 = dismiss.clone();
-                let vw = view.width().max(1) as f64;
-                let vh = view.height().max(1) as f64;
-                view.snapshot(region, opts, None::<&gio::Cancellable>, move |res| {
+        if is_visible {
+            // Fast viewport capture
+            view.snapshot(
+                webkit6::SnapshotRegion::Visible,
+                webkit6::SnapshotOptions::empty(),
+                None::<&gio::Cancellable>,
+                move |res| {
                     match res {
                         Ok(tex) => {
-                            let final_tex = if let Some(r) = st2.region.get().map(|r| r.normalized()) {
-                                // Scale crop to texture pixels (HiDPI)
-                                let sx = tex.width() as f64 / vw;
-                                let sy = tex.height() as f64 / vh;
-                                let scaled = Rect {
-                                    x: r.x * sx,
-                                    y: r.y * sy,
-                                    w: r.w * sx,
-                                    h: r.h * sy,
-                                };
-                                crop_texture(&tex, scaled).unwrap_or(tex)
-                            } else {
-                                tex
+                            let tw = tex.width() as f64;
+                            let th = tex.height() as f64;
+                            let sx = tw / vp_w;
+                            let sy = th / vp_h;
+                            let crop_r = Rect {
+                                x: (x - scroll_x) * sx,
+                                y: (y - scroll_y) * sy,
+                                w: w * sx,
+                                h: h * sy,
                             };
-                            finish_capture(&app2, &final_tex, to_clipboard);
-                            dismiss2();
-                            let _ = &view2;
+                            let final_tex = crop_texture(&tex, crop_r).unwrap_or(tex);
+                            finish_capture(&app, &final_tex, to_clipboard);
                         }
-                        Err(e) => eprintln!("[rail] screenshot failed: {e}"),
+                        Err(e) => eprintln!("[rail] visible snapshot error: {e}"),
                     }
-                });
-            }
-        };
-
-        let capture_preset = {
-            let app = self.clone();
-            let view = view.clone();
-            let dismiss = dismiss.clone();
-            move |full: bool, to_clipboard: bool| {
-                let region = if full {
-                    webkit6::SnapshotRegion::FullDocument
-                } else {
-                    webkit6::SnapshotRegion::Visible
-                };
-                let opts = webkit6::SnapshotOptions::empty();
-                let app2 = app.clone();
-                let dismiss2 = dismiss.clone();
-                view.snapshot(region, opts, None::<&gio::Cancellable>, move |res| {
+                    cleanup_screenshot(&view_c);
+                },
+            );
+        } else {
+            // Continuous scroll capture across the document
+            view.snapshot(
+                webkit6::SnapshotRegion::FullDocument,
+                webkit6::SnapshotOptions::empty(),
+                None::<&gio::Cancellable>,
+                move |res| {
                     match res {
                         Ok(tex) => {
-                            finish_capture(&app2, &tex, to_clipboard);
-                            dismiss2();
+                            let tw = tex.width() as f64;
+                            let th = tex.height() as f64;
+                            let sx = tw / doc_w;
+                            let sy = th / doc_h;
+                            let crop_r = Rect {
+                                x: x * sx,
+                                y: y * sy,
+                                w: w * sx,
+                                h: h * sy,
+                            };
+                            let final_tex = crop_texture(&tex, crop_r).unwrap_or(tex);
+                            finish_capture(&app, &final_tex, to_clipboard);
                         }
-                        Err(e) => eprintln!("[rail] screenshot failed: {e}"),
+                        Err(e) => {
+                            eprintln!("[rail] full document snapshot error: {e}; falling back");
+                        }
                     }
-                });
-            }
-        };
-
-        // Top bar: immediate capture → Download (Firefox downloads by default from these buttons;
-        // we also support clipboard via the region toolbar).
-        {
-            let cap = capture_preset.clone();
-            btn_vis.connect_clicked(move |_| cap(false, false));
+                    cleanup_screenshot(&view_c);
+                },
+            );
         }
-        {
-            let cap = capture_preset.clone();
-            btn_full.connect_clicked(move |_| cap(true, false));
-        }
-
-        {
-            let d = dismiss.clone();
-            btn_close.connect_clicked(move |_| d());
-        }
-        {
-            let cap = capture_region.clone();
-            btn_copy.connect_clicked(move |_| cap(true));
-        }
-        {
-            let cap = capture_region.clone();
-            btn_dl.connect_clicked(move |_| cap(false));
-        }
-
-        // Keyboard
-        let key = gtk::EventControllerKey::new();
-        let dismiss_k = dismiss.clone();
-        let cap_k = capture_region.clone();
-        let st_k = state.clone();
-        key.connect_key_pressed(move |_, k, _, _| {
-            if k == gdk::Key::Escape {
-                dismiss_k();
-                return glib::Propagation::Stop;
-            }
-            if st_k.mode.get() == Mode::Region && st_k.region.get().is_some() {
-                if k == gdk::Key::c || k == gdk::Key::C {
-                    cap_k(true);
-                    return glib::Propagation::Stop;
-                }
-                if k == gdk::Key::s || k == gdk::Key::S {
-                    cap_k(false);
-                    return glib::Propagation::Stop;
-                }
-            }
-            glib::Propagation::Proceed
-        });
-        overlay.add_controller(key);
-
-        // Mount over the webview's Overlay parent (tab widget)
-        let mut attached = false;
-        let mut cur = view.parent();
-        while let Some(w) = cur {
-            if let Some(ov) = w.downcast_ref::<gtk::Overlay>() {
-                ov.add_overlay(&overlay);
-                attached = true;
-                break;
-            }
-            cur = w.parent();
-        }
-        if !attached {
-            self.shell.append(&overlay);
-            overlay.set_hexpand(true);
-            overlay.set_vexpand(true);
-        }
-
-        // Stash so we can remove it later
-        *self.ss_overlay.borrow_mut() = Some(overlay.clone());
-        overlay.grab_focus();
     }
 
     pub(crate) fn end_screenshot_overlay(&self) {
-        if let Some(o) = self.ss_overlay.borrow_mut().take() {
-            if let Some(parent) = o.parent() {
-                if let Some(boxp) = parent.downcast_ref::<gtk::Box>() {
-                    boxp.remove(&o);
-                } else if let Some(ov) = parent.downcast_ref::<gtk::Overlay>() {
-                    ov.remove_overlay(&o);
-                }
-            }
+        if let Some(v) = self.focused_view() {
+            cleanup_screenshot(&v);
         }
-    }
-}
-
-fn finish_capture(app: &App, tex: &gdk::Texture, to_clipboard: bool) {
-    if to_clipboard {
-        app.win.clipboard().set_texture(tex);
-        eprintln!("[rail] screenshot copied to clipboard");
-    } else {
-        save_texture_png(tex);
     }
 }
 
@@ -724,71 +717,23 @@ fn cleanup_screenshot(view: &WebView) {
     view.evaluate_javascript(CLEANUP_JS, None, None, None::<&gio::Cancellable>, |_| {});
 }
 
-fn parse_js_rect(s: &str) -> Option<Rect> {
-    let s = s.trim().trim_matches('"');
-    let s = s.replace("\\\"", "\"");
-    let get = |key: &str| -> Option<f64> {
-        let pat = format!("\"{}\":", key);
-        let idx = s.find(&pat)?;
-        let rest = &s[idx + pat.len()..];
-        let num: String = rest
-            .chars()
-            .skip_while(|c| c.is_whitespace())
-            .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
-            .collect();
-        num.parse().ok()
-    };
-    Some(Rect {
-        x: get("x")?,
-        y: get("y")?,
-        w: get("w")?,
-        h: get("h")?,
-    })
-}
-
-fn hit_handle(r: Rect, x: f64, y: f64) -> Option<&'static str> {
-    let t = 10.0;
-    let near = |a: f64, b: f64| (a - b).abs() < t;
-    let on_x = near(x, r.x);
-    let on_xr = near(x, r.x + r.w);
-    let on_y = near(y, r.y);
-    let on_yb = near(y, r.y + r.h);
-    let mid_x = near(x, r.x + r.w / 2.0);
-    let mid_y = near(y, r.y + r.h / 2.0);
-    if on_x && on_y {
-        return Some("nw");
+fn finish_capture(app: &Rc<App>, tex: &gdk::Texture, to_clipboard: bool) {
+    if to_clipboard {
+        app.win.clipboard().set_texture(tex);
+        app.show_copied_toast(tr("Nusxalandi!"), tr("Screenshot buferga nusxalandi"));
+    } else if let Some(path) = save_texture_png(tex) {
+        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        app.show_copied_toast(tr("Saqlandi!"), &format!("screenshots/{}", name));
     }
-    if on_xr && on_y {
-        return Some("ne");
-    }
-    if on_x && on_yb {
-        return Some("sw");
-    }
-    if on_xr && on_yb {
-        return Some("se");
-    }
-    if mid_x && on_y {
-        return Some("n");
-    }
-    if mid_x && on_yb {
-        return Some("s");
-    }
-    if on_x && mid_y {
-        return Some("w");
-    }
-    if on_xr && mid_y {
-        return Some("e");
-    }
-    None
 }
 
 fn crop_texture(tex: &gdk::Texture, r: Rect) -> Option<gdk::Texture> {
     let tw = tex.width() as f64;
     let th = tex.height() as f64;
-    let x = r.x.clamp(0.0, tw - 1.0);
-    let y = r.y.clamp(0.0, th - 1.0);
-    let w = r.w.clamp(1.0, tw - x);
-    let h = r.h.clamp(1.0, th - y);
+    let x = r.x.clamp(0.0, (tw - 1.0).max(0.0));
+    let y = r.y.clamp(0.0, (th - 1.0).max(0.0));
+    let w = r.w.clamp(1.0, (tw - x).max(1.0));
+    let h = r.h.clamp(1.0, (th - y).max(1.0));
     let ix = x as i32;
     let iy = y as i32;
     let iw = w as i32;
@@ -803,8 +748,10 @@ fn crop_texture(tex: &gdk::Texture, r: Rect) -> Option<gdk::Texture> {
     for row in 0..ih as usize {
         let src_off = ((iy as usize + row) * stride as usize) + (ix as usize * 4);
         let dst_off = row * (iw as usize) * 4;
-        out[dst_off..dst_off + iw as usize * 4]
-            .copy_from_slice(&buf[src_off..src_off + iw as usize * 4]);
+        if src_off + iw as usize * 4 <= buf.len() && dst_off + iw as usize * 4 <= out.len() {
+            out[dst_off..dst_off + iw as usize * 4]
+                .copy_from_slice(&buf[src_off..src_off + iw as usize * 4]);
+        }
     }
     let bytes = glib::Bytes::from_owned(out);
     Some(
@@ -813,15 +760,17 @@ fn crop_texture(tex: &gdk::Texture, r: Rect) -> Option<gdk::Texture> {
     )
 }
 
-fn save_texture_png(tex: &gdk::Texture) {
+fn save_texture_png(tex: &gdk::Texture) -> Option<std::path::PathBuf> {
     let dir = rail_data_dir().join("screenshots");
     let _ = std::fs::create_dir_all(&dir);
     let ts = chrono_like_timestamp();
     let path = dir.join(format!("Screenshot {ts}.png"));
     if let Err(e) = tex.save_to_png(&path) {
         eprintln!("[rail] save png failed: {e}");
+        None
     } else {
         eprintln!("[rail] screenshot saved → {}", path.display());
+        Some(path)
     }
 }
 
@@ -843,4 +792,24 @@ fn chrono_like_timestamp() -> String {
         .map(|d| d.as_secs())
         .unwrap_or(0);
     format!("{secs}")
+}
+
+fn get_json_num(s: &str, key: &str) -> Option<f64> {
+    let pat = format!("\"{}\":", key);
+    let idx = s.find(&pat)?;
+    let rest = &s[idx + pat.len()..];
+    let num: String = rest
+        .chars()
+        .skip_while(|c| c.is_whitespace())
+        .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
+        .collect();
+    num.parse().ok()
+}
+
+fn get_json_str(s: &str, key: &str) -> Option<String> {
+    let pat = format!("\"{}\":\"", key);
+    let idx = s.find(&pat)?;
+    let rest = &s[idx + pat.len()..];
+    let end_idx = rest.find('"')?;
+    Some(rest[..end_idx].to_string())
 }
