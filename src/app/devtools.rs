@@ -113,6 +113,7 @@ impl App {
                 self.devtools_panel.append(&self.devtools_resize_handle);
                 self.devtools_panel.append(&self.devtools_content_box);
 
+                self.devtools_resize_handle.set_cursor_from_name(Some("ns-resize"));
                 self.devtools_panel.set_halign(gtk::Align::Fill);
                 self.devtools_panel.set_valign(gtk::Align::End);
                 self.devtools_panel.set_width_request(-1);
@@ -143,6 +144,7 @@ impl App {
                 self.devtools_panel.append(&self.devtools_content_box);
                 self.devtools_panel.append(&self.devtools_resize_handle);
 
+                self.devtools_resize_handle.set_cursor_from_name(Some("ew-resize"));
                 self.devtools_panel.set_halign(gtk::Align::Start);
                 self.devtools_panel.set_valign(gtk::Align::Fill);
                 self.devtools_panel.set_height_request(-1);
@@ -173,6 +175,7 @@ impl App {
                 self.devtools_panel.append(&self.devtools_resize_handle);
                 self.devtools_panel.append(&self.devtools_content_box);
 
+                self.devtools_resize_handle.set_cursor_from_name(Some("ew-resize"));
                 self.devtools_panel.set_halign(gtk::Align::End);
                 self.devtools_panel.set_valign(gtk::Align::Fill);
                 self.devtools_panel.set_height_request(-1);

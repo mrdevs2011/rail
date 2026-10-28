@@ -19,10 +19,15 @@ pub(crate) fn wire_devtools(app: &Rc<App>, devtools_close_btn: gtk::Button, devt
 
     // DevTools resize drag handle
     let dt_drag = gtk::GestureDrag::new();
+    dt_drag.set_propagation_phase(gtk::PropagationPhase::Capture);
     let app_drag = app.clone();
+    let handle_ref = devtools_resize_handle.clone();
     let start_size = Rc::new(Cell::new(0i32));
     let st_sz_begin = start_size.clone();
-    dt_drag.connect_drag_begin(move |_, _, _| {
+    let h_begin = handle_ref.clone();
+    dt_drag.connect_drag_begin(move |g, _, _| {
+        g.set_state(gtk::EventSequenceState::Claimed);
+        h_begin.add_css_class("dragging");
         let side = app_drag.devtools_dock_side.get();
         let cur = match side {
             DevToolsDockSide::Bottom => app_drag.devtools_panel.height(),
@@ -41,19 +46,28 @@ pub(crate) fn wire_devtools(app: &Rc<App>, devtools_close_btn: gtk::Button, devt
         let win_h = app_drag_up.win.height() as f64;
         match side {
             DevToolsDockSide::Bottom => {
-                let nh = (base - offset_y).clamp(180.0, (win_h - 100.0).max(200.0)) as i32;
+                let nh = (base - offset_y).clamp(160.0, (win_h - 80.0).max(200.0)) as i32;
                 app_drag_up.devtools_panel.set_height_request(nh);
+                app_drag_up.devtools_panel.queue_allocate();
             }
             DevToolsDockSide::Left => {
-                let nw = (base + offset_x).clamp(280.0, (win_w - 200.0).max(300.0)) as i32;
+                let nw = (base + offset_x).clamp(260.0, (win_w - 160.0).max(300.0)) as i32;
                 app_drag_up.devtools_panel.set_width_request(nw);
+                app_drag_up.devtools_panel.queue_allocate();
             }
             DevToolsDockSide::Right => {
-                let nw = (base - offset_x).clamp(280.0, (win_w - 200.0).max(300.0)) as i32;
+                let nw = (base - offset_x).clamp(260.0, (win_w - 160.0).max(300.0)) as i32;
                 app_drag_up.devtools_panel.set_width_request(nw);
+                app_drag_up.devtools_panel.queue_allocate();
             }
             _ => {}
         }
+    });
+
+    let h_end = handle_ref.clone();
+    dt_drag.connect_drag_end(move |g, _, _| {
+        g.set_state(gtk::EventSequenceState::None);
+        h_end.remove_css_class("dragging");
     });
     devtools_resize_handle.add_controller(dt_drag);
 

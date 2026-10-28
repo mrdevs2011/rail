@@ -14,32 +14,19 @@ use std::cell::Cell;
 /// Element hover without mutating the page (no outline on DOM — drawn on our overlay).
 const HOVER_JS: &str = r#"
 (function(){
-  if (window.__railSs) return;
-  const MAX_W = Math.min(window.innerWidth * 0.98, 4000);
-  const MAX_H = Math.min(window.innerHeight * 0.98, 4000);
-  const MIN = 8;
   function pick(x, y) {
     let el = document.elementFromPoint(x, y);
-    if (!el) return null;
-    // Walk up to a sensible block (skip tiny / full-viewport nodes).
-    while (el && el !== document.documentElement && el !== document.body) {
-      const r = el.getBoundingClientRect();
-      if (r.width >= MIN && r.height >= MIN && r.width <= MAX_W && r.height <= MAX_H) {
-        return { x: r.left, y: r.top, w: r.width, h: r.height };
-      }
-      el = el.parentElement;
+    if (!el || el === document.documentElement || el === document.body) return null;
+    let curr = el;
+    while (curr && curr.parentElement && curr.parentElement !== document.body && curr.parentElement !== document.documentElement) {
+      const r = curr.getBoundingClientRect();
+      if (r.width >= 16 && r.height >= 14) break;
+      curr = curr.parentElement;
     }
-    return null;
+    const r = (curr || el).getBoundingClientRect();
+    return { x: r.left, y: r.top, w: r.width, h: r.height };
   }
-  window.__railSs = { pick, last: null };
-  document.addEventListener('mousemove', function(e) {
-    window.__railSs.last = pick(e.clientX, e.clientY);
-  }, true);
-  document.addEventListener('click', function(e) {
-    e.preventDefault(); e.stopPropagation();
-    window.__railSs.last = pick(e.clientX, e.clientY);
-    window.__railSs.clicked = window.__railSs.last;
-  }, true);
+  window.__railSs = { pick };
 })();
 "#;
 
@@ -266,11 +253,12 @@ impl App {
                     let pos2 = pos_c.clone();
                     let ox = x;
                     let oy = y;
+                    let js = format!(
+                        "window.__railSs && window.__railSs.pick({}, {}) ? JSON.stringify(window.__railSs.pick({}, {})) : null",
+                        ox, oy, ox, oy
+                    );
                     view_c.evaluate_javascript(
-                        "window.__railSs && window.__railSs.clicked
-                          ? JSON.stringify(window.__railSs.clicked)
-                          : (window.__railSs && window.__railSs.last
-                              ? JSON.stringify(window.__railSs.last) : null)",
+                        &js,
                         None,
                         None,
                         None::<&gio::Cancellable>,
@@ -301,7 +289,6 @@ impl App {
                             if let Some(r) = st2.region.get() {
                                 pos2(r);
                             }
-                            // clear one-shot click mark
                             area2.queue_draw();
                         },
                     );
@@ -373,8 +360,12 @@ impl App {
                 Mode::Picking => {
                     let st3 = st_m.clone();
                     let a3 = area_m.clone();
+                    let js = format!(
+                        "window.__railSs && window.__railSs.pick({}, {}) ? JSON.stringify(window.__railSs.pick({}, {})) : null",
+                        x, y, x, y
+                    );
                     view_m.evaluate_javascript(
-                        "window.__railSs && window.__railSs.last ? JSON.stringify(window.__railSs.last) : null",
+                        &js,
                         None,
                         None,
                         None::<&gio::Cancellable>,
@@ -498,6 +489,26 @@ impl App {
             }
         });
         area.add_controller(motion);
+
+        // --- Scroll on page while picking / selecting ---
+        let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+        let view_scroll = view.clone();
+        let area_scroll = area.clone();
+        let st_scroll = state.clone();
+        scroll.connect_scroll(move |_, _, dy| {
+            let px = dy * 70.0;
+            let js = format!("window.scrollBy({{ top: {}, behavior: 'instant' }})", px);
+            let st_sc = st_scroll.clone();
+            let a_sc = area_scroll.clone();
+            view_scroll.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, move |_| {
+                if st_sc.mode.get() == Mode::Picking {
+                    st_sc.hover_el.set(None);
+                    a_sc.queue_draw();
+                }
+            });
+            glib::Propagation::Stop
+        });
+        area.add_controller(scroll);
 
         // --- Capture helpers ---
         let dismiss = {

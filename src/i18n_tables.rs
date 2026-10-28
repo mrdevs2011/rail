@@ -402,7 +402,7 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Never allow", "Hech qachon ruxsat bermaslik", "Никогда не разрешать"),
     ("Take Screenshot", "Skrinshot olish", "Сделать скриншот"),
     ("Save visible", "Ko'rinadigan qism", "Видимая область"),
-    ("Save full page", "Butun sahifa", "Вся страница"),
+    ("Save full page", "Butun sahifa (uzunchoq)", "Вся страница (длинный)"),
     ("Download", "Yuklab olish", "Скачать"),
     ("Drag or click on the page to select a region. Press ESC to cancel.", "Hududni tanlash uchun sahifani bosing yoki torting. Bekor qilish — ESC.", "Перетащите или щёлкните, чтобы выбрать область. ESC — отмена."),
     ("Screenshot copied!", "Skrinshot nusxalandi!", "Скриншот скопирован!"),
