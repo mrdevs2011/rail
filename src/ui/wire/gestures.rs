@@ -70,9 +70,9 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
     }
 
     // Overview-only 2D pan (two-finger swipe between tabs/rows). Normal browsing leaves
-    // scroll to WebKit entirely — no Touchpad Slide mode.
+    // scroll to WebKit entirely — Bubble phase ensures normal page scroll is never intercepted.
     let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
-    scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
+    scroll.set_propagation_phase(gtk::PropagationPhase::Bubble);
     let accum_x = Rc::new(Cell::new(0.0f64));
     let accum_y = Rc::new(Cell::new(0.0f64));
     let last_scroll = Rc::new(Cell::new(0i64));
