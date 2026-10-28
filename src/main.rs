@@ -76,15 +76,6 @@ fn main() -> glib::ExitCode {
         std::env::set_var("SOUP_FORCE_HTTP1", "1");
     }
 
-    // WebKitGTK DMA-BUF renderer on Intel Iris Xe / TigerLake often causes black texture
-    // failures between WebProcess and UIProcess. Disabling DMA-BUF maintains full GPU
-    // compositing while eliminating the black box / pitch-black tab bug.
-    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
-        unsafe {
-            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-        }
-    }
-
     // RAM: constrain WebKit early (before any NetworkSession / WebView)
     // DocumentViewer cache model uses far less memory than full WebBrowser.
     // GPU compositing va DMABUF renderer yoqilgan holda qoldiriladi: ilgari ikkalasi majburan

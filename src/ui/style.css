@@ -23,18 +23,14 @@ scrollbar.overlay-indicator {
     margin: 0;
     min-width: 0;
     min-height: 0;
-    -GtkScrollbar-has-backward-stepper: false;
-    -GtkScrollbar-has-forward-stepper: false;
 }
 scrollbar.horizontal,
 scrollbar.horizontal.overlay-indicator {
     min-height: 3px;
-    height: 3px;
 }
 scrollbar.vertical,
 scrollbar.vertical.overlay-indicator {
     min-width: 3px;
-    width: 3px;
 }
 scrollbar trough,
 scrollbar.horizontal trough,
@@ -71,7 +67,6 @@ scrollbar.horizontal slider,
 scrollbar.horizontal.overlay-indicator slider,
 scrollbar.overlay-indicator:not(.dragging):not(.hovering).horizontal slider {
     min-height: 3px;
-    height: 3px;
     min-width: 24px;
     margin: 0;
     border: none;
@@ -80,7 +75,6 @@ scrollbar.vertical slider,
 scrollbar.vertical.overlay-indicator slider,
 scrollbar.overlay-indicator:not(.dragging):not(.hovering).vertical slider {
     min-width: 3px;
-    width: 3px;
     min-height: 24px;
     margin: 0;
     border: none;
@@ -92,7 +86,6 @@ scrollbar.horizontal.dragging slider {
     background: rgba(255, 255, 255, 0.55);
     background-color: rgba(255, 255, 255, 0.55);
     min-height: 5px;
-    height: 5px;
     border: none;
 }
 scrollbar.vertical:hover slider,
@@ -100,7 +93,6 @@ scrollbar.vertical.dragging slider {
     background: rgba(255, 255, 255, 0.55);
     background-color: rgba(255, 255, 255, 0.55);
     min-width: 5px;
-    width: 5px;
     border: none;
 }
 scrollbar button {
@@ -535,7 +527,6 @@ progressbar.load-bar progress {
     padding: 14px 18px 12px;
     box-shadow: none;
     min-width: 580px;
-    max-width: 580px;
 }
 .palette image {
     color: #727272;
@@ -568,7 +559,6 @@ entry.palette-entry, entry.palette-entry:focus-within {
 }
 .palette-suggestions-scroll {
     min-height: 0;
-    max-height: 220px;
 }
 .palette-sug-item {
     padding: 7px 11px;
@@ -611,14 +601,14 @@ entry.palette-entry, entry.palette-entry:focus-within {
 }
 
 /* ---- profile colors (True Dark Multi-Profile) ---- */
-.prof-bg-0 { background-color: #ededed; color: #050811 !important; }
-.prof-bg-1 { background-color: #c084fc; color: #050811 !important; }
-.prof-bg-2 { background-color: #4ade80; color: #050811 !important; }
-.prof-bg-3 { background-color: #facc15; color: #050811 !important; }
-.prof-bg-4 { background-color: #f87171; color: #050811 !important; }
-.prof-bg-5 { background-color: #22d3ee; color: #050811 !important; }
-.prof-bg-6 { background-color: #fb923c; color: #050811 !important; }
-.prof-bg-7 { background-color: #2dd4bf; color: #050811 !important; }
+.prof-bg-0 { background-color: #ededed; color: #050811; }
+.prof-bg-1 { background-color: #c084fc; color: #050811; }
+.prof-bg-2 { background-color: #4ade80; color: #050811; }
+.prof-bg-3 { background-color: #facc15; color: #050811; }
+.prof-bg-4 { background-color: #f87171; color: #050811; }
+.prof-bg-5 { background-color: #22d3ee; color: #050811; }
+.prof-bg-6 { background-color: #fb923c; color: #050811; }
+.prof-bg-7 { background-color: #2dd4bf; color: #050811; }
 
 /* ---- profile circle button in URL palette ---- */
 button.profile-circle-btn {
@@ -761,7 +751,6 @@ popover.extensions-popover > contents {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
     color: #ffffff;
     min-width: 280px;
-    max-width: 340px;
 }
 popover.extensions-popover > arrow {
     background: #0d0d0d;
@@ -1056,7 +1045,6 @@ button.color-choice.selected {
     border-radius: 0;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
     min-width: 340px;
-    max-width: 460px;
 }
 
 /* ---- JS script dialogs ---- */
@@ -1247,20 +1235,17 @@ button.color-choice.selected {
     border-bottom: 1px solid #151515;
     border-right: none;
     min-height: 48px;
-    max-height: 52px;
 }
 .settings-modal.responsive-narrow .settings-sidebar {
     border-right: none;
     border-bottom: none;
     min-width: 0;
-    width: auto;
     padding: 6px 8px;
 }
 .settings-modal.responsive-narrow .settings-tab-btn {
     margin: 0 4px;
     padding: 6px 12px;
     font-size: 12px;
-    width: auto;
 }
 .settings-modal.responsive-narrow .settings-tab-btn.active {
     box-shadow: inset 0 -2px 0 0 #ededed;
@@ -1317,8 +1302,7 @@ button.color-choice.selected {
     background: #090909;
     border-right: 1px solid #151515;
     padding: 12px 8px;
-    min-width: 205px;
-    width: 215px;
+    min-width: 215px;
 }
 .settings-tab-btn {
     background: transparent;
@@ -1451,9 +1435,6 @@ button.settings-engine-btn.active {
     color: #d4d4d4;
 }
 /* Stacked multi-binding shortcut card (Ctrl+1..9 etc.) */
-.shortcut-stack {
-    position: relative;
-}
 .shortcut-stack-card {
     background: #121212;
     border: 1px solid #2a2a2a;
@@ -1590,7 +1571,6 @@ button.settings-engine-btn.active {
     min-height: 8px;
     background: #0d0d0d;
     border-top: 1px solid #222222;
-    cursor: ns-resize;
     transition: background 0.12s ease, border-color 0.12s ease;
 }
 .devtools-resize-handle:hover,
@@ -1605,7 +1585,6 @@ button.settings-engine-btn.active {
 .devtools-panel.dock-bottom .devtools-resize-handle {
     min-height: 8px;
     border-top: 1px solid #222222;
-    cursor: ns-resize;
 }
 .devtools-panel.dock-bottom .devtools-resize-handle:hover,
 .devtools-panel.dock-bottom .devtools-resize-handle.dragging {
@@ -1617,7 +1596,6 @@ button.settings-engine-btn.active {
     min-width: 8px;
     border-left: 1px solid #222222;
     border-right: 1px solid #222222;
-    cursor: ew-resize;
 }
 .devtools-panel.dock-left .devtools-resize-handle:hover,
 .devtools-panel.dock-right .devtools-resize-handle:hover,
@@ -1809,7 +1787,7 @@ selection {
 button.update-get {
     background: #ffffff;
     background-image: none;
-    color: #000000 !important;
+    color: #000000;
     border: 1px solid #ffffff;
     border-radius: 3px;
     padding: 5px 20px;
@@ -1819,14 +1797,14 @@ button.update-get {
 button.update-get label,
 button.update-get > label,
 button.update-get label * {
-    color: #000000 !important;
+    color: #000000;
 }
 button.update-get:hover {
     background: #f0f0f0;
 }
 button.update-get:hover label,
 button.update-get:hover > label {
-    color: #000000 !important;
+    color: #000000;
 }
 button.update-get:disabled {
     opacity: 0.6;
@@ -1998,8 +1976,6 @@ window.qr-win {
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.95);
     padding: 0;
     min-width: 320px;
-    max-width: 360px;
-    overflow: hidden;
 }
 .qr-topbar {
     padding: 14px 16px 10px 18px;
@@ -2047,43 +2023,39 @@ window.qr-win {
     background: #080808;
     border-radius: 0;
     margin-top: 2px;
-    cursor: pointer;
 }
 .qr-url {
     font-size: 12px;
     color: #d4d4d4;
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
-    user-select: none;
-    -webkit-user-select: none;
-    cursor: pointer;
 }
 .qr-copy-btn {
     font-size: 12px;
     font-weight: 700;
     padding: 6px 14px;
     border-radius: 0;
-    background: #ffffff !important;
-    color: #000000 !important;
+    background: #ffffff;
+    color: #000000;
     border: 1px solid #ffffff;
     transition: all 120ms ease;
     min-width: 60px;
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
 }
 .qr-copy-btn label {
-    color: #000000 !important;
+    color: #000000;
     font-weight: 700;
 }
 .qr-copy-btn:hover {
-    background: #e5e5e5 !important;
-    color: #000000 !important;
+    background: #e5e5e5;
+    color: #000000;
     border-color: #ffffff;
 }
 .qr-copy-btn:hover label {
-    color: #000000 !important;
+    color: #000000;
 }
 .qr-copy-btn:active {
-    background: #cccccc !important;
-    color: #000000 !important;
+    background: #cccccc;
+    color: #000000;
 }
 
 .copied-toast {
@@ -2308,14 +2280,9 @@ progressbar.load-bar progress {
 /* language flags in dropdowns */
 .flag-icon {
     border-radius: 2px;
-    overflow: hidden;
 }
-
 
 /* Sidebar header action buttons */
-.side-head-actions {
-    spacing: 2px;
-}
 button.side-head-btn {
     min-width: 28px;
     min-height: 28px;
@@ -2333,8 +2300,8 @@ button.side-head-btn:hover {
 .side-brand-logo {
   min-width: 24px;
   min-height: 24px;
-  margin-start: 2px;
-  margin-end: 4px;
+  margin-left: 2px;
+  margin-right: 4px;
   opacity: 1;
 }
 
