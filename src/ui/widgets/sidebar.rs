@@ -135,10 +135,10 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
     side.add_css_class("side-bar");
     side.set_size_request(SIDE_W, -1);
     side.set_overflow(gtk::Overflow::Hidden);
-    side.set_margin_top(10);
-    side.set_margin_bottom(10);
-    side.set_margin_start(8);
-    side.set_margin_end(2);
+    side.set_margin_top(0);
+    side.set_margin_bottom(0);
+    side.set_margin_start(0);
+    side.set_margin_end(0);
     side.append(&head);
     side.append(&pill);
     side.append(&list_scroll);
