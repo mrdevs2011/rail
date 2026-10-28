@@ -35,11 +35,16 @@ impl App {
         // scripts with zero V8 syntax errors.
         settings.set_enable_webrtc(webrtc_allowed());
         settings.set_enable_dns_prefetching(false);
-        settings.set_enable_smooth_scrolling(true);
+        // Direct 1:1 kinetic scrolling without sluggish artificial 250ms software delay:
+        settings.set_enable_smooth_scrolling(false);
         settings.set_enable_webgl(true); // needed for smooth compositing on many sites
+        settings.set_property("enable-2d-canvas-acceleration", true);
         settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_mediasource(true);
+        settings.set_enable_media(true);
         settings.set_enable_media_capabilities(true);
+        settings.set_media_playback_allows_inline(true);
+        settings.set_media_playback_requires_user_gesture(false);
         // Widevine CDM is absent on desktop Linux WebKitGTK; enabling EME causes YouTube to request DRM/ClearKey and fail
         settings.set_enable_encrypted_media(false);
         settings.set_enable_developer_extras(true);
@@ -79,10 +84,15 @@ impl App {
             }
         });
 
+        let website_policies = webkit6::WebsitePolicies::builder()
+            .autoplay(webkit6::AutoplayPolicy::Allow)
+            .build();
+
         WebView::builder()
             .network_session(session)
             .settings(&settings)
             .user_content_manager(&ucm)
+            .website_policies(&website_policies)
             .build()
     }
 

@@ -82,6 +82,26 @@ fn main() -> glib::ExitCode {
     // GPU compositing va DMABUF renderer yoqilgan holda qoldiriladi: ilgari ikkalasi majburan
     // o'chirilgan edi, bu sahifalarni CPU'da chizishga olib kelib scroll'ni qotirardi/dagal qilardi.
     // Muammo bo'lsa (bo'sh ekran, miltillash) eski rejim: `RAIL_SOFTWARE_RENDER=1 rail`.
+    // Disable broken gst-plugins-bad alpha combiners that crash on WebM / screen recordings
+    match std::env::var("GST_PLUGIN_FEATURE_RANK") {
+        Ok(v) => {
+            if !v.contains("vp8alphadecodebin:0") {
+                let merged = format!("{v},vp8alphadecodebin:0,vp9alphadecodebin:0");
+                unsafe {
+                    std::env::set_var("GST_PLUGIN_FEATURE_RANK", merged);
+                }
+            }
+        }
+        Err(_) => {
+            unsafe {
+                std::env::set_var(
+                    "GST_PLUGIN_FEATURE_RANK",
+                    "vp8alphadecodebin:0,vp9alphadecodebin:0",
+                );
+            }
+        }
+    }
+
     if std::env::var_os("RAIL_SOFTWARE_RENDER").is_some_and(|v| v != "0") {
         unsafe {
             std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");

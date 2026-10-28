@@ -451,9 +451,13 @@ pub(crate) fn open_pwa_window(
     let settings = webkit6::Settings::new();
     settings.set_enable_javascript(true);
     settings.set_enable_webgl(true);
-    settings.set_enable_smooth_scrolling(true);
+    settings.set_property("enable-2d-canvas-acceleration", true);
+    settings.set_enable_smooth_scrolling(false);
     settings.set_enable_mediasource(true);
+    settings.set_enable_media(true);
     settings.set_enable_media_capabilities(true);
+    settings.set_media_playback_allows_inline(true);
+    settings.set_media_playback_requires_user_gesture(false);
     settings.set_enable_webaudio(true);
     settings.set_enable_media_stream(true);
     settings.set_enable_html5_local_storage(true);
@@ -468,10 +472,15 @@ pub(crate) fn open_pwa_window(
     let ucm = webkit6::UserContentManager::new();
     crate::web::inject_web_optimizations(&ucm);
 
+    let website_policies = webkit6::WebsitePolicies::builder()
+        .autoplay(webkit6::AutoplayPolicy::Allow)
+        .build();
+
     let view = WebView::builder()
         .network_session(&session)
         .settings(&settings)
         .user_content_manager(&ucm)
+        .website_policies(&website_policies)
         .hexpand(true)
         .vexpand(true)
         .build();
