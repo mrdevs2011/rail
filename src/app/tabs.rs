@@ -64,6 +64,7 @@ impl App {
         ucm.register_script_message_handler("railgo", None);
         ucm.register_script_message_handler("railScreenshot", None);
         ucm.register_script_message_handler("railWebstore", None);
+        ucm.register_script_message_handler("railExtBridge", None);
         let html_css = load_html_css();
         if !html_css.trim().is_empty() {
             ucm.add_style_sheet(&user_style_sheet(&html_css));

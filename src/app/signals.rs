@@ -431,6 +431,11 @@ impl App {
                     }
                 }
             });
+
+            let app_br = self.clone();
+            ucm.connect_script_message_received(Some("railExtBridge"), move |_, val| {
+                app_br.handle_ext_bridge_message(val.to_str().as_str());
+            });
         }
 
         let app = self.clone();

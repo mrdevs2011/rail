@@ -47,6 +47,27 @@ pub(crate) struct Extension {
 
 static EXTENSIONS: RwLock<Vec<Extension>> = RwLock::new(Vec::new());
 
+pub(crate) fn ext_data_dir() -> PathBuf {
+    rail_data_dir().join("ext_data")
+}
+
+pub(crate) fn read_ext_storage(ext_id: &str, area: &str) -> String {
+    let p = ext_data_dir().join(format!("{}_{}.json", ext_id, area));
+    let s = std::fs::read_to_string(p).unwrap_or_else(|_| "{}".to_string());
+    if s.trim().is_empty() {
+        "{}".to_string()
+    } else {
+        s
+    }
+}
+
+pub(crate) fn write_ext_storage(ext_id: &str, area: &str, data: &str) {
+    let dir = ext_data_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    let p = dir.join(format!("{}_{}.json", ext_id, area));
+    let _ = std::fs::write(p, data);
+}
+
 pub(crate) fn extensions_dir() -> PathBuf {
     rail_data_dir().join("extensions")
 }
@@ -469,6 +490,9 @@ pub(crate) fn polyfill_for_ext(ext: &Extension) -> String {
         ext.manifest_raw.trim().to_string()
     };
 
+    let initial_local = read_ext_storage(&ext.id, "local");
+    let initial_sync = read_ext_storage(&ext.id, "sync");
+
     format!(
         r#"(function() {{
   if (window.__rail_ext_{ext_id}) return;
@@ -476,44 +500,41 @@ pub(crate) fn polyfill_for_ext(ext: &Extension) -> String {
   var extId = "{ext_id}";
   var extBaseUrl = "{base_url}";
   var manifest = {manifest_json};
+  var initialLocal = {initial_local};
+  var initialSync = {initial_sync};
 
   window.chrome = window.chrome || {{}};
   window.browser = window.browser || window.chrome;
 
   var storageListeners = [];
 
-  function makeStorageArea(areaName, persistence) {{
+  function postBridge(action, payload) {{
+    try {{
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railExtBridge) {{
+        var obj = Object.assign({{ action: action, extId: extId }}, payload || {{}});
+        window.webkit.messageHandlers.railExtBridge.postMessage(JSON.stringify(obj));
+      }}
+    }} catch(e) {{}}
+  }}
+
+  function makeStorageArea(areaName, initialStore) {{
+    var store = Object.assign({{}}, initialStore || {{}});
     return {{
       get: function(keys, cb) {{
         return new Promise(function(resolve) {{
           var res = {{}};
           try {{
-            var getVal = function(k) {{
-              if (persistence === 'memory') return window['__rail_mem_' + extId + '_' + k];
-              var raw = localStorage.getItem('__rail_ext_' + extId + '_' + k);
-              return raw !== null ? JSON.parse(raw) : undefined;
-            }};
             if (keys === null || keys === undefined) {{
-              var prefix = '__rail_ext_' + extId + '_';
-              for (var i = 0; i < localStorage.length; i++) {{
-                var k = localStorage.key(i);
-                if (k && k.indexOf(prefix) === 0) {{
-                  var realKey = k.slice(prefix.length);
-                  res[realKey] = JSON.parse(localStorage.getItem(k));
-                }}
-              }}
+              res = Object.assign({{}}, store);
             }} else if (typeof keys === 'string') {{
-              var val = getVal(keys);
-              if (val !== undefined) res[keys] = val;
+              if (store[keys] !== undefined) res[keys] = store[keys];
             }} else if (Array.isArray(keys)) {{
               keys.forEach(function(k) {{
-                var val = getVal(k);
-                if (val !== undefined) res[k] = val;
+                if (store[k] !== undefined) res[k] = store[k];
               }});
             }} else if (typeof keys === 'object') {{
               Object.keys(keys).forEach(function(k) {{
-                var val = getVal(k);
-                res[k] = val !== undefined ? val : keys[k];
+                res[k] = store[k] !== undefined ? store[k] : keys[k];
               }});
             }}
           }} catch(e) {{}}
@@ -526,18 +547,12 @@ pub(crate) fn polyfill_for_ext(ext: &Extension) -> String {
           var changes = {{}};
           try {{
             Object.keys(items || {{}}).forEach(function(k) {{
-              var oldVal = persistence === 'memory' ? window['__rail_mem_' + extId + '_' + k] : (function() {{
-                var r = localStorage.getItem('__rail_ext_' + extId + '_' + k);
-                return r !== null ? JSON.parse(r) : undefined;
-              }})();
+              var oldVal = store[k];
               var newVal = items[k];
-              if (persistence === 'memory') {{
-                window['__rail_mem_' + extId + '_' + k] = newVal;
-              }} else {{
-                localStorage.setItem('__rail_ext_' + extId + '_' + k, JSON.stringify(newVal));
-              }}
+              store[k] = newVal;
               changes[k] = {{ oldValue: oldVal, newValue: newVal }};
             }});
+            postBridge('storageSet', {{ area: areaName, data: JSON.stringify(store) }});
             storageListeners.forEach(function(fn) {{
               try {{ fn(changes, areaName); }} catch(e) {{}}
             }});
@@ -548,17 +563,15 @@ pub(crate) fn polyfill_for_ext(ext: &Extension) -> String {
       }},
       remove: function(keys, cb) {{
         return new Promise(function(resolve) {{
+          var arr = typeof keys === 'string' ? [keys] : (Array.isArray(keys) ? keys : []);
+          var changes = {{}};
           try {{
-            var arr = typeof keys === 'string' ? [keys] : (Array.isArray(keys) ? keys : []);
-            var changes = {{}};
             arr.forEach(function(k) {{
-              if (persistence === 'memory') {{
-                delete window['__rail_mem_' + extId + '_' + k];
-              }} else {{
-                localStorage.removeItem('__rail_ext_' + extId + '_' + k);
-              }}
-              changes[k] = {{ oldValue: undefined, newValue: undefined }};
+              var oldVal = store[k];
+              delete store[k];
+              changes[k] = {{ oldValue: oldVal, newValue: undefined }};
             }});
+            postBridge('storageSet', {{ area: areaName, data: JSON.stringify(store) }});
             storageListeners.forEach(function(fn) {{
               try {{ fn(changes, areaName); }} catch(e) {{}}
             }});
@@ -570,20 +583,15 @@ pub(crate) fn polyfill_for_ext(ext: &Extension) -> String {
       clear: function(cb) {{
         return new Promise(function(resolve) {{
           try {{
-            var prefix = '__rail_ext_' + extId + '_';
-            for (var i = localStorage.length - 1; i >= 0; i--) {{
-              var k = localStorage.key(i);
-              if (k && k.indexOf(prefix) === 0) {{
-                localStorage.removeItem(k);
-              }}
-            }}
+            store = {{}};
+            postBridge('storageSet', {{ area: areaName, data: JSON.stringify(store) }});
           }} catch(e) {{}}
           if (typeof cb === 'function') setTimeout(cb, 0);
           resolve();
         }});
       }},
       getBytesInUse: function(keys, cb) {{
-        var size = 1024;
+        var size = JSON.stringify(store).length;
         if (typeof cb === 'function') setTimeout(function() {{ cb(size); }}, 0);
         return Promise.resolve(size);
       }}
@@ -591,9 +599,9 @@ pub(crate) fn polyfill_for_ext(ext: &Extension) -> String {
   }}
 
   if (!window.chrome.storage) {{
-    var localStorageArea = makeStorageArea('local', 'local');
-    var syncStorageArea = makeStorageArea('sync', 'local');
-    var sessionStorageArea = makeStorageArea('session', 'memory');
+    var localStorageArea = makeStorageArea('local', initialLocal);
+    var syncStorageArea = makeStorageArea('sync', initialSync);
+    var sessionStorageArea = makeStorageArea('session', {{}});
     window.chrome.storage = {{
       local: localStorageArea,
       sync: syncStorageArea,
@@ -721,9 +729,82 @@ pub(crate) fn polyfill_for_ext(ext: &Extension) -> String {
         return window.chrome.runtime.sendMessage(msg, cb);
       }},
       create: function(props, cb) {{
-        if (props && props.url) window.open(props.url, '_blank');
+        var url = (props && props.url) || 'rail://start/';
+        postBridge('openTab', {{ url: url }});
+        if (typeof cb === 'function') setTimeout(cb, 0);
+        return Promise.resolve({{ id: 1, url: url }});
+      }}
+    }};
+  }}
+
+  if (!window.chrome.search) {{
+    window.chrome.search = {{
+      query: function(options, cb) {{
+        var q = (options && options.text) || '';
+        postBridge('search', {{ text: q }});
         if (typeof cb === 'function') setTimeout(cb, 0);
         return Promise.resolve();
+      }}
+    }};
+  }}
+
+  if (!window.chrome.notifications) {{
+    window.chrome.notifications = {{
+      create: function(id, options, cb) {{
+        var title = (options && options.title) || 'Rail Extension';
+        var message = (options && options.message) || '';
+        postBridge('notify', {{ title: title, message: message }});
+        if (typeof cb === 'function') setTimeout(function() {{ cb(id || '1'); }}, 0);
+        return Promise.resolve(id || '1');
+      }},
+      clear: function(id, cb) {{ if (cb) setTimeout(cb, 0); return Promise.resolve(true); }}
+    }};
+  }}
+
+  if (!window.chrome.commands) {{
+    var cmdListeners = [];
+    window.chrome.commands = {{
+      onCommand: {{
+        addListener: function(fn) {{ if (typeof fn === 'function' && cmdListeners.indexOf(fn) === -1) cmdListeners.push(fn); }},
+        removeListener: function(fn) {{ var i = cmdListeners.indexOf(fn); if (i !== -1) cmdListeners.splice(i, 1); }},
+        hasListener: function(fn) {{ return cmdListeners.indexOf(fn) !== -1; }}
+      }},
+      getAll: function(cb) {{
+        var list = [
+          {{ name: "crystal-fix", description: "Crystal Text — fix selected text with AI", shortcut: "Alt+F" }},
+          {{ name: "_execute_action", description: "Activate extension", shortcut: "Ctrl+Comma" }}
+        ];
+        if (typeof cb === 'function') setTimeout(function() {{ cb(list); }}, 0);
+        return Promise.resolve(list);
+      }},
+      __dispatch: function(cmd) {{
+        cmdListeners.forEach(function(fn) {{ try {{ fn(cmd); }} catch(e) {{}} }});
+      }}
+    }};
+  }}
+
+  if (!window.chrome.contextMenus) {{
+    window.chrome.contextMenus = {{
+      create: function(props, cb) {{ if (cb) setTimeout(cb, 0); return 1; }},
+      update: function(id, props, cb) {{ if (cb) setTimeout(cb, 0); return Promise.resolve(); }},
+      remove: function(id, cb) {{ if (cb) setTimeout(cb, 0); return Promise.resolve(); }},
+      removeAll: function(cb) {{ if (cb) setTimeout(cb, 0); return Promise.resolve(); }},
+      onClicked: {{ addListener: function() {{}}, removeListener: function() {{}} }}
+    }};
+  }}
+
+  if (!window.chrome.scripting) {{
+    window.chrome.scripting = {{
+      executeScript: function(details, cb) {{
+        var res = [];
+        if (typeof details?.func === 'function') {{
+          try {{
+            var r = details.func.apply(null, details.args || []);
+            res = [{{ result: r }}];
+          }} catch(e) {{}}
+        }}
+        if (typeof cb === 'function') setTimeout(function() {{ cb(res); }}, 0);
+        return Promise.resolve(res);
       }}
     }};
   }}
@@ -744,7 +825,9 @@ pub(crate) fn polyfill_for_ext(ext: &Extension) -> String {
 "#,
         ext_id = ext.id,
         base_url = base_url,
-        manifest_json = manifest_clean
+        manifest_json = manifest_clean,
+        initial_local = initial_local,
+        initial_sync = initial_sync
     )
 }
 
