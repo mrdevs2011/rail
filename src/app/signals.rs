@@ -219,6 +219,22 @@ impl App {
         view.connect_permission_request(move |v, req| app.handle_permission_request(v, req));
         let app = self.clone();
         view.connect_estimated_load_progress_notify(move |_| app.update_load_bar());
+        view.connect_load_failed(move |_v, event, uri, error| {
+            eprintln!("rail: load failed for {} ({:?}): {}", uri, event, error);
+            false
+        });
+        view.connect_load_failed_with_tls_errors(move |v, failing_uri, cert, _errors| {
+            if let Some(session) = v.network_session() {
+                if let Ok(uri_obj) = glib::Uri::parse(failing_uri, glib::UriFlags::NONE) {
+                    if let Some(host) = uri_obj.host() {
+                        session.allow_tls_certificate_for_host(cert, &host);
+                        v.load_uri(failing_uri);
+                        return true;
+                    }
+                }
+            }
+            false
+        });
         let app = self.clone();
         view.connect_create(move |v, nav| {
             // Chrome/Brave parity: plain left-click navigates in the same tab.

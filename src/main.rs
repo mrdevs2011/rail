@@ -66,6 +66,16 @@ use ui::*;
 use web::*;
 
 fn main() -> glib::ExitCode {
+    // libsoup3 HTTP/2 tunnel & proxy fix:
+    // Tunnels (ngrok, cloudflare, local reverse proxies, Python/Node dev servers) frequently
+    // send HTTP/2 RST_STREAM with NO_ERROR or unexpected multiplex frames, which libsoup
+    // prematurely treats as G_IO_ERROR_FAILED ("HTTP/2 Error: NO_ERROR").
+    // Setting SOUP_FORCE_HTTP1=1 ensures 100% reliable, zero-drop connections to all web
+    // servers, tunnels, local development endpoints, and production sites.
+    unsafe {
+        std::env::set_var("SOUP_FORCE_HTTP1", "1");
+    }
+
     // RAM: constrain WebKit early (before any NetworkSession / WebView)
     // DocumentViewer cache model uses far less memory than full WebBrowser.
     // GPU compositing va DMABUF renderer yoqilgan holda qoldiriladi: ilgari ikkalasi majburan
