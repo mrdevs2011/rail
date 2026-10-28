@@ -61,6 +61,20 @@ fn rebuild_extensions_popover(app: &Rc<App>, popover: &gtk::Popover) {
             text_box.append(&name_lbl);
             text_box.append(&ver_lbl);
 
+            let has_popup = ext.default_popup.is_some();
+            if has_popup {
+                let a_pop = app.clone();
+                let ext_pop = ext.clone();
+                let pop_c = popover.clone();
+                let click = gtk::GestureClick::new();
+                click.connect_released(move |_, _, _, _| {
+                    pop_c.popdown();
+                    a_pop.open_extension_popup(&ext_pop);
+                });
+                text_box.add_controller(click);
+                text_box.set_cursor_from_name(Some("pointer"));
+            }
+
             let sw = gtk::Switch::new();
             sw.set_active(ext.enabled);
             sw.set_valign(gtk::Align::Center);
@@ -73,6 +87,21 @@ fn rebuild_extensions_popover(app: &Rc<App>, popover: &gtk::Popover) {
 
             item_row.append(&icon);
             item_row.append(&text_box);
+
+            if has_popup {
+                let btn_open = gtk::Button::from_icon_name("view-reveal-symbolic");
+                btn_open.add_css_class("flat-icon");
+                btn_open.set_tooltip_text(Some(tr("Open popup")));
+                let a_pop = app.clone();
+                let ext_pop = ext.clone();
+                let pop_c = popover.clone();
+                btn_open.connect_clicked(move |_| {
+                    pop_c.popdown();
+                    a_pop.open_extension_popup(&ext_pop);
+                });
+                item_row.append(&btn_open);
+            }
+
             item_row.append(&sw);
 
             list_box.append(&item_row);
@@ -137,6 +166,26 @@ fn rebuild_extensions_popover(app: &Rc<App>, popover: &gtk::Popover) {
         app_manage.open_settings_tab(SettingsTab::Extensions);
     });
     root.append(&btn_manage);
+
+    // Footer Button 3: Chrome Web Store
+    let btn_store = gtk::Button::new();
+    btn_store.add_css_class("ext-popover-footer-btn");
+    let store_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let store_icon = gtk::Image::from_icon_name("software-properties-symbolic");
+    store_icon.set_pixel_size(14);
+    let store_lbl = gtk::Label::new(Some("Chrome Web Store"));
+    store_lbl.set_xalign(0.0);
+    store_box.append(&store_icon);
+    store_box.append(&store_lbl);
+    btn_store.set_child(Some(&store_box));
+
+    let app_store = app.clone();
+    let popover_store = popover.clone();
+    btn_store.connect_clicked(move |_| {
+        popover_store.popdown();
+        app_store.new_tab_with_url("https://chromewebstore.google.com");
+    });
+    root.append(&btn_store);
 
     popover.set_child(Some(&root));
 }

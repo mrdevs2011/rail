@@ -23,6 +23,13 @@ pub(crate) struct ContentScript {
 }
 
 #[derive(Clone, Debug)]
+pub(crate) struct ExtensionCommand {
+    pub name: String,
+    pub suggested_key: String,
+    pub description: String,
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct Extension {
     pub id: String,
     pub name: String,
@@ -31,6 +38,10 @@ pub(crate) struct Extension {
     pub path: PathBuf,
     pub enabled: bool,
     pub content_scripts: Vec<ContentScript>,
+    pub default_popup: Option<String>,
+    pub default_icon: Option<String>,
+    pub background_script: Option<String>,
+    pub commands: Vec<ExtensionCommand>,
     pub manifest_raw: String,
 }
 
@@ -151,6 +162,75 @@ pub(crate) fn parse_manifest(dir: &Path) -> Result<Extension, String> {
         }
     }
 
+    let action_obj = root.get("action").or_else(|| root.get("browser_action"));
+    let default_popup = action_obj
+        .and_then(|a| a.get("default_popup"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let default_icon = action_obj
+        .and_then(|a| a.get("default_icon"))
+        .and_then(|v| {
+            if let Some(s) = v.as_str() {
+                Some(s.to_string())
+            } else {
+                v.get("128")
+                    .or_else(|| v.get("48"))
+                    .or_else(|| v.get("32"))
+                    .or_else(|| v.get("16"))
+                    .and_then(|i| i.as_str())
+                    .map(|s| s.to_string())
+            }
+        })
+        .or_else(|| {
+            root.get("icons").and_then(|v| {
+                v.get("128")
+                    .or_else(|| v.get("48"))
+                    .or_else(|| v.get("32"))
+                    .or_else(|| v.get("16"))
+                    .and_then(|i| i.as_str())
+                    .map(|s| s.to_string())
+            })
+        });
+
+    let background_script = root.get("background").and_then(|b| {
+        b.get("service_worker")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .or_else(|| {
+                b.get("scripts")
+                    .and_then(|v| v.as_arr())
+                    .and_then(|arr| arr.first())
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+            })
+    });
+
+    let mut commands = Vec::new();
+    if let Some(cmds) = root.get("commands").and_then(|v| v.as_obj()) {
+        for (cmd_name, cmd_val) in cmds {
+            let desc = cmd_val.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let key = cmd_val.get("suggested_key").and_then(|k| {
+                if let Some(s) = k.as_str() {
+                    Some(s.to_string())
+                } else {
+                    k.get("linux")
+                        .or_else(|| k.get("default"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                }
+            }).unwrap_or_default();
+
+            if !key.is_empty() {
+                commands.push(ExtensionCommand {
+                    name: cmd_name.to_string(),
+                    suggested_key: key,
+                    description: desc,
+                });
+            }
+        }
+    }
+
     let id = {
         let clean: String = name.chars()
             .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
@@ -171,6 +251,10 @@ pub(crate) fn parse_manifest(dir: &Path) -> Result<Extension, String> {
         path: dir.to_path_buf(),
         enabled: true,
         content_scripts,
+        default_popup,
+        default_icon,
+        background_script,
+        commands,
         manifest_raw: content,
     })
 }
@@ -316,8 +400,68 @@ with zipfile.ZipFile(io.BytesIO(data[idx:])) as z:
     register_unpacked_extension(path)
 }
 
+/// Download, extract and register an extension from Chrome Web Store by its 32-char ID.
+pub(crate) fn install_from_webstore(ext_id: &str) -> Result<Extension, String> {
+    let clean_id = ext_id.trim();
+    if clean_id.len() != 32 || !clean_id.chars().all(|c| c.is_ascii_lowercase()) {
+        return Err("Noto'g'ri Chrome Web Store ID (32 ta kichik harf bo'lishi kerak)".into());
+    }
+
+    let tmp_file = std::env::temp_dir().join(format!("rail_ext_{}.crx", clean_id));
+    let url = format!(
+        "https://clients2.google.com/service/update2/crx?response=redirect&os=linux&arch=x86-64&nacl_arch=x86-64&prod=chromecrx&prodchannel=&prodversion=120.0.0.0&acceptformat=crx2,crx3&x=id%3D{}%26uc",
+        clean_id
+    );
+
+    let status = std::process::Command::new("curl")
+        .args([
+            "-fsSL",
+            "-m", "35",
+            "-A", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "-o", tmp_file.to_str().unwrap_or(""),
+            &url,
+        ])
+        .status()
+        .map_err(|e| format!("curl bilan yuklab bo'lmadi: {e}"))?;
+
+    if !status.success() || !tmp_file.is_file() {
+        let _ = std::fs::remove_file(&tmp_file);
+        return Err("Chrome Web Store serveridan yuklab bo'lmadi".into());
+    }
+
+    let target_dir = extensions_dir().join(clean_id);
+    let _ = std::fs::remove_dir_all(&target_dir);
+    let _ = std::fs::create_dir_all(&target_dir);
+
+    let py_status = std::process::Command::new("python3")
+        .arg("-c")
+        .arg(r#"
+import sys, zipfile, io
+p, out = sys.argv[1], sys.argv[2]
+with open(p, 'rb') as f:
+    data = f.read()
+idx = data.find(b'PK\x03\x04')
+if idx == -1:
+    sys.exit(1)
+with zipfile.ZipFile(io.BytesIO(data[idx:])) as z:
+    z.extractall(out)
+"#)
+        .arg(&tmp_file)
+        .arg(&target_dir)
+        .status();
+
+    let _ = std::fs::remove_file(&tmp_file);
+
+    if py_status.map(|s| s.success()).unwrap_or(false) && target_dir.join("manifest.json").is_file() {
+        register_unpacked_extension(&target_dir)
+    } else {
+        let _ = std::fs::remove_dir_all(&target_dir);
+        Err("Kengaytma arxivini ochib bo'lmadi yoki manifest.json topilmadi".into())
+    }
+}
+
 /// Comprehensive Chrome & WebExtensions runtime, storage, tabs, and i18n polyfill.
-fn polyfill_js(ext: &Extension) -> String {
+pub(crate) fn polyfill_for_ext(ext: &Extension) -> String {
     let base_url = format!("file://{}", ext.path.display());
     let manifest_clean = if ext.manifest_raw.trim().is_empty() {
         "{}".to_string()
@@ -608,7 +752,7 @@ fn polyfill_js(ext: &Extension) -> String {
 pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
     let list = get_all_extensions();
     for ext in list.iter().filter(|e| e.enabled) {
-        let polyfill = polyfill_js(ext);
+        let polyfill = polyfill_for_ext(ext);
 
         for cs in &ext.content_scripts {
             let matches_str = format!(
@@ -689,6 +833,79 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
             }
         }
     }
+
+    // Chrome Web Store 1-Click Install Helper script
+    const WEBSTORE_HELPER_JS: &str = r#"(function() {
+  if (!location.hostname.includes('chromewebstore.google.com') && !location.hostname.includes('chrome.google.com')) return;
+
+  function injectRailButton() {
+    var m = location.pathname.match(/\/detail\/[^\/]+\/([a-z]{32})/);
+    if (!m) return;
+    var extId = m[1];
+
+    if (document.getElementById('rail-webstore-install-btn')) return;
+
+    var btn = document.createElement('button');
+    btn.id = 'rail-webstore-install-btn';
+    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Rail\'ga o\'rnatish';
+    btn.style.cssText = 'position: fixed; bottom: 32px; right: 32px; z-index: 2147483647; background: #2563eb; color: #ffffff; border: none; border-radius: 9999px; padding: 14px 28px; font-size: 15px; font-weight: 700; box-shadow: 0 10px 30px rgba(37, 99, 235, 0.5); cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); display: flex; align-items: center; font-family: system-ui, -apple-system, sans-serif; letter-spacing: 0.3px;';
+
+    btn.onmouseenter = function() { btn.style.transform = 'translateY(-2px) scale(1.04)'; btn.style.boxShadow = '0 14px 36px rgba(37, 99, 235, 0.65)'; };
+    btn.onmouseleave = function() { btn.style.transform = 'none'; btn.style.boxShadow = '0 10px 30px rgba(37, 99, 235, 0.5)'; };
+
+    btn.onclick = function() {
+      btn.disabled = true;
+      btn.innerHTML = '⏳ O\'rnatilmoqda...';
+      btn.style.opacity = '0.9';
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railWebstore) {
+        window.webkit.messageHandlers.railWebstore.postMessage(JSON.stringify({ action: "install", id: extId }));
+      }
+    };
+
+    document.body.appendChild(btn);
+  }
+
+  window.__railWebstoreInstalled = function(id) {
+    var btn = document.getElementById('rail-webstore-install-btn');
+    if (btn) {
+      btn.innerHTML = '✓ Rail\'ga o\'rnatildi';
+      btn.style.background = '#059669';
+      btn.style.boxShadow = '0 10px 30px rgba(5, 150, 105, 0.5)';
+      btn.disabled = true;
+    }
+  };
+
+  window.__railWebstoreFailed = function(err) {
+    var btn = document.getElementById('rail-webstore-install-btn');
+    if (btn) {
+      btn.innerHTML = '❌ ' + (err || "Xatolik yuz berdi");
+      btn.style.background = '#dc2626';
+      btn.disabled = false;
+    }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectRailButton);
+  } else {
+    injectRailButton();
+  }
+  var prevUrl = location.href;
+  setInterval(function() {
+    if (location.href !== prevUrl) {
+      prevUrl = location.href;
+      injectRailButton();
+    }
+  }, 1000);
+})();"#;
+
+    let ws_script = webkit6::UserScript::new(
+        WEBSTORE_HELPER_JS,
+        webkit6::UserContentInjectedFrames::TopFrame,
+        webkit6::UserScriptInjectionTime::End,
+        &[],
+        &[],
+    );
+    ucm.add_script(&ws_script);
 }
 
 /// Re-apply all user scripts, user styles and extensions to all open WebViews.

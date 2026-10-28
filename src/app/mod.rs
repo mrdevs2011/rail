@@ -25,6 +25,7 @@ mod keys;
 mod translate;
 mod ctxmenu;
 mod screenshot;
+mod extensions_ui;
 
 pub(crate) struct App {
     pub(crate) win: gtk::ApplicationWindow,

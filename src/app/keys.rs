@@ -85,6 +85,11 @@ impl App {
             }
         }
 
+        // Extension commands (e.g. Quick Open Ctrl+Comma, Crystal Text Alt+F)
+        if self.try_extension_command(key, state) {
+            return true;
+        }
+
         if self.settings_modal_open() {
             // Settings is a real tab (rail://settings) — Esc never closes it.
             // Ctrl+W / other browser shortcuts fall through below.
