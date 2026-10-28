@@ -1880,7 +1880,11 @@ popover.ctxm button.ctxm-hdr-btn:disabled {
     opacity: 0.35;
 }
 
-/* ── QR code dialog ─────────────────────────────────────────────────── */
+/* ── QR code modal ─────────────────────────────────────────────────── */
+.qr-backdrop {
+    background: rgba(0, 0, 0, 0.75);
+    border-radius: 0;
+}
 window.qr-win {
     background: transparent;
     box-shadow: none;

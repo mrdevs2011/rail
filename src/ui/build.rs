@@ -245,6 +245,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         devtools_resize_handle: devtools_resize_handle.clone(),
         devtools_url_lbl: devtools_url_lbl.clone(),
         devtools_window: RefCell::new(None),
+        qr_modal: RefCell::new(None),
         settings_modal: settings_modal.clone(),
         settings_body: settings_body.clone(),
         settings_sidebar: settings_sidebar.clone(),

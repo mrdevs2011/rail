@@ -126,6 +126,7 @@ pub(crate) struct App {
     pub(crate) devtools_url_lbl: gtk::Label,
     pub(crate) devtools_window: RefCell<Option<gtk::Window>>,
     // Floating Settings Panel (Alt+Shift+S / Alt+P / Alt+I)
+    pub(crate) qr_modal: RefCell<Option<gtk::Box>>,
     pub(crate) settings_modal: gtk::Box,
     pub(crate) settings_body: gtk::Box,
     pub(crate) settings_sidebar: gtk::Box,

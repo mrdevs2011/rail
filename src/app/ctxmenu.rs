@@ -191,19 +191,47 @@ impl App {
         pop.popup();
     }
 
-    /// Beautiful modal card with a scannable QR code of the page address.
-    pub(crate) fn show_qr_window(self: &Rc<Self>, url: &str) {
-        let win = gtk::Window::new();
-        win.set_title(Some(""));
-        win.set_transient_for(Some(&self.win));
-        win.set_modal(true);
-        win.set_resizable(false);
-        win.set_decorated(false);
-        win.add_css_class("qr-win");
+    pub(crate) fn qr_modal_open(&self) -> bool {
+        self.qr_modal.borrow().is_some()
+    }
 
-        // Outer card
+    pub(crate) fn hide_qr_modal(self: &Rc<Self>) {
+        if let Some(backdrop) = self.qr_modal.borrow_mut().take() {
+            if let Some(parent) = backdrop.parent() {
+                if let Ok(overlay) = parent.downcast::<gtk::Overlay>() {
+                    overlay.remove_overlay(&backdrop);
+                }
+            }
+        }
+    }
+
+    /// Brutalist sharp modal card with a scannable QR code of the page address.
+    /// Rendered as an in-window overlay to avoid OS window-manager corner rounding.
+    pub(crate) fn show_qr_window(self: &Rc<Self>, url: &str) {
+        self.hide_qr_modal();
+
+        let root_overlay = match self.win.child().and_then(|c| c.downcast::<gtk::Overlay>().ok()) {
+            Some(ov) => ov,
+            None => return,
+        };
+
+        // Full-window dim backdrop
+        let backdrop = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        backdrop.add_css_class("qr-backdrop");
+        backdrop.set_hexpand(true);
+        backdrop.set_vexpand(true);
+        backdrop.set_halign(gtk::Align::Fill);
+        backdrop.set_valign(gtk::Align::Fill);
+        backdrop.set_can_target(true);
+
+        // Center card with 100% sharp corners
         let card = gtk::Box::new(gtk::Orientation::Vertical, 0);
         card.add_css_class("qr-card");
+        card.set_halign(gtk::Align::Center);
+        card.set_valign(gtk::Align::Center);
+        card.set_hexpand(true);
+        card.set_vexpand(true);
+        card.set_can_target(true);
 
         // ── Top bar: title + close ───────────────────────────────────────────
         let topbar = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -221,9 +249,11 @@ impl App {
         close_btn.set_focus_on_click(false);
         let x_label = gtk::Label::new(Some("✕"));
         close_btn.set_child(Some(&x_label));
-        let wc = win.downgrade();
+        let app_close = Rc::downgrade(self);
         close_btn.connect_clicked(move |_| {
-            if let Some(w) = wc.upgrade() { w.close(); }
+            if let Some(app) = app_close.upgrade() {
+                app.hide_qr_modal();
+            }
         });
         topbar.append(&close_btn);
         card.append(&topbar);
@@ -235,7 +265,6 @@ impl App {
                 let scale = (280 / (n + 8)).max(4);
                 let px = (n + 8) * scale;
 
-                // White rounded frame around the QR
                 let qr_frame = gtk::Box::new(gtk::Orientation::Vertical, 0);
                 qr_frame.add_css_class("qr-frame");
                 qr_frame.set_halign(gtk::Align::Center);
@@ -247,7 +276,7 @@ impl App {
                 area.set_draw_func(move |_, cr, w, h| {
                     cr.set_source_rgb(1.0, 1.0, 1.0);
                     let _ = cr.paint();
-                    cr.set_source_rgb(0.06, 0.06, 0.08);
+                    cr.set_source_rgb(0.0, 0.0, 0.0);
                     let ox = ((w - px) / 2 + 4 * scale) as f64;
                     let oy = ((h - px) / 2 + 4 * scale) as f64;
                     for y in 0..code.size {
@@ -298,7 +327,6 @@ impl App {
         copy_btn.set_has_frame(false);
         copy_btn.set_focus_on_click(false);
         let url_owned = url.to_string();
-        let win_weak = win.downgrade();
         copy_btn.connect_clicked(move |btn| {
             if let Some(clip) = gdk::Display::default().map(|d| d.clipboard()) {
                 clip.set_text(&url_owned);
@@ -308,25 +336,49 @@ impl App {
             glib::timeout_add_local_once(std::time::Duration::from_millis(1500), move || {
                 if let Some(b) = btn_weak.upgrade() { b.set_label(tr("Copy")); }
             });
-            let _ = win_weak;
         });
         url_row.append(&copy_btn);
         card.append(&url_row);
 
-        win.set_child(Some(&card));
+        backdrop.append(&card);
 
-        // Close on Escape
+        // Click on backdrop outside the card to close
+        let click = gtk::GestureClick::new();
+        let app_click = Rc::downgrade(self);
+        let card_weak = card.downgrade();
+        let bd_weak = backdrop.downgrade();
+        click.connect_released(move |_, _, x, y| {
+            if let (Some(c), Some(bd)) = (card_weak.upgrade(), bd_weak.upgrade()) {
+                if let Some(bounds) = c.compute_bounds(&bd) {
+                    let bx = bounds.x() as f64;
+                    let by = bounds.y() as f64;
+                    let bw = bounds.width() as f64;
+                    let bh = bounds.height() as f64;
+                    if x < bx || x > bx + bw || y < by || y > by + bh {
+                        if let Some(app) = app_click.upgrade() {
+                            app.hide_qr_modal();
+                        }
+                    }
+                }
+            }
+        });
+        backdrop.add_controller(click);
+
+        // Escape key to close
         let key = gtk::EventControllerKey::new();
-        let w = win.downgrade();
+        let app_key = Rc::downgrade(self);
         key.connect_key_pressed(move |_, k, _, _| {
             if k == gdk::Key::Escape {
-                if let Some(w) = w.upgrade() { w.close(); }
+                if let Some(app) = app_key.upgrade() {
+                    app.hide_qr_modal();
+                }
                 return glib::Propagation::Stop;
             }
             glib::Propagation::Proceed
         });
-        win.add_controller(key);
-        win.present();
+        backdrop.add_controller(key);
 
+        root_overlay.add_overlay(&backdrop);
+        *self.qr_modal.borrow_mut() = Some(backdrop);
     }
 }

@@ -125,6 +125,10 @@ impl App {
         }
 
         if k == gdk::Key::Escape {
+            if self.qr_modal_open() {
+                self.hide_qr_modal();
+                return true;
+            }
             if self.palette_open() {
                 self.cancel_palette();
                 return true;
