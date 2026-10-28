@@ -144,12 +144,12 @@ impl App {
 
             let vw = strip.width() as f64;
             let vh = strip.height() as f64;
-            let zoom_busy = !near(zc, zt, 0.002);
-            // Any overview zoom transition (in or out), including delayed exit while ov still true.
+            let in_overview = app.ov.get() || app.ov_exiting.get() || zc < 0.999 || zt < 0.999;
+            // Any overview zoom transition (in or out), staying active until the timed ease settles.
             let ov_motion = vw > 1.0
                 && vh > 1.0
-                && zoom_busy
-                && (app.ov.get() || app.ov_exiting.get() || zc < 0.99 || zt < 0.99);
+                && in_overview
+                && (zanim.get().is_some() || !near(zc, zt, 0.001));
 
             let nz: f64;
             let mut nx: f64;
@@ -161,28 +161,37 @@ impl App {
                 let target_wcy = oyt + vh / (2.0 * zt_safe);
 
                 let (t0, z0, wcx0, wcy0, wcxt, wcyt) = match zanim.get() {
-                    Some(a)
-                        if (a.2 - zt).abs() < 1e-9
-                            && (a.5 - target_wcx).abs() < 1.0
-                            && (a.6 - target_wcy).abs() < 1.0 =>
-                    {
+                    Some(a) if (a.2 - zt).abs() < 1e-9 => {
                         (a.0, a.1, a.3, a.4, a.5, a.6)
                     }
                     _ => {
                         let wcx_start = oxc + vw / (2.0 * zc_safe);
                         let wcy_start = oyc + vh / (2.0 * zc_safe);
-                        let a = (now, zc, zt, wcx_start, wcy_start, target_wcx, target_wcy);
+                        let mut twcx = target_wcx;
+                        let mut twcy = target_wcy;
+                        // Subpixel alignment: if centers match within 1px, lock to eliminate micro-drift/jitter
+                        if (twcx - wcx_start).abs() < 1.0 {
+                            twcx = wcx_start;
+                        }
+                        if (twcy - wcy_start).abs() < 1.0 {
+                            twcy = wcy_start;
+                        }
+                        let a = (now, zc, zt, wcx_start, wcy_start, twcx, twcy);
                         zanim.set(Some(a));
-                        (a.0, a.1, a.3, a.4, a.5, a.6)
+                        (a.0, a.1, a.3, a.4, twcx, twcy)
                     }
                 };
-                let u = (((now - t0) as f64 / 1e6) / OV_ANIM_SECS).clamp(0.0, 1.0);
+                let zoom_ratio = (zt / z0.max(0.01)).ln().abs();
+                // Full overview open/close uses OV_ANIM_SECS; small incremental steps (Ctrl+/-) use 0.06s so holding is smooth
+                let anim_secs = (zoom_ratio * 0.20).clamp(0.06, OV_ANIM_SECS);
+                let u = (((now - t0) as f64 / 1e6) / anim_secs).clamp(0.0, 1.0);
                 // Ease-out quad: responsive, fast, and flat/even (tekkiz) without sluggish tail
                 let e = 1.0 - (1.0 - u) * (1.0 - u);
                 if u >= 1.0 {
                     nz = zt;
                     nx = oxt;
                     ny = oyt;
+                    zanim.set(None);
                 } else {
                     // Logarithmic zoom for perceptually uniform field-of-view scaling
                     nz = (z0.max(0.01).ln() + (zt.max(0.01).ln() - z0.max(0.01).ln()) * e).exp();

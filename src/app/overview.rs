@@ -103,6 +103,10 @@ impl App {
             }
         }
         self.settings_modal.set_can_target(true);
+        // Ensure camera offsets are cleanly aligned to targets so focus pipeline doesn't start a micro-spring
+        self.layout.set_offset_x(self.target_x.get());
+        self.layout.set_offset_y(self.target_y.get());
+        self.layout.set_zoom(1.0);
         // Full focus pipeline once the camera is still (wake tab, sidebar, title, session).
         let (fr, fc) = (self.focus_row.get(), self.focus_col.get());
         self.focus_coords(fr, fc);

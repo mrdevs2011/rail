@@ -24,6 +24,14 @@ impl App {
     /// Zoom the focused tab: `dir` > 0 in, < 0 out, 0 reset to 100%.
     pub(crate) fn page_zoom(self: &Rc<Self>, dir: i32) {
         let Some(v) = self.focused_view() else { return };
+        static LAST_PZ: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+        let now = glib::monotonic_time();
+        let last = LAST_PZ.load(std::sync::atomic::Ordering::Relaxed);
+        // Rate-limit auto-repeat zoom steps to ~90ms so holding key enlarges/shrinks gradually and smoothly
+        if dir != 0 && now - last < 90_000 {
+            return;
+        }
+        LAST_PZ.store(now, std::sync::atomic::Ordering::Relaxed);
         let z = if dir == 0 { 1.0 } else { next_page_zoom(v.zoom_level(), dir) };
         v.set_zoom_level(z);
     }
@@ -47,11 +55,11 @@ impl App {
             if (ctrl || alt) && !(ctrl && alt) {
                 match Self::zoom_dir(k, keycode, shift) {
                     Some(1) => {
-                        self.overview_zoom_by(1.12);
+                        self.overview_zoom_by(1.06);
                         return true;
                     }
                     Some(-1) => {
-                        self.overview_zoom_by(1.0 / 1.12);
+                        self.overview_zoom_by(1.0 / 1.06);
                         return true;
                     }
                     Some(_) => {
