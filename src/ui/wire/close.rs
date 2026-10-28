@@ -21,7 +21,7 @@ pub(crate) fn wire_close(app: &Rc<App>, win: gtk::ApplicationWindow) {
     {
         // Ko'rinmagan tablarni uxlatish (split da yonma-yon ko'rinib turgan tab uxlamaydi)
         let weak = Rc::downgrade(&app);
-        glib::timeout_add_local(Duration::from_secs(2), move || match weak.upgrade() {
+        glib::timeout_add_local(Duration::from_secs(15), move || match weak.upgrade() {
             Some(a) => {
                 a.suspend_hidden_tabs();
                 if let Ok(mut h) = a.history.try_borrow_mut() {

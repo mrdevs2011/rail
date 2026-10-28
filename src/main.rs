@@ -52,10 +52,12 @@ mod pages;
 mod shortcuts;
 mod ui;
 mod web;
+mod extensions;
 
 use app::App;
 use cli::*;
 use config::*;
+use extensions::*;
 use model::*;
 use nav::*;
 use pages::*;

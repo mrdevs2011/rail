@@ -24,27 +24,6 @@ impl App {
         });
         view.add_controller(click);
 
-        // Web page pinch-to-zoom (matching Brave / Chromium behavior)
-        let pinch = gtk::GestureZoom::new();
-        pinch.set_propagation_phase(gtk::PropagationPhase::Capture);
-        let base_zoom = Rc::new(Cell::new(1.0f64));
-        let b_start = base_zoom.clone();
-        let v_weak_zoom = view.downgrade();
-        pinch.connect_begin(move |_, _| {
-            if let Some(v) = v_weak_zoom.upgrade() {
-                b_start.set(v.zoom_level());
-            }
-        });
-        let b_scale = base_zoom.clone();
-        let v_scale = view.downgrade();
-        pinch.connect_scale_changed(move |_, scale| {
-            if let Some(v) = v_scale.upgrade() {
-                let nz = (b_scale.get() * scale).clamp(0.25, 5.0);
-                v.set_zoom_level(nz);
-            }
-        });
-        view.add_controller(pinch);
-
         // Web page horizontal scroll via mouse wheel (Shift + wheel)
         let page_scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
         page_scroll.set_propagation_phase(gtk::PropagationPhase::Capture);

@@ -137,3 +137,60 @@ pub(crate) fn save_app_settings(s: &AppSettings) -> bool {
     }
     std::fs::write(path, out).is_ok()
 }
+
+/// Check if Rail is currently the default browser for HTTP/HTTPS/HTML.
+pub(crate) fn is_default_browser() -> bool {
+    if let Some(app_info) = gio::AppInfo::default_for_type("x-scheme-handler/http", false) {
+        if let Some(id) = app_info.id() {
+            if id.to_lowercase().contains("rail") {
+                return true;
+            }
+        }
+        if app_info.name().to_lowercase().contains("rail") {
+            return true;
+        }
+    }
+    if let Ok(out) = std::process::Command::new("xdg-settings")
+        .args(["check", "default-web-browser", "rail.desktop"])
+        .output()
+    {
+        if String::from_utf8_lossy(&out.stdout).trim() == "yes" {
+            return true;
+        }
+    }
+    false
+}
+
+/// Set or unset Rail as the default browser on Linux (freedesktop / GIO / XDG).
+pub(crate) fn set_default_browser(enable: bool) -> bool {
+    if enable {
+        let all = gio::AppInfo::all();
+        if let Some(rail) = all.iter().find(|a| a.id().map_or(false, |id| id.to_lowercase().contains("rail"))) {
+            for mime in &["x-scheme-handler/http", "x-scheme-handler/https", "text/html", "x-scheme-handler/about"] {
+                let _ = rail.set_as_default_for_type(mime);
+            }
+        }
+        let _ = std::process::Command::new("xdg-settings")
+            .args(["set", "default-web-browser", "rail.desktop"])
+            .output();
+        for mime in &["x-scheme-handler/http", "x-scheme-handler/https", "text/html"] {
+            let _ = std::process::Command::new("xdg-mime")
+                .args(["default", "rail.desktop", mime])
+                .output();
+        }
+        is_default_browser()
+    } else {
+        let all = gio::AppInfo::all();
+        if let Some(other) = all.iter().find(|a| !a.id().map_or(false, |id| id.to_lowercase().contains("rail")) && a.supports_uris()) {
+            for mime in &["x-scheme-handler/http", "x-scheme-handler/https", "text/html"] {
+                let _ = other.set_as_default_for_type(mime);
+            }
+            if let Some(id) = other.id() {
+                let _ = std::process::Command::new("xdg-settings")
+                    .args(["set", "default-web-browser", &id])
+                    .output();
+            }
+        }
+        !is_default_browser()
+    }
+}

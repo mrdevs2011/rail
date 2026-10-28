@@ -57,6 +57,7 @@ impl App {
         if !html_css.trim().is_empty() {
             ucm.add_style_sheet(&user_style_sheet(&html_css));
         }
+        apply_extensions_to_ucm(&ucm);
         STYLE_MANAGERS.with(|l| l.borrow_mut().push(ucm.downgrade()));
         ADBLOCK_FILTER.with(|f| {
             if let Some(f) = f.borrow().as_ref() {

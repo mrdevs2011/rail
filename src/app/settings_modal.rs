@@ -17,6 +17,7 @@ impl App {
         let tab_name = match tab {
             SettingsTab::General => "general",
             SettingsTab::Profiles => "profiles",
+            SettingsTab::Extensions => "extensions",
             SettingsTab::Data => "data",
             SettingsTab::Privacy => "privacy",
             SettingsTab::Customize => "customize",
@@ -240,7 +241,7 @@ impl App {
     pub(crate) fn sync_settings_responsive(&self) {
         let w = self.settings_modal.width();
         let w = if w > 0 { w } else { self.win.width() };
-        let is_narrow = w > 0 && w < 720;
+        let is_narrow = w > 0 && w < 520;
         if is_narrow {
             self.settings_modal.add_css_class("responsive-narrow");
             self.settings_body.set_orientation(gtk::Orientation::Vertical);

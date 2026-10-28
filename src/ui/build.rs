@@ -4,6 +4,7 @@ use crate::*;
 
 pub(crate) fn build(gapp: &gtk::Application) {
     setup_adblock();
+    init_extensions();
     if let Some(s) = gtk::Settings::default() {
         s.set_gtk_application_prefer_dark_theme(true);
     }
@@ -74,6 +75,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     // Settings Body (Left sidebar + Right stack)
     let settings_body = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     settings_body.add_css_class("settings-body");
+    settings_body.set_hexpand(true);
     settings_body.set_vexpand(true);
 
     let settings_sidebar = gtk::Box::new(gtk::Orientation::Vertical, 4);
@@ -88,6 +90,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     let sidebar_items = [
         (SettingsTab::General, "preferences-system-symbolic", tr("General")),
         (SettingsTab::Profiles, "system-users-symbolic", tr("Profiles")),
+        (SettingsTab::Extensions, "application-x-addon-symbolic", tr("Extensions")),
         (SettingsTab::Data, "drive-harddisk-symbolic", tr("Data")),
         (SettingsTab::Privacy, "security-high-symbolic", tr("Privacy & Shield")),
         (SettingsTab::Customize, "document-edit-symbolic", tr("Customize")),
@@ -164,6 +167,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     update::ensure_icon();
     gtk::Window::set_default_icon_name("rail");
     overlay.add_overlay(&update::build_card(&win));
+    build_extensions_page(&settings_stack, win.clone());
 
     let app = Rc::new(App {
         win: win.clone(),

@@ -80,6 +80,7 @@ pub(crate) fn settings_uri_for_tab(tab: SettingsTab) -> &'static str {
     match tab {
         SettingsTab::General => "rail://settings",
         SettingsTab::Profiles => "rail://settings/profiles",
+        SettingsTab::Extensions => "rail://settings/extensions",
         SettingsTab::Data => "rail://settings/data",
         SettingsTab::Privacy => "rail://settings/privacy",
         SettingsTab::Customize => "rail://settings/customize",
@@ -97,6 +98,7 @@ pub(crate) fn settings_tab_from_uri(uri: &str) -> Option<SettingsTab> {
     Some(match rest {
         "" | "general" => SettingsTab::General,
         "profiles" | "profile" => SettingsTab::Profiles,
+        "extensions" | "extension" => SettingsTab::Extensions,
         "data" | "backup" => SettingsTab::Data,
         "privacy" | "shield" => SettingsTab::Privacy,
         "customize" | "css" | "shortcuts" => SettingsTab::Customize,

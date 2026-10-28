@@ -1245,7 +1245,8 @@ button.color-choice.selected {
     background: #090909;
     border-right: 1px solid #151515;
     padding: 12px 8px;
-    min-width: 195px;
+    min-width: 205px;
+    width: 215px;
 }
 .settings-tab-btn {
     background: transparent;

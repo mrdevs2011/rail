@@ -206,11 +206,9 @@ impl App {
                 if tab.view.is_loading() || tab.view.is_playing_audio() || !self.tab_is_visible(tab) {
                     continue;
                 }
-                if let Some(tex) = Self::capture_durable_frame(&tab.view) {
-                    tab.freeze.set_paintable(Some(&tex));
-                } else if tab.freeze.paintable().is_none() {
-                    continue;
-                }
+                let wp = gtk::WidgetPaintable::new(Some(&tab.view));
+                let frame = gdk::prelude::PaintableExt::current_image(&wp);
+                tab.freeze.set_paintable(Some(&frame));
                 tab.freeze.set_visible(true);
                 frozen.push((tab.freeze.clone(), tab.view.clone()));
             }

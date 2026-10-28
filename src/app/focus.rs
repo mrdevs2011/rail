@@ -231,6 +231,7 @@ impl App {
             let tab_name = match section {
                 SettingsTab::General => "general",
                 SettingsTab::Profiles => "profiles",
+                SettingsTab::Extensions => "extensions",
                 SettingsTab::Data => "data",
                 SettingsTab::Privacy => "privacy",
                 SettingsTab::Customize => "customize",

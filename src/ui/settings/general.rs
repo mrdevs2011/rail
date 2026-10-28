@@ -73,6 +73,34 @@ pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
     engine_card.append(&engines_flow);
     page_general.append(&engine_card);
 
+    // Default Browser Card
+    let def_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    def_card.add_css_class("settings-card");
+    let def_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    let def_info_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    def_info_box.set_hexpand(true);
+    let def_title = gtk::Label::new(Some(tr("Default Web Browser")));
+    def_title.add_css_class("settings-card-title");
+    def_title.set_xalign(0.0);
+    let def_desc = gtk::Label::new(Some(tr("Set Rail as the default browser to open web links from other apps.")));
+    def_desc.add_css_class("settings-card-desc");
+    def_desc.set_xalign(0.0);
+    def_desc.set_wrap(true);
+    def_info_box.append(&def_title);
+    def_info_box.append(&def_desc);
+
+    let def_switch = gtk::Switch::new();
+    def_switch.set_active(is_default_browser());
+    def_switch.set_valign(gtk::Align::Center);
+    def_switch.connect_state_set(move |_, state| {
+        set_default_browser(state);
+        glib::Propagation::Proceed
+    });
+    def_row.append(&def_info_box);
+    def_row.append(&def_switch);
+    def_card.append(&def_row);
+    page_general.append(&def_card);
+
     // Language Card
     let lang_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
     lang_card.add_css_class("settings-card");
