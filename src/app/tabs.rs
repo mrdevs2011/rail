@@ -31,11 +31,8 @@ impl App {
         attach_download_handlers_once(session);
 
         let settings = webkit6::Settings::new();
-        // Modern Chrome User-Agent ensures YouTube, web video players, codecs and
-        // web apps serve compatible HTML5 MSE / VP9 / WebM pipelines on Linux.
-        settings.set_user_agent(Some(
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        ));
+        // Native WebKitGTK user agent ensures websites deliver JavaScriptCore-compatible
+        // scripts with zero V8 syntax errors.
         settings.set_enable_webrtc(webrtc_allowed());
         settings.set_enable_dns_prefetching(false);
         settings.set_enable_smooth_scrolling(true);

@@ -32,7 +32,17 @@ impl App {
             return;
         }
         LAST_PZ.store(now, std::sync::atomic::Ordering::Relaxed);
-        let z = if dir == 0 { 1.0 } else { next_page_zoom(v.zoom_level(), dir) };
+        let cur = unsafe {
+            v.data::<std::sync::Arc<std::sync::atomic::AtomicU64>>("rail-expected-zoom")
+                .map(|p| f64::from_bits(p.as_ref().load(std::sync::atomic::Ordering::Relaxed)))
+                .unwrap_or_else(|| v.zoom_level())
+        };
+        let z = if dir == 0 { 1.0 } else { next_page_zoom(cur, dir) };
+        unsafe {
+            if let Some(p) = v.data::<std::sync::Arc<std::sync::atomic::AtomicU64>>("rail-expected-zoom") {
+                p.as_ref().store(z.to_bits(), std::sync::atomic::Ordering::Relaxed);
+            }
+        }
         v.set_zoom_level(z);
     }
 

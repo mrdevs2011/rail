@@ -24,6 +24,103 @@ impl App {
         });
         view.add_controller(click);
 
+        // Disarm WebKitGTK's internal pinch-to-zoom gesture so it cannot hijack
+        // the touchpad and scale the entire DOM layout / header bars.
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+        let expected_zoom = Arc::new(AtomicU64::new(1.0f64.to_bits()));
+        unsafe {
+            use gtk4::glib::gobject_ffi;
+            let ptr = view.as_ptr() as *mut gobject_ffi::GObject;
+            let gesture_ptr = gobject_ffi::g_object_get_data(ptr, b"wk-view-zoom-gesture\0".as_ptr() as *const _);
+            if !gesture_ptr.is_null() {
+                gobject_ffi::g_signal_handlers_destroy(gesture_ptr as *mut gobject_ffi::GObject);
+                let g: gtk::GestureZoom = gtk4::glib::translate::from_glib_none(gesture_ptr as *mut _);
+                view.remove_controller(&g);
+            }
+            view.set_data("rail-expected-zoom", expected_zoom.clone());
+        }
+
+        // Lock down WebKit's zoom level against rogue gesture overrides.
+        // Only intentional keyboard shortcuts (Ctrl+/Ctrl-/Ctrl 0) via `page_zoom` are permitted.
+        let exp_z = expected_zoom.clone();
+        let resetting = Arc::new(AtomicBool::new(false));
+        let r_z = resetting.clone();
+        view.connect_notify(Some("zoom-level"), move |v, _| {
+            if r_z.load(Ordering::Relaxed) {
+                return;
+            }
+            let exp = f64::from_bits(exp_z.load(Ordering::Relaxed));
+            let cur = v.zoom_level();
+            if (cur - exp).abs() > 0.002 {
+                r_z.store(true, Ordering::Relaxed);
+                v.set_zoom_level(exp);
+                r_z.store(false, Ordering::Relaxed);
+            }
+        });
+
+        // Touchpad pinch-to-zoom:
+        // In Capture phase, this captures touchpad pinch gestures and converts them into
+        // synthetic DOM WheelEvents with ctrlKey: true at the exact pointer coordinates.
+        // This allows canvas applications (Excalidraw, Figma, Google Maps, Miro, Canva, 3D viewers)
+        // to naturally zoom only their canvas content, completely preventing WebKitGTK's
+        // native gesture from hijacking and scaling the entire page layout / UI headers.
+        let pinch = gtk::GestureZoom::new();
+        pinch.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let last_scale = Rc::new(Cell::new(1.0f64));
+        let last_b = last_scale.clone();
+        pinch.connect_begin(move |gesture, _| {
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            last_b.set(1.0);
+        });
+        let last_s = last_scale.clone();
+        let a_pinch = self.clone();
+        let v_pinch = view.downgrade();
+        pinch.connect_scale_changed(move |gesture, scale| {
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            if a_pinch.ov.get() {
+                return;
+            }
+            let Some(v) = v_pinch.upgrade() else { return };
+            let prev = last_s.replace(scale);
+            if prev <= 0.01 {
+                return;
+            }
+            let factor = scale / prev;
+            if (factor - 1.0).abs() < 0.002 {
+                return;
+            }
+            // Zoom in (factor > 1.0) -> negative deltaY (scroll up with Ctrl)
+            // Zoom out (factor < 1.0) -> positive deltaY (scroll down with Ctrl)
+            // Logarithmic step matches browser trackpad pinch velocity
+            let dy = -((factor.ln()) * 260.0);
+            let (cx, cy) = gesture
+                .bounding_box()
+                .map(|r| (r.x() as f64 + (r.width() as f64) / 2.0, r.y() as f64 + (r.height() as f64) / 2.0))
+                .unwrap_or_else(|| (v.width() as f64 / 2.0, v.height() as f64 / 2.0));
+
+            let js = format!(
+                r#"(function() {{
+                    const el = document.elementFromPoint({x:.1}, {y:.1}) || document.body;
+                    el.dispatchEvent(new WheelEvent('wheel', {{
+                        clientX: {x:.1},
+                        clientY: {y:.1},
+                        deltaY: {dy:.2},
+                        deltaMode: 0,
+                        ctrlKey: true,
+                        bubbles: true,
+                        cancelable: true
+                    }}));
+                }})();"#,
+                x = cx,
+                y = cy,
+                dy = dy,
+            );
+            v.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
+        });
+        view.add_controller(pinch);
+
         // Web page horizontal scroll via mouse wheel (Shift + wheel)
         let page_scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
         page_scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
