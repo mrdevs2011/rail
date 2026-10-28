@@ -39,7 +39,8 @@ impl App {
         settings.set_enable_webgl(true); // needed for smooth compositing on many sites
         settings.set_enable_mediasource(true);
         settings.set_enable_media_capabilities(true);
-        settings.set_enable_encrypted_media(true);
+        // Widevine CDM is absent on desktop Linux WebKitGTK; enabling EME causes YouTube to request DRM/ClearKey and fail
+        settings.set_enable_encrypted_media(false);
         settings.set_enable_developer_extras(true);
         settings.set_enable_back_forward_navigation_gestures(true);
         settings.set_enable_webaudio(true);
