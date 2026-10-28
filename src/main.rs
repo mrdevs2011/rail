@@ -88,7 +88,7 @@ fn main() -> glib::ExitCode {
         }
     }
     if std::env::var_os("RAIL_LOW_MEM").is_some_and(|v| v != "0") {
-        // Extreme low-RAM: small limit, aggressive reclaim, no process kill (0.0 = never kill).
+        // Extreme low-RAM mode only: small limit, aggressive reclaim
         let mut mps = webkit6::MemoryPressureSettings::new();
         mps.set_memory_limit(256);
         mps.set_conservative_threshold(0.25);
@@ -99,19 +99,11 @@ fn main() -> glib::ExitCode {
         if let Some(ctx) = webkit6::WebContext::default() {
             ctx.set_cache_model(webkit6::CacheModel::DocumentViewer);
         }
-    } else {
-        // Default: real browser cache + WebKit memory pressure so RAM stays bounded
-        // without the kill-reload thrash of an ultra-low limit.
-        let mut mps = webkit6::MemoryPressureSettings::new();
-        mps.set_memory_limit(768);
-        mps.set_conservative_threshold(0.33);
-        mps.set_strict_threshold(0.66);
-        mps.set_kill_threshold(0.0); // never kill web process from WebKit side; Rail suspends instead
-        mps.set_poll_interval(5.0);
-        webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
-        if let Some(ctx) = webkit6::WebContext::default() {
-            ctx.set_cache_model(webkit6::CacheModel::WebBrowser);
-        }
+    } else if let Some(ctx) = webkit6::WebContext::default() {
+        // Default mode: full browser caching without artificial RAM throttling.
+        // This ensures YouTube / HTML5 video buffers remain in RAM for instant seeking
+        // without constant buffer eviction thrashing.
+        ctx.set_cache_model(webkit6::CacheModel::WebBrowser);
     }
 
     let args: Vec<String> = std::env::args().collect();
