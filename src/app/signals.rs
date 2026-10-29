@@ -30,6 +30,29 @@ impl App {
         });
         view.add_controller(click);
 
+        // WebKit's hit-test signal provides the real destination of the hovered anchor,
+        // including links whose visible text is different from their href.
+        let app_hover = self.clone();
+        let hovered_view = view.downgrade();
+        view.connect_mouse_target_changed(move |_, hit, _| {
+            let Some(v) = hovered_view.upgrade() else { return };
+            if app_hover.focused_view().as_ref() != Some(&v) {
+                app_hover.hovered_link_label.set_visible(false);
+                return;
+            }
+            if hit.context_is_link() {
+                if let Some(uri) = hit.link_uri().filter(|u| !u.is_empty()) {
+                    app_hover.hovered_link_label.set_text(uri.as_str());
+                    app_hover.hovered_link_label.set_tooltip_text(Some(uri.as_str()));
+                    app_hover.hovered_link_label.set_visible(true);
+                    return;
+                }
+            }
+            app_hover.hovered_link_label.set_text("");
+            app_hover.hovered_link_label.set_tooltip_text(None);
+            app_hover.hovered_link_label.set_visible(false);
+        });
+
         // Leave WebKitGTK's native pinch gesture and zoom-level handling enabled.
         // WebKit arbitrates native page zoom against page-level touch/pointer handlers;
         // Rail must not remove the gesture or force the zoom level back to a stale value.

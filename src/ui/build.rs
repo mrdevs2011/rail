@@ -167,6 +167,20 @@ pub(crate) fn build(gapp: &gtk::Application) {
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&shell));
     overlay.add_overlay(&load_bar);
+
+    // Browser-style link preview, anchored at the bottom-left of the content window.
+    let hovered_link_label = gtk::Label::new(None);
+    hovered_link_label.add_css_class("hovered-link-status");
+    hovered_link_label.set_xalign(0.0);
+    hovered_link_label.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
+    hovered_link_label.set_max_width_chars(100);
+    hovered_link_label.set_halign(gtk::Align::Start);
+    hovered_link_label.set_valign(gtk::Align::End);
+    hovered_link_label.set_margin_start(8);
+    hovered_link_label.set_margin_bottom(8);
+    hovered_link_label.set_visible(false);
+    hovered_link_label.set_can_target(false);
+    overlay.add_overlay(&hovered_link_label);
     // Settings overlays the strip only (tab square), not the whole window
     strip_host.add_overlay(&settings_modal);
 
@@ -200,6 +214,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         pill_engine_icon,
         pill_pwa_btn: pill_pwa_btn.clone(),
         load_bar,
+        hovered_link_label,
         palette,
         palette_engine_icon,
         entry: entry.clone(),

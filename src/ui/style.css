@@ -2444,3 +2444,15 @@ entry.find-entry, entry.find-entry:focus-within {
 .find-bar.find-none .find-count {
     color: #fafafa;
 }
+
+
+/* Native-browser style hovered link destination preview. */
+.hovered-link-status {
+    color: #e5e7eb;
+    background: alpha(#09090b, 0.94);
+    border: 1px solid #27272a;
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 500;
+}
