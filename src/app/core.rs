@@ -242,19 +242,23 @@ impl App {
                 .collect();
             let mut js = String::from("(function(){try{var L=[");
             js.push_str(&items.join(","));
-            // Replay a real DOM drag sequence at the pointer's page coordinates.
-            // Upload zones (GitHub, Gemini, etc.) listen for drop, not paste.
+            // Prefer the page's native file input: upload frameworks (including GitHub)
+            // consume its change event, while synthetic DOM drop events are untrusted.
+            // Fall back to a DOM drag sequence for drop-only targets.
             js.push_str(&format!(
                 "];var dt=new DataTransfer();L.forEach(function(x){{var b=atob(x[2]);var u=new Uint8Array(b.length);\
                  for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);\
                  dt.items.add(new File([u],x[0],{{type:x[1]}}));}});\
-                 dt.effectAllowed='copy';dt.dropEffect='copy';\
-                 var t=document.elementFromPoint({drop_x},{drop_y})||document.body;\
-                 ['dragenter','dragover','drop'].forEach(function(n){{\
-                   var e=new DragEvent(n,{{dataTransfer:dt,bubbles:true,cancelable:true,composed:true,clientX:{drop_x},clientY:{drop_y}}});\
-                   t.dispatchEvent(e);\
-                 }});\
-                 }}catch(e){{console.error('Rail file drop failed',e);}}}})();"
+                 var inputs=Array.from(document.querySelectorAll('input[type=file]:not(:disabled)'));\
+                 var input=inputs.find(function(i){{return i.multiple||dt.files.length===1;}})||inputs[0];\
+                 if(input){{var set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'files').set;set.call(input,dt.files);\
+                   input.dispatchEvent(new Event('input',{{bubbles:true,composed:true}}));\
+                   input.dispatchEvent(new Event('change',{{bubbles:true,composed:true}}));\
+                 }}else{{var t=document.elementFromPoint({drop_x},{drop_y})||document.body;\
+                   dt.effectAllowed='copy';dt.dropEffect='copy';\
+                   ['dragenter','dragover','drop'].forEach(function(n){{t.dispatchEvent(new DragEvent(n,{{dataTransfer:dt,bubbles:true,cancelable:true,composed:true,clientX:{drop_x},clientY:{drop_y}}}));}});\
+                 }}\
+                 }}catch(e){{console.error('Rail file upload failed',e);}}}})();"
             ));
             view.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
         });
