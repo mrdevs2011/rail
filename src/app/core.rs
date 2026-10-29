@@ -240,7 +240,16 @@ impl App {
                 .collect();
             let mut js = String::from("(function(){try{var L=[");
             js.push_str(&items.join(","));
-            js.push_str("];var dt=new DataTransfer();L.forEach(function(x){var b=atob(x[2]),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);dt.items.add(new File([u],x[0],{type:x[1]}));});                var inputs=Array.from(document.querySelectorAll('input[type=\"file\"]')).filter(function(e){return !e.disabled;});                var input=inputs.find(function(e){return !e.accept||e.accept.indexOf('image')>=0;})||inputs[0];                if(input){input.files=dt.files;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));}                else{var t=document.activeElement;if(t&&t.isContentEditable)t.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true,composed:true}));}                }catch(e){console.error('Rail drop upload failed',e);}})();");
+            // Use the exact same clipboard paste route as Rail's working Ctrl+V
+            // image upload. Synthetic drag events are not trusted by web apps.
+            js.push_str(
+                "];var dt=new DataTransfer();L.forEach(function(x){var b=atob(x[2]);var u=new Uint8Array(b.length);\
+                 for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);\
+                 dt.items.add(new File([u],x[0],{type:x[1]}));});\
+                 var t=document.activeElement||document.body;\
+                 t.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true,composed:true}));\
+                 }catch(e){console.error('Rail drop paste failed',e);}})();",
+            );
             view.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
         });
     }

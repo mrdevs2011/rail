@@ -161,6 +161,8 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
 
     // Drag-and-drop local files or URLs directly into Rail
     let drop = gtk::DropTarget::new(gdk::FileList::static_type(), gdk::DragAction::COPY);
+    // Intercept desktop file drops before WebKit turns them into file:// text.
+    drop.set_propagation_phase(gtk::PropagationPhase::Capture);
     let a_drop = app.clone();
     let win_drop = win.clone();
     drop.connect_drop(move |_target, val, x, y| {
