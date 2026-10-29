@@ -63,10 +63,26 @@ fn render_extensions_list(list_box: &gtk::Box, refresh: Rc<dyn Fn()>) {
             btn_del.add_css_class("flat-icon");
             btn_del.set_tooltip_text(Some(tr("Remove")));
             let ext_id_del = ext.id.clone();
+            let ext_name_del = ext.name.clone();
             let refresh_del = Rc::clone(&refresh);
-            btn_del.connect_clicked(move |_| {
-                remove_extension(&ext_id_del);
-                refresh_del();
+            btn_del.connect_clicked(move |b| {
+                let alert = gtk::AlertDialog::builder()
+                    .modal(true)
+                    .message(tr("Are you sure you want to remove this extension?"))
+                    .detail(&format!("\"{}\"", ext_name_del))
+                    .buttons([tr("Cancel"), tr("Remove")])
+                    .cancel_button(0)
+                    .default_button(1)
+                    .build();
+                let ext_id = ext_id_del.clone();
+                let ref_fn = refresh_del.clone();
+                let parent_win = b.root().and_then(|r| r.downcast::<gtk::Window>().ok());
+                alert.choose(parent_win.as_ref(), gio::Cancellable::NONE, move |res| {
+                    if res == Ok(1) {
+                        remove_extension(&ext_id);
+                        ref_fn();
+                    }
+                });
             });
 
             row1.append(&icon);
@@ -125,6 +141,7 @@ pub(crate) fn build_extensions_page(settings_stack: &gtk::Stack, win: gtk::Appli
 
     let btn_load = gtk::Button::with_label(tr("Load unpacked folder"));
     btn_load.add_css_class("suggested-action");
+    btn_load.add_css_class("ext-load-btn");
 
     let btn_zip = gtk::Button::with_label(tr("Install .zip / .crx"));
 

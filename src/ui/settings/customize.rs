@@ -49,7 +49,7 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
     css_scroll.add_css_class("css-editor-frame");
     css_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     css_scroll.set_vexpand(true);
-    css_scroll.set_min_content_height(300);
+    css_scroll.set_min_content_height(480);
     css_scroll.set_child(Some(&editor_hbox));
     page_css.append(&css_scroll);
 
@@ -118,16 +118,9 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
     let sc_page = gtk::Box::new(gtk::Orientation::Vertical, 6);
     sc_page.set_vexpand(true);
 
-    let sc_prio = gtk::CheckButton::with_label(tr("Rail shortcuts win over website shortcuts"));
-    sc_prio.set_active(true);
-    let sc_prio_hint = gtk::Label::new(Some(
-        tr("Unchecked: when a page uses the same keys, the page wins and Rail stays out of the way."),
-    ));
-    sc_prio_hint.add_css_class("settings-card-desc");
-    sc_prio_hint.set_xalign(0.0);
-    sc_prio_hint.set_wrap(true);
-    sc_page.append(&sc_prio);
-    sc_page.append(&sc_prio_hint);
+    // Note: sc_prio removed per user request: website shortcuts always have precedence over browser shortcuts
+    let sc_prio = gtk::CheckButton::new();
+    sc_prio.set_active(false);
 
     let sc_rows = gtk::Box::new(gtk::Orientation::Vertical, 2);
     let sc_scroll = gtk::ScrolledWindow::new();

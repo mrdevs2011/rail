@@ -346,7 +346,7 @@ pub(crate) fn format_view_source_html(target_url: &str, raw_code: &str) -> Strin
 
 pub(crate) fn load_view_source_page(v: &WebView, target: &str) {
     if target.is_empty() {
-        v.load_html(&format_view_source_html("about:blank", ""), Some("view-source:about:blank"));
+        v.load_html(&format_view_source_html("about:blank", ""), Some("about:blank"));
         return;
     }
     let target_clean = target.to_string();
@@ -356,7 +356,7 @@ pub(crate) fn load_view_source_page(v: &WebView, target: &str) {
         let path_str = target_clean.trim_start_matches("file://");
         let content = std::fs::read_to_string(path_str).unwrap_or_else(|e| format!("/* Error reading file: {e} */"));
         let html = format_view_source_html(&target_clean, &content);
-        v.load_html(&html, Some(&format!("view-source:{target_clean}")));
+        v.load_html(&html, Some("about:blank"));
         return;
     }
 
@@ -364,7 +364,7 @@ pub(crate) fn load_view_source_page(v: &WebView, target: &str) {
     let url_for_thread = target_clean.clone();
     std::thread::spawn(move || {
         let out = std::process::Command::new("curl")
-            .args(["-fsSL", "-m", "15", "-A", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", &url_for_thread])
+            .args(["-4", "-fsSL", "-L", "-m", "15", "-A", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", &url_for_thread])
             .output();
         let code = match out {
             Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).into_owned(),
@@ -374,13 +374,12 @@ pub(crate) fn load_view_source_page(v: &WebView, target: &str) {
         let _ = tx.send(code);
     });
 
-    let uri_for_js = format!("view-source:{target_clean}");
     glib::timeout_add_local(std::time::Duration::from_millis(50), move || {
         match rx.try_recv() {
             Ok(src) => {
                 if let Some(vw) = view_weak.upgrade() {
                     let html = format_view_source_html(&target_clean, &src);
-                    vw.load_html(&html, Some(&uri_for_js));
+                    vw.load_html(&html, Some("about:blank"));
                 }
                 glib::ControlFlow::Break
             }

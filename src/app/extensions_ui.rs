@@ -169,6 +169,11 @@ impl App {
         root_box.append(&view);
         win.set_child(Some(&root_box));
 
+        let win_close_vw = win.clone();
+        view.connect_close(move |_| {
+            win_close_vw.close();
+        });
+
         // Close on Escape
         let key_ctl = gtk::EventControllerKey::new();
         let win_esc = win.clone();
@@ -184,8 +189,9 @@ impl App {
 
         // Dismiss on focus leave (click outside), matching Chrome/Brave extension popups
         let win_focus = win.clone();
+        let opened_at = std::time::Instant::now();
         win.connect_is_active_notify(move |w| {
-            if !w.is_active() {
+            if !w.is_active() && opened_at.elapsed().as_millis() > 350 {
                 win_focus.close();
             }
         });
@@ -198,6 +204,10 @@ impl App {
         });
 
         win.present();
+        let v_focus = view.clone();
+        glib::idle_add_local_once(move || {
+            v_focus.grab_focus();
+        });
     }
 
     /// Check if keyboard combination matches any registered extension command

@@ -459,17 +459,18 @@ pub(crate) fn install_from_webstore(ext_id: &str) -> Result<Extension, String> {
 
     let tmp_file = std::env::temp_dir().join(format!("rail_ext_{}.crx", clean_id));
     let url = format!(
-        "https://clients2.google.com/service/update2/crx?response=redirect&prod=chromecrx&prodchannel=&prodversion=130.0.0.0&lang=en-US&acceptformat=crx3,puff&x=id%3D{}%26installsource%3Dondemand%26uc",
+        "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=128.0.6613.120&acceptformat=crx2,crx3&x=id%3D{}%26uc",
         clean_id
     );
 
     let status = std::process::Command::new("curl")
         .args([
+            "-4",
             "-fsSL",
             "-L",
             "--compressed",
-            "-m", "45",
-            "-A", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+            "-m", "60",
+            "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
             "-o", tmp_file.to_str().unwrap_or(""),
             &url,
         ])
@@ -526,9 +527,9 @@ pub(crate) fn polyfill_for_ext(ext: &Extension) -> String {
 
     format!(
         r#"(function() {{
-  if (window.__rail_ext_{ext_id}) return;
-  window.__rail_ext_{ext_id} = true;
   var extId = "{ext_id}";
+  if (window["__rail_ext_" + extId]) return;
+  window["__rail_ext_" + extId] = true;
   var extBaseUrl = "{base_url}";
   var manifest = {manifest_json};
   var initialLocal = {initial_local};
@@ -953,8 +954,25 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
   if (!location.hostname.includes('chromewebstore.google.com') && !location.hostname.includes('chrome.google.com')) return;
 
   function getExtId() {
-    var m = location.pathname.match(/\/detail\/(?:[^\/]+\/)?([a-z]{32})/);
-    return m ? m[1] : null;
+    var m = location.href.match(/([a-z]{32})(?:[/?#]|$)/i);
+    return m ? m[1].toLowerCase() : null;
+  }
+
+  function queryAllDeep(selector, root) {
+    root = root || document;
+    var results = [];
+    try {
+      results = Array.prototype.slice.call(root.querySelectorAll(selector));
+    } catch(e) {}
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+    var node = walker.nextNode();
+    while (node) {
+      if (node.shadowRoot) {
+        results = results.concat(queryAllDeep(selector, node.shadowRoot));
+      }
+      node = walker.nextNode();
+    }
+    return results;
   }
 
   function triggerInstall(btn, extId) {
@@ -982,15 +1000,16 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
     if (!extId) return;
 
     // 1. Hijack native gray/disabled "Add to Chrome" button on chromewebstore.google.com
-    var candidates = document.querySelectorAll('button, [role="button"], a[role="button"]');
+    var candidates = queryAllDeep('button, [role="button"], a[role="button"]', document);
     for (var i = 0; i < candidates.length; i++) {
       var el = candidates[i];
       if (el.id === 'rail-webstore-install-btn' || el.getAttribute('data-rail-webstore-hijacked') === 'true') continue;
       var txt = (el.textContent || '').trim().toLowerCase();
       var aria = (el.getAttribute('aria-label') || '').toLowerCase();
       var isChromeBtn = txt.includes('chrome') || txt.includes('add to') || txt.includes('добавить') ||
-                        txt.includes('доступно') || txt.includes('available') || aria.includes('chrome');
-      var isCtA = el.getAttribute('jsname') === 'wQO0od' || el.classList.contains('F9O37c') || el.closest('[data-item-id]');
+                        txt.includes('доступно') || txt.includes('available') || aria.includes('chrome') ||
+                        aria.includes('add to') || aria.includes('install');
+      var isCtA = el.getAttribute('jsname') === 'wQO0od' || el.classList.contains('F9O37c') || (el.closest && el.closest('[data-item-id]'));
 
       if (isChromeBtn || isCtA) {
         el.setAttribute('data-rail-webstore-hijacked', 'true');
@@ -1018,7 +1037,7 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
     }
 
     // 2. Guaranteed floating backup button at bottom-right
-    if (!document.getElementById('rail-webstore-install-btn')) {
+    if (!document.getElementById('rail-webstore-install-btn') && document.body) {
       var btn = document.createElement('button');
       btn.id = 'rail-webstore-install-btn';
       btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Rail\'ga qo\'shish';
@@ -1065,13 +1084,7 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
   } else {
     hijackWebstorePage();
   }
-  var prevUrl = location.href;
-  setInterval(function() {
-    if (location.href !== prevUrl) {
-      prevUrl = location.href;
-      hijackWebstorePage();
-    }
-  }, 750);
+  setInterval(hijackWebstorePage, 800);
 })();"#;
 
     let ws_script = webkit6::UserScript::new(

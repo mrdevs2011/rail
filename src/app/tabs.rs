@@ -64,7 +64,15 @@ impl App {
         settings.set_auto_load_images(true);
         settings.set_load_icons_ignoring_image_load_setting(true);
         // Back/forward uses the page cache: instant history navigation instead of a reload
-        settings.set_enable_page_cache(true);
+        let dev_no_cache = rail_data_dir().join("dev-disable-cache").exists();
+        settings.set_enable_page_cache(!dev_no_cache);
+
+        if rail_data_dir().join("dev-cors-bypass").exists() || rail_data_dir().join("dev-mixed-content").exists() {
+            settings.set_disable_web_security(true);
+            settings.set_allow_universal_access_from_file_urls(true);
+            settings.set_allow_file_access_from_file_urls(true);
+            settings.set_allow_top_navigation_to_data_urls(true);
+        }
 
         let ucm = webkit6::UserContentManager::new();
         ucm.register_script_message_handler("railgo", None);
@@ -225,7 +233,7 @@ impl App {
                     let html = crate::format_view_source_html(&uri_target, &raw_html);
                     let session = a.profiles.borrow_mut().get_or_create_session(&prof_id);
                     let new_view = Self::create_web_view(&session, &prof_id);
-                    new_view.load_html(&html, Some(&view_source_uri));
+                    new_view.load_html(&html, Some("about:blank"));
                     a.set_view_saved_uri(&new_view, &view_source_uri);
                     a.add_view(new_view, prof_id, false);
                 } else {

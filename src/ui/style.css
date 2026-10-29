@@ -2394,3 +2394,12 @@ button.pill-pwa-btn:hover {
     color: #62a0ea;
     background: rgba(53, 132, 228, 0.15);
 }
+
+/* Extension load unpacked button - pure white text */
+button.suggested-action,
+button.suggested-action label,
+.ext-load-btn,
+.ext-load-btn label {
+    color: #ffffff !important;
+    font-weight: 600;
+}

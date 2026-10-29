@@ -64,6 +64,7 @@ pub(crate) fn load_html_css() -> String {
             if text.contains("font: -webkit-small-control")
                 || text.contains("/* ===== form controls ===== */")
                 || text.contains("Sites that set their own CSS still win; this layer only replaces the defaults.")
+                || (!text.contains("/* ===== 1. Box Sizing") && text.lines().count() <= 35)
             {
                 let _ = std::fs::write(&path, DEFAULT_HTML_CSS);
                 return DEFAULT_HTML_CSS.to_string();
@@ -81,6 +82,7 @@ pub(crate) fn load_html_css() -> String {
             let initial = if initial.contains("font: -webkit-small-control")
                 || initial.contains("/* ===== form controls ===== */")
                 || initial.contains("Sites that set their own CSS still win; this layer only replaces the defaults.")
+                || (!initial.contains("/* ===== 1. Box Sizing") && initial.lines().count() <= 35)
             {
                 DEFAULT_HTML_CSS.to_string()
             } else {

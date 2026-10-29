@@ -115,11 +115,11 @@ pub(crate) fn sc_bind_tooltip<W: gtk::prelude::IsA<gtk::Widget>>(w: &W, key: &'s
     });
 }
 
-/// Rail intercepts keys in capture phase, respecting each shortcut's priority (Rail vs Website).
+/// Website shortcuts always have priority over browser shortcuts (Bubble phase lets web view receive keys first).
 pub(crate) fn apply_shortcut_priority() {
     KEY_CTL.with(|k| {
         if let Some(ctl) = k.borrow().as_ref() {
-            ctl.set_propagation_phase(gtk::PropagationPhase::Capture);
+            ctl.set_propagation_phase(gtk::PropagationPhase::Bubble);
         }
     });
 }

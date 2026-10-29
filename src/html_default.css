@@ -1,11 +1,85 @@
-/* Rail custom user styles
-   Add your custom styles or CSS overrides here.
-   Press "Save" (Ctrl+S) in Settings > Customize to apply to all tabs. */
+/* ==========================================================================
+   Rail HTML5 Default Standards & Base Stylesheet
+   Designed to provide clean, semantic defaults across all web pages.
+   Rules use modern standard CSS and low-specificity selectors (:where)
+   so website custom styles always take precedence.
+   ========================================================================== */
 
-/* ===== dev-style ultra-thin scrollbars ===== */
+/* ===== 1. Box Sizing & Fluid Root ===== */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+    scroll-behavior: smooth;
+}
+
+/* ===== 2. Typography & Text Standards ===== */
+:where(b, strong) {
+    font-weight: 700;
+}
+
+:where(code, kbd, samp, pre) {
+    font-family: ui-monospace, 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace;
+    font-size: 0.95em;
+}
+
+:where(sub, sup) {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+}
+
+:where(sub) {
+    bottom: -0.25em;
+}
+
+:where(sup) {
+    top: -0.5em;
+}
+
+:where(abbr[title]) {
+    text-decoration: underline dotted;
+    cursor: help;
+}
+
+/* ===== 3. Media & Embedded Elements ===== */
+:where(img, video, canvas, svg) {
+    max-width: 100%;
+    height: auto;
+}
+
+:where(audio, canvas, iframe, img, svg, video) {
+    vertical-align: middle;
+}
+
+/* ===== 4. Tables ===== */
+:where(table) {
+    border-collapse: collapse;
+    border-spacing: 0;
+    text-indent: 0;
+}
+
+/* ===== 5. Horizontal Rules & Details ===== */
+:where(hr) {
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+    margin: 1.5rem 0;
+    opacity: 0.25;
+}
+
+:where(summary) {
+    cursor: pointer;
+}
+
+/* ===== 6. Modern Ultra-Thin Scrollbars ===== */
 ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 5px;
+    height: 5px;
 }
 ::-webkit-scrollbar-track {
     background: transparent;
@@ -24,3 +98,6 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(160, 160, 160, 0.25) transparent;
 }
+
+/* ===== 7. User Custom Overrides ===== */
+/* Add any additional website overrides below: */
