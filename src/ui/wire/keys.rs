@@ -28,8 +28,8 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
         // Route image Ctrl+V through Rail's native clipboard fallback; keep text
         // paste native in WebKitGTK. This check must precede shortcut resolution.
         if ctrl
-            && key == gdk::Key::v
             && !state.intersects(M::ALT_MASK | M::SUPER_MASK | M::SHIFT_MASK)
+            && (key == gdk::Key::v || key == gdk::Key::V || keycode == 55)
         {
             if a.try_paste_image() {
                 return glib::Propagation::Stop;
