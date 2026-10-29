@@ -222,6 +222,18 @@ impl App {
             }
         }
 
+        // Active DNS prefetching in the background while typing to eliminate lookup latency
+        if let Some(first) = suggestions.first() {
+            if first.kind != SuggestionKind::Search {
+                let target_host = host_of(&first.target_url).or_else(|| host_of(&first.autofill_text));
+                if let Some(h) = target_host {
+                    let prof_id = self.selected_palette_profile.borrow().clone();
+                    let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
+                    session.prefetch_dns(&h);
+                }
+            }
+        }
+
         // 2. Render suggestions UI
         self.render_suggestions_ui(&suggestions);
         *self.current_suggestions.borrow_mut() = suggestions;

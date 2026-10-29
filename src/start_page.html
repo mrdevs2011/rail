@@ -198,9 +198,10 @@ body {
   window.railSugg = function (text, arr) {
     if (text !== lastQ) return;               // stale answer
     sugs = arr || []; sel = -1;
-    if (fwd && sugs.length && sugs[0].kind !== 2) {
+    var hasSpace = text.indexOf(' ') !== -1 || text.endsWith(' ');
+    if (fwd && !hasSpace && sugs.length && sugs[0].kind !== 2) {
       var clean = text.trim().toLowerCase(), af = sugs[0].autofill || '';
-      if (af.toLowerCase().indexOf(clean) === 0 && af.length > text.length && q.value === text) {
+      if (af && af.toLowerCase().indexOf(clean) === 0 && af.length > text.length && q.value === text) {
         q.value = af; q.setSelectionRange(text.length, af.length); prevLen = text.length;
       }
     }

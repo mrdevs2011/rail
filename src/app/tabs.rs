@@ -34,7 +34,9 @@ impl App {
         // Native WebKitGTK user agent ensures websites deliver JavaScriptCore-compatible
         // scripts with zero V8 syntax errors.
         settings.set_enable_webrtc(webrtc_allowed());
-        settings.set_enable_dns_prefetching(false);
+        // High-speed background DNS prefetching eliminates lookup latency on all link clicks
+        settings.set_enable_dns_prefetching(true);
+        settings.set_property("enable-offline-web-application-cache", true);
         // Smooth, kinetic scrolling across all pages and web views:
         settings.set_enable_smooth_scrolling(true);
         settings.set_enable_webgl(true); // needed for smooth compositing on many sites

@@ -305,7 +305,7 @@ impl App {
                 return false;
             }
             let html = crate::web::format_error_html(uri, &err_msg);
-            v.load_html(&html, Some(uri));
+            v.load_alternate_html(&html, uri, None);
             true
         });
         let win_fs = self.win.clone();
@@ -330,13 +330,18 @@ impl App {
             if let Some(session) = v.network_session() {
                 if let Ok(uri_obj) = glib::Uri::parse(failing_uri, glib::UriFlags::NONE) {
                     if let Some(host) = uri_obj.host() {
-                        session.allow_tls_certificate_for_host(cert, &host);
-                        v.load_uri(failing_uri);
-                        return true;
+                        let h = host.as_str();
+                        if h == "localhost" || h == "127.0.0.1" || h.ends_with(".local") {
+                            session.allow_tls_certificate_for_host(cert, &host);
+                            v.load_uri(failing_uri);
+                            return true;
+                        }
                     }
                 }
             }
-            false
+            let html = crate::web::format_error_html(failing_uri, "net::ERR_CERT_AUTHORITY_INVALID: SSL / TLS certificate validation failed.");
+            v.load_alternate_html(&html, failing_uri, None);
+            true
         });
         let app = self.clone();
         view.connect_create(move |v, nav| {

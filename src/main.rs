@@ -289,8 +289,11 @@ fn main() -> glib::ExitCode {
                     let uri = file.uri().to_string();
                     a.new_tab_with_url(&uri);
                 }
+                a.win.set_visible(true);
                 a.win.present();
-                a.win.present_with_time(gdk::CURRENT_TIME);
+                if let Some(v) = a.focused_view() {
+                    v.grab_focus();
+                }
             }
             None => {
                 if let Some(first) = files.first() {
@@ -325,8 +328,14 @@ fn main() -> glib::ExitCode {
                         a.new_tab_with_url(&uri);
                     }
                 }
+                if let Some(token) = cmdline.getenv("XDG_ACTIVATION_TOKEN").or_else(|| cmdline.getenv("DESKTOP_STARTUP_ID")) {
+                    a.win.set_startup_id(&token);
+                }
+                a.win.set_visible(true);
                 a.win.present();
-                a.win.present_with_time(gdk::CURRENT_TIME);
+                if let Some(v) = a.focused_view() {
+                    v.grab_focus();
+                }
             }
             // First launch: populate TARGET_URL and activate.
             None => {
