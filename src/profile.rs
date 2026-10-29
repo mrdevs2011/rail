@@ -332,6 +332,11 @@ impl ProfileManager {
         );
 
         session.set_itp_enabled(true);
+        // Favicons are off by default: without this WebView::favicon() is always None and the
+        // sidebar falls back to letter badges instead of the site's icon.
+        if let Some(dm) = session.website_data_manager() {
+            dm.set_favicons_enabled(true);
+        }
         session.set_persistent_credential_storage_enabled(false);
 
         if let Some(cookies) = session.cookie_manager() {
