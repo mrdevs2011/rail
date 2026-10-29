@@ -55,7 +55,7 @@ mod web;
 mod extensions;
 mod pwa;
 
-use app::App;
+use app::*;
 use cli::*;
 use config::*;
 use extensions::*;

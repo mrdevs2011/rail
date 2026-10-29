@@ -4,6 +4,8 @@ use crate::*;
 
 pub(crate) struct TabWidgets {
     pub(crate) container: gtk::Box,
+    pub(crate) tab_inner: gtk::Box,
+    pub(crate) overlay: gtk::Overlay,
     pub(crate) resize_handle: gtk::Box,
     pub(crate) height_handle: gtk::Box,
     pub(crate) freeze: gtk::Picture,
@@ -114,12 +116,12 @@ impl App {
         dt_box.set_vexpand(false);
         dt_box.set_visible(false);
 
-        let tab_vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        tab_vbox.set_hexpand(true);
-        tab_vbox.set_vexpand(true);
-        tab_vbox.append(&overlay);
-        tab_vbox.append(&dt_handle);
-        tab_vbox.append(&dt_box);
+        let tab_inner = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        tab_inner.set_hexpand(true);
+        tab_inner.set_vexpand(true);
+        tab_inner.append(&overlay);
+        tab_inner.append(&dt_handle);
+        tab_inner.append(&dt_box);
 
         let container = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         container.add_css_class("rail-col");
@@ -131,11 +133,13 @@ impl App {
         resize_handle.add_css_class("tab-resize-handle");
         resize_handle.set_cursor_from_name(Some("col-resize"));
 
-        container.append(&tab_vbox);
+        container.append(&tab_inner);
         container.append(&resize_handle);
 
         TabWidgets {
             container,
+            tab_inner,
+            overlay,
             resize_handle,
             height_handle,
             freeze,

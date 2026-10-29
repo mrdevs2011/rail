@@ -203,8 +203,12 @@ impl App {
                 last_active: Cell::new(std::time::Instant::now()),
                 dt_box: tw.dt_box,
                 dt_handle: tw.dt_handle,
+                tab_inner: tw.tab_inner,
+                overlay: tw.overlay,
                 dt_open: Cell::new(false),
                 dt_height: Cell::new(self.default_devtools_height.get()),
+                dt_width: Cell::new(self.default_devtools_width.get()),
+                dt_dock: Cell::new(self.devtools_dock_side.get()),
             });
             drop(rows);
         } else if cur_row_empty && cur_r > 0 {
@@ -274,8 +278,12 @@ impl App {
                 last_active: Cell::new(std::time::Instant::now()),
                 dt_box: tw.dt_box,
                 dt_handle: tw.dt_handle,
+                tab_inner: tw.tab_inner,
+                overlay: tw.overlay,
                 dt_open: Cell::new(false),
                 dt_height: Cell::new(self.default_devtools_height.get()),
+                dt_width: Cell::new(self.default_devtools_width.get()),
+                dt_dock: Cell::new(self.devtools_dock_side.get()),
             });
             drop(rows);
         } else if cur_row_empty && from_r > 0 {

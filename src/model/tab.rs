@@ -25,8 +25,12 @@ pub(crate) struct Tab {
     /// Per-tab docked DevTools inspector container
     pub(crate) dt_box: gtk::Box,
     pub(crate) dt_handle: gtk::Box,
+    pub(crate) tab_inner: gtk::Box,
+    pub(crate) overlay: gtk::Overlay,
     pub(crate) dt_open: Cell<bool>,
     pub(crate) dt_height: Cell<i32>,
+    pub(crate) dt_width: Cell<i32>,
+    pub(crate) dt_dock: Cell<DevToolsDockSide>,
 }
 
 impl Tab {

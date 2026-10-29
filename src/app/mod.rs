@@ -5,7 +5,8 @@ use crate::*;
 mod core;
 mod scroll;
 mod tabs;
-mod devtools;
+pub(crate) mod devtools;
+pub(crate) use devtools::*;
 mod dialogs;
 mod signals;
 mod lifecycle;
@@ -126,6 +127,7 @@ pub(crate) struct App {
     // DevTools Panel (F12 / Alt+Shift+I / Alt+Shift+D)
     pub(crate) devtools_open: Cell<bool>,
     pub(crate) default_devtools_height: Cell<i32>,
+    pub(crate) default_devtools_width: Cell<i32>,
     pub(crate) devtools_dock_side: Cell<DevToolsDockSide>,
     pub(crate) devtools_panel: gtk::Box,
     pub(crate) devtools_content_box: gtk::Box,

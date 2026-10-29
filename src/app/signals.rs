@@ -75,57 +75,52 @@ impl App {
             let insp_weak = insp.downgrade();
             insp.connect_open_window(move |_| {
                 if let Some(v) = view_weak.upgrade() {
-                    app_insp.show_view_devtools(&v);
-                    if let Some(i) = insp_weak.upgrade() {
-                        if let Some(w) = i.web_view() {
+                    let side = app_insp.devtools_dock_side.get();
+                    if side == DevToolsDockSide::Undocked {
+                        if let Some(i) = insp_weak.upgrade() {
                             if let Some((r, c)) = app_insp.find_view_coords(&v) {
                                 let rows = app_insp.rows.borrow();
                                 if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) {
-                                    let widget: gtk::Widget = w.upcast();
-                                    if widget.parent().as_ref() != Some(tab.dt_box.upcast_ref()) {
-                                        if widget.parent().is_some() {
-                                            widget.unparent();
-                                        }
-                                        while let Some(ch) = tab.dt_box.first_child() {
-                                            tab.dt_box.remove(&ch);
-                                        }
-                                        widget.set_hexpand(true);
-                                        widget.set_vexpand(true);
-                                        tab.dt_box.append(&widget);
-                                    }
+                                    app_insp.show_floating_devtools(&v, tab, &i);
+                                    return true;
                                 }
                             }
-                            return true;
                         }
+                    } else {
+                        app_insp.show_view_devtools(&v);
+                        return true;
                     }
                 }
                 false
             });
+
             let app_detach = self.clone();
             let v_detach = view.downgrade();
             insp.connect_detach(move |_| {
-                if let Some(v) = v_detach.upgrade() {
-                    let Some((r, c)) = app_detach.find_view_coords(&v) else { return false };
-                    let rows = app_detach.rows.borrow();
-                    if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) {
-                        tab.dt_open.set(false);
-                        tab.dt_box.set_visible(false);
-                        tab.dt_handle.set_visible(false);
-                        while let Some(ch) = tab.dt_box.first_child() {
-                            tab.dt_box.remove(&ch);
-                        }
-                    }
-                }
-                false
-            });
-            let app_attach = self.clone();
-            let v_attach = view.downgrade();
-            insp.connect_attach(move |_| {
-                if let Some(v) = v_attach.upgrade() {
-                    app_attach.show_view_devtools(&v);
+                if let Some(_v) = v_detach.upgrade() {
+                    let target = LAST_DT_TARGET.with(|c| c.take()).unwrap_or(DevToolsDockSide::Undocked);
+                    app_detach.set_devtools_dock_side(target);
                 }
                 true
             });
+
+            let app_attach = self.clone();
+            let v_attach = view.downgrade();
+            insp.connect_attach(move |_| {
+                if let Some(_v) = v_attach.upgrade() {
+                    let target = LAST_DT_TARGET.with(|c| c.take()).unwrap_or_else(|| {
+                        let cur = app_attach.devtools_dock_side.get();
+                        if cur == DevToolsDockSide::Undocked {
+                            DevToolsDockSide::Bottom
+                        } else {
+                            cur
+                        }
+                    });
+                    app_attach.set_devtools_dock_side(target);
+                }
+                true
+            });
+
             let a_closed = self.clone();
             let v_closed = view.downgrade();
             insp.connect_closed(move |_| {
@@ -133,10 +128,17 @@ impl App {
                     a_closed.hide_view_devtools(&v);
                 }
             });
+
             let app_front = self.clone();
             let v_front = view.downgrade();
             insp.connect_bring_to_front(move |_| {
                 if let Some(v) = v_front.upgrade() {
+                    if app_front.devtools_dock_side.get() == DevToolsDockSide::Undocked {
+                        if let Some(win) = app_front.devtools_window.borrow().as_ref() {
+                            win.present();
+                            return true;
+                        }
+                    }
                     if let Some((r, c)) = app_front.find_view_coords(&v) {
                         app_front.focus_coords(r, c);
                     }
@@ -376,40 +378,79 @@ impl App {
     ) {
         self.setup_view_signals(view);
 
-        // Per-tab DevTools inspector vertical resize drag gesture
+        // Per-tab DevTools inspector resize drag gesture (handles Bottom, Left, and Right docking)
         let dt_drag = gtk::GestureDrag::new();
         dt_drag.set_propagation_phase(gtk::PropagationPhase::Capture);
-        let start_h = Rc::new(Cell::new(0i32));
+        let start_dim = Rc::new(Cell::new(0i32));
         let dt_box_weak = dt_box.downgrade();
         let app_dt = self.clone();
         let v_dt = view.downgrade();
-        let s_h_begin = start_h.clone();
+        let s_dim_begin = start_dim.clone();
         let b_weak_begin = dt_box_weak.clone();
+        let app_dt_begin = app_dt.clone();
         dt_drag.connect_drag_begin(move |g, _, _| {
             g.set_state(gtk::EventSequenceState::Claimed);
             if let Some(b) = b_weak_begin.upgrade() {
-                s_h_begin.set(b.height());
+                let side = app_dt_begin.devtools_dock_side.get();
+                let cur = match side {
+                    DevToolsDockSide::Bottom => b.height(),
+                    DevToolsDockSide::Left | DevToolsDockSide::Right => b.width(),
+                    _ => 0,
+                };
+                s_dim_begin.set(cur);
             }
         });
-        let s_h_update = start_h.clone();
+        let s_dim_update = start_dim.clone();
         let b_weak_update = dt_box_weak.clone();
         let v_weak_update = v_dt.clone();
         let app_dt_update = app_dt.clone();
-        dt_drag.connect_drag_update(move |_, _, offset_y| {
+        dt_drag.connect_drag_update(move |_, offset_x, offset_y| {
             let Some(b) = b_weak_update.upgrade() else { return };
             let Some(v) = v_weak_update.upgrade() else { return };
-            let base = s_h_update.get() as f64;
-            let tab_total_h = (v.height() + b.height()) as f64;
-            let max_h = (tab_total_h - 100.0).max(160.0);
-            let nh = (base - offset_y).clamp(120.0, max_h) as i32;
-            b.set_height_request(nh);
-            if let Some((r, c)) = app_dt_update.find_view_coords(&v) {
-                let rows = app_dt_update.rows.borrow();
-                if let Some(t) = rows.get(r).and_then(|row| row.tabs.get(c)) {
-                    t.dt_height.set(nh);
+            let side = app_dt_update.devtools_dock_side.get();
+            let base = s_dim_update.get() as f64;
+            match side {
+                DevToolsDockSide::Bottom => {
+                    let tab_total_h = (v.height() + b.height()) as f64;
+                    let max_h = (tab_total_h - 100.0).max(160.0);
+                    let nh = (base - offset_y).clamp(120.0, max_h) as i32;
+                    b.set_height_request(nh);
+                    if let Some((r, c)) = app_dt_update.find_view_coords(&v) {
+                        let rows = app_dt_update.rows.borrow();
+                        if let Some(t) = rows.get(r).and_then(|row| row.tabs.get(c)) {
+                            t.dt_height.set(nh);
+                        }
+                    }
+                    app_dt_update.default_devtools_height.set(nh);
                 }
+                DevToolsDockSide::Left => {
+                    let tab_total_w = (v.width() + b.width()) as f64;
+                    let max_w = (tab_total_w - 120.0).max(200.0);
+                    let nw = (base + offset_x).clamp(200.0, max_w) as i32;
+                    b.set_width_request(nw);
+                    if let Some((r, c)) = app_dt_update.find_view_coords(&v) {
+                        let rows = app_dt_update.rows.borrow();
+                        if let Some(t) = rows.get(r).and_then(|row| row.tabs.get(c)) {
+                            t.dt_width.set(nw);
+                        }
+                    }
+                    app_dt_update.default_devtools_width.set(nw);
+                }
+                DevToolsDockSide::Right => {
+                    let tab_total_w = (v.width() + b.width()) as f64;
+                    let max_w = (tab_total_w - 120.0).max(200.0);
+                    let nw = (base - offset_x).clamp(200.0, max_w) as i32;
+                    b.set_width_request(nw);
+                    if let Some((r, c)) = app_dt_update.find_view_coords(&v) {
+                        let rows = app_dt_update.rows.borrow();
+                        if let Some(t) = rows.get(r).and_then(|row| row.tabs.get(c)) {
+                            t.dt_width.set(nw);
+                        }
+                    }
+                    app_dt_update.default_devtools_width.set(nw);
+                }
+                _ => {}
             }
-            app_dt_update.default_devtools_height.set(nh);
             b.queue_allocate();
         });
         dt_drag.connect_drag_end(move |g, _, _| {

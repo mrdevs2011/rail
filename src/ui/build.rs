@@ -248,6 +248,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         map_state: RefCell::new(MinimapState::default()),
         devtools_open: Cell::new(false),
         default_devtools_height: Cell::new(340),
+        default_devtools_width: Cell::new(420),
         devtools_dock_side: Cell::new(devtools_dock_from_str(&initial_settings.devtools_dock)),
         devtools_panel: devtools_panel.clone(),
         devtools_content_box: devtools_content_box.clone(),

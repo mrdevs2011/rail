@@ -43,8 +43,12 @@ impl App {
                     last_active: Cell::new(std::time::Instant::now()),
                     dt_box: tw.dt_box.clone(),
                     dt_handle: tw.dt_handle.clone(),
+                    tab_inner: tw.tab_inner.clone(),
+                    overlay: tw.overlay.clone(),
                     dt_open: Cell::new(false),
                     dt_height: Cell::new(self.default_devtools_height.get()),
+                    dt_width: Cell::new(self.default_devtools_width.get()),
+                    dt_dock: Cell::new(self.devtools_dock_side.get()),
                 });
                 let c_idx = rows[next_r].tabs.len() - 1;
                 (next_r, c_idx)
@@ -72,8 +76,12 @@ impl App {
                     last_active: Cell::new(std::time::Instant::now()),
                     dt_box: tw.dt_box.clone(),
                     dt_handle: tw.dt_handle.clone(),
+                    tab_inner: tw.tab_inner.clone(),
+                    overlay: tw.overlay.clone(),
                     dt_open: Cell::new(false),
                     dt_height: Cell::new(self.default_devtools_height.get()),
+                    dt_width: Cell::new(self.default_devtools_width.get()),
+                    dt_dock: Cell::new(self.devtools_dock_side.get()),
                 });
                 (cur_r, col_idx)
             }

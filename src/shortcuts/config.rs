@@ -113,14 +113,6 @@ thread_local! {
     pub(crate) static KEY_CTL: RefCell<Option<gtk::EventControllerKey>> = RefCell::new(None);
     /// The one running Rail window state: a second `rail [URL]` launch is forwarded here.
     pub(crate) static MAIN_APP: RefCell<Option<Rc<App>>> = RefCell::new(None);
-    /// Re-entrancy guard: Inspector::show() emits bring-to-front, which called show_devtools() again (stack overflow).
-    pub(crate) static IN_SHOW_DEVTOOLS: Cell<bool> = Cell::new(false);
-    /// The view whose inspector is currently shown in the Rail panel/window (may differ from the focused view after Ctrl+Tab).
-    pub(crate) static DT_VIEW: RefCell<Option<WebView>> = RefCell::new(None);
-    /// True while Rail itself closes the undocked DevTools window (so close-request must not tear DevTools down).
-    pub(crate) static DT_CLOSING_WIN: Cell<bool> = Cell::new(false);
-    /// Toolbar slot (0-based, 24px pitch) last clicked in the inspector toolbar; -1 = none.
-    pub(crate) static LAST_DT_SLOT: Cell<i32> = Cell::new(-1);
 }
 
 pub(crate) fn shortcuts_path() -> PathBuf {

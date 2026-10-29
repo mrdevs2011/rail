@@ -1580,10 +1580,22 @@ button.settings-engine-btn.active {
     box-shadow: -16px 0 48px rgba(0, 0, 0, 0.85);
 }
 .devtools-resize-handle {
-    min-height: 8px;
     background: #0d0d0d;
-    border-top: 1px solid #222222;
     transition: background 0.12s ease, border-color 0.12s ease;
+}
+.devtools-resize-handle.handle-horizontal {
+    min-height: 6px;
+    border-top: 1px solid #222222;
+    border-bottom: none;
+    border-left: none;
+    border-right: none;
+}
+.devtools-resize-handle.handle-vertical {
+    min-width: 6px;
+    border-left: 1px solid #222222;
+    border-right: 1px solid #222222;
+    border-top: none;
+    border-bottom: none;
 }
 .devtools-resize-handle:hover,
 .devtools-resize-handle.dragging {
@@ -1592,7 +1604,21 @@ button.settings-engine-btn.active {
 }
 .devtools-tab-dock {
     background: #000000;
+}
+.devtools-tab-dock.dock-bottom {
     border-top: 1px solid #181818;
+    border-left: none;
+    border-right: none;
+}
+.devtools-tab-dock.dock-left {
+    border-right: 1px solid #181818;
+    border-top: none;
+    border-left: none;
+}
+.devtools-tab-dock.dock-right {
+    border-left: 1px solid #181818;
+    border-top: none;
+    border-right: none;
 }
 .devtools-panel.dock-bottom .devtools-resize-handle {
     min-height: 8px;
