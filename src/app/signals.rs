@@ -497,6 +497,11 @@ impl App {
                 app_ss.on_screenshot_message(&v, val.to_str().as_str());
             });
 
+            let app_br = self.clone();
+            ucm.connect_script_message_received(Some("railExtBridge"), move |_, val| {
+                app_br.handle_ext_bridge_message(val.to_str().as_str());
+            });
+
             let wv_ctx = view.downgrade();
             ucm.connect_script_message_received(Some("railContextMenu"), move |_, _val| {
                 if let Some(v) = wv_ctx.upgrade() {

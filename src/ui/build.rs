@@ -4,6 +4,7 @@ use crate::*;
 
 pub(crate) fn build(gapp: &gtk::Application) {
     setup_adblock();
+    init_extensions();
     if let Some(s) = gtk::Settings::default() {
         s.set_gtk_application_prefer_dark_theme(true);
     }
@@ -19,7 +20,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     let history_mgr = HistoryManager::new(rail_data_dir());
     let initial_prof_id = profile_mgr.active_profile().id;
 
-    let SidebarWidgets { footer_downloads, footer_settings, head_close_side, head_back, head_forward, head_reload, brand_logo, list, pill, pill_label, pill_engine_icon, pill_pwa_btn, side } = build_sidebar();
+    let SidebarWidgets { footer_downloads, footer_settings, head_close_side, head_back, head_forward, head_reload, head_ext, brand_logo, list, pill, pill_label, pill_engine_icon, pill_pwa_btn, side } = build_sidebar();
 
     let StripWidgets { layout, shell, shell_layout, strip, strip_host } = build_strip(side.clone());
 
@@ -89,6 +90,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     let sidebar_items = [
         (SettingsTab::General, "preferences-system-symbolic", tr("General")),
         (SettingsTab::Profiles, "system-users-symbolic", tr("Profiles")),
+        (SettingsTab::Extensions, "application-x-addon-symbolic", tr("Extensions")),
         (SettingsTab::Data, "drive-harddisk-symbolic", tr("Data")),
         (SettingsTab::Privacy, "security-high-symbolic", tr("Privacy & Shield")),
         (SettingsTab::Customize, "document-edit-symbolic", tr("Customize")),
@@ -197,6 +199,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     update::ensure_icon();
     gtk::Window::set_default_icon_name("rail");
     overlay.add_overlay(&update::build_card(&win));
+    build_extensions_page(&settings_stack, win.clone());
 
     let app = Rc::new(App {
         win: win.clone(),
@@ -340,7 +343,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     });
 
     wire_devtools(&app, devtools_close_btn, devtools_content_box, devtools_detach_btn, devtools_resize_handle, footer_downloads, footer_settings);
-    wire_sidebar_header(&app, head_back, head_forward, head_reload, head_close_side);
+    wire_sidebar_header(&app, head_back, head_forward, head_reload, head_ext, head_close_side);
 
     let a_pwa = app.clone();
     app.pill_pwa_btn.connect_clicked(move |_| {

@@ -119,6 +119,7 @@ pub(crate) fn apply_html_css(css: &str) -> usize {
                 if !css.trim().is_empty() {
                     ucm.add_style_sheet(&user_style_sheet(css));
                 }
+                apply_extensions_to_ucm(&ucm);
                 applied += 1;
             }
         }
