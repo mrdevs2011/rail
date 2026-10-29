@@ -185,26 +185,48 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
 
   const topbar = document.createElement('div');
   topbar.id = '__rail_ss_topbar';
-  topbar.innerHTML = `
-    <span>Maydonni belgilang yoki element ustiga bosing</span>
-    <button class="rail-ss-top-btn" id="__rail_ss_top_full">To'liq sahifa</button>
-    <span style="opacity: 0.6; font-size: 11px;">ESC: bekor qilish</span>
-  `;
+  const topText = document.createElement('span');
+  topText.textContent = "Maydonni belgilang yoki element ustiga bosing";
+  const topFullBtn = document.createElement('button');
+  topFullBtn.className = 'rail-ss-top-btn';
+  topFullBtn.id = '__rail_ss_top_full';
+  topFullBtn.textContent = "To'liq sahifa";
+  const topEsc = document.createElement('span');
+  topEsc.style.cssText = 'opacity: 0.6; font-size: 11px;';
+  topEsc.textContent = 'ESC: bekor qilish';
+  topbar.appendChild(topText);
+  topbar.appendChild(topFullBtn);
+  topbar.appendChild(topEsc);
   root.appendChild(topbar);
 
   const toolbar = document.createElement('div');
   toolbar.id = '__rail_ss_toolbar';
-  toolbar.innerHTML = `
-    <button class="rail-ss-btn rail-ss-btn-close" id="__rail_ss_close" title="Bekor qilish">✕</button>
-    <button class="rail-ss-btn rail-ss-btn-copy" id="__rail_ss_copy" title="Nusxalash">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-      <span>Copy</span>
-    </button>
-    <button class="rail-ss-btn rail-ss-btn-dl" id="__rail_ss_dl" title="Yuklab olish">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-      <span>Download</span>
-    </button>
-  `;
+
+  const btnClose = document.createElement('button');
+  btnClose.className = 'rail-ss-btn rail-ss-btn-close';
+  btnClose.id = '__rail_ss_close';
+  btnClose.title = 'Bekor qilish';
+  btnClose.textContent = '✕';
+
+  const btnCopy = document.createElement('button');
+  btnCopy.className = 'rail-ss-btn rail-ss-btn-copy';
+  btnCopy.id = '__rail_ss_copy';
+  btnCopy.title = 'Nusxalash';
+  const copySpan = document.createElement('span');
+  copySpan.textContent = 'Copy';
+  btnCopy.appendChild(copySpan);
+
+  const btnDl = document.createElement('button');
+  btnDl.className = 'rail-ss-btn rail-ss-btn-dl';
+  btnDl.id = '__rail_ss_dl';
+  btnDl.title = 'Yuklab olish';
+  const dlSpan = document.createElement('span');
+  dlSpan.textContent = 'Download';
+  btnDl.appendChild(dlSpan);
+
+  toolbar.appendChild(btnClose);
+  toolbar.appendChild(btnCopy);
+  toolbar.appendChild(btnDl);
   root.appendChild(toolbar);
 
   (document.body || docEl).appendChild(root);

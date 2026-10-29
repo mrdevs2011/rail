@@ -993,11 +993,54 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
     return results;
   }
 
+  function createIconSvg(type) {
+    if (type === 'download') {
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '18');
+      svg.setAttribute('height', '18');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2.5');
+      svg.setAttribute('stroke-linecap', 'round');
+      svg.setAttribute('stroke-linejoin', 'round');
+      svg.style.marginRight = '8px';
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4');
+      var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      poly.setAttribute('points', '7 10 12 15 17 10');
+      var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', '12'); line.setAttribute('y1', '15');
+      line.setAttribute('x2', '12'); line.setAttribute('y2', '3');
+      svg.appendChild(path);
+      svg.appendChild(poly);
+      svg.appendChild(line);
+      return svg;
+    }
+    return null;
+  }
+
+  function setButtonSafe(btn, text, iconType) {
+    try {
+      while (btn.firstChild) {
+        btn.removeChild(btn.firstChild);
+      }
+      var span = document.createElement('span');
+      span.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;';
+      var svg = createIconSvg(iconType);
+      if (svg) span.appendChild(svg);
+      var label = document.createElement('span');
+      label.textContent = text;
+      span.appendChild(label);
+      btn.appendChild(span);
+    } catch(_) {}
+  }
+
   function triggerInstall(btn, extId) {
     if (btn) {
       btn.disabled = true;
       btn.setAttribute('aria-disabled', 'true');
-      btn.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;">⏳ Rail\'ga o\'rnatilmoqda...</span>';
+      setButtonSafe(btn, "⏳ Rail'ga o'rnatilmoqda...", 'wait');
       btn.style.opacity = '0.9';
     }
     var otherBtns = document.querySelectorAll('#rail-webstore-install-btn, [data-rail-webstore-hijacked="true"]');
@@ -1005,7 +1048,7 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
       if (otherBtns[i] !== btn) {
         otherBtns[i].disabled = true;
         otherBtns[i].setAttribute('aria-disabled', 'true');
-        otherBtns[i].innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;">⏳ Rail\'ga o\'rnatilmoqda...</span>';
+        setButtonSafe(otherBtns[i], "⏳ Rail'ga o'rnatilmoqda...", 'wait');
       }
     }
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railWebstore) {
@@ -1042,7 +1085,7 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
         el.style.setProperty('border-radius', '24px', 'important');
         el.style.setProperty('font-weight', '700', 'important');
         el.style.setProperty('box-shadow', '0 4px 14px rgba(37, 99, 235, 0.45)', 'important');
-        el.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Rail\'ga qo\'shish</span>';
+        setButtonSafe(el, "Rail'ga qo'shish", 'download');
 
         el.addEventListener('click', function(e) {
           e.preventDefault();
@@ -1058,7 +1101,7 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
     if (!document.getElementById('rail-webstore-install-btn') && document.body) {
       var btn = document.createElement('button');
       btn.id = 'rail-webstore-install-btn';
-      btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Rail\'ga qo\'shish';
+      setButtonSafe(btn, "Rail'ga qo'shish", 'download');
       btn.style.cssText = 'position: fixed; bottom: 32px; right: 32px; z-index: 2147483647; background: #2563eb; color: #ffffff; border: none; border-radius: 9999px; padding: 14px 28px; font-size: 15px; font-weight: 700; box-shadow: 0 10px 30px rgba(37, 99, 235, 0.5); cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); display: flex; align-items: center; font-family: system-ui, -apple-system, sans-serif; letter-spacing: 0.3px;';
 
       btn.onmouseenter = function() { btn.style.transform = 'translateY(-2px) scale(1.04)'; btn.style.boxShadow = '0 14px 36px rgba(37, 99, 235, 0.65)'; };
@@ -1078,7 +1121,7 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
     var btns = document.querySelectorAll('#rail-webstore-install-btn, [data-rail-webstore-hijacked="true"]');
     for (var i = 0; i < btns.length; i++) {
       var b = btns[i];
-      b.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;">✓ Rail\'ga o\'rnatildi</span>';
+      setButtonSafe(b, "✓ Rail'ga o'rnatildi", 'check');
       b.style.setProperty('background', '#059669', 'important');
       b.style.setProperty('background-color', '#059669', 'important');
       b.style.setProperty('box-shadow', '0 10px 30px rgba(5, 150, 105, 0.5)', 'important');
@@ -1090,7 +1133,7 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
     var btns = document.querySelectorAll('#rail-webstore-install-btn, [data-rail-webstore-hijacked="true"]');
     for (var i = 0; i < btns.length; i++) {
       var b = btns[i];
-      b.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;">❌ ' + (err || "Xatolik yuz berdi") + '</span>';
+      setButtonSafe(b, "❌ " + (err || "Xatolik yuz berdi"), 'cross');
       b.style.setProperty('background', '#dc2626', 'important');
       b.style.setProperty('background-color', '#dc2626', 'important');
       b.disabled = false;
