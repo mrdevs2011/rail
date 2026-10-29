@@ -182,8 +182,19 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
                     let paths: Vec<std::path::PathBuf> =
                         files.iter().filter_map(|f| f.path()).collect();
                     if !paths.is_empty() {
-                        a_drop.drop_files_into_page(view, paths);
-                        return true;
+                        let origin = view.compute_point(
+                            &win_drop,
+                            &gtk::graphene::Point::new(0.0, 0.0),
+                        );
+                        if let Some(origin) = origin {
+                            a_drop.drop_files_into_page(
+                                view,
+                                paths,
+                                x - origin.x() as f64,
+                                y - origin.y() as f64,
+                            );
+                            return true;
+                        }
                     }
                 }
             }

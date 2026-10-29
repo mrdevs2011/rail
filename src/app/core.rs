@@ -187,6 +187,8 @@ impl App {
         self: &Rc<Self>,
         view: WebView,
         paths: Vec<std::path::PathBuf>,
+        drop_x: f64,
+        drop_y: f64,
     ) {
         const MAX_FILE: u64 = 20 * 1024 * 1024;
         const MAX_FILES: usize = 10;
@@ -240,16 +242,20 @@ impl App {
                 .collect();
             let mut js = String::from("(function(){try{var L=[");
             js.push_str(&items.join(","));
-            // Use the exact same clipboard paste route as Rail's working Ctrl+V
-            // image upload. Synthetic drag events are not trusted by web apps.
-            js.push_str(
-                "];var dt=new DataTransfer();L.forEach(function(x){var b=atob(x[2]);var u=new Uint8Array(b.length);\
+            // Replay a real DOM drag sequence at the pointer's page coordinates.
+            // Upload zones (GitHub, Gemini, etc.) listen for drop, not paste.
+            js.push_str(&format!(
+                "];var dt=new DataTransfer();L.forEach(function(x){{var b=atob(x[2]);var u=new Uint8Array(b.length);\
                  for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);\
-                 dt.items.add(new File([u],x[0],{type:x[1]}));});\
-                 var t=document.activeElement||document.body;\
-                 t.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true,composed:true}));\
-                 }catch(e){console.error('Rail drop paste failed',e);}})();",
-            );
+                 dt.items.add(new File([u],x[0],{{type:x[1]}}));}});\
+                 dt.effectAllowed='copy';dt.dropEffect='copy';\
+                 var t=document.elementFromPoint({drop_x},{drop_y})||document.body;\
+                 ['dragenter','dragover','drop'].forEach(function(n){{\
+                   var e=new DragEvent(n,{{dataTransfer:dt,bubbles:true,cancelable:true,composed:true,clientX:{drop_x},clientY:{drop_y}}});\
+                   t.dispatchEvent(e);\
+                 }});\
+                 }}catch(e){{console.error('Rail file drop failed',e);}}}})();"
+            ));
             view.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
         });
     }
