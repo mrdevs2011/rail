@@ -21,21 +21,25 @@ impl App {
             .map(|t| t.view.clone())
     }
 
-    /// True when the clipboard offers an image but no text. WebKitGTK does not expose
-    /// clipboard images through DataTransfer (WebKit bug 218519), so such a paste must be
-    /// replayed into the page by Rail.
-    pub(crate) fn clipboard_is_image_only(&self) -> bool {
-        let f = self.win.clipboard().formats();
-        f.contains_type(<gdk::Texture as glib::prelude::StaticType>::static_type())
-            && !f.contain_mime_type("text/plain")
-            && !f.contain_mime_type("text/plain;charset=utf-8")
+    /// True when the clipboard advertises an image, even if it also offers text.
+    /// WebKitGTK does not expose clipboard images through DataTransfer (WebKit bug
+    /// 218519), so Rail must read the image natively and replay it into the page.
+    pub(crate) fn clipboard_has_image(&self) -> bool {
+        let formats = self.win.clipboard().formats();
+        formats.contains_type(<gdk::Texture as glib::prelude::StaticType>::static_type())
+            || formats.mime_types().iter().any(|mime| mime.starts_with("image/"))
     }
 
     /// Reads the clipboard image natively and dispatches a synthetic `paste` event
     /// carrying it as a File, so pages (Gemini etc.) see it in clipboardData.files.
     pub(crate) fn paste_clipboard_image(self: &Rc<Self>, view: WebView) {
         self.win.clipboard().read_texture_async(gio::Cancellable::NONE, move |res| {
-            let Ok(Some(tex)) = res else { return };
+            let Ok(Some(tex)) = res else {
+                // Some clipboard providers advertise an image format that GTK cannot
+                // decode. Preserve normal paste as a graceful fallback (e.g. text URL).
+                view.execute_editing_command("Paste");
+                return;
+            };
             let png = tex.save_to_png_bytes();
             let b64 = glib::base64_encode(&png[..]);
             let js = format!(
@@ -52,14 +56,14 @@ impl App {
         });
     }
 
-    /// Ctrl+V with an image-only clipboard while a page has focus: handled by Rail.
+    /// Ctrl+V with an image on the clipboard while a page has focus: handled by Rail.
     pub(crate) fn try_paste_image(self: &Rc<Self>) -> bool {
         let Some(view) = self.focused_view() else { return false };
         let page_focused = match gtk::prelude::GtkWindowExt::focus(&self.win) {
             Some(w) => w == *view.upcast_ref::<gtk::Widget>() || w.is_ancestor(&view),
             None => false,
         };
-        if !page_focused || !self.clipboard_is_image_only() {
+        if !page_focused || !self.clipboard_has_image() {
             return false;
         }
         self.paste_clipboard_image(view);

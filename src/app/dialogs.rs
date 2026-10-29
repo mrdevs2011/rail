@@ -314,7 +314,7 @@ impl App {
         if is_editable {
             menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Cut, tr("Cut")));
             menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Copy, tr("Copy")));
-            if self.clipboard_is_image_only() {
+            if self.clipboard_has_image() {
                 let app_p = self.clone();
                 let v_p = view.clone();
                 let act_paste = gio::SimpleAction::new("ctx-paste-image", None);
