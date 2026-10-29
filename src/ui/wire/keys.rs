@@ -114,12 +114,10 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
             return glib::Propagation::Proceed;
         }
 
-        // Autorepeat loop suppressor: block machine-gun repeat when shortcut is held down
-        if ctrl || alt || super_key {
-            if held.get() == Some(keycode) {
-                return glib::Propagation::Stop;
-            }
-        }
+        // Do not globally suppress a key just because its keycode matches the previous
+        // press. GTK/WebKit can occasionally miss a release while focus moves between
+        // embedded views; that left `held` stuck and swallowed every later tap of the
+        // same shortcut. Let GTK's normal key-repeat policy handle held keys instead.
 
         // Overview zoom hold direction must be captured before dispatch consumes the action.
         let overview_repeat_dir = if a.overview_open() {
@@ -145,9 +143,6 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
             ScResolve::Action("overview_zoom_in" | "overview_zoom_out" | "find_next" | "find_prev")
         );
         if handled {
-            if (ctrl || alt || super_key) && !repeatable {
-                held.set(Some(keycode));
-            }
             if let Some(dir) = overview_repeat_dir {
                 zoom_key.set(Some(keycode));
                 let a_zoom = a.clone();

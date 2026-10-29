@@ -69,15 +69,15 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
         "Focus workspace Down (Alt+Arrow)",
         ["Alt+Down"]
     ),
-    sc!("move_left", G_TABS, "Move tab column Left", ["Alt+Shift+H"]),
+    sc!("move_left", G_TABS, "Move tab column Left", ["Alt+Shift+H", "Alt+Shift+Left"]),
     sc!(
         "move_right",
         G_TABS,
         "Move tab column Right",
-        ["Alt+Shift+L"]
+        ["Alt+Shift+L", "Alt+Shift+Right"]
     ),
-    sc!("move_down", G_TABS, "Move window Down", ["Alt+Shift+J"]),
-    sc!("move_up", G_TABS, "Move window Up", ["Alt+Shift+K"]),
+    sc!("move_down", G_TABS, "Move window Down", ["Alt+Shift+J", "Alt+Shift+Down"]),
+    sc!("move_up", G_TABS, "Move window Up", ["Alt+Shift+K", "Alt+Shift+Up"]),
     sc!("next_tab", G_TABS, "Cycle to next tab", ["Ctrl+Tab"]),
     sc!(
         "prev_tab",
