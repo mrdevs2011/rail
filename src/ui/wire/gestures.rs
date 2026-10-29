@@ -162,14 +162,32 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
     // Drag-and-drop local files or URLs directly into Rail
     let drop = gtk::DropTarget::new(gdk::FileList::static_type(), gdk::DragAction::COPY);
     let a_drop = app.clone();
-    drop.connect_drop(move |_target, val, _x, _y| {
+    let win_drop = win.clone();
+    drop.connect_drop(move |_target, val, x, y| {
         if let Ok(file_list) = val.get::<gdk::FileList>() {
             let files = file_list.files();
-            if let Some(first) = files.first() {
-                let uri = first.uri();
-                a_drop.navigate(&uri);
-                return true;
+            if files.is_empty() {
+                return false;
             }
+            let picked = win_drop.pick(x, y, gtk::PickFlags::DEFAULT);
+            if let Some(view) = a_drop.focused_view() {
+                let view_widget = view.upcast_ref::<gtk::Widget>();
+                let over_page = picked
+                    .as_ref()
+                    .map(|w| w == view_widget || view_widget.is_ancestor(w))
+                    .unwrap_or(false);
+                if over_page {
+                    let paths: Vec<std::path::PathBuf> =
+                        files.iter().filter_map(|f| f.path()).collect();
+                    if !paths.is_empty() {
+                        a_drop.drop_files_into_page(view, paths);
+                        return true;
+                    }
+                }
+            }
+            // Dropping on browser chrome retains the traditional open-local-file behavior.
+            a_drop.navigate(&files[0].uri());
+            return true;
         }
         false
     });

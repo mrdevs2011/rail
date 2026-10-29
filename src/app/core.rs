@@ -27,7 +27,10 @@ impl App {
     pub(crate) fn clipboard_has_image(&self) -> bool {
         let formats = self.win.clipboard().formats();
         formats.contains_type(<gdk::Texture as glib::prelude::StaticType>::static_type())
-            || formats.mime_types().iter().any(|mime| mime.starts_with("image/"))
+            || formats
+                .mime_types()
+                .iter()
+                .any(|mime| mime.starts_with("image/"))
     }
 
     /// Reads the clipboard image natively and dispatches a synthetic `paste` event
@@ -53,8 +56,14 @@ impl App {
                    if(n)t=n.nodeType===1?n:n.parentElement;}}\
                  if(!edit(t)){{var es=Array.from(document.querySelectorAll('[contenteditable=\"true\"],textarea,input[type=\"text\"]'));\
                    t=es.find(function(e){{return e.getClientRects().length>0&&!e.disabled;}})||t;}}\
-                 t=t||document.body||document;\
-                 t.dispatchEvent(new ClipboardEvent('paste',{{clipboardData:dt,bubbles:true,cancelable:true,composed:true}}));\
+                 /* Prefer the site's real file-input pathway: synthetic paste events are\
+                    untrusted and ChatGPT-like apps may deliberately ignore them. */\
+                 var fs=Array.from(document.querySelectorAll('input[type=\"file\"]')).filter(function(e){{return !e.disabled;}});\
+                 var fi=fs.find(function(e){{return !e.accept||e.accept.indexOf('image')>=0;}})||fs[0];\
+                 if(fi){{var fd=new DataTransfer();fd.items.add(f);fi.files=fd.files;\
+                   fi.dispatchEvent(new Event('input',{{bubbles:true}}));fi.dispatchEvent(new Event('change',{{bubbles:true}}));}}\
+                 else{{t=t||document.body||document;\
+                   t.dispatchEvent(new ClipboardEvent('paste',{{clipboardData:dt,bubbles:true,cancelable:true,composed:true}}));}}\
                  }}catch(e){{console.error('Rail image paste failed',e);}}}})();",
                 b64
             );
@@ -64,12 +73,14 @@ impl App {
 
     /// Ctrl+V with an image on the clipboard while a page has focus: handled by Rail.
     pub(crate) fn try_paste_image(self: &Rc<Self>) -> bool {
-        let Some(view) = self.focused_view() else { return false };
+        let Some(view) = self.focused_view() else {
+            return false;
+        };
         let page_focused = match gtk::prelude::GtkWindowExt::focus(&self.win) {
             Some(w) => {
                 let v = view.upcast_ref::<gtk::Widget>();
                 w == *v || v.is_ancestor(&w) || w.is_ancestor(v)
-            },
+            }
             None => false,
         };
         if !page_focused || !self.clipboard_has_image() {
@@ -81,7 +92,10 @@ impl App {
 
     /// True when the clipboard carries copied files (Ctrl+C in a file manager).
     pub(crate) fn clipboard_has_files(&self) -> bool {
-        self.win.clipboard().formats().contain_mime_type("text/uri-list")
+        self.win
+            .clipboard()
+            .formats()
+            .contain_mime_type("text/uri-list")
     }
 
     /// WebKitGTK does not hand copied files to pages either, so Rail reads them natively
@@ -93,7 +107,10 @@ impl App {
         let clip = self.win.clipboard();
         let app = self.clone();
         glib::spawn_future_local(async move {
-            let Ok(val) = clip.read_value_future(gdk::FileList::static_type(), glib::Priority::DEFAULT).await else {
+            let Ok(val) = clip
+                .read_value_future(gdk::FileList::static_type(), glib::Priority::DEFAULT)
+                .await
+            else {
                 view.execute_editing_command("Paste");
                 return;
             };
@@ -101,7 +118,12 @@ impl App {
                 view.execute_editing_command("Paste");
                 return;
             };
-            let paths: Vec<std::path::PathBuf> = list.files().iter().filter_map(|f| f.path()).take(MAX_FILES).collect();
+            let paths: Vec<std::path::PathBuf> = list
+                .files()
+                .iter()
+                .filter_map(|f| f.path())
+                .take(MAX_FILES)
+                .collect();
             if paths.is_empty() {
                 view.execute_editing_command("Paste");
                 return;
@@ -109,17 +131,27 @@ impl App {
             let files = gio::spawn_blocking(move || {
                 let mut out: Vec<(String, String, String)> = Vec::new();
                 for p in paths {
-                    let Ok(meta) = std::fs::metadata(&p) else { continue };
+                    let Ok(meta) = std::fs::metadata(&p) else {
+                        continue;
+                    };
                     if !meta.is_file() || meta.len() > MAX_FILE {
                         continue;
                     }
-                    let Ok(data) = std::fs::read(&p) else { continue };
+                    let Ok(data) = std::fs::read(&p) else {
+                        continue;
+                    };
                     let name: String = p
                         .file_name()
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_else(|| "file".into())
                         .chars()
-                        .map(|c| if matches!(c, '\\' | '\'' | '"' | '\n' | '\r') { '_' } else { c })
+                        .map(|c| {
+                            if matches!(c, '\\' | '\'' | '"' | '\n' | '\r') {
+                                '_'
+                            } else {
+                                c
+                            }
+                        })
                         .collect();
                     let (ct, _) = gio::content_type_guess(Some(&p), &data[..]);
                     let mime = gio::content_type_get_mime_type(&ct)
@@ -132,10 +164,16 @@ impl App {
             .await
             .unwrap_or_default();
             if files.is_empty() {
-                app.show_copied_toast(tr("Paste skipped"), tr("File could not be read or is larger than 20 MB"));
+                app.show_copied_toast(
+                    tr("Paste skipped"),
+                    tr("File could not be read or is larger than 20 MB"),
+                );
                 return;
             }
-            let items: Vec<String> = files.iter().map(|(n, m, b)| format!("['{n}','{m}','{b}']")).collect();
+            let items: Vec<String> = files
+                .iter()
+                .map(|(n, m, b)| format!("['{n}','{m}','{b}']"))
+                .collect();
             let mut js = String::from("(function(){try{var dt=new DataTransfer();var L=[");
             js.push_str(&items.join(","));
             js.push_str(
@@ -150,9 +188,75 @@ impl App {
         });
     }
 
+    /// Inject files dropped from the desktop onto a web page through its file input.
+    /// WebKitGTK's native drag payload is a Gdk FileList, not DOM File objects.
+    pub(crate) fn drop_files_into_page(
+        self: &Rc<Self>,
+        view: WebView,
+        paths: Vec<std::path::PathBuf>,
+    ) {
+        const MAX_FILE: u64 = 20 * 1024 * 1024;
+        const MAX_FILES: usize = 10;
+        let app = self.clone();
+        glib::spawn_future_local(async move {
+            let files = gio::spawn_blocking(move || {
+                let mut out: Vec<(String, String, String)> = Vec::new();
+                for p in paths.into_iter().take(MAX_FILES) {
+                    let Ok(meta) = std::fs::metadata(&p) else {
+                        continue;
+                    };
+                    if !meta.is_file() || meta.len() > MAX_FILE {
+                        continue;
+                    }
+                    let Ok(data) = std::fs::read(&p) else {
+                        continue;
+                    };
+                    let name = p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| "file".into())
+                        .chars()
+                        .map(|c| {
+                            if c.is_control() || matches!(c, '\\' | '"' | '\'') {
+                                '_'
+                            } else {
+                                c
+                            }
+                        })
+                        .collect::<String>();
+                    let (ct, _) = gio::content_type_guess(Some(&p), &data[..]);
+                    let mime = gio::content_type_get_mime_type(&ct)
+                        .map(|m| m.to_string())
+                        .unwrap_or_else(|| "application/octet-stream".into());
+                    out.push((name, mime, glib::base64_encode(&data).to_string()));
+                }
+                out
+            })
+            .await
+            .unwrap_or_default();
+            if files.is_empty() {
+                app.show_copied_toast(
+                    tr("Drop skipped"),
+                    tr("File could not be read or is larger than 20 MB"),
+                );
+                return;
+            }
+            let items: Vec<String> = files
+                .iter()
+                .map(|(n, m, b)| format!("['{}','{}','{}']", n, m, b))
+                .collect();
+            let mut js = String::from("(function(){try{var L=[");
+            js.push_str(&items.join(","));
+            js.push_str("];var dt=new DataTransfer();L.forEach(function(x){var b=atob(x[2]),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);dt.items.add(new File([u],x[0],{type:x[1]}));});                var inputs=Array.from(document.querySelectorAll('input[type=\"file\"]')).filter(function(e){return !e.disabled;});                var input=inputs.find(function(e){return !e.accept||e.accept.indexOf('image')>=0;})||inputs[0];                if(input){input.files=dt.files;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));}                else{var t=document.activeElement;if(t&&t.isContentEditable)t.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true,composed:true}));}                }catch(e){console.error('Rail drop upload failed',e);}})();");
+            view.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
+        });
+    }
+
     /// Ctrl+V with copied files on the clipboard while a page has focus: handled by Rail.
     pub(crate) fn try_paste_files(self: &Rc<Self>) -> bool {
-        let Some(view) = self.focused_view() else { return false };
+        let Some(view) = self.focused_view() else {
+            return false;
+        };
         let page_focused = match gtk::prelude::GtkWindowExt::focus(&self.win) {
             Some(w) => w == *view.upcast_ref::<gtk::Widget>() || w.is_ancestor(&view),
             None => false,
@@ -313,7 +417,8 @@ impl App {
                 if tab.container.parent().as_ref() != Some(self.strip.upcast_ref()) {
                     self.strip.append(&tab.container);
                 }
-                self.strip.reorder_child_after(&tab.container, prev.as_ref());
+                self.strip
+                    .reorder_child_after(&tab.container, prev.as_ref());
                 prev = Some(tab.container.clone().upcast());
             }
             grid.push(row_grid);
@@ -330,7 +435,13 @@ impl App {
     }
 
     pub(crate) fn show_copied_toast(&self, title: &str, msg: &str) {
-        let Some(overlay) = self.win.child().and_then(|c| c.downcast::<gtk::Overlay>().ok()) else { return };
+        let Some(overlay) = self
+            .win
+            .child()
+            .and_then(|c| c.downcast::<gtk::Overlay>().ok())
+        else {
+            return;
+        };
         let rev = gtk::Revealer::new();
         rev.set_transition_type(gtk::RevealerTransitionType::SlideUp);
         rev.set_halign(gtk::Align::End);
