@@ -174,11 +174,35 @@ impl App {
             }
         }
 
+        // F5 / Ctrl+F5 / Shift+F5 reload
+        if (k == gdk::Key::F5 || keycode == 71) && !alt {
+            if let Some(v) = self.focused_view() {
+                if ctrl || shift {
+                    hard_reload_or_start(&v);
+                } else {
+                    reload_or_start(&v);
+                }
+            }
+            return true;
+        }
+
+        // Ctrl+Shift+T — reopen last closed tab
+        if ctrl && shift && !alt && (k == gdk::Key::t || keycode == 28) {
+            self.reopen_closed_tab();
+            return true;
+        }
+
         // Ctrl+Shift+R — hard refresh (bypass cache), Chrome/Brave bilan bir xil
         if ctrl && shift && !alt && (k == gdk::Key::r || keycode == 27) {
             if let Some(v) = self.focused_view() {
                 hard_reload_or_start(&v);
             }
+            return true;
+        }
+
+        // Ctrl+H — History
+        if ctrl && !shift && !alt && (k == gdk::Key::h || keycode == 43) {
+            self.open_history();
             return true;
         }
 

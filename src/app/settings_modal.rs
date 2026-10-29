@@ -196,6 +196,10 @@ impl App {
         }
     }
 
+    pub(crate) fn open_history(self: &Rc<Self>) {
+        self.open_settings_tab(SettingsTab::Data);
+    }
+
     #[allow(dead_code)]
     pub(crate) fn clear_history_action(self: &Rc<Self>) {
         self.history.borrow_mut().clear();

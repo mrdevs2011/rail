@@ -305,8 +305,26 @@ impl App {
                 return false;
             }
             let html = crate::web::format_error_html(uri, &err_msg);
-            v.load_html(&html, Some("about:blank"));
+            v.load_html(&html, Some(uri));
             true
+        });
+        let win_fs = self.win.clone();
+        view.connect_enter_fullscreen(move |_| {
+            win_fs.set_fullscreened(true);
+            false
+        });
+        let win_unfs = self.win.clone();
+        view.connect_leave_fullscreen(move |_| {
+            win_unfs.set_fullscreened(false);
+            false
+        });
+        let app_audio = self.clone();
+        view.connect_is_playing_audio_notify(move |_| {
+            app_audio.refresh_sidebar();
+        });
+        let app_muted = self.clone();
+        view.connect_is_muted_notify(move |_| {
+            app_muted.refresh_sidebar();
         });
         view.connect_load_failed_with_tls_errors(move |v, failing_uri, cert, _errors| {
             if let Some(session) = v.network_session() {
@@ -365,8 +383,8 @@ impl App {
             } else if saved.starts_with("rail://settings") {
                 v.load_html(&settings_shell_page(), Some(&saved));
                 app_term.sync_settings_chrome();
-            } else if saved.starts_with("rail://downloads") {
-                load_internal_page(v, "rail://downloads");
+            } else if is_internal_uri(&saved) {
+                load_internal_page(v, &saved);
             } else {
                 v.load_uri(&saved);
             }

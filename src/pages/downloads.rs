@@ -263,7 +263,30 @@ pub(crate) fn attach_download_handlers(session: &webkit6::NetworkSession) {
             .unwrap_or_else(|| "download".to_string());
         // strip query
         let suggested = suggested.split('?').next().unwrap_or("download").to_string();
-        let path = dest_dir.join(&suggested);
+        let mut final_name = suggested.clone();
+        let mut path = dest_dir.join(&final_name);
+        if path.exists() {
+            let stem = std::path::Path::new(&suggested)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("download");
+            let ext = std::path::Path::new(&suggested)
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|e| format!(".{e}"))
+                .unwrap_or_default();
+            let mut counter = 1;
+            loop {
+                let candidate_name = format!("{stem} ({counter}){ext}");
+                let candidate = dest_dir.join(&candidate_name);
+                if !candidate.exists() {
+                    final_name = candidate_name;
+                    path = candidate;
+                    break;
+                }
+                counter += 1;
+            }
+        }
         let path_s = path.to_string_lossy().to_string();
         download.set_destination(&path_s);
 
@@ -275,7 +298,7 @@ pub(crate) fn attach_download_handlers(session: &webkit6::NetworkSession) {
         DOWNLOADS.with(|d| {
             d.borrow_mut().push(DownloadEntry {
                 id,
-                filename: suggested.clone(),
+                filename: final_name,
                 url: uri.clone(),
                 path: path_s.clone(),
                 status: "downloading".into(),

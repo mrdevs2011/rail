@@ -106,6 +106,20 @@ impl App {
 
         view.connect_decide_policy(|_view, decision, decision_type| {
             if decision_type == webkit6::PolicyDecisionType::NavigationAction {
+                if let Some(nav_decision) = decision.downcast_ref::<webkit6::NavigationPolicyDecision>() {
+                    if let Some(req) = nav_decision.navigation_action().and_then(|a| a.request()) {
+                        if let Some(uri) = req.uri() {
+                            let uri_s = uri.to_string();
+                            let scheme = uri_s.split(':').next().unwrap_or("").to_lowercase();
+                            let is_external = matches!(scheme.as_str(), "mailto" | "tel" | "tg" | "telegram" | "magnet" | "slack" | "discord" | "zoommtg" | "skype" | "callto");
+                            if is_external {
+                                let _ = gio::AppInfo::launch_default_for_uri(&uri_s, None::<&gio::AppLaunchContext>);
+                                decision.ignore();
+                                return true;
+                            }
+                        }
+                    }
+                }
                 let policies = webkit6::WebsitePolicies::builder()
                     .autoplay(webkit6::AutoplayPolicy::Allow)
                     .build();
@@ -188,7 +202,11 @@ impl App {
         if is_internal_uri(url) {
             load_internal_page(&view, url);
         } else {
+            if is_internal_uri(url) {
+            load_internal_page(&view, url);
+        } else {
             view.load_uri(url);
+        }
         }
         self.set_view_saved_uri(&view, url);
         self.add_view(view, profile_id.to_string(), false);
@@ -204,7 +222,11 @@ impl App {
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
-        view.load_uri(url);
+        if is_internal_uri(url) {
+            load_internal_page(&view, url);
+        } else {
+            view.load_uri(url);
+        }
         self.add_view(view, prof_id, true);
     }
 

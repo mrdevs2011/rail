@@ -29,6 +29,14 @@ impl App {
             return;
         }
         let tab = rows[r_idx].detach(c_idx);
+        let closed_uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_else(|| self.saved_uri_of(&tab.view));
+        if !closed_uri.is_empty() && !closed_uri.starts_with("rail://start") {
+            let mut rc = self.recently_closed.borrow_mut();
+            rc.push((closed_uri, tab.profile_id.clone()));
+            if rc.len() > 30 {
+                rc.remove(0);
+            }
+        }
         self.strip.remove(&tab.container);
 
         let row_removed = if rows[r_idx].tabs.is_empty() && rows.len() > 1 {
@@ -480,5 +488,12 @@ impl App {
         if n < 2 { return; }
         let next = (cur_c as isize + dir).rem_euclid(n as isize) as usize;
         self.focus_coords(cur_r, next);
+    }
+
+    /// Ctrl+Shift+T: reopen the last closed tab with its profile
+    pub(crate) fn reopen_closed_tab(self: &Rc<Self>) {
+        if let Some((url, prof_id)) = self.recently_closed.borrow_mut().pop() {
+            self.new_tab_with_url_and_profile(&url, &prof_id);
+        }
     }
 }

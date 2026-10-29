@@ -447,4 +447,6 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Earlier", "Oldinroq", "Ранее"),
     ("Open in new tab", "Yangi tabda ochish", "Открыть в новой вкладке"),
     ("No browsing history yet", "Ko'rishlar tarixi hali mavjud emas", "История просмотров пока пуста"),
+    ("Playing audio (click to mute)", "Ovoz yangramoqda (o'chirish uchun bosing)", "Воспроизводится звук (нажмите для отключения)"),
+    ("Muted (click to unmute)", "Ovoz o'chirilgan (yoqish uchun bosing)", "Звук отключен (нажмите для включения)"),
 ];

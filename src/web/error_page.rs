@@ -480,7 +480,7 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
   </div>
 
   <div class="actions-row">
-    <button class="btn-primary" onclick="location.reload()">
+    <button class="btn-primary" onclick="retryLoad()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
       <span id="t-reload">Qayta yuklash</span>
     </button>
@@ -561,6 +561,10 @@ function setLang(lang) {{
   }});
 }}
 
+function retryLoad() {{
+  window.location.href = {safe_uri_js};
+}}
+
 function copyDiag() {{
   var text = document.getElementById('diag-content').innerText;
   navigator.clipboard.writeText(text).then(function() {{
@@ -589,6 +593,7 @@ function copyDiag() {{
         desc_en_json = format!("\"{}\"", crate::minijson::escape(detail.desc_en)),
         fixes_en_json = format!("[{}]", detail.fixes_en.iter().map(|s| format!("\"{}\"", crate::minijson::escape(s))).collect::<Vec<_>>().join(",")),
         safe_uri = safe_uri,
+        safe_uri_js = format!("\"{}\"", crate::minijson::escape(failing_uri)),
         safe_raw = safe_raw,
         timestamp = timestamp,
     )

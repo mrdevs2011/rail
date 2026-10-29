@@ -283,6 +283,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         current_settings_tab: Cell::new(SettingsTab::General),
         css_buffer: css_buffer.clone(),
         search_engine: RefCell::new(initial_settings.search_engine.clone()),
+        recently_closed: RefCell::new(Vec::new()),
     });
 
     app.select_palette_profile(&initial_prof_id);

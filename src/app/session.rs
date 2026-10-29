@@ -142,8 +142,8 @@ impl App {
                 view.load_html(&start_page(), Some("rail://start/"));
             } else if item.url.starts_with("rail://settings") {
                 view.load_html(&settings_shell_page(), Some(&item.url));
-            } else if item.url.starts_with("rail://downloads") {
-                view.load_html(&start_page(), Some("rail://downloads"));
+            } else if is_internal_uri(&item.url) {
+                load_internal_page(&view, &item.url);
             } else {
                 view.load_uri(&item.url);
             }
