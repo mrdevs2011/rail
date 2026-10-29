@@ -167,8 +167,6 @@ impl App {
 
         insp.show();
 
-        let app_wire = self.clone();
-        let view_wire = view.clone();
         let attach_widget = {
             let dt_box = tab.dt_box.clone();
             let insp = insp.clone();
@@ -185,8 +183,7 @@ impl App {
                         widget.set_hexpand(true);
                         widget.set_vexpand(true);
                         dt_box.append(&widget);
-                        app_wire.wire_inspector_click_controller(&widget, &view_wire);
-                    }
+                        }
                 }
             }
         };
@@ -196,8 +193,6 @@ impl App {
 
         let dt_box_poll = tab.dt_box.clone();
         let insp_poll = insp.clone();
-        let app_poll = self.clone();
-        let view_poll = view.clone();
         let retries = std::rc::Rc::new(std::cell::Cell::new(0));
         glib::timeout_add_local(std::time::Duration::from_millis(35), move || {
             let count = retries.get();
@@ -213,7 +208,6 @@ impl App {
                     widget.set_hexpand(true);
                     widget.set_vexpand(true);
                     dt_box_poll.append(&widget);
-                    app_poll.wire_inspector_click_controller(&widget, &view_poll);
                 }
                 return glib::ControlFlow::Break;
             }
@@ -267,84 +261,11 @@ impl App {
                     widget.set_hexpand(true);
                     widget.set_vexpand(true);
                     v_box.append(&widget);
-                    self.wire_inspector_click_controller(&widget, &v);
                 }
             }
         }
 
         win.present();
-    }
-
-    pub(crate) fn wire_inspector_click_controller(self: &Rc<Self>, widget: &gtk::Widget, view: &WebView) {
-        // Tag widget to prevent duplicate controllers
-        let tag = "has_rail_dt_ctrl";
-        if unsafe { widget.data::<bool>(tag).is_some() } {
-            return;
-        }
-        unsafe {
-            widget.set_data(tag, true);
-        }
-
-        let dt_click = gtk::GestureClick::new();
-        dt_click.set_propagation_phase(gtk::PropagationPhase::Capture);
-        let app_c = self.clone();
-        let v_c = view.clone();
-        dt_click.connect_pressed(move |g, _, x, y| {
-            if g.current_button() != gdk::BUTTON_PRIMARY {
-                return;
-            }
-            if y >= 0.0 && y <= 35.0 {
-                let cur = app_c.devtools_dock_side.get();
-                let slot = (x / 28.0).floor() as i32;
-                let target_side: Option<DevToolsDockSide> = match cur {
-                    DevToolsDockSide::Bottom => match slot {
-                        0 => {
-                            app_c.hide_view_devtools(&v_c);
-                            None
-                        }
-                        1 => Some(DevToolsDockSide::Left),
-                        2 => Some(DevToolsDockSide::Right),
-                        3 => Some(DevToolsDockSide::Undocked),
-                        _ => None,
-                    },
-                    DevToolsDockSide::Left => match slot {
-                        0 => {
-                            app_c.hide_view_devtools(&v_c);
-                            None
-                        }
-                        1 => Some(DevToolsDockSide::Bottom),
-                        2 => Some(DevToolsDockSide::Right),
-                        3 => Some(DevToolsDockSide::Undocked),
-                        _ => None,
-                    },
-                    DevToolsDockSide::Right => match slot {
-                        0 => {
-                            app_c.hide_view_devtools(&v_c);
-                            None
-                        }
-                        1 => Some(DevToolsDockSide::Left),
-                        2 => Some(DevToolsDockSide::Bottom),
-                        3 => Some(DevToolsDockSide::Undocked),
-                        _ => None,
-                    },
-                    DevToolsDockSide::Undocked => match slot {
-                        0 => Some(DevToolsDockSide::Left),
-                        1 => Some(DevToolsDockSide::Bottom),
-                        2 => Some(DevToolsDockSide::Right),
-                        _ => None,
-                    },
-                };
-
-                if let Some(side) = target_side {
-                    LAST_DT_TARGET.with(|c| c.set(Some(side)));
-                    let app_change = app_c.clone();
-                    glib::idle_add_local_once(move || {
-                        app_change.set_devtools_dock_side(side);
-                    });
-                }
-            }
-        });
-        widget.add_controller(dt_click);
     }
 
     pub(crate) fn hide_view_devtools(&self, view: &WebView) {

@@ -208,26 +208,10 @@ pub(crate) fn inject_web_optimizations(ucm: &webkit6::UserContentManager) {
     }
   }, false);
 
-  // 3. Passive Scroll Compositor Promotion:
-  // Promotes touch/wheel listeners to passive on non-preventing elements for silky 120 FPS scrolling.
-  // CRITICAL: NEVER force passive if ctrlKey is present (touchpad pinch-to-zoom on maps/canvas).
-  try {
-    var originalAddEventListener = EventTarget.prototype.addEventListener;
-    EventTarget.prototype.addEventListener = function(type, listener, options) {
-      if ((type === 'touchstart' || type === 'touchmove') && (this === window || this === document || this === document.body)) {
-        if (typeof options === 'boolean') {
-          options = { capture: options, passive: true };
-        } else if (typeof options === 'object' && options !== null) {
-          if (options.passive === undefined) {
-            options = Object.assign({}, options, { passive: true });
-          }
-        } else {
-          options = { passive: true };
-        }
-      }
-      return originalAddEventListener.call(this, type, listener, options);
-    };
-  } catch(_) {}
+  // Do not monkey-patch addEventListener to force passive touch listeners.
+  // Sites and web apps need to be able to call preventDefault() for nested scrolling,
+  // drawing canvases, touch gestures and custom scroll containers. WebKit handles native
+  // compositor scrolling itself; changing listener options globally breaks site behavior.
 
   // 4. Asynchronous image decoding: offloads image decompression from UI thread
   function makeImagesAsync(root) {

@@ -414,9 +414,50 @@ impl App {
 // ---------------------------------------------------------------------------
 
 thread_local! {
-    /// Per-app-session decisions: (host, permission kind) -> allowed.
+    /// Persistent decisions keyed by (host, permission kind), loaded once per app thread.
     static PERMISSION_DECISIONS: std::cell::RefCell<std::collections::HashMap<(String, &'static str), bool>> =
-        std::cell::RefCell::new(std::collections::HashMap::new());
+        std::cell::RefCell::new(load_permission_decisions());
+}
+
+fn permission_decisions_path() -> std::path::PathBuf {
+    rail_data_dir().join("site-permissions.tsv")
+}
+
+fn load_permission_decisions() -> std::collections::HashMap<(String, &'static str), bool> {
+    let mut out = std::collections::HashMap::new();
+    let Ok(text) = std::fs::read_to_string(permission_decisions_path()) else { return out };
+    for line in text.lines() {
+        let mut parts = line.split('\t');
+        let (Some(host), Some(kind), Some(value)) = (parts.next(), parts.next(), parts.next()) else { continue };
+        let kind: &'static str = match kind {
+            "mic" => "mic", "camera" => "camera", "camera+mic" => "camera+mic",
+            "geolocation" => "geolocation", "notifications" => "notifications", _ => continue,
+        };
+        if !host.is_empty() && !host.chars().any(char::is_control) {
+            out.insert((host.to_string(), kind), value == "allow");
+        }
+    }
+    out
+}
+
+fn save_permission_decisions(decisions: &std::collections::HashMap<(String, &'static str), bool>) {
+    let path = permission_decisions_path();
+    let Some(dir) = path.parent() else { return };
+    if std::fs::create_dir_all(dir).is_err() { return; }
+    let mut entries: Vec<_> = decisions.iter().collect();
+    entries.sort_by(|a, b| a.0.cmp(b.0));
+    let mut data = String::new();
+    for ((host, kind), allowed) in entries {
+        if host.chars().any(char::is_control) { continue; }
+        data.push_str(host);
+        data.push('\t'); data.push_str(kind);
+        data.push('\t'); data.push_str(if *allowed { "allow" } else { "deny" });
+        data.push('\n');
+    }
+    let tmp = path.with_extension("tsv.tmp");
+    if std::fs::write(&tmp, data).is_ok() {
+        let _ = std::fs::rename(tmp, path);
+    }
 }
 
 /// Permission kinds Rail asks about. Anything else keeps WebKit's default handling.
@@ -498,7 +539,9 @@ impl App {
                 if allow { req.allow(); } else { req.deny(); }
                 if remember {
                     PERMISSION_DECISIONS.with(|m| {
-                        m.borrow_mut().insert((host.clone(), kind), allow);
+                        let mut decisions = m.borrow_mut();
+                        decisions.insert((host.clone(), kind), allow);
+                        save_permission_decisions(&decisions);
                     });
                 }
                 if let Some(c) = closer_slot.borrow().as_ref() {
@@ -514,7 +557,7 @@ impl App {
             b.connect_clicked(move |_| f(allow, remember));
             vbox.append(&b);
         };
-        add_btn(tr("Allow while visiting the site"), "js-dialog-btn-ok", true, true);
+        add_btn(tr("Always allow on this site"), "js-dialog-btn-ok", true, true);
         add_btn(tr("Allow this time"), "js-dialog-btn-cancel", true, false);
         add_btn(tr("Never allow"), "js-dialog-btn-cancel", false, true);
 

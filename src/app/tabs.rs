@@ -38,7 +38,7 @@ impl App {
         settings.set_enable_dns_prefetching(true);
         settings.set_property("enable-offline-web-application-cache", true);
         // Smooth, kinetic scrolling across all pages and web views:
-        settings.set_enable_smooth_scrolling(true);
+        settings.set_enable_smooth_scrolling(load_app_settings().smooth_scrolling);
         settings.set_enable_webgl(true); // needed for smooth compositing on many sites
         settings.set_property("enable-2d-canvas-acceleration", true);
         settings.set_enable_hyperlink_auditing(false);
