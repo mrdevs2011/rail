@@ -47,6 +47,60 @@ pub(crate) struct Extension {
 
 static EXTENSIONS: RwLock<Vec<Extension>> = RwLock::new(Vec::new());
 
+/// Extension shortcut mode (Ctrl+Shift+E). Off (default): extension shortcuts are blocked.
+/// On: Rail's own shortcuts are disabled and only extension shortcuts work.
+static EXT_KEYS_ON: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub(crate) fn ext_keys_on() -> bool {
+    EXT_KEYS_ON.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+pub(crate) fn set_ext_keys_on(on: bool) {
+    EXT_KEYS_ON.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Runs before every extension content script. Key listeners (keydown/keyup/keypress) that a
+/// content script registers while it executes are wrapped so they only fire in extension mode.
+/// `postMessage({__railExtKeys: bool})` flips the switch live in an open page and its frames.
+const EXT_KEY_GATE_JS: &str = r#"(function() {
+  if (window.__railGate) return;
+  window.__railGate = true;
+  window.__railExtKeys = __INIT__;
+  window.__railInExt = false;
+  var KEYS = { keydown: 1, keyup: 1, keypress: 1 };
+  var wrappers = new WeakMap();
+  var origAdd = EventTarget.prototype.addEventListener;
+  var origRemove = EventTarget.prototype.removeEventListener;
+  EventTarget.prototype.addEventListener = function(type, fn, opts) {
+    if (window.__railInExt && KEYS[type] && fn && (typeof fn === 'function' || typeof fn === 'object')) {
+      var w = wrappers.get(fn);
+      if (!w) {
+        w = function(e) {
+          if (!window.__railExtKeys) return;
+          return typeof fn === 'function' ? fn.call(this, e) : fn.handleEvent(e);
+        };
+        wrappers.set(fn, w);
+      }
+      return origAdd.call(this, type, w, opts);
+    }
+    return origAdd.apply(this, arguments);
+  };
+  EventTarget.prototype.removeEventListener = function(type, fn, opts) {
+    var w = (fn && (typeof fn === 'function' || typeof fn === 'object')) ? wrappers.get(fn) : null;
+    return origRemove.call(this, type, (w && KEYS[type]) ? w : fn, opts);
+  };
+  origAdd.call(window, 'message', function(e) {
+    var d = e.data;
+    if (!d || typeof d !== 'object' || d.__railExtKeys === undefined) return;
+    if (e.source !== window && e.source !== window.parent) return;
+    window.__railExtKeys = !!d.__railExtKeys;
+    try { window.dispatchEvent(new Event('blur')); } catch (_) {}
+    for (var i = 0; i < window.frames.length; i++) {
+      try { window.frames[i].postMessage({ __railExtKeys: window.__railExtKeys }, '*'); } catch (_) {}
+    }
+  }, true);
+})();"#;
+
 pub(crate) fn ext_data_dir() -> PathBuf {
     rail_data_dir().join("ext_data")
 }
@@ -907,6 +961,8 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
                 webkit6::UserContentInjectedFrames::TopFrame
             };
 
+            let gate_js = EXT_KEY_GATE_JS.replace("__INIT__", if ext_keys_on() { "true" } else { "false" });
+
             // Inject JavaScript
             for js_file in &cs.js {
                 let p = ext.path.join(js_file);
@@ -930,10 +986,17 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
 
 {polyfill}
 
+{gate}
+window.__railInExt = true;
+try {{
 {code}
+}} finally {{
+  window.__railInExt = false;
+}}
 }})();"#,
                         matches_str = matches_str,
                         polyfill = polyfill,
+                        gate = gate_js,
                         code = code
                     );
 

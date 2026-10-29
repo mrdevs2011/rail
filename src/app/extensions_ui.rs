@@ -210,9 +210,39 @@ impl App {
         });
     }
 
+    /// Ctrl+Shift+E: switch between normal mode (extension shortcuts blocked) and extension
+    /// mode (Rail shortcuts off, only extension shortcuts work).
+    pub(crate) fn toggle_extension_mode(self: &Rc<Self>) {
+        let on = !crate::extensions::ext_keys_on();
+        crate::extensions::set_ext_keys_on(on);
+        // Pages opened from now on start in the new state (content scripts are regenerated).
+        crate::extensions::apply_extensions_all();
+        // Pages that are already open flip live.
+        let msg = format!("window.postMessage({{__railExtKeys:{}}},'*');", on);
+        for row in self.rows.borrow().iter() {
+            for t in row.tabs.iter() {
+                t.view.evaluate_javascript(&msg, None, None, None::<&gio::Cancellable>, |_| {});
+            }
+        }
+        if on {
+            self.show_copied_toast(
+                tr("Extension mode ON"),
+                tr("Rail shortcuts are off, only extension shortcuts work. Ctrl+Shift+E to exit."),
+            );
+        } else {
+            self.show_copied_toast(
+                tr("Extension mode OFF"),
+                tr("Rail shortcuts are back, extension shortcuts are blocked."),
+            );
+        }
+    }
+
     /// Check if keyboard combination matches any registered extension command
     pub(crate) fn try_extension_command(self: &Rc<Self>, key: gdk::Key, state: gdk::ModifierType) -> bool {
         use gdk::ModifierType as M;
+        if !crate::extensions::ext_keys_on() {
+            return false; // extension shortcuts are blocked outside extension mode
+        }
         let ctrl = state.contains(M::CONTROL_MASK);
         let alt = state.contains(M::ALT_MASK);
         let shift = state.contains(M::SHIFT_MASK);

@@ -66,6 +66,91 @@ impl App {
         true
     }
 
+    /// True when the clipboard carries copied files (Ctrl+C in a file manager).
+    pub(crate) fn clipboard_has_files(&self) -> bool {
+        self.win.clipboard().formats().contain_mime_type("text/uri-list")
+    }
+
+    /// WebKitGTK does not hand copied files to pages either, so Rail reads them natively
+    /// and replays a synthetic `paste` event whose clipboardData.files holds them.
+    /// If the clipboard has no local files (e.g. a copied link), plain Paste is run instead.
+    pub(crate) fn paste_clipboard_files(self: &Rc<Self>, view: WebView) {
+        const MAX_FILE: u64 = 20 * 1024 * 1024;
+        const MAX_FILES: usize = 10;
+        let clip = self.win.clipboard();
+        let app = self.clone();
+        glib::spawn_future_local(async move {
+            let Ok(val) = clip.read_value_future(gdk::FileList::static_type(), glib::Priority::DEFAULT).await else {
+                view.execute_editing_command("Paste");
+                return;
+            };
+            let Ok(list) = val.get::<gdk::FileList>() else {
+                view.execute_editing_command("Paste");
+                return;
+            };
+            let paths: Vec<std::path::PathBuf> = list.files().iter().filter_map(|f| f.path()).take(MAX_FILES).collect();
+            if paths.is_empty() {
+                view.execute_editing_command("Paste");
+                return;
+            }
+            let files = gio::spawn_blocking(move || {
+                let mut out: Vec<(String, String, String)> = Vec::new();
+                for p in paths {
+                    let Ok(meta) = std::fs::metadata(&p) else { continue };
+                    if !meta.is_file() || meta.len() > MAX_FILE {
+                        continue;
+                    }
+                    let Ok(data) = std::fs::read(&p) else { continue };
+                    let name: String = p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| "file".into())
+                        .chars()
+                        .map(|c| if matches!(c, '\\' | '\'' | '"' | '\n' | '\r') { '_' } else { c })
+                        .collect();
+                    let (ct, _) = gio::content_type_guess(Some(&p), &data[..]);
+                    let mime = gio::content_type_get_mime_type(&ct)
+                        .map(|m| m.to_string())
+                        .unwrap_or_else(|| "application/octet-stream".into());
+                    out.push((name, mime, glib::base64_encode(&data).to_string()));
+                }
+                out
+            })
+            .await
+            .unwrap_or_default();
+            if files.is_empty() {
+                app.show_copied_toast(tr("Paste skipped"), tr("File could not be read or is larger than 20 MB"));
+                return;
+            }
+            let items: Vec<String> = files.iter().map(|(n, m, b)| format!("['{n}','{m}','{b}']")).collect();
+            let mut js = String::from("(function(){try{var dt=new DataTransfer();var L=[");
+            js.push_str(&items.join(","));
+            js.push_str(
+                "];L.forEach(function(x){var b=atob(x[2]);var u=new Uint8Array(b.length);\
+                 for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);\
+                 dt.items.add(new File([u],x[0],{type:x[1]}));});\
+                 var t=document.activeElement||document.body;\
+                 t.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true,composed:true}));\
+                 }catch(e){}})();",
+            );
+            view.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
+        });
+    }
+
+    /// Ctrl+V with copied files on the clipboard while a page has focus: handled by Rail.
+    pub(crate) fn try_paste_files(self: &Rc<Self>) -> bool {
+        let Some(view) = self.focused_view() else { return false };
+        let page_focused = match gtk::prelude::GtkWindowExt::focus(&self.win) {
+            Some(w) => w == *view.upcast_ref::<gtk::Widget>() || w.is_ancestor(&view),
+            None => false,
+        };
+        if !page_focused || !self.clipboard_has_files() {
+            return false;
+        }
+        self.paste_clipboard_files(view);
+        true
+    }
+
     pub(crate) fn palette_open(&self) -> bool {
         gtk::prelude::WidgetExt::is_visible(&self.palette)
     }

@@ -25,12 +25,43 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
             return glib::Propagation::Stop;
         }
 
+        // Ctrl+Shift+E: toggle extension shortcut mode (see App::toggle_extension_mode)
+        if ctrl && !alt && state.contains(M::SHIFT_MASK)
+            && (key == gdk::Key::e || key == gdk::Key::E || keycode == 26)
+        {
+            a.toggle_extension_mode();
+            return glib::Propagation::Stop;
+        }
+
         // Image paste: WebKitGTK gives pages an empty clipboardData for images
         if ctrl && !alt && !state.contains(M::SHIFT_MASK)
             && (key == gdk::Key::v || key == gdk::Key::V || keycode == 55)
             && a.try_paste_image()
         {
             return glib::Propagation::Stop;
+        }
+
+        // File paste: copied files (text/uri-list) are replayed into the page as File objects
+        if ctrl && !alt && !state.contains(M::SHIFT_MASK)
+            && (key == gdk::Key::v || key == gdk::Key::V || keycode == 55)
+            && a.try_paste_files()
+        {
+            return glib::Propagation::Stop;
+        }
+
+        // Extension mode: Rail's own shortcuts are off, only extension commands are handled.
+        // Everything else goes straight to the page.
+        if crate::extensions::ext_keys_on() {
+            if (ctrl || alt || super_key) && held.get() == Some(keycode) {
+                return glib::Propagation::Stop;
+            }
+            if a.try_extension_command(key, state) {
+                if ctrl || alt || super_key {
+                    held.set(Some(keycode));
+                }
+                return glib::Propagation::Stop;
+            }
+            return glib::Propagation::Proceed;
         }
 
         // Autorepeat loop suppressor: block machine-gun repeat when shortcut is held down
