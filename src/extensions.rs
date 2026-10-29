@@ -458,28 +458,46 @@ pub(crate) fn install_from_webstore(ext_id: &str) -> Result<Extension, String> {
     }
 
     let tmp_file = std::env::temp_dir().join(format!("rail_ext_{}.crx", clean_id));
-    let url = format!(
-        "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=128.0.6613.120&acceptformat=crx2,crx3&x=id%3D{}%26uc",
-        clean_id
-    );
+    let _ = std::fs::remove_file(&tmp_file);
 
-    let status = std::process::Command::new("curl")
-        .args([
-            "-4",
-            "-fsSL",
-            "-L",
-            "--compressed",
-            "-m", "60",
-            "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-            "-o", tmp_file.to_str().unwrap_or(""),
-            &url,
-        ])
-        .status()
-        .map_err(|e| format!("curl bilan yuklab bo'lmadi: {e}"))?;
+    let urls = [
+        format!(
+            "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=130.0.6723.70&acceptformat=crx2,crx3&x=id%3D{}%26uc",
+            clean_id
+        ),
+        format!(
+            "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=131.0.6778.86&acceptformat=crx2,crx3&x=id%3D{}%26uc",
+            clean_id
+        ),
+    ];
 
-    if !status.success() || !tmp_file.is_file() {
+    let mut downloaded = false;
+    for url in &urls {
+        let status = std::process::Command::new("curl")
+            .args([
+                "-4",
+                "-fsSL",
+                "-L",
+                "--compressed",
+                "-m", "60",
+                "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+                "-o", tmp_file.to_str().unwrap_or(""),
+                url,
+            ])
+            .status();
+
+        if status.map(|s| s.success()).unwrap_or(false)
+            && tmp_file.is_file()
+            && tmp_file.metadata().map(|m| m.len() > 100).unwrap_or(false)
+        {
+            downloaded = true;
+            break;
+        }
         let _ = std::fs::remove_file(&tmp_file);
-        return Err("Chrome Web Store serveridan yuklab bo'lmadi".into());
+    }
+
+    if !downloaded {
+        return Err("Chrome Web Store serveridan yuklab bo'lmadi (Google API javob bermadi)".into());
     }
 
     let target_dir = extensions_dir().join(clean_id);
