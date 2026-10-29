@@ -452,11 +452,27 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
     hoverBox.style.display = 'block';
   }
 
+  function isOurUi(target) {
+    return target && target.closest && (target.closest('#__rail_ss_toolbar') || target.closest('#__rail_ss_topbar'));
+  }
+
+  function interceptEvent(e) {
+    if (isOurUi(e.target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+  }
+
   function onMouseDown(e) {
-    if (e.button !== 0) return;
-    if (e.target.closest && (e.target.closest('#__rail_ss_toolbar') || e.target.closest('#__rail_ss_topbar'))) {
+    if (isOurUi(e.target)) {
       return;
     }
+    // Prevent underlying webpage buttons, inputs, links from receiving click/focus
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+    if (e.button !== 0) return;
 
     toolbar.style.display = 'none';
 
@@ -467,8 +483,6 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
       isResizing = true;
       resizeHandle = handle.dataset.dir;
       resizeInitial = { pageX: e.pageX, pageY: e.pageY, sel: { ...sel } };
-      e.preventDefault();
-      e.stopPropagation();
       return;
     }
 
@@ -476,18 +490,20 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
       isMoving = true;
       moveOffsetX = e.pageX - sel.left;
       moveOffsetY = e.pageY - sel.top;
-      e.preventDefault();
-      e.stopPropagation();
       return;
     }
 
     isMouseDown = true;
     startX = e.pageX;
     startY = e.pageY;
-    e.preventDefault();
   }
 
   function onMouseUp(e) {
+    if (isOurUi(e.target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
     if (e.button !== 0) return;
 
     if (isResizing) {
@@ -549,6 +565,11 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
   window.addEventListener('mousemove', onMouseMove, true);
   window.addEventListener('mousedown', onMouseDown, true);
   window.addEventListener('mouseup', onMouseUp, true);
+  window.addEventListener('click', interceptEvent, true);
+  window.addEventListener('pointerdown', interceptEvent, true);
+  window.addEventListener('pointerup', interceptEvent, true);
+  window.addEventListener('contextmenu', interceptEvent, true);
+  window.addEventListener('dblclick', interceptEvent, true);
   window.addEventListener('keydown', onKeyDown, true);
   window.addEventListener('scroll', onScroll, true);
 
@@ -556,6 +577,11 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
     window.removeEventListener('mousemove', onMouseMove, true);
     window.removeEventListener('mousedown', onMouseDown, true);
     window.removeEventListener('mouseup', onMouseUp, true);
+    window.removeEventListener('click', interceptEvent, true);
+    window.removeEventListener('pointerdown', interceptEvent, true);
+    window.removeEventListener('pointerup', interceptEvent, true);
+    window.removeEventListener('contextmenu', interceptEvent, true);
+    window.removeEventListener('dblclick', interceptEvent, true);
     window.removeEventListener('keydown', onKeyDown, true);
     window.removeEventListener('scroll', onScroll, true);
     if (document.body) document.body.style.cursor = origCursor;

@@ -72,9 +72,32 @@ impl App {
         if let Some(insp) = view.inspector() {
             let app_insp = self.clone();
             let view_weak = view.downgrade();
+            let insp_weak = insp.downgrade();
             insp.connect_open_window(move |_| {
                 if let Some(v) = view_weak.upgrade() {
                     app_insp.show_view_devtools(&v);
+                    if let Some(i) = insp_weak.upgrade() {
+                        if let Some(w) = i.web_view() {
+                            if let Some((r, c)) = app_insp.find_view_coords(&v) {
+                                let rows = app_insp.rows.borrow();
+                                if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) {
+                                    let widget: gtk::Widget = w.upcast();
+                                    if widget.parent().as_ref() != Some(tab.dt_box.upcast_ref()) {
+                                        if widget.parent().is_some() {
+                                            widget.unparent();
+                                        }
+                                        while let Some(ch) = tab.dt_box.first_child() {
+                                            tab.dt_box.remove(&ch);
+                                        }
+                                        widget.set_hexpand(true);
+                                        widget.set_vexpand(true);
+                                        tab.dt_box.append(&widget);
+                                    }
+                                }
+                            }
+                            return true;
+                        }
+                    }
                 }
                 false
             });

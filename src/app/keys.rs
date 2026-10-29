@@ -204,6 +204,10 @@ impl App {
                 self.open_file_dialog();
                 return true;
             }
+            if k == gdk::Key::u || keycode == 30 {
+                self.view_source_of_focused();
+                return true;
+            }
             if k == gdk::Key::w || keycode == 25 {
                 if !self.palette_open() {
                     if let Some(v) = self.focused_view() {

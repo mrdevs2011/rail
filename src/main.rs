@@ -261,7 +261,7 @@ fn main() -> glib::ExitCode {
     };
     let app = gtk::Application::builder()
         .application_id(app_id.as_str())
-        .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE)
+        .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE | gio::ApplicationFlags::HANDLES_OPEN)
         .build();
 
     // Disable GTK Inspector default shortcut (Ctrl+Shift+I) so it never intercepts Rail's WebKit DevTools
@@ -280,6 +280,25 @@ fn main() -> glib::ExitCode {
             return;
         }
         build(gapp);
+    });
+    app.connect_open(|gapp, files, _hint| {
+        let existing = MAIN_APP.with(|m| m.borrow().clone());
+        match existing {
+            Some(a) => {
+                for file in files {
+                    let uri = file.uri().to_string();
+                    a.new_tab_with_url(&uri);
+                }
+                a.win.present();
+                a.win.present_with_time(gdk::CURRENT_TIME);
+            }
+            None => {
+                if let Some(first) = files.first() {
+                    let _ = TARGET_URL.set(first.uri().to_string());
+                }
+                gapp.activate();
+            }
+        }
     });
     app.connect_command_line(|gapp, cmdline| {
         let args: Vec<String> = cmdline.arguments().iter().map(|a| a.to_string_lossy().into_owned()).collect();
@@ -307,6 +326,7 @@ fn main() -> glib::ExitCode {
                     }
                 }
                 a.win.present();
+                a.win.present_with_time(gdk::CURRENT_TIME);
             }
             // First launch: populate TARGET_URL and activate.
             None => {

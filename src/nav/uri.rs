@@ -22,7 +22,10 @@ pub(crate) const SEARCH_ENGINE_LIST: &[(&str, &str, &str)] = &[
 
 pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
     let s = input.trim();
-    let s = s.strip_prefix("view-source:").unwrap_or(s).trim();
+    if s.starts_with("view-source:") {
+        let rest = s.trim_start_matches("view-source:").trim();
+        return format!("view-source:{}", to_uri(rest, search_engine));
+    }
     // Short internal names → rail:// URLs
     match s.to_ascii_lowercase().as_str() {
         "settings" | "rail:settings" => return "rail://settings".into(),
@@ -42,40 +45,54 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
     }
     if s.starts_with("file:") {
         let path = s.trim_start_matches("file:").trim_start_matches('/');
+        let p = format!("/{path}");
+        if let Ok(uri) = glib::filename_to_uri(&p, None) {
+            return uri.to_string();
+        }
         return format!("file:///{path}");
     }
     if s.starts_with('/') {
+        if let Ok(uri) = glib::filename_to_uri(s, None) {
+            return uri.to_string();
+        }
         return format!("file://{s}");
     }
     if s.starts_with("~/") {
         let home = glib::home_dir();
+        let full = home.join(&s[2..]);
+        if let Ok(uri) = glib::filename_to_uri(&full, None) {
+            return uri.to_string();
+        }
         return format!("file://{}/{}", home.display(), &s[2..]);
     }
     if s.starts_with("./") || s.starts_with("../") {
         if let Ok(cur) = std::env::current_dir() {
             let full = cur.join(s);
-            if let Ok(canon) = std::fs::canonicalize(&full) {
-                return format!("file://{}", canon.display());
+            let target = std::fs::canonicalize(&full).unwrap_or(full);
+            if let Ok(uri) = glib::filename_to_uri(&target, None) {
+                return uri.to_string();
             }
-            return format!("file://{}", full.display());
+            return format!("file://{}", target.display());
         }
     }
 
     // Check if `s` exists directly on the filesystem (e.g. "analyze.py", "index.html")
     let direct_path = std::path::Path::new(s);
     if direct_path.exists() {
-        if let Ok(canon) = std::fs::canonicalize(direct_path) {
-            return format!("file://{}", canon.display());
+        let target = std::fs::canonicalize(direct_path).unwrap_or_else(|_| direct_path.to_path_buf());
+        if let Ok(uri) = glib::filename_to_uri(&target, None) {
+            return uri.to_string();
         }
-        return format!("file://{}", direct_path.display());
+        return format!("file://{}", target.display());
     }
 
     // Check if `/{s}` exists on the filesystem (e.g. user typed "home/muhamad/computer-analysis/index.html")
     let abs_candidate = format!("/{s}");
     let abs_path = std::path::Path::new(&abs_candidate);
     if abs_path.exists() {
-        if let Ok(canon) = std::fs::canonicalize(abs_path) {
-            return format!("file://{}", canon.display());
+        let target = std::fs::canonicalize(abs_path).unwrap_or_else(|_| abs_path.to_path_buf());
+        if let Ok(uri) = glib::filename_to_uri(&target, None) {
+            return uri.to_string();
         }
         return format!("file://{abs_candidate}");
     }
@@ -185,9 +202,9 @@ pub(crate) fn host_of(uri: &str) -> Option<String> {
     Some(h.trim_start_matches("www.").to_string())
 }
 
-/// Rail'ning ichki sahifalari (rail://start/ ...): WebKit ularni load_uri/reload bilan ocholmaydi.
+/// Rail'ning ichki sahifalari (rail://start/ ... va view-source:): WebKit ularni load_uri/reload bilan ocholmaydi.
 pub(crate) fn is_internal_uri(u: &str) -> bool {
-    u.starts_with("rail://")
+    u.starts_with("rail://") || u.starts_with("view-source:")
 }
 
 pub(crate) fn settings_shell_page() -> String {
@@ -271,11 +288,116 @@ pub(crate) fn edit_uri_for_entry(uri: &str) -> String {
     uri.to_string()
 }
 
+pub(crate) fn format_view_source_html(target_url: &str, raw_code: &str) -> String {
+    let mut lines_html = String::with_capacity(raw_code.len() * 2);
+    for line in raw_code.lines() {
+        let esc = line
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;");
+        lines_html.push_str("<span class=\"line\">");
+        lines_html.push_str(&esc);
+        lines_html.push_str("</span>\n");
+    }
+    format!(
+        r#"<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>view-source:{target_url}</title>
+<style>
+  html, body {{
+    background: #0d0e12;
+    color: #e4e4e7;
+    font-family: 'JetBrains Mono', 'Fira Code', 'DejaVu Sans Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 16px 20px;
+    user-select: text;
+  }}
+  pre {{
+    margin: 0;
+    counter-reset: line;
+  }}
+  .line {{
+    display: block;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }}
+  .line::before {{
+    counter-increment: line;
+    content: counter(line);
+    display: inline-block;
+    width: 48px;
+    margin-right: 20px;
+    color: #52525b;
+    text-align: right;
+    user-select: none;
+  }}
+</style>
+</head>
+<body>
+<pre>{lines_html}</pre>
+</body>
+</html>"#
+    )
+}
+
+pub(crate) fn load_view_source_page(v: &WebView, target: &str) {
+    if target.is_empty() {
+        v.load_html(&format_view_source_html("about:blank", ""), Some("view-source:about:blank"));
+        return;
+    }
+    let target_clean = target.to_string();
+    let view_weak = v.downgrade();
+
+    if target_clean.starts_with("file://") {
+        let path_str = target_clean.trim_start_matches("file://");
+        let content = std::fs::read_to_string(path_str).unwrap_or_else(|e| format!("/* Error reading file: {e} */"));
+        let html = format_view_source_html(&target_clean, &content);
+        v.load_html(&html, Some(&format!("view-source:{target_clean}")));
+        return;
+    }
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    let url_for_thread = target_clean.clone();
+    std::thread::spawn(move || {
+        let out = std::process::Command::new("curl")
+            .args(["-fsSL", "-m", "15", "-A", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", &url_for_thread])
+            .output();
+        let code = match out {
+            Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).into_owned(),
+            Ok(o) => format!("/* Error loading source: HTTP status {:?} */\n{}", o.status.code(), String::from_utf8_lossy(&o.stderr)),
+            Err(e) => format!("/* Error fetching source: {e} */"),
+        };
+        let _ = tx.send(code);
+    });
+
+    let uri_for_js = format!("view-source:{target_clean}");
+    glib::timeout_add_local(std::time::Duration::from_millis(50), move || {
+        match rx.try_recv() {
+            Ok(src) => {
+                if let Some(vw) = view_weak.upgrade() {
+                    let html = format_view_source_html(&target_clean, &src);
+                    vw.load_html(&html, Some(&uri_for_js));
+                }
+                glib::ControlFlow::Break
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => glib::ControlFlow::Break,
+        }
+    });
+}
+
 pub(crate) fn load_internal_page(v: &WebView, uri: &str) {
     if uri.starts_with("rail://downloads") {
         v.load_html(&downloads_page(), Some("rail://downloads"));
     } else if uri.starts_with("rail://settings") {
         v.load_html(&settings_shell_page(), Some(uri.split('#').next().unwrap_or("rail://settings")));
+    } else if uri.starts_with("view-source:") {
+        let target = uri.trim_start_matches("view-source:").trim();
+        load_view_source_page(v, target);
     } else {
         v.load_html(&start_page(), Some("rail://start/"));
     }

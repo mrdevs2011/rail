@@ -199,4 +199,39 @@ impl App {
         view.load_uri(url);
         self.add_view(view, prof_id, true);
     }
+
+    /// View Page Source (Ctrl+U): extracts active DOM HTML or fetches raw page, renders with line numbers
+    pub(crate) fn view_source_of_focused(self: &Rc<Self>) {
+        let Some(v) = self.focused_view() else { return };
+        let uri = v.uri().map(|s| s.to_string()).unwrap_or_else(|| self.saved_uri_of(&v));
+        if uri.is_empty() || uri.starts_with("rail://") {
+            return;
+        }
+        let a = self.clone();
+        let prof_id = self.profiles.borrow().active_id().to_string();
+        let uri_target = uri.clone();
+        v.evaluate_javascript(
+            "document.documentElement ? (document.doctype ? new XMLSerializer().serializeToString(document.doctype) + '\n' : '<!DOCTYPE html>\n') + document.documentElement.outerHTML : ''",
+            None,
+            None,
+            gio::Cancellable::NONE,
+            move |res| {
+                let raw_html = match res {
+                    Ok(val) => val.to_string(),
+                    Err(_) => String::new(),
+                };
+                let view_source_uri = format!("view-source:{uri_target}");
+                if !raw_html.trim().is_empty() {
+                    let html = crate::format_view_source_html(&uri_target, &raw_html);
+                    let session = a.profiles.borrow_mut().get_or_create_session(&prof_id);
+                    let new_view = Self::create_web_view(&session, &prof_id);
+                    new_view.load_html(&html, Some(&view_source_uri));
+                    a.set_view_saved_uri(&new_view, &view_source_uri);
+                    a.add_view(new_view, prof_id, false);
+                } else {
+                    a.new_tab_with_url(&view_source_uri);
+                }
+            },
+        );
+    }
 }

@@ -91,6 +91,33 @@ impl App {
 
         attach_widget();
         glib::idle_add_local_once(attach_widget);
+
+        let dt_box_poll = tab.dt_box.clone();
+        let insp_poll = insp.clone();
+        let retries = std::rc::Rc::new(std::cell::Cell::new(0));
+        glib::timeout_add_local(std::time::Duration::from_millis(35), move || {
+            let count = retries.get();
+            if let Some(w) = insp_poll.web_view() {
+                let widget: gtk::Widget = w.upcast();
+                if widget.parent().as_ref() != Some(dt_box_poll.upcast_ref()) {
+                    if widget.parent().is_some() {
+                        widget.unparent();
+                    }
+                    while let Some(ch) = dt_box_poll.first_child() {
+                        dt_box_poll.remove(&ch);
+                    }
+                    widget.set_hexpand(true);
+                    widget.set_vexpand(true);
+                    dt_box_poll.append(&widget);
+                }
+                return glib::ControlFlow::Break;
+            }
+            if count >= 35 {
+                return glib::ControlFlow::Break;
+            }
+            retries.set(count + 1);
+            glib::ControlFlow::Continue
+        });
     }
 
     pub(crate) fn hide_view_devtools(&self, view: &WebView) {
