@@ -226,7 +226,7 @@ impl App {
     pub(crate) fn sync_search_engine_ui(self: &Rc<Self>) {
         let engine = self.search_engine.borrow().clone();
         let display_name = search_engine_display_name(&engine);
-        let placeholder = format!("{} {}...", tr("Search with"), display_name);
+        let placeholder = tr("Search with {} or enter URL").replace("{}", &display_name);
 
         self.entry.set_placeholder_text(Some(&placeholder));
 

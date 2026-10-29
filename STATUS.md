@@ -169,3 +169,10 @@
 - Qilindi: WebKit DevTools (Web Inspector) ochilishida GTK Inspector chiqishi bartaraf etildi (capture phase'da to'xtatildi va GSettings disable qilindi).
 - Qilindi: Settings, Downloads va Profiles to'liq responsiv qilindi (Settings avtomatik vertikal/gorizontal dinamik o'zgaradi, gorizontal scroll tab bar, Profiles ellipsize va wrap, Downloads clamp va flex layout).
 - Build & Test: `cargo test --release` (58/58 test muvaffaqiyatli o'tdi) va `cargo build --release` OK.
+
+---
+### 2026-10-29
+- Qilindi: Settings > Data > Tarix qatorlarida endi sana ham ko'rinadi (`dd.mm.yyyy  HH:MM`); qatorlar bitta satrga tushirildi, margin/padding minimal (`.hist-row` style.css da, `hist_list_box` spacing 0). Omnibar placeholder `Search with {engine} or enter URL` bo'ldi (uz/en/ru, `i18n_tables.rs`).
+- Build & Test: `cargo build --release` OK, `cargo test --release` 60/60 OK. GUI da ko'zdan kechirilmagan.
+- Keyingi qadam: real oynada tarix qatorlari balandligi va uzun url/sarlavha qisqarishini tekshirish.
+- Qilindi (qo'shimcha): Web Store o'rnatish `install_from_webstore` da curl `-m 60` umumiy limiti olib tashlandi (46 MB kengaytma ~290 KB/s da 60s ga sig'masdi); endi `--speed-limit 20000 --speed-time 30`, `--connect-timeout 20`, `-m 1800`. Build OK, test 60/60 OK.

@@ -444,6 +444,7 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Clear History", "Tarixni tozalash", "Очистить историю"),
     ("Today", "Bugun", "Сегодня"),
     ("Yesterday", "Kecha", "Вчера"),
+    ("Search with {} or enter URL", "{} orqali qidiring yoki URL kiriting", "Поиск в {} или введите URL"),
     ("Earlier", "Oldinroq", "Ранее"),
     ("Open in new tab", "Yangi tabda ochish", "Открыть в новой вкладке"),
     ("No browsing history yet", "Ko'rishlar tarixi hali mavjud emas", "История просмотров пока пуста"),

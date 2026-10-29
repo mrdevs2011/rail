@@ -1370,6 +1370,19 @@ button.color-choice.selected {
     margin-top: 2px;
     margin-bottom: 6px;
 }
+.hist-row {
+    background: #111111;
+    border: none;
+    border-bottom: 1px solid #191919;
+    border-radius: 0;
+    padding: 1px 8px;
+    margin: 0;
+    min-height: 0;
+}
+.hist-row:hover { background: #161616; }
+.hist-row .shortcut-kbd { padding: 0 6px; font-size: 10.5px; }
+.hist-row .settings-card-title, .hist-row .settings-card-desc { margin: 0; }
+.hist-row button.flat-icon { min-width: 22px; min-height: 20px; }
 .settings-option-item {
     background: #000000;
     border: 1px solid #191919;

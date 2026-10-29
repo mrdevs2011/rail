@@ -49,7 +49,7 @@ pub(crate) fn build_data_page(settings_stack: &gtk::Stack) -> DataPage {
     hist_top_row.append(&btn_clear_hist_tab);
     sub_page_history.append(&hist_top_row);
 
-    let hist_list_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    let hist_list_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
     hist_list_box.set_vexpand(true);
 
     let hist_scroll = gtk::ScrolledWindow::new();
@@ -357,21 +357,21 @@ pub(crate) fn render_history_list(
             let hdr = gtk::Label::new(Some(&date_str));
             hdr.add_css_class("data-section-title");
             hdr.set_xalign(0.0);
-            hdr.set_margin_top(12);
-            hdr.set_margin_bottom(4);
+            hdr.set_margin_top(8);
+            hdr.set_margin_bottom(2);
             box_widget.append(&hdr);
             last_date = date_str;
         }
 
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-        row.add_css_class("settings-card");
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        row.add_css_class("hist-row");
         row.set_valign(gtk::Align::Center);
 
         // Time
         let time_str = glib::DateTime::from_unix_local(entry.last_visit)
-            .and_then(|d| d.format("%H:%M"))
+            .and_then(|d| d.format("%d.%m.%Y  %H:%M"))
             .map(|s| s.to_string())
-            .unwrap_or_else(|_| "--:--".into());
+            .unwrap_or_else(|_| "--.--.----  --:--".into());
         let time_lbl = gtk::Label::new(Some(&time_str));
         time_lbl.add_css_class("shortcut-kbd");
         time_lbl.set_valign(gtk::Align::Center);
@@ -384,7 +384,7 @@ pub(crate) fn render_history_list(
         row.append(&icon);
 
         // Info: Title & URL
-        let info_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
+        let info_box = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         info_box.set_hexpand(true);
         info_box.set_valign(gtk::Align::Center);
 
@@ -403,6 +403,11 @@ pub(crate) fn render_history_list(
         url_lbl.set_xalign(0.0);
         url_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
 
+        for l in [&title_lbl, &url_lbl] {
+            l.set_hexpand(true);
+            l.set_width_chars(1);
+            l.set_max_width_chars(1);
+        }
         info_box.append(&title_lbl);
         info_box.append(&url_lbl);
         row.append(&info_box);

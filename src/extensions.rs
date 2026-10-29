@@ -479,7 +479,11 @@ pub(crate) fn install_from_webstore(ext_id: &str) -> Result<Extension, String> {
                 "-fsSL",
                 "-L",
                 "--compressed",
-                "-m", "60",
+                // Sekin tarmoqda katta kengaytmalar (40+ MB) 60s ga sig'madi: faqat to'xtab qolganda uzamiz.
+                "--connect-timeout", "20",
+                "--speed-limit", "20000",
+                "--speed-time", "30",
+                "-m", "1800",
                 "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
                 "-o", tmp_file.to_str().unwrap_or(""),
                 url,
