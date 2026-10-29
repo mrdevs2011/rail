@@ -15,6 +15,26 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     let zoom_repeat_key: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
     let zoom_repeat_source: Rc<RefCell<Option<glib::SourceId>>> = Rc::new(RefCell::new(None));
 
+    // WebKit consumes Ctrl+V before bubble-phase browser shortcuts run. Handle
+    // image paste in a dedicated capture-phase controller; plain text paste still
+    // proceeds to WebKit untouched.
+    let paste_keys = gtk::EventControllerKey::new();
+    paste_keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let paste_app = app.clone();
+    paste_keys.connect_key_pressed(move |_, key, keycode, state| {
+        use gdk::ModifierType as M;
+        if state.contains(M::CONTROL_MASK)
+            && !state.intersects(M::ALT_MASK | M::SUPER_MASK | M::SHIFT_MASK)
+            && (key == gdk::Key::v || key == gdk::Key::V || keycode == 55)
+        {
+            if paste_app.try_paste_image() {
+                return glib::Propagation::Stop;
+            }
+        }
+        glib::Propagation::Proceed
+    });
+    win.add_controller(paste_keys);
+
     let a = app.clone();
     let held = held_shortcut.clone();
     let zoom_key = zoom_repeat_key.clone();
@@ -24,18 +44,6 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
         let ctrl = state.contains(M::CONTROL_MASK);
         let alt = state.contains(M::ALT_MASK);
         let super_key = state.contains(M::SUPER_MASK);
-
-        // Route image Ctrl+V through Rail's native clipboard fallback; keep text
-        // paste native in WebKitGTK. This check must precede shortcut resolution.
-        if ctrl
-            && !state.intersects(M::ALT_MASK | M::SUPER_MASK | M::SHIFT_MASK)
-            && (key == gdk::Key::v || key == gdk::Key::V || keycode == 55)
-        {
-            if a.try_paste_image() {
-                return glib::Propagation::Stop;
-            }
-            return glib::Propagation::Proceed;
-        }
 
         // Ignore OS key-repeat events while our smooth overview zoom loop owns this key.
         if zoom_key.get() == Some(keycode) {

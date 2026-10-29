@@ -27,10 +27,7 @@ impl App {
     pub(crate) fn clipboard_has_image(&self) -> bool {
         let formats = self.win.clipboard().formats();
         formats.contains_type(<gdk::Texture as glib::prelude::StaticType>::static_type())
-            || formats
-                .mime_types()
-                .iter()
-                .any(|mime| mime.starts_with("image/"))
+            || formats.mime_types().iter().any(|mime| mime.starts_with("image/"))
     }
 
     /// Reads the clipboard image natively and dispatches a synthetic `paste` event
