@@ -2,6 +2,12 @@
 
 use crate::*;
 
+thread_local! {
+    /// Tracks WebViews where the website called `preventDefault()` on `contextmenu` (or has a custom menu).
+    static LAST_CONTEXT_PREVENTED: std::cell::RefCell<std::collections::HashMap<usize, std::time::Instant>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
 impl App {
     pub(crate) fn setup_view_signals(self: &Rc<Self>, view: &WebView) {
         let app = self.clone();
@@ -156,6 +162,27 @@ impl App {
             if uri.starts_with("rail://") {
                 return true;
             }
+
+            // Shift+RightClick forces Rail's browser menu (Chrome / Firefox parity for Inspect / View Source)
+            let is_shift = gdk::Display::default()
+                .and_then(|d| d.default_seat())
+                .and_then(|s| s.keyboard())
+                .map(|k| k.modifier_state().contains(gdk::ModifierType::SHIFT_MASK))
+                .unwrap_or(false);
+
+            let ptr = v.as_ptr() as usize;
+            let recently_prevented = LAST_CONTEXT_PREVENTED.with(|m| {
+                m.borrow_mut()
+                    .remove(&ptr)
+                    .map_or(false, |t| t.elapsed() < std::time::Duration::from_millis(400))
+            });
+
+            if recently_prevented && !is_shift {
+                // The website provided its own custom context menu or called preventDefault().
+                // Suppress Rail's menu completely so the website's menu displays cleanly without overlap.
+                return true;
+            }
+
             if App::is_page_level_hit(hit) {
                 app.show_page_menu(v);
                 return true;
@@ -435,6 +462,18 @@ impl App {
             let app_br = self.clone();
             ucm.connect_script_message_received(Some("railExtBridge"), move |_, val| {
                 app_br.handle_ext_bridge_message(val.to_str().as_str());
+            });
+
+            let wv_ctx = view.downgrade();
+            ucm.connect_script_message_received(Some("railContextMenu"), move |_, _val| {
+                if let Some(v) = wv_ctx.upgrade() {
+                    let ptr = v.as_ptr() as usize;
+                    LAST_CONTEXT_PREVENTED.with(|m| {
+                        let mut map = m.borrow_mut();
+                        map.retain(|_, t| t.elapsed() < std::time::Duration::from_secs(5));
+                        map.insert(ptr, std::time::Instant::now());
+                    });
+                }
             });
         }
 

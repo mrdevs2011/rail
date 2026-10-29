@@ -470,6 +470,7 @@ pub(crate) fn open_pwa_window(
     settings.set_enable_page_cache(true);
 
     let ucm = webkit6::UserContentManager::new();
+    ucm.register_script_message_handler("railContextMenu", None);
     crate::web::inject_web_optimizations(&ucm);
 
     let website_policies = webkit6::WebsitePolicies::builder()

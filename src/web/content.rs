@@ -164,6 +164,54 @@ pub(crate) fn inject_web_optimizations(ucm: &webkit6::UserContentManager) {
       };
     }
   }
+
+  // 2. Custom context menu & preventDefault detection.
+  // When a site provides its own context menu or suppresses the browser menu (e.g. YouTube,
+  // Google Docs, Telegram, Figma, SpaceMR), notify the host so Rail's menu doesn't collide.
+  function notifyContextPrevented() {
+    try {
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railContextMenu) {
+        window.webkit.messageHandlers.railContextMenu.postMessage("prevented");
+      }
+    } catch(_) {}
+  }
+
+  // Capture phase: intercept e.preventDefault on contextmenu
+  window.addEventListener('contextmenu', function(e) {
+    if (e.defaultPrevented) {
+      notifyContextPrevented();
+      return;
+    }
+    var orig = e.preventDefault;
+    e.preventDefault = function() {
+      notifyContextPrevented();
+      return orig.apply(this, arguments);
+    };
+  }, true);
+
+  // Bubble phase on window: catches cases where handlers return false or set defaultPrevented
+  window.addEventListener('contextmenu', function(e) {
+    if (e.defaultPrevented) {
+      notifyContextPrevented();
+      return;
+    }
+    var target = e.target;
+    if (target && target.closest) {
+      if (target.closest('.html5-video-player, ytd-player, #movie_player, .monaco-editor, [data-context-menu], [role="menu"]')) {
+        notifyContextPrevented();
+      }
+    }
+  }, false);
+
+  window.addEventListener('pointerdown', function(e) {
+    if (e.button === 2) {
+      var orig = e.preventDefault;
+      e.preventDefault = function() {
+        notifyContextPrevented();
+        return orig.apply(this, arguments);
+      };
+    }
+  }, true);
 })();
 "#;
 
