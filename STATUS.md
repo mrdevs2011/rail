@@ -183,3 +183,13 @@
 - Qilindi: sidebar tab qatoridagi ovoz tugmasi (volume svg) endi jonli `is_muted()` bo'yicha shu tab ovozini o'chiradi/yoqadi (toggle), ikonka va tooltip bosilishi bilan yangilanadi; audio/mute notify sidebar'ni `refresh_sidebar_soon` bilan qayta chizadi (har notify'da sinxron qayta qurish yo'q).
 - Build & Test: `cargo build --release` OK, `cargo test --release` 60/60 OK. GUI da ko'zdan kechirilmagan.
 - Keyingi qadam: real oynada split holatda video fullscreen (YouTube) va tab ovoz tugmasini tekshirish.
+
+---
+### 2026-10-30 (shortcutlar)
+- Qilindi: barcha shortcutlar endi tugmaga emas, amal ID'siga bog'langan. `sc_resolve` tugmani Customize ro'yxatidagi amalga (`SHORTCUT_DEFS.id`) aylantiradi, `App::run_action(id)` (src/app/keys.rs) bajaradi. Eski "o'zgartirilgan tugmani standart tugmaga aylantirib `on_key` ga uzatish" (sc_synth) olib tashlandi. F12 / Ctrl+Shift+I / Ctrl+Shift+E endi qotirilmagan, F5 / Ctrl+F5 / Shift+F5 / Ctrl+= ham ro'yxatdagi amalning 2-standart tugmasi.
+- Qilindi: tugmani aniqlash 3 yo'l bilan (jismoniy tugma, layout bergan belgi, Shift'siz belgi): keypad +/-/0/1..9/strelkalar, Ctrl+Shift+= (zoom-in), kirill-only klaviatura. "minus"/"-" kabi yozuvlar `sc_canon` bilan tenglashtiriladi.
+- Qilindi: Ctrl+F sahifada qidirish (src/app/find.rs, FindController): panel, natijalar soni, Enter/Shift+Enter, F3/Shift+F3, Ctrl+G/Ctrl+Shift+G, Esc. Yangi amallar: find, find_next, find_prev, reopen_tab, history, open_file, view_source, extension_mode (hammasi Customize'da).
+- Qilindi: tugma qo'yib yuborilishi alohida Capture controller'da kuzatiladi (WebKit release'ni yutsa `held` qotib, keyingi bosish yo'qolardi). Zoom va find_next/prev bosib turilganda takrorlanadi.
+- Build & Test: `cargo build --release` OK, `cargo test --release` 66/66 OK (6 yangi test). GUI da ko'zdan kechirilmagan.
+- Keyingi qadam: real oynada Ctrl+F, Alt+F (full/half kenglik), F11, Ctrl+=/-/0 ni standart va o'zgartirilgan tugma bilan sinash. Customize faqat 1-tugmani tahrirlaydi, qo'shimcha standartlar (F5, Ctrl+G ...) qoladi.
+- Git holati: uncommitted (src/app/keys.rs, find.rs, mod.rs, focus.rs, shortcuts/config.rs, ui/wire/keys.rs, ui/build.rs, style.css, i18n_tables.rs, tests.rs, docs/shortcuts).

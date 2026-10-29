@@ -213,6 +213,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         last_entry_len: Cell::new(0),
         delete_key: Cell::new(false),
         ov_hint,
+        find_ui: RefCell::new(None),
         ov: Cell::new(false),
         ov_exiting: Cell::new(false),
         ov_user_zoom: Cell::new(OV_ZOOM),

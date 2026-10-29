@@ -1,12 +1,36 @@
 //! Keyboard handling.
+//!
+//! Ikki qism:
+//!  * `run_action(id)` — Settings > Customize > Shortcuts ro'yxatidagi har bir amal ID bo'yicha.
+//!    Tugma default bo'lsa ham, foydalanuvchi o'zgartirgan bo'lsa ham shu yerga keladi
+//!    (tugma → ID moslashtirishni `sc_resolve` qiladi), shuning uchun hech narsa bitta tugmaga bog'lanmagan.
+//!  * `on_key` — ro'yxatdan tashqari qat'iy tugmalar: Esc, overview ichidagi oddiy tugmalar,
+//!    kengaytma buyruqlari, qidiruv paneli (Shift+Enter).
 
 use crate::*;
 
+/// Customize ro'yxatidagi raqamsiz amallar. Raqamlilari: tab_1..9, ws_1..9, mv_1..9.
+/// Yangi `sc!` qo'shilsa, bu yerga va `run_action` ga ham qo'shiladi (test shuni tekshiradi).
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) const STATIC_ACTIONS: &[&str] = &[
+    "new_tab", "focus_url", "close_tab", "reload", "hard_reload", "full_tab", "new_workspace",
+    "focus_left", "focus_right", "focus_down", "focus_up",
+    "win_left", "win_right", "win_up", "win_down",
+    "move_left", "move_right", "move_down", "move_up",
+    "next_tab", "prev_tab", "stack_left", "stack_right",
+    "settings", "profiles", "data", "devtools", "devtools_dock", "map", "overview",
+    "overview_zoom_in", "overview_zoom_out", "zoom_reset",
+    "sidebar", "downloads", "fullscreen", "quit",
+    "reopen_tab", "history", "open_file", "view_source",
+    "find", "find_next", "find_prev", "extension_mode",
+];
+
 impl App {
-    // ---- keys ------------------------------------------------------------
+    // ---- zoom ------------------------------------------------------------
 
     /// Ctrl zoom keys: `Some(1)` in, `Some(-1)` out, `Some(0)` reset.
     /// `=` counts as plus (US layout: Ctrl+= without Shift); keypad +/- work too.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn zoom_dir(k: gdk::Key, keycode: u32, shift: bool) -> Option<i32> {
         if matches!(k, gdk::Key::plus | gdk::Key::equal | gdk::Key::KP_Add) {
             return Some(1);
@@ -46,38 +70,170 @@ impl App {
         v.set_zoom_level(z);
     }
 
-    pub(crate) fn on_key(self: &Rc<Self>, key: gdk::Key, keycode: u32, state: gdk::ModifierType) -> bool {
+    // ---- actions ---------------------------------------------------------
+
+    /// `tab_3` → Some(3) (faqat 1..=9).
+    fn action_num(id: &str, prefix: &str) -> Option<usize> {
+        id.strip_prefix(prefix)?.parse::<usize>().ok().filter(|n| (1..=9).contains(n))
+    }
+
+    /// Customize ro'yxatidagi `id` uchun handler bormi?
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn action_known(id: &str) -> bool {
+        STATIC_ACTIONS.contains(&id) || ["tab_", "ws_", "mv_"].iter().any(|p| Self::action_num(id, p).is_some())
+    }
+
+    /// Shortcut amalini bajaradi. `false` — tugma ishlatilmadi va sahifaga o'tishi kerak.
+    pub(crate) fn run_action(self: &Rc<Self>, id: &str) -> bool {
+        if let Some(n) = Self::action_num(id, "tab_") {
+            if n == 9 {
+                self.focus_last_tab();
+            } else {
+                self.focus_tab_index(n - 1);
+            }
+            return true;
+        }
+        if let Some(n) = Self::action_num(id, "ws_") {
+            self.focus_row(n - 1);
+            return true;
+        }
+        if let Some(n) = Self::action_num(id, "mv_") {
+            self.move_tab_to_row(n - 1);
+            return true;
+        }
+        match id {
+            // ---- tabs ----
+            "new_tab" => self.open_new_tab_palette(),
+            "focus_url" => self.show_palette(),
+            "close_tab" => {
+                if !self.palette_open() {
+                    if let Some(v) = self.focused_view() {
+                        self.close_view(&v);
+                    }
+                }
+            }
+            "reload" => {
+                if let Some(v) = self.focused_view() {
+                    reload_or_start(&v);
+                }
+            }
+            "hard_reload" => {
+                if let Some(v) = self.focused_view() {
+                    hard_reload_or_start(&v);
+                }
+            }
+            "reopen_tab" => self.reopen_closed_tab(),
+            "next_tab" => self.cycle_tab(1),
+            "prev_tab" => self.cycle_tab(-1),
+            // ---- layout (niri-style) ----
+            "full_tab" => self.toggle_full(),
+            "new_workspace" => self.split_vertical(),
+            "focus_left" | "win_left" => self.focus_column_left(),
+            "focus_right" | "win_right" => self.focus_column_right(),
+            "focus_up" | "win_up" => self.focus_row_up(),
+            "focus_down" | "win_down" => self.focus_row_down(),
+            "move_left" => self.move_column(-1),
+            "move_right" => self.move_column(1),
+            "move_up" => self.move_window_vertical(-1),
+            "move_down" => self.move_window_vertical(1),
+            "stack_left" => self.consume_or_expel(-1),
+            "stack_right" => self.consume_or_expel(1),
+            // ---- panels ----
+            "settings" => self.toggle_settings_modal(),
+            "profiles" => {
+                if self.settings_modal_open() {
+                    self.open_settings_tab(SettingsTab::Profiles);
+                } else if self.focused_is_welcome() {
+                    self.toggle_welcome_profiles();
+                } else if self.palette_open() {
+                    if self.profile_popover.is_visible() {
+                        self.profile_popover.popdown();
+                    } else {
+                        self.profile_popover.popup();
+                    }
+                } else {
+                    self.toggle_profiles_modal();
+                }
+            }
+            "data" => {
+                if self.settings_modal_open() {
+                    self.open_settings_tab(SettingsTab::Data);
+                } else {
+                    self.toggle_data_modal();
+                }
+            }
+            "history" => self.open_history(),
+            "downloads" => self.open_downloads(),
+            "open_file" => self.open_file_dialog(),
+            "view_source" => self.view_source_of_focused(),
+            "devtools" => {
+                if self.devtools_open() {
+                    self.hide_devtools();
+                } else {
+                    self.toggle_devtools();
+                }
+            }
+            "devtools_dock" => self.cycle_devtools_dock(),
+            "map" => {
+                if self.map_open() {
+                    self.hide_map();
+                } else {
+                    self.toggle_map();
+                }
+            }
+            "overview" => self.toggle_overview(),
+            "sidebar" => self.toggle_sidebar(),
+            "fullscreen" => self.win.set_fullscreened(!self.win.is_fullscreen()),
+            "quit" => self.win.close(),
+            // ---- zoom: overview ichida grid, aks holda sahifa ----
+            "overview_zoom_in" => {
+                if self.overview_open() {
+                    self.overview_zoom_by(1.06);
+                } else {
+                    self.page_zoom(1);
+                }
+            }
+            "overview_zoom_out" => {
+                if self.overview_open() {
+                    self.overview_zoom_by(1.0 / 1.06);
+                } else {
+                    self.page_zoom(-1);
+                }
+            }
+            "zoom_reset" => {
+                if self.overview_open() {
+                    self.overview_zoom_by(OV_ZOOM / self.target_zoom.get());
+                } else {
+                    self.page_zoom(0);
+                }
+            }
+            "extension_mode" => self.toggle_extension_mode(),
+            // ---- find in page ----
+            "find" => return self.find_open(),
+            "find_next" => return self.find_step(true),
+            "find_prev" => return self.find_step(false),
+            _ => return false,
+        }
+        true
+    }
+
+    // ---- fixed keys ------------------------------------------------------
+
+    /// Customize ro'yxatiga kirmaydigan qat'iy tugmalar: Esc, overview ichidagi oddiy tugmalar,
+    /// kengaytma buyruqlari, Shift+Enter (qidiruvda oldingi natija).
+    pub(crate) fn on_key(self: &Rc<Self>, key: gdk::Key, _keycode: u32, state: gdk::ModifierType) -> bool {
         use gdk::ModifierType as M;
         let ctrl = state.contains(M::CONTROL_MASK);
         let shift = state.contains(M::SHIFT_MASK);
         let alt = state.contains(M::ALT_MASK);
         let k = key.to_lower();
 
-        // Overview is a read-only bird's-eye view: it comes first, before settings / devtools /
-        // page handling, so arrows (and h/j/k/l, Enter, x, Esc) work WITHOUT Alt and never
-        // reach any tab (including the settings tab). Ctrl/Alt/Super combos fall through.
+        // Overview is a read-only bird's-eye view: plain keys (arrows, h/j/k/l, Enter, x, Esc)
+        // work WITHOUT Alt and never reach any tab. Ctrl/Alt/Super combos are shortcuts (run_action).
         if self.overview_open() {
             if k == gdk::Key::Escape {
                 self.cancel_overview();
                 return true;
-            }
-            // Ctrl+/-/0 or Alt+/-/0 (and keypad): scale the overview grid, not the page.
-            if (ctrl || alt) && !(ctrl && alt) {
-                match Self::zoom_dir(k, keycode, shift) {
-                    Some(1) => {
-                        self.overview_zoom_by(1.06);
-                        return true;
-                    }
-                    Some(-1) => {
-                        self.overview_zoom_by(1.0 / 1.06);
-                        return true;
-                    }
-                    Some(_) => {
-                        self.overview_zoom_by(OV_ZOOM / self.target_zoom.get());
-                        return true;
-                    }
-                    None => {}
-                }
             }
             if !ctrl && !alt && !state.contains(M::SUPER_MASK) {
                 self.ov_key(k, M::empty());
@@ -90,60 +246,35 @@ impl App {
             return true;
         }
 
+        // Find bar: Esc yopadi, Shift+Enter — oldingi natija
+        if self.find_is_open() && !self.settings_modal_open() {
+            if k == gdk::Key::Escape {
+                self.find_close(true);
+                return true;
+            }
+            let enter = matches!(k, gdk::Key::Return | gdk::Key::KP_Enter | gdk::Key::ISO_Enter);
+            if enter && shift && !ctrl && !alt {
+                self.find_step(false);
+                return true;
+            }
+        }
+
         if self.settings_modal_open() {
             // Settings is a real tab (rail://settings) — Esc never closes it.
-            // Ctrl+W / other browser shortcuts fall through below.
             if k == gdk::Key::Escape {
                 return true; // swallow; do not hide
             }
-            if alt && !shift && !ctrl && (k == gdk::Key::p || k == gdk::Key::P) {
-                self.open_settings_tab(SettingsTab::Profiles);
-                return true;
-            }
-            if alt && !shift && !ctrl && (k == gdk::Key::i || k == gdk::Key::I) {
-                self.open_settings_tab(SettingsTab::Data);
-                return true;
-            }
-            // Ctrl / Alt browser shortcuts: continue to global handlers (Ctrl+W closes tab)
-            if ctrl || (alt && !shift) {
-                // fall through
-            } else {
-                // Typing goes to settings form fields
-                return false;
-            }
+            // Typing goes to settings form fields
+            return false;
         }
 
-        if self.map_open() {
-            if k == gdk::Key::Escape {
-                self.hide_map();
-                return true;
-            }
-            if alt && !shift && !ctrl && (k == gdk::Key::m || k == gdk::Key::M) {
-                self.hide_map();
-                return true;
-            }
-        }
-
-        if self.devtools_open() {
-            if k == gdk::Key::Escape {
-                self.hide_devtools();
-                return true;
-            }
-            if (!ctrl && !shift && !alt && k == gdk::Key::F12)
-                || (ctrl && shift && !alt && (k == gdk::Key::i || k == gdk::Key::I)) {
-                self.hide_devtools();
-                return true;
-            }
-        }
-
-        if alt && shift && !ctrl && (k == gdk::Key::d || k == gdk::Key::D) {
-            self.cycle_devtools_dock();
+        if self.map_open() && k == gdk::Key::Escape {
+            self.hide_map();
             return true;
         }
 
-        if (!ctrl && !shift && !alt && k == gdk::Key::F12)
-            || (ctrl && shift && !alt && (k == gdk::Key::i || k == gdk::Key::I)) {
-            self.toggle_devtools();
+        if self.devtools_open() && k == gdk::Key::Escape {
+            self.hide_devtools();
             return true;
         }
 
@@ -163,316 +294,6 @@ impl App {
             return false;
         }
         if self.overview_open() && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
-            return true;
-        }
-
-        // Ctrl +/-/0 — page zoom of the focused tab (20%..500%)
-        if ctrl && !alt {
-            if let Some(dir) = Self::zoom_dir(k, keycode, shift) {
-                self.page_zoom(dir);
-                return true;
-            }
-        }
-
-        // F5 / Ctrl+F5 / Shift+F5 reload
-        if (k == gdk::Key::F5 || keycode == 71) && !alt {
-            if let Some(v) = self.focused_view() {
-                if ctrl || shift {
-                    hard_reload_or_start(&v);
-                } else {
-                    reload_or_start(&v);
-                }
-            }
-            return true;
-        }
-
-        // Ctrl+Shift+T — reopen last closed tab
-        if ctrl && shift && !alt && (k == gdk::Key::t || keycode == 28) {
-            self.reopen_closed_tab();
-            return true;
-        }
-
-        // Ctrl+Shift+R — hard refresh (bypass cache), Chrome/Brave bilan bir xil
-        if ctrl && shift && !alt && (k == gdk::Key::r || keycode == 27) {
-            if let Some(v) = self.focused_view() {
-                hard_reload_or_start(&v);
-            }
-            return true;
-        }
-
-        // Ctrl+H — History
-        if ctrl && !shift && !alt && (k == gdk::Key::h || keycode == 43) {
-            self.open_history();
-            return true;
-        }
-
-        // Ctrl+J — Downloads (Chrome parity)
-        if ctrl && !shift && !alt && (k == gdk::Key::j || keycode == 44) {
-            self.open_downloads();
-            return true;
-        }
-
-        // Ctrl+Tab cycling and Ctrl+1..9 tab switching
-        if ctrl && !shift && !alt {
-            // Standart brauzer shortcutlari: Ctrl+T / Ctrl+L / Ctrl+W / Ctrl+R / Ctrl+Q
-            // (keycode — boshqa klaviatura tartibida ham ishlashi uchun)
-            if k == gdk::Key::t || keycode == 28 {
-                self.open_new_tab_palette();
-                return true;
-            }
-            if k == gdk::Key::l || keycode == 46 {
-                self.show_palette();
-                return true;
-            }
-            if k == gdk::Key::o || keycode == 32 {
-                self.open_file_dialog();
-                return true;
-            }
-            if k == gdk::Key::u || keycode == 30 {
-                self.view_source_of_focused();
-                return true;
-            }
-            if k == gdk::Key::w || keycode == 25 {
-                if !self.palette_open() {
-                    if let Some(v) = self.focused_view() {
-                        self.close_view(&v);
-                    }
-                }
-                return true;
-            }
-            if k == gdk::Key::r || keycode == 27 {
-                if let Some(v) = self.focused_view() {
-                    reload_or_start(&v);
-                }
-                return true;
-            }
-            if k == gdk::Key::q || keycode == 24 {
-                self.win.close();
-                return true;
-            }
-            if k == gdk::Key::Tab || k == gdk::Key::ISO_Left_Tab || keycode == 23 {
-                self.cycle_tab(1);
-                return true;
-            }
-            // Tab switching within active workspace (Ctrl+1..8 to tabs 1..8, Ctrl+9 to last tab)
-            if keycode == 10 || keycode == 87 || k == gdk::Key::_1 || k == gdk::Key::KP_1 || key.to_unicode() == Some('1') {
-                self.focus_tab_index(0);
-                return true;
-            }
-            if keycode == 11 || keycode == 88 || k == gdk::Key::_2 || k == gdk::Key::KP_2 || key.to_unicode() == Some('2') {
-                self.focus_tab_index(1);
-                return true;
-            }
-            if keycode == 12 || keycode == 89 || k == gdk::Key::_3 || k == gdk::Key::KP_3 || key.to_unicode() == Some('3') {
-                self.focus_tab_index(2);
-                return true;
-            }
-            if keycode == 13 || keycode == 90 || k == gdk::Key::_4 || k == gdk::Key::KP_4 || key.to_unicode() == Some('4') {
-                self.focus_tab_index(3);
-                return true;
-            }
-            if keycode == 14 || keycode == 91 || k == gdk::Key::_5 || k == gdk::Key::KP_5 || key.to_unicode() == Some('5') {
-                self.focus_tab_index(4);
-                return true;
-            }
-            if keycode == 15 || keycode == 92 || k == gdk::Key::_6 || k == gdk::Key::KP_6 || key.to_unicode() == Some('6') {
-                self.focus_tab_index(5);
-                return true;
-            }
-            if keycode == 16 || keycode == 93 || k == gdk::Key::_7 || k == gdk::Key::KP_7 || key.to_unicode() == Some('7') {
-                self.focus_tab_index(6);
-                return true;
-            }
-            if keycode == 17 || keycode == 94 || k == gdk::Key::_8 || k == gdk::Key::KP_8 || key.to_unicode() == Some('8') {
-                self.focus_tab_index(7);
-                return true;
-            }
-            if keycode == 18 || keycode == 95 || k == gdk::Key::_9 || k == gdk::Key::KP_9 || key.to_unicode() == Some('9') {
-                self.focus_last_tab();
-                return true;
-            }
-        }
-        if ctrl && shift && !alt && (k == gdk::Key::ISO_Left_Tab || k == gdk::Key::Tab || keycode == 23) {
-            self.cycle_tab(-1);
-            return true;
-        }
-        if !ctrl && !shift && !alt && k == gdk::Key::F11 {
-            self.win.set_fullscreened(!self.win.is_fullscreen());
-            return true;
-        }
-
-        // Alt + Arrow: navigate tabs (columns) and workspaces (rows) — locked shortcuts
-        if alt && !shift && !ctrl {
-            match k {
-                gdk::Key::Left | gdk::Key::KP_Left => {
-                    self.focus_column_left();
-                    return true;
-                }
-                gdk::Key::Right | gdk::Key::KP_Right => {
-                    self.focus_column_right();
-                    return true;
-                }
-                gdk::Key::Up | gdk::Key::KP_Up => {
-                    self.focus_row_up();
-                    return true;
-                }
-                gdk::Key::Down | gdk::Key::KP_Down => {
-                    self.focus_row_down();
-                    return true;
-                }
-                gdk::Key::p | gdk::Key::P => {
-                    if self.focused_is_welcome() && !self.settings_modal_open() {
-                        self.toggle_welcome_profiles();
-                    } else if self.palette_open() {
-                        if self.profile_popover.is_visible() {
-                            self.profile_popover.popdown();
-                        } else {
-                            self.profile_popover.popup();
-                        }
-                    } else {
-                        self.toggle_profiles_modal();
-                    }
-                }
-                gdk::Key::i | gdk::Key::I => self.toggle_data_modal(),
-                gdk::Key::f => self.toggle_full(),
-                gdk::Key::h => self.focus_column_left(),
-                gdk::Key::l => self.focus_column_right(),
-                gdk::Key::j => self.focus_row_down(),
-                gdk::Key::k => self.focus_row_up(),
-                gdk::Key::b => self.toggle_sidebar(),
-                gdk::Key::o => self.toggle_overview(),
-                gdk::Key::bracketleft => self.consume_or_expel(-1),
-                gdk::Key::bracketright => self.consume_or_expel(1),
-                gdk::Key::m => self.toggle_map(),
-                gdk::Key::s | gdk::Key::S => {
-                    self.toggle_settings_modal();
-                    return true;
-                }
-                _ => {
-                    if keycode == 39 {
-                        self.toggle_settings_modal();
-                        return true;
-                    }
-                    // Alt+[ / Alt+] (physical keys, so they work on any keyboard layout)
-                    if keycode == 34 {
-                        self.consume_or_expel(-1);
-                        return true;
-                    }
-                    if keycode == 35 {
-                        self.consume_or_expel(1);
-                        return true;
-                    }
-                    // Vertical workspace selection (Alt+1..9)
-                    if keycode == 10 || keycode == 87 || k == gdk::Key::_1 || k == gdk::Key::KP_1 || key.to_unicode() == Some('1') {
-                        self.focus_row(0);
-                        return true;
-                    }
-                    if keycode == 11 || keycode == 88 || k == gdk::Key::_2 || k == gdk::Key::KP_2 || key.to_unicode() == Some('2') {
-                        self.focus_row(1);
-                        return true;
-                    }
-                    if keycode == 12 || keycode == 89 || k == gdk::Key::_3 || k == gdk::Key::KP_3 || key.to_unicode() == Some('3') {
-                        self.focus_row(2);
-                        return true;
-                    }
-                    if keycode == 13 || keycode == 90 || k == gdk::Key::_4 || k == gdk::Key::KP_4 || key.to_unicode() == Some('4') {
-                        self.focus_row(3);
-                        return true;
-                    }
-                    if keycode == 14 || keycode == 91 || k == gdk::Key::_5 || k == gdk::Key::KP_5 || key.to_unicode() == Some('5') {
-                        self.focus_row(4);
-                        return true;
-                    }
-                    if keycode == 15 || keycode == 92 || k == gdk::Key::_6 || k == gdk::Key::KP_6 || key.to_unicode() == Some('6') {
-                        self.focus_row(5);
-                        return true;
-                    }
-                    if keycode == 16 || keycode == 93 || k == gdk::Key::_7 || k == gdk::Key::KP_7 || key.to_unicode() == Some('7') {
-                        self.focus_row(6);
-                        return true;
-                    }
-                    if keycode == 17 || keycode == 94 || k == gdk::Key::_8 || k == gdk::Key::KP_8 || key.to_unicode() == Some('8') {
-                        self.focus_row(7);
-                        return true;
-                    }
-                    if keycode == 18 || keycode == 95 || k == gdk::Key::_9 || k == gdk::Key::KP_9 || key.to_unicode() == Some('9') {
-                        self.focus_row(8);
-                        return true;
-                    }
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        if alt && shift && !ctrl {
-            match k {
-                gdk::Key::v | gdk::Key::V => self.split_vertical(),
-                gdk::Key::h => self.move_column(-1),
-                gdk::Key::l => self.move_column(1),
-                gdk::Key::j => self.move_window_vertical(1),
-                gdk::Key::k => self.move_window_vertical(-1),
-                _ => {
-                    // Alt+Shift+1 -> move to workspace/row 1
-                    if keycode == 10 || keycode == 87
-                        || k == gdk::Key::_1 || k == gdk::Key::exclam || k == gdk::Key::KP_1
-                        || key == gdk::Key::_1 || key == gdk::Key::exclam || key == gdk::Key::KP_1
-                        || key.to_unicode() == Some('1') || key.to_unicode() == Some('!')
-                    {
-                        self.move_tab_to_row(0);
-                        return true;
-                    }
-                    // Alt+Shift+2 -> move to workspace/row 2
-                    if keycode == 11 || keycode == 88
-                        || k == gdk::Key::_2 || k == gdk::Key::at || k == gdk::Key::quotedbl || k == gdk::Key::KP_2
-                        || key == gdk::Key::_2 || key == gdk::Key::at || key == gdk::Key::quotedbl || key == gdk::Key::KP_2
-                        || key.to_unicode() == Some('2') || key.to_unicode() == Some('@') || key.to_unicode() == Some('"')
-                    {
-                        self.move_tab_to_row(1);
-                        return true;
-                    }
-                    // Alt+Shift+3 -> move to workspace/row 3
-                    if keycode == 12 || keycode == 89
-                        || k == gdk::Key::_3 || k == gdk::Key::numbersign || k == gdk::Key::KP_3
-                        || key == gdk::Key::_3 || key == gdk::Key::numbersign || key == gdk::Key::KP_3
-                        || key.to_unicode() == Some('3') || key.to_unicode() == Some('#')
-                    {
-                        self.move_tab_to_row(2);
-                        return true;
-                    }
-                    // Alt+Shift+4 -> move to workspace/row 4
-                    if keycode == 13 || keycode == 90 || k == gdk::Key::_4 || k == gdk::Key::KP_4 || key.to_unicode() == Some('4') {
-                        self.move_tab_to_row(3);
-                        return true;
-                    }
-                    // Alt+Shift+5 -> move to workspace/row 5
-                    if keycode == 14 || keycode == 91 || k == gdk::Key::_5 || k == gdk::Key::KP_5 || key.to_unicode() == Some('5') {
-                        self.move_tab_to_row(4);
-                        return true;
-                    }
-                    // Alt+Shift+6 -> move to workspace/row 6
-                    if keycode == 15 || keycode == 92 || k == gdk::Key::_6 || k == gdk::Key::asciicircum || k == gdk::Key::KP_6 || key.to_unicode() == Some('6') || key.to_unicode() == Some('^') {
-                        self.move_tab_to_row(5);
-                        return true;
-                    }
-                    // Alt+Shift+7 -> move to workspace/row 7
-                    if keycode == 16 || keycode == 93 || k == gdk::Key::_7 || k == gdk::Key::ampersand || k == gdk::Key::KP_7 || key.to_unicode() == Some('7') || key.to_unicode() == Some('&') {
-                        self.move_tab_to_row(6);
-                        return true;
-                    }
-                    // Alt+Shift+8 -> move to workspace/row 8
-                    if keycode == 17 || keycode == 94 || k == gdk::Key::_8 || k == gdk::Key::asterisk || k == gdk::Key::KP_8 || key.to_unicode() == Some('8') || key.to_unicode() == Some('*') {
-                        self.move_tab_to_row(7);
-                        return true;
-                    }
-                    // Alt+Shift+9 -> move to workspace/row 9
-                    if keycode == 18 || keycode == 95 || k == gdk::Key::_9 || k == gdk::Key::parenleft || k == gdk::Key::KP_9 || key.to_unicode() == Some('9') || key.to_unicode() == Some('(') {
-                        self.move_tab_to_row(8);
-                        return true;
-                    }
-                    return false;
-                }
-            }
             return true;
         }
         false

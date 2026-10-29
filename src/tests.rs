@@ -281,8 +281,9 @@ fn test_stack_shortcuts() {
         let def = SHORTCUT_DEFS.iter().find(|d| d.id == id).expect("shortcut exists");
         assert_eq!(def.defaults[0], combo);
     }
-    assert_eq!(sc_synth("Alt+[").map(|(k, _)| k), Some(gdk::Key::bracketleft));
-    assert_eq!(sc_synth("Alt+]").map(|(k, _)| k), Some(gdk::Key::bracketright));
+    SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
+    assert!(matches!(sc_resolve("Alt+["), ScResolve::Action("stack_left")));
+    assert!(matches!(sc_resolve("Alt+]"), ScResolve::Action("stack_right")));
 }
 
 /// One action = one shortcut, and one shortcut = one action (or multiple non-conflicting default shortcuts).
@@ -304,16 +305,102 @@ fn test_devtools_shortcuts() {
     let def = SHORTCUT_DEFS.iter().find(|d| d.id == "devtools").expect("devtools shortcut exists");
     assert!(def.defaults.contains(&"F12"));
     assert!(def.defaults.contains(&"Ctrl+Shift+I"));
-    let res = sc_resolve("Ctrl+Shift+I");
-    match res {
-        ScResolve::Action(action) => assert_eq!(action, "F12"),
-        _ => panic!("Expected Action(\"F12\"), got non-action"),
+    SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
+    assert!(matches!(sc_resolve("Ctrl+Shift+I"), ScResolve::Action("devtools")));
+    assert!(matches!(sc_resolve("F12"), ScResolve::Action("devtools")));
+}
+
+/// Customize ro'yxatidagi har bir amalning handleri bor, handlerlar ro'yxatida esa ortiqcha ID yo'q.
+#[test]
+fn test_every_shortcut_has_a_handler() {
+    for def in SHORTCUT_DEFS {
+        assert!(App::action_known(def.id), "\"{}\" Customize ro'yxatida bor, lekin run_action da handleri yo'q", def.id);
     }
-    let res_f12 = sc_resolve("F12");
-    match res_f12 {
-        ScResolve::Action(action) => assert_eq!(action, "F12"),
-        _ => panic!("Expected Action(\"F12\"), got non-action"),
+    for id in crate::app::STATIC_ACTIONS {
+        assert!(SHORTCUT_DEFS.iter().any(|d| d.id == *id), "\"{}\" handler bor, lekin Customize ro'yxatida yo'q", id);
     }
+}
+
+/// Har bir standart tugma o'z amaliga olib borishi kerak.
+#[test]
+fn test_default_combos_resolve_to_own_action() {
+    SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
+    for def in SHORTCUT_DEFS {
+        for d in def.defaults {
+            match sc_resolve(d) {
+                ScResolve::Action(id) => assert_eq!(id, def.id, "{} -> {}", d, id),
+                _ => panic!("{} ({}) hech qaysi amalga ulanmagan", d, def.id),
+            }
+        }
+    }
+}
+
+/// Foydalanuvchi tugmani o'zgartirsa: yangi tugma ishlaydi, eskisi sahifaga qaytadi, o'chirilgani ham.
+#[test]
+fn test_customized_shortcut_follows_action_not_key() {
+    let mut cfg = ShortcutConfig::default();
+    cfg.overrides.insert("find".to_string(), vec!["Alt+G".to_string()]);
+    cfg.overrides.insert("full_tab".to_string(), vec!["Ctrl+Shift+F".to_string()]);
+    cfg.disabled.insert("fullscreen".to_string());
+    SHORTCUTS.with(|c| *c.borrow_mut() = cfg);
+    assert!(matches!(sc_resolve("Alt+G"), ScResolve::Action("find")));
+    assert!(matches!(sc_resolve("Ctrl+F"), ScResolve::Disabled));
+    assert!(matches!(sc_resolve("Ctrl+Shift+F"), ScResolve::Action("full_tab")));
+    assert!(matches!(sc_resolve("Alt+F"), ScResolve::Disabled));
+    assert!(matches!(sc_resolve("F11"), ScResolve::Disabled));
+    // ro'yxatda umuman yo'q tugma qat'iy tugmalarga (Esc, overview) qoladi
+    assert!(matches!(sc_resolve("Escape"), ScResolve::Unknown));
+    assert!(matches!(sc_resolve("Shift+Return"), ScResolve::Unknown));
+    SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
+}
+
+#[test]
+fn test_combo_spelling_is_canonical() {
+    assert_eq!(sc_canon("Ctrl+minus"), sc_canon("Ctrl+-"));
+    assert_eq!(sc_canon("Ctrl+equal"), sc_canon("Ctrl+="));
+    assert_eq!(sc_canon("Shift+Ctrl+t"), sc_canon("Ctrl+Shift+T"));
+    assert_eq!(sc_canon("Ctrl++"), sc_canon("Ctrl+plus"));
+    assert_eq!(sc_canon("Ctrl+KP_Add"), sc_canon("Ctrl+plus"));
+    assert_ne!(sc_canon("Ctrl+T"), sc_canon("Ctrl+Shift+T"));
+}
+
+#[test]
+fn test_find_reload_zoom_defaults() {
+    SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
+    for (combo, id) in [
+        ("Ctrl+F", "find"), ("F3", "find_next"), ("Ctrl+G", "find_next"),
+        ("Shift+F3", "find_prev"), ("Ctrl+Shift+G", "find_prev"),
+        ("F5", "reload"), ("Ctrl+R", "reload"),
+        ("Ctrl+F5", "hard_reload"), ("Shift+F5", "hard_reload"), ("Ctrl+Shift+R", "hard_reload"),
+        ("Ctrl+=", "overview_zoom_in"), ("Ctrl+plus", "overview_zoom_in"),
+        ("Ctrl+-", "overview_zoom_out"), ("Ctrl+0", "zoom_reset"),
+        ("Ctrl+Shift+T", "reopen_tab"), ("Ctrl+H", "history"), ("Ctrl+Shift+E", "extension_mode"),
+        ("Alt+F", "full_tab"), ("F11", "fullscreen"),
+    ] {
+        match sc_resolve(combo) {
+            ScResolve::Action(got) => assert_eq!(got, id, "{}", combo),
+            _ => panic!("{} -> {} ga ulanmagan", combo, id),
+        }
+    }
+}
+
+/// Tugma hodisasi: Shift+= (US) zoom-in, keypad + / 0 / strelkalar ham o'z amaliga tushadi.
+#[test]
+fn test_key_events_resolve_through_all_spellings() {
+    use gdk::ModifierType as M;
+    SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
+    let r = |k: gdk::Key, code: u32, m: M| sc_resolve_any(&shortcut_combos(k, code, m));
+    assert!(matches!(r(gdk::Key::plus, 21, M::CONTROL_MASK | M::SHIFT_MASK), ScResolve::Action("overview_zoom_in")));
+    assert!(matches!(r(gdk::Key::equal, 21, M::CONTROL_MASK), ScResolve::Action("overview_zoom_in")));
+    assert!(matches!(r(gdk::Key::KP_Add, 86, M::CONTROL_MASK), ScResolve::Action("overview_zoom_in")));
+    assert!(matches!(r(gdk::Key::KP_Subtract, 82, M::CONTROL_MASK), ScResolve::Action("overview_zoom_out")));
+    assert!(matches!(r(gdk::Key::KP_0, 90, M::CONTROL_MASK), ScResolve::Action("zoom_reset")));
+    assert!(matches!(r(gdk::Key::KP_3, 89, M::CONTROL_MASK), ScResolve::Action("tab_3")));
+    assert!(matches!(r(gdk::Key::KP_Left, 83, M::ALT_MASK), ScResolve::Action("win_left")));
+    assert!(matches!(r(gdk::Key::ISO_Left_Tab, 23, M::CONTROL_MASK | M::SHIFT_MASK), ScResolve::Action("prev_tab")));
+    // oddiy harf / Esc ro'yxatga kirmaydi
+    assert!(matches!(r(gdk::Key::h, 43, M::empty()), ScResolve::Unknown));
+    assert!(matches!(r(gdk::Key::Escape, 9, M::empty()), ScResolve::Unknown));
 }
 
 #[test]

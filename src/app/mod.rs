@@ -23,6 +23,9 @@ mod minimap;
 mod profiles_modal;
 mod overview;
 mod keys;
+#[cfg(test)]
+pub(crate) use keys::STATIC_ACTIONS;
+mod find;
 mod translate;
 mod ctxmenu;
 mod screenshot;
@@ -57,6 +60,8 @@ pub(crate) struct App {
     /// Oxirgi bosilgan tugma o'chirish (Backspace/Delete/Ctrl+X...) bo'lganmi: shunda inline to'ldirish ishlamaydi
     pub(crate) delete_key: Cell<bool>,
     pub(crate) ov_hint: gtk::Label,
+    /// Sahifa ichida qidirish paneli (Ctrl+F); birinchi ochilganda yaratiladi.
+    pub(crate) find_ui: RefCell<Option<Rc<find::FindUi>>>,
     /// Overview is active: the strip is zoomed out and tabs ignore the pointer.
     pub(crate) ov: Cell<bool>,
     /// Zoom-in from overview is running; CSS/ov stay until the camera lands.

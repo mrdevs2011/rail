@@ -32,8 +32,8 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("new_tab", G_TABS, "Open Omnibar / New tab", ["Ctrl+T"]),
     sc!("focus_url", G_TABS, "Focus URL / Address bar", ["Ctrl+L"]),
     sc!("close_tab", G_TABS, "Close focused tab", ["Ctrl+W"]),
-    sc!("reload", G_TABS, "Reload active tab", ["Ctrl+R"]),
-    sc!("hard_reload", G_TABS, "Hard reload (bypass cache)", ["Ctrl+Shift+R"]),
+    sc!("reload", G_TABS, "Reload active tab", ["Ctrl+R", "F5"]),
+    sc!("hard_reload", G_TABS, "Hard reload (bypass cache)", ["Ctrl+Shift+R", "Ctrl+F5", "Shift+F5"]),
     sc!("full_tab", G_TABS, "Toggle Full Tab View", ["Alt+F"]),
     sc!("new_workspace", G_TABS, "New Workspace", ["Alt+Shift+V"]),
     sc!("focus_left", G_TABS, "Focus column Left", ["Alt+H"]),
@@ -50,6 +50,7 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("move_up", G_TABS, "Move window Up", ["Alt+Shift+K"]),
     sc!("next_tab", G_TABS, "Cycle to next tab", ["Ctrl+Tab"]),
     sc!("prev_tab", G_TABS, "Cycle to previous tab", ["Ctrl+Shift+Tab"]),
+    sc!("reopen_tab", G_TABS, "Reopen last closed tab", ["Ctrl+Shift+T"]),
     sc!("stack_left", G_TABS, "Stack into left column / unstack left", ["Alt+["]),
     sc!("stack_right", G_TABS, "Stack into right column / unstack right", ["Alt+]"]),
     sc!("tab_1", G_TABS, "Switch to tab 1", ["Ctrl+1"]),
@@ -86,11 +87,18 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("devtools_dock", G_PANELS, "Cycle DevTools dock position", ["Alt+Shift+D"]),
     sc!("map", G_PANELS, "Toggle Roadmap / Minimap", ["Alt+M"]),
     sc!("overview", G_PANELS, "Toggle Spatial Overview", ["Alt+O"]),
-    sc!("overview_zoom_in", G_PANELS, "Zoom in (page 20-500%, overview scale)", ["Ctrl+plus"]),
+    sc!("overview_zoom_in", G_PANELS, "Zoom in (page 20-500%, overview scale)", ["Ctrl+plus", "Ctrl+="]),
     sc!("overview_zoom_out", G_PANELS, "Zoom out (page 20-500%, overview scale)", ["Ctrl+minus"]),
     sc!("zoom_reset", G_PANELS, "Reset zoom (page 100%, overview default)", ["Ctrl+0"]),
     sc!("sidebar", G_PANELS, "Toggle Sidebar", ["Alt+B"]),
     sc!("downloads", G_PANELS, "Open Downloads", ["Ctrl+J"]),
+    sc!("history", G_PANELS, "Open History", ["Ctrl+H"]),
+    sc!("open_file", G_PANELS, "Open a file", ["Ctrl+O"]),
+    sc!("view_source", G_PANELS, "View page source", ["Ctrl+U"]),
+    sc!("find", G_PANELS, "Find in page", ["Ctrl+F"]),
+    sc!("find_next", G_PANELS, "Find next match", ["F3", "Ctrl+G"]),
+    sc!("find_prev", G_PANELS, "Find previous match", ["Shift+F3", "Ctrl+Shift+G"]),
+    sc!("extension_mode", G_PANELS, "Toggle extension shortcut mode", ["Ctrl+Shift+E"]),
     sc!("fullscreen", G_PANELS, "Toggle Fullscreen", ["F11"]),
     sc!("quit", G_PANELS, "Quit Rail", ["Ctrl+Q"]),
 ];
@@ -103,7 +111,8 @@ pub(crate) struct ShortcutConfig {
 }
 
 pub(crate) enum ScResolve {
-    Action(String),
+    /// Customize ro'yxatidagi amal IDsi (`SHORTCUT_DEFS[..].id`)
+    Action(&'static str),
     Disabled,
     Unknown,
 }
@@ -331,9 +340,43 @@ pub(crate) fn is_modifier_key(key: gdk::Key) -> bool {
     )
 }
 
-/// Layout-independent name of a key press, e.g. "Alt+Shift+T" or "F12".
-pub(crate) fn shortcut_combo(key: gdk::Key, keycode: u32, state: gdk::ModifierType) -> Option<String> {
+/// Modifier prefix in canonical order: "Ctrl+Alt+Shift+Super+".
+fn sc_mods_prefix(state: gdk::ModifierType, with_shift: bool) -> String {
     use gdk::ModifierType as M;
+    let mut out = String::new();
+    if state.contains(M::CONTROL_MASK) {
+        out.push_str("Ctrl+");
+    }
+    if state.contains(M::ALT_MASK) {
+        out.push_str("Alt+");
+    }
+    if with_shift && state.contains(M::SHIFT_MASK) {
+        out.push_str("Shift+");
+    }
+    if state.contains(M::SUPER_MASK) {
+        out.push_str("Super+");
+    }
+    out
+}
+
+/// Latin layout label of a physical key (X11 keycode). Used only when the active layouts have no
+/// Latin letter for the key (e.g. Cyrillic-only), so Ctrl+T etc. keep working there.
+fn sc_us_label(keycode: u32) -> Option<&'static str> {
+    Some(match keycode {
+        10 => "1", 11 => "2", 12 => "3", 13 => "4", 14 => "5", 15 => "6", 16 => "7", 17 => "8", 18 => "9", 19 => "0",
+        20 => "-", 21 => "=",
+        24 => "Q", 25 => "W", 26 => "E", 27 => "R", 28 => "T", 29 => "Y", 30 => "U", 31 => "I", 32 => "O", 33 => "P",
+        34 => "[", 35 => "]",
+        38 => "A", 39 => "S", 40 => "D", 41 => "F", 42 => "G", 43 => "H", 44 => "J", 45 => "K", 46 => "L",
+        47 => ";", 48 => "'", 51 => "\\",
+        52 => "Z", 53 => "X", 54 => "C", 55 => "V", 56 => "B", 57 => "N", 58 => "M",
+        59 => ",", 60 => ".", 61 => "/",
+        _ => return None,
+    })
+}
+
+/// Layout-independent name of a key press, e.g. "Alt+Shift+T" or "F12" (physical key, level 0).
+pub(crate) fn shortcut_combo(key: gdk::Key, keycode: u32, state: gdk::ModifierType) -> Option<String> {
     if is_modifier_key(key) {
         return None;
     }
@@ -356,6 +399,12 @@ pub(crate) fn shortcut_combo(key: gdk::Key, keycode: u32, state: gdk::ModifierTy
                 }
             }
             if label.is_none() {
+                // Latin harf yo'q (masalan faqat kirill klaviatura): jismoniy tugma o'rni bo'yicha
+                if let Some(l) = sc_us_label(keycode) {
+                    label = Some(l.to_string());
+                }
+            }
+            if label.is_none() {
                 for (kk, k) in entries.iter() {
                     if kk.level() == 0 {
                         if let Some(n) = k.name() {
@@ -371,62 +420,120 @@ pub(crate) fn shortcut_combo(key: gdk::Key, keycode: u32, state: gdk::ModifierTy
         Some(l) => l,
         None => key.to_lower().name()?.to_string(),
     };
-    let mut out = String::new();
-    if state.contains(M::CONTROL_MASK) {
-        out.push_str("Ctrl+");
-    }
-    if state.contains(M::ALT_MASK) {
-        out.push_str("Alt+");
-    }
-    if state.contains(M::SHIFT_MASK) {
-        out.push_str("Shift+");
-    }
-    if state.contains(M::SUPER_MASK) {
-        out.push_str("Super+");
-    }
-    out.push_str(&label);
-    Some(out)
+    Some(format!("{}{}", sc_mods_prefix(state, true), label))
 }
 
-/// Turns a default combo string back into a key event Rail's key handler understands.
-pub(crate) fn sc_synth(combo: &str) -> Option<(gdk::Key, gdk::ModifierType)> {
-    use gdk::ModifierType as M;
-    let mut mods = M::empty();
-    let mut name = "";
-    for part in combo.split('+') {
-        match part {
-            "Ctrl" => mods |= M::CONTROL_MASK,
-            "Alt" => mods |= M::ALT_MASK,
-            "Shift" => mods |= M::SHIFT_MASK,
-            "Super" => mods |= M::SUPER_MASK,
-            other => name = other,
+/// Name of the key the event actually produced (keypad keys folded into the normal ones).
+/// The bool is true for a symbol that needs Shift on some layouts ('+', '_', '{' ...).
+fn sc_key_token(key: gdk::Key) -> Option<(String, bool)> {
+    use gdk::Key as K;
+    let named = match key {
+        K::KP_Left => Some("Left"),
+        K::KP_Right => Some("Right"),
+        K::KP_Up => Some("Up"),
+        K::KP_Down => Some("Down"),
+        K::KP_Enter | K::ISO_Enter => Some("Return"),
+        K::ISO_Left_Tab => Some("Tab"),
+        _ => None,
+    };
+    if let Some(n) = named {
+        return Some((n.to_string(), false));
+    }
+    if let Some(c) = key.to_unicode() {
+        if c.is_ascii_graphic() {
+            let tok = if c == '+' { "plus".to_string() } else { c.to_ascii_uppercase().to_string() };
+            return Some((tok, !c.is_ascii_alphanumeric()));
         }
     }
-    let key = match name {
-        "[" => gdk::Key::bracketleft,
-        "]" => gdk::Key::bracketright,
-        _ if name.chars().count() == 1 => gdk::Key::from_name(name.to_lowercase())?,
-        _ => gdk::Key::from_name(name)?,
+    key.name().map(|n| (n.to_string(), false))
+}
+
+/// Every name a key press can match a shortcut by, best first:
+///  1. physical key ("Ctrl+=" for the `=` key on any layout),
+///  2. the key the layout produced ("Ctrl+plus" for Ctrl+Shift+= on US, keypad + / digits),
+///  3. same without Shift for shifted symbols.
+pub(crate) fn shortcut_combos(key: gdk::Key, keycode: u32, state: gdk::ModifierType) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut push = |c: String| {
+        if !out.contains(&c) {
+            out.push(c);
+        }
     };
-    Some((key, mods))
+    if let Some(c) = shortcut_combo(key, keycode, state) {
+        push(c);
+    }
+    if let Some((tok, shifted_symbol)) = sc_key_token(key) {
+        push(format!("{}{}", sc_mods_prefix(state, true), tok));
+        if shifted_symbol {
+            push(format!("{}{}", sc_mods_prefix(state, false), tok));
+        }
+    }
+    out
+}
+
+/// Brings a combo to one spelling so "Ctrl+minus" == "Ctrl+-", "Ctrl+equal" == "Ctrl+=",
+/// "Shift+Ctrl+t" == "Ctrl+Shift+T".
+pub(crate) fn sc_canon(combo: &str) -> String {
+    let mut parts: Vec<&str> = combo.split('+').collect();
+    let mut key = parts.pop().unwrap_or("").to_string();
+    if key.is_empty() {
+        // "Ctrl++": '+' tugmasi
+        key = "plus".to_string();
+        parts.retain(|p| !p.is_empty());
+    }
+    let has = |m: &str| parts.iter().any(|p| p.eq_ignore_ascii_case(m));
+    let key = match key.as_str() {
+        "minus" | "KP_Subtract" => "-".to_string(),
+        "equal" => "=".to_string(),
+        "KP_Add" => "plus".to_string(),
+        "Esc" => "Escape".to_string(),
+        "Enter" | "KP_Enter" => "Return".to_string(),
+        "ISO_Left_Tab" => "Tab".to_string(),
+        k if k.chars().count() == 1 => k.to_uppercase(),
+        k => k.to_string(),
+    };
+    let mut out = String::new();
+    for m in ["Ctrl", "Alt", "Shift", "Super"] {
+        if has(m) {
+            out.push_str(m);
+            out.push('+');
+        }
+    }
+    out.push_str(&key);
+    out
 }
 
 pub(crate) fn sc_resolve(combo: &str) -> ScResolve {
+    let want = sc_canon(combo);
     SHORTCUTS.with(|c| {
         let cfg = c.borrow();
         for def in SHORTCUT_DEFS {
-            if sc_effective(def, &cfg).iter().any(|x| x == combo) {
+            if sc_effective(def, &cfg).iter().any(|x| sc_canon(x) == want) {
                 if !sc_enabled(&cfg, def.id) {
                     return ScResolve::Disabled;
                 }
-                return ScResolve::Action(def.defaults[0].to_string());
+                return ScResolve::Action(def.id);
             }
         }
+        // Standart tugma boshqa amalga o'tkazib yuborilgan: eski amalni ishga tushirmaymiz
         for def in SHORTCUT_DEFS {
-            if def.defaults.contains(&combo) {
+            if def.defaults.iter().any(|x| sc_canon(x) == want) {
                 return ScResolve::Disabled;
             }
         }
         ScResolve::Unknown
     })
+}
+
+/// Bir tugma bosilishining barcha nomlari bo'yicha amalni topadi (Action > Disabled > Unknown).
+pub(crate) fn sc_resolve_any(combos: &[String]) -> ScResolve {
+    let mut disabled = false;
+    for c in combos {
+        match sc_resolve(c) {
+            ScResolve::Action(id) => return ScResolve::Action(id),
+            ScResolve::Disabled => disabled = true,
+            ScResolve::Unknown => {}
+        }
+    }
+    if disabled { ScResolve::Disabled } else { ScResolve::Unknown }
 }

@@ -186,7 +186,10 @@ impl App {
         self.sync_settings_chrome();
         self.sync_welcome_palette();
 
-        if !self.palette_open() && !self.ov.get() && !self.settings_modal_open() {
+        // Qidiruv paneli boshqa tabga bog'langan qolmasin
+        self.find_sync_focus();
+
+        if !self.palette_open() && !self.ov.get() && !self.settings_modal_open() && !self.find_is_open() {
             if let Some(v) = self.focused_view() {
                 v.grab_focus();
             }

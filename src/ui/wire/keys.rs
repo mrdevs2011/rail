@@ -25,11 +25,16 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
             return glib::Propagation::Stop;
         }
 
-        // Ctrl+Shift+E: toggle extension shortcut mode (see App::toggle_extension_mode)
-        if ctrl && !alt && state.contains(M::SHIFT_MASK)
-            && (key == gdk::Key::e || key == gdk::Key::E || keycode == 26)
-        {
+        // Tugma qaysi amalga bog'langan (Settings > Customize > Shortcuts): standart ham, o'zgartirilgan ham
+        let resolved = sc_resolve_any(&shortcut_combos(key, keycode, state));
+
+        // Extension shortcut mode toggle (see App::toggle_extension_mode). Extension rejimida ham ishlashi kerak.
+        if let ScResolve::Action("extension_mode") = resolved {
+            if held.get() == Some(keycode) {
+                return glib::Propagation::Stop;
+            }
             a.toggle_extension_mode();
+            held.set(Some(keycode));
             return glib::Propagation::Stop;
         }
 
@@ -71,31 +76,20 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
             }
         }
 
-        // WebKit DevTools (Web Inspector): Ctrl+Shift+I or F12
-        // Intercept right here in capture phase and stop propagation so GTK Inspector never opens!
-        if (ctrl && state.contains(M::SHIFT_MASK) && !alt && (key == gdk::Key::i || key == gdk::Key::I || keycode == 31))
-            || (!ctrl && !state.contains(M::SHIFT_MASK) && !alt && key == gdk::Key::F12)
-        {
-            a.toggle_devtools();
-            return glib::Propagation::Stop;
-        }
-
-        let combo = shortcut_combo(key, keycode, state);
-        let handled = match combo.as_deref().map(sc_resolve) {
-            Some(ScResolve::Action(def_combo)) => {
-                if Some(def_combo.as_str()) == combo.as_deref() {
-                    a.on_key(key, keycode, state)
-                } else if let Some((k2, m2)) = sc_synth(&def_combo) {
-                    a.on_key(k2, 0, m2)
-                } else {
-                    false
-                }
-            }
-            Some(ScResolve::Disabled) => false,
-            _ => a.on_key(key, keycode, state),
+        // Hamma amal ID bo'yicha bajariladi: tugma o'zgartirilgan bo'lsa ham xuddi shu yo'l.
+        // `Unknown` — ro'yxatda yo'q tugma (Esc, overview ichidagi oddiy tugmalar, Shift+Enter ...).
+        let handled = match resolved {
+            ScResolve::Action(id) => a.run_action(id),
+            ScResolve::Disabled => false,
+            ScResolve::Unknown => a.on_key(key, keycode, state),
         };
+        // Zoom va qidiruvda tugmani bosib turish qadam-baqadam ishlashi kerak (o'z tezlik chegarasi bor)
+        let repeatable = matches!(
+            resolved,
+            ScResolve::Action("overview_zoom_in" | "overview_zoom_out" | "find_next" | "find_prev")
+        );
         if handled {
-            if ctrl || alt || super_key {
+            if (ctrl || alt || super_key) && !repeatable {
                 held.set(Some(keycode));
             }
             glib::Propagation::Stop
@@ -104,12 +98,18 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
         }
     });
 
+    // Tugma qo'yib yuborilishi har doim ko'rinishi kerak: asosiy controller Bubble fazada, WebKit
+    // release'ni "yutib" yuborsa `held` qotib qolib, keyingi bosish yo'qolib qolardi. Shuning uchun
+    // release'ni alohida Capture controller kuzatadi.
+    let release = gtk::EventControllerKey::new();
+    release.set_propagation_phase(gtk::PropagationPhase::Capture);
     let held_rel = held_shortcut.clone();
-    keys.connect_key_released(move |_, _, keycode, _| {
+    release.connect_key_released(move |_, _, keycode, _| {
         if held_rel.get() == Some(keycode) {
             held_rel.set(None);
         }
     });
+    win.add_controller(release);
 
     let held_focus = held_shortcut.clone();
     win.connect_has_focus_notify(move |_| {
