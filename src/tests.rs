@@ -449,6 +449,9 @@ fn test_page_zoom_steps_cover_20_to_500() {
     // off-step value snaps to the neighbouring step
     assert_eq!(next_page_zoom(1.05, 1), 1.10);
     assert_eq!(next_page_zoom(1.05, -1), 1.0);
+    // Immediately reversing direction must return to the previous zoom step.
+    assert_eq!(next_page_zoom(next_page_zoom(1.0, -1), 1), 1.0);
+    assert_eq!(next_page_zoom(next_page_zoom(1.0, 1), -1), 1.0);
 }
 
 #[test]

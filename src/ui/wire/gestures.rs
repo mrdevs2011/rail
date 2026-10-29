@@ -22,7 +22,15 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
         zoom.set_propagation_phase(gtk::PropagationPhase::Bubble);
         let last = Rc::new(Cell::new(1.0f64));
         let last_b = last.clone();
-        zoom.connect_begin(move |_, _| {
+        let a_begin = app.clone();
+        zoom.connect_begin(move |gesture, _| {
+            // This controller exists on the shell, above every WebView. Deny the gesture
+            // immediately during normal browsing so page-specific pinch handlers and
+            // WebKit's native zoom get first refusal. Rail only owns pinch in overview.
+            if !a_begin.ov.get() || a_begin.ov_exiting.get() {
+                gesture.set_state(gtk::EventSequenceState::Denied);
+                return;
+            }
             last_b.set(1.0);
         });
         let a2 = app.clone();

@@ -129,15 +129,31 @@ impl App {
         *ui.view.borrow_mut() = Some(v.clone());
         let Some(fc) = v.find_controller() else { return };
         let u = ui.clone();
-        let h1 = fc.connect_found_text(move |_, n| {
-            u.total.set(n);
+        let h1 = fc.connect_found_text(move |_, _| {
+            // This signal only confirms a found match; never overwrite the total here.
+            // The separate counted-matches signal supplies the complete result count.
             if u.fresh.replace(false) {
                 u.idx.set(1);
             }
             u.show_label();
         });
         let u = ui.clone();
-        let h2 = fc.connect_failed_to_find_text(move |_| {
+        let h2 = fc.connect_counted_matches(move |_, n| {
+            // `found-text` reports the currently found text; it is not a reliable
+            // total for the page. WebKit's asynchronous `counted-matches` signal is
+            // the authoritative total used by the find bar and next/previous wrapping.
+            u.total.set(n);
+            if n == 0 {
+                u.idx.set(0);
+            } else if u.idx.get() == 0 || u.fresh.get() {
+                u.idx.set(1);
+            } else {
+                u.idx.set(u.idx.get().min(n));
+            }
+            u.show_label();
+        });
+        let u = ui.clone();
+        let h3 = fc.connect_failed_to_find_text(move |_| {
             u.total.set(0);
             u.idx.set(0);
             u.fresh.set(false);
@@ -145,7 +161,8 @@ impl App {
         });
         let mut hooks = ui.hooks.borrow_mut();
         hooks.push((fc.clone(), h1));
-        hooks.push((fc, h2));
+        hooks.push((fc.clone(), h2));
+        hooks.push((fc, h3));
     }
 
     /// Ctrl+F. `false` — hozir ochib bo'lmaydi (omnibar, sozlamalar, overview): tugma sahifaga o'tadi.
@@ -207,6 +224,7 @@ impl App {
         ui.count.set_text("");
         ui.bar.remove_css_class("find-none");
         fc.search(&text, FindUi::opts(), FIND_MAX);
+        fc.count_matches(&text, FindUi::opts(), FIND_MAX);
     }
 
     /// Keyingi / oldingi natija. `false` — panel yopiq (tugma sahifaga o'tadi).

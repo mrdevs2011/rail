@@ -30,44 +30,9 @@ impl App {
         });
         view.add_controller(click);
 
-        // Disarm WebKitGTK's internal pinch-to-zoom gesture so it cannot hijack
-        // the touchpad and scale the entire DOM layout / header bars over websites.
-        let controllers = view.observe_controllers();
-        for i in 0..controllers.n_items() {
-            if let Some(c) = controllers.item(i) {
-                if let Ok(zoom_g) = c.downcast::<gtk::GestureZoom>() {
-                    view.remove_controller(&zoom_g);
-                    break;
-                }
-            }
-        }
-
-        use std::sync::Arc;
-        use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-        let expected_zoom = Arc::new(AtomicU64::new(1.0f64.to_bits()));
-        unsafe {
-            view.set_data("rail-expected-zoom", expected_zoom.clone());
-        }
-
-        // Lock down WebKit's zoom level against rogue gesture overrides.
-        // Only intentional keyboard shortcuts (Ctrl+/Ctrl-/Ctrl 0) via `page_zoom` are permitted.
-        let exp_z = expected_zoom.clone();
-        let resetting = Arc::new(AtomicBool::new(false));
-        let r_z = resetting.clone();
-        view.connect_notify(Some("zoom-level"), move |v, _| {
-            if r_z.load(Ordering::Relaxed) {
-                return;
-            }
-            let exp = f64::from_bits(exp_z.load(Ordering::Relaxed));
-            let cur = v.zoom_level();
-            if (cur - exp).abs() > 0.002 {
-                r_z.store(true, Ordering::Relaxed);
-                v.set_zoom_level(exp);
-                r_z.store(false, Ordering::Relaxed);
-            }
-        });
-
-
+        // Leave WebKitGTK's native pinch gesture and zoom-level handling enabled.
+        // WebKit arbitrates native page zoom against page-level touch/pointer handlers;
+        // Rail must not remove the gesture or force the zoom level back to a stale value.
 
         // Track developer tools window state & auto-dock to per-tab container
         if let Some(insp) = view.inspector() {

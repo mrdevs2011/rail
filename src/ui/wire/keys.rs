@@ -10,14 +10,25 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     apply_shortcut_priority();
     sc_refresh_bound();
     let held_shortcut: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
+    // Overview zoom uses a frame-rate-independent hold loop rather than relying on the
+    // desktop's keyboard-repeat delay (which may emit only one shortcut event).
+    let zoom_repeat_key: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
+    let zoom_repeat_source: Rc<RefCell<Option<glib::SourceId>>> = Rc::new(RefCell::new(None));
 
     let a = app.clone();
     let held = held_shortcut.clone();
+    let zoom_key = zoom_repeat_key.clone();
+    let zoom_source = zoom_repeat_source.clone();
     keys.connect_key_pressed(move |_, key, keycode, state| {
         use gdk::ModifierType as M;
         let ctrl = state.contains(M::CONTROL_MASK);
         let alt = state.contains(M::ALT_MASK);
         let super_key = state.contains(M::SUPER_MASK);
+
+        // Ignore OS key-repeat events while our smooth overview zoom loop owns this key.
+        if zoom_key.get() == Some(keycode) {
+            return glib::Propagation::Stop;
+        }
 
         // Omnibar / new-tab input: Esc must close it even if a shortcut map interferes
         if key == gdk::Key::Escape && a.palette_open() {
@@ -76,6 +87,17 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
             }
         }
 
+        // Overview zoom hold direction must be captured before dispatch consumes the action.
+        let overview_repeat_dir = if a.overview_open() {
+            match &resolved {
+                ScResolve::Action("overview_zoom_in") => Some(1.0f64),
+                ScResolve::Action("overview_zoom_out") => Some(-1.0f64),
+                _ => None,
+            }
+        } else {
+            None
+        };
+
         // Hamma amal ID bo'yicha bajariladi: tugma o'zgartirilgan bo'lsa ham xuddi shu yo'l.
         // `Unknown` — ro'yxatda yo'q tugma (Esc, overview ichidagi oddiy tugmalar, Shift+Enter ...).
         let handled = match resolved {
@@ -92,6 +114,22 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
             if (ctrl || alt || super_key) && !repeatable {
                 held.set(Some(keycode));
             }
+            if let Some(dir) = overview_repeat_dir {
+                zoom_key.set(Some(keycode));
+                let a_zoom = a.clone();
+                let key_zoom = zoom_key.clone();
+                let source = glib::timeout_add_local(std::time::Duration::from_millis(16), move || {
+                    if key_zoom.get() != Some(keycode) {
+                        return glib::ControlFlow::Break;
+                    }
+                    if a_zoom.overview_open() && !a_zoom.ov_exiting.get() {
+                        let factor = if dir > 0.0 { 1.012 } else { 1.0 / 1.012 };
+                        a_zoom.overview_zoom_by(factor);
+                    }
+                    glib::ControlFlow::Continue
+                });
+                *zoom_source.borrow_mut() = Some(source);
+            }
             glib::Propagation::Stop
         } else {
             glib::Propagation::Proceed
@@ -104,16 +142,30 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     let release = gtk::EventControllerKey::new();
     release.set_propagation_phase(gtk::PropagationPhase::Capture);
     let held_rel = held_shortcut.clone();
+    let zoom_key_rel = zoom_repeat_key.clone();
+    let zoom_source_rel = zoom_repeat_source.clone();
     release.connect_key_released(move |_, _, keycode, _| {
         if held_rel.get() == Some(keycode) {
             held_rel.set(None);
+        }
+        if zoom_key_rel.get() == Some(keycode) {
+            zoom_key_rel.set(None);
+            if let Some(source) = zoom_source_rel.borrow_mut().take() {
+                source.remove();
+            }
         }
     });
     win.add_controller(release);
 
     let held_focus = held_shortcut.clone();
+    let zoom_key_focus = zoom_repeat_key.clone();
+    let zoom_source_focus = zoom_repeat_source.clone();
     win.connect_has_focus_notify(move |_| {
         held_focus.set(None);
+        zoom_key_focus.set(None);
+        if let Some(source) = zoom_source_focus.borrow_mut().take() {
+            source.remove();
+        }
     });
     win.add_controller(keys);
 }

@@ -46,27 +46,12 @@ impl App {
     }
 
     /// Zoom the focused tab: `dir` > 0 in, < 0 out, 0 reset to 100%.
+    /// Always base the next step on WebKit's live zoom level so pinch gestures and keyboard
+    /// zoom stay in sync. Opposite directions are never dropped by a shared debounce timer.
     pub(crate) fn page_zoom(self: &Rc<Self>, dir: i32) {
         let Some(v) = self.focused_view() else { return };
-        static LAST_PZ: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
-        let now = glib::monotonic_time();
-        let last = LAST_PZ.load(std::sync::atomic::Ordering::Relaxed);
-        // Rate-limit auto-repeat zoom steps to ~90ms so holding key enlarges/shrinks gradually and smoothly
-        if dir != 0 && now - last < 90_000 {
-            return;
-        }
-        LAST_PZ.store(now, std::sync::atomic::Ordering::Relaxed);
-        let cur = unsafe {
-            v.data::<std::sync::Arc<std::sync::atomic::AtomicU64>>("rail-expected-zoom")
-                .map(|p| f64::from_bits(p.as_ref().load(std::sync::atomic::Ordering::Relaxed)))
-                .unwrap_or_else(|| v.zoom_level())
-        };
+        let cur = v.zoom_level();
         let z = if dir == 0 { 1.0 } else { next_page_zoom(cur, dir) };
-        unsafe {
-            if let Some(p) = v.data::<std::sync::Arc<std::sync::atomic::AtomicU64>>("rail-expected-zoom") {
-                p.as_ref().store(z.to_bits(), std::sync::atomic::Ordering::Relaxed);
-            }
-        }
         v.set_zoom_level(z);
     }
 
