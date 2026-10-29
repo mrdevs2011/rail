@@ -250,6 +250,19 @@ impl HistoryManager {
         });
     }
 
+    pub fn remove_entry(&mut self, url: &str) {
+        if self.entries.remove(url).is_some() {
+            self.dirty = true;
+            self.flush();
+        }
+    }
+
+    pub fn get_all_sorted(&self) -> Vec<HistoryEntry> {
+        let mut list: Vec<HistoryEntry> = self.entries.values().cloned().collect();
+        list.sort_by(|a, b| b.last_visit.cmp(&a.last_visit));
+        list
+    }
+
     pub fn suggest(&self, query: &str) -> Vec<HistorySuggestion> {
         let raw_q = query.trim();
         if raw_q.is_empty() {
@@ -375,15 +388,21 @@ impl HistoryManager {
             })
             .collect();
 
-        // Always include default web search suggestion at the end
+        // Web search suggestion: top for multi-word queries, end for domain queries
         let query_esc = url_encode(raw_q);
-        results.push(HistorySuggestion {
+        let search_sug = HistorySuggestion {
             display_title: crate::i18n::trf("Search web for \"{}\"", &[raw_q]),
-            display_url: format!("duckduckgo.com/?q={}", query_esc),
-            target_url: format!("https://duckduckgo.com/?q={}", query_esc),
+            display_url: format!("google.com/search?q={}", query_esc),
+            target_url: format!("https://www.google.com/search?q={}", query_esc),
             autofill_text: raw_q.to_string(),
             kind: SuggestionKind::Search,
-        });
+        };
+
+        if raw_q.contains(' ') {
+            results.insert(0, search_sug);
+        } else {
+            results.push(search_sug);
+        }
 
         results
     }

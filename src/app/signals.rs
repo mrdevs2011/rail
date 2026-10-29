@@ -31,20 +31,21 @@ impl App {
         view.add_controller(click);
 
         // Disarm WebKitGTK's internal pinch-to-zoom gesture so it cannot hijack
-        // the touchpad and scale the entire DOM layout / header bars.
+        // the touchpad and scale the entire DOM layout / header bars over websites.
+        let controllers = view.observe_controllers();
+        for i in 0..controllers.n_items() {
+            if let Some(c) = controllers.item(i) {
+                if let Ok(zoom_g) = c.downcast::<gtk::GestureZoom>() {
+                    view.remove_controller(&zoom_g);
+                    break;
+                }
+            }
+        }
+
         use std::sync::Arc;
         use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-
         let expected_zoom = Arc::new(AtomicU64::new(1.0f64.to_bits()));
         unsafe {
-            use gtk4::glib::gobject_ffi;
-            let ptr = view.as_ptr() as *mut gobject_ffi::GObject;
-            let gesture_ptr = gobject_ffi::g_object_get_data(ptr, b"wk-view-zoom-gesture\0".as_ptr() as *const _);
-            if !gesture_ptr.is_null() {
-                gobject_ffi::g_signal_handlers_destroy(gesture_ptr as *mut gobject_ffi::GObject);
-                let g: gtk::GestureZoom = gtk4::glib::translate::from_glib_none(gesture_ptr as *mut _);
-                view.remove_controller(&g);
-            }
             view.set_data("rail-expected-zoom", expected_zoom.clone());
         }
 
@@ -298,9 +299,14 @@ impl App {
         view.connect_permission_request(move |v, req| app.handle_permission_request(v, req));
         let app = self.clone();
         view.connect_estimated_load_progress_notify(move |_| app.update_load_bar());
-        view.connect_load_failed(move |_v, event, uri, error| {
-            eprintln!("rail: load failed for {} ({:?}): {}", uri, event, error);
-            false
+        view.connect_load_failed(move |v, _event, uri, error| {
+            let err_msg = error.message().to_string();
+            if err_msg.contains("Load request cancelled") {
+                return false;
+            }
+            let html = crate::web::format_error_html(uri, &err_msg);
+            v.load_html(&html, Some("about:blank"));
+            true
         });
         view.connect_load_failed_with_tls_errors(move |v, failing_uri, cert, _errors| {
             if let Some(session) = v.network_session() {

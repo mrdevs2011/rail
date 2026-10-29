@@ -440,4 +440,11 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("Install this site as desktop app", "Ushbu saytni ish stoli ilovasi sifatida o'rnatish", "Установить этот сайт как приложение"),
     ("Copy Page Address", "Sahifa manzilini nusxalash", "Скопировать адрес страницы"),
     ("App installed successfully! Opening standalone window...", "Ilova muvaffaqiyatli o'rnatildi! Alohida oyna ochilmoqda...", "Приложение успешно установлено! Открывается отдельное окно..."),
+    ("Search history...", "Tarixda qidirish...", "Поиск по истории..."),
+    ("Clear History", "Tarixni tozalash", "Очистить историю"),
+    ("Today", "Bugun", "Сегодня"),
+    ("Yesterday", "Kecha", "Вчера"),
+    ("Earlier", "Oldinroq", "Ранее"),
+    ("Open in new tab", "Yangi tabda ochish", "Открыть в новой вкладке"),
+    ("No browsing history yet", "Ko'rishlar tarixi hali mavjud emas", "История просмотров пока пуста"),
 ];

@@ -29,6 +29,7 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
     // Short internal names → rail:// URLs
     match s.to_ascii_lowercase().as_str() {
         "settings" | "rail:settings" => return "rail://settings".into(),
+        "history" | "rail:history" | "chrome://history" | "rail://history" => return "rail://settings/data".into(),
         "downloads" | "rail:downloads" => return "rail://downloads".into(),
         "start" | "newtab" | "rail:start" => return "rail://start/".into(),
         _ => {}
@@ -255,6 +256,9 @@ pub(crate) fn normalize_internal_uri(uri: &str) -> String {
     let u = uri.trim();
     if u.starts_with("rail://downloads") {
         return "rail://downloads".into();
+    }
+    if u.starts_with("rail://history") || u.starts_with("chrome://history") {
+        return "rail://settings/data".into();
     }
     if u.starts_with("rail://settings") {
         return settings_uri_for_tab(settings_tab_from_uri(u).unwrap_or(SettingsTab::General)).into();

@@ -2,7 +2,30 @@
 
 use crate::*;
 
-pub(crate) fn wire_settings(app: &Rc<App>, add_prof_btn: gtk::Button, btn_clear_cache: gtk::Button, btn_clear_hist: gtk::Button, btn_copy_sync_url: gtk::Button, btn_export_local: gtk::Button, btn_import_local: gtk::Button, btn_sync_now: gtk::Button, btn_sync_restore: gtk::Button, engine_buttons: Vec<(String, gtk::Button)>, layout: StripLayout, new_profile_entry: gtk::Entry, settings_close_btn: gtk::Button, settings_update_chip: gtk::Button, sync_restore_entry: gtk::Entry, sync_url_result_entry: gtk::Entry, tab_buttons_vec: Vec<(SettingsTab, gtk::Button)>, win: gtk::ApplicationWindow) {
+pub(crate) fn wire_settings(
+    app: &Rc<App>,
+    add_prof_btn: gtk::Button,
+    btn_clear_cache: gtk::Button,
+    btn_clear_hist: gtk::Button,
+    btn_clear_hist_tab: gtk::Button,
+    btn_copy_sync_url: gtk::Button,
+    btn_export_local: gtk::Button,
+    btn_import_local: gtk::Button,
+    btn_sync_now: gtk::Button,
+    btn_sync_restore: gtk::Button,
+    engine_buttons: Vec<(String, gtk::Button)>,
+    hist_list_box: gtk::Box,
+    hist_search_entry: gtk::Entry,
+    layout: StripLayout,
+    new_profile_entry: gtk::Entry,
+    settings_close_btn: gtk::Button,
+    settings_update_chip: gtk::Button,
+    sub_history_btn: gtk::Button,
+    sync_restore_entry: gtk::Entry,
+    sync_url_result_entry: gtk::Entry,
+    tab_buttons_vec: Vec<(SettingsTab, gtk::Button)>,
+    win: gtk::ApplicationWindow,
+) {
     let a = app.clone();
     settings_close_btn.connect_clicked(move |_| {
         // X = close the settings tab (same as Ctrl+W), not just hide chrome
@@ -72,7 +95,39 @@ pub(crate) fn wire_settings(app: &Rc<App>, add_prof_btn: gtk::Button, btn_clear_
     let a = app.clone();
     btn_clear_cache.connect_clicked(move |_| a.clear_cache_action());
 
+    // History subtab live search, clearing & rendering
     let a = app.clone();
+    let b_box = hist_list_box.clone();
+    let s_ent = hist_search_entry.clone();
+    btn_clear_hist_tab.connect_clicked(move |_| {
+        a.clear_history_action();
+        let items = a.history.borrow().get_all_sorted();
+        render_history_list(&b_box, &items, &s_ent.text(), &a, &s_ent);
+    });
+
+    let a = app.clone();
+    let b_box = hist_list_box.clone();
+    let s_ent = hist_search_entry.clone();
+    hist_search_entry.connect_changed(move |ent| {
+        let items = a.history.borrow().get_all_sorted();
+        render_history_list(&b_box, &items, &ent.text(), &a, &s_ent);
+    });
+
+    let a = app.clone();
+    let b_box = hist_list_box.clone();
+    let s_ent = hist_search_entry.clone();
+    sub_history_btn.connect_clicked(move |_| {
+        let items = a.history.borrow().get_all_sorted();
+        render_history_list(&b_box, &items, &s_ent.text(), &a, &s_ent);
+    });
+
+    let a = app.clone();
+    let b_box = hist_list_box.clone();
+    let s_ent = hist_search_entry.clone();
+    hist_list_box.connect_map(move |_| {
+        let items = a.history.borrow().get_all_sorted();
+        render_history_list(&b_box, &items, &s_ent.text(), &a, &s_ent);
+    });
 
     let a = app.clone();
     btn_sync_now.connect_clicked(move |_| a.prompt_and_execute_sync());

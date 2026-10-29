@@ -19,7 +19,7 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
     // Overview pinch-to-zoom (trackpad) + Ctrl+wheel zoom
     {
         let zoom = gtk::GestureZoom::new();
-        zoom.set_propagation_phase(gtk::PropagationPhase::Capture);
+        zoom.set_propagation_phase(gtk::PropagationPhase::Bubble);
         let last = Rc::new(Cell::new(1.0f64));
         let last_b = last.clone();
         zoom.connect_begin(move |_, _| {

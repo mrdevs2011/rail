@@ -135,7 +135,25 @@ pub(crate) fn build(gapp: &gtk::Application) {
     let GeneralPage { engine_buttons, initial_settings } = build_general_page(&settings_stack);
     let CustomizePage { css_buffer } = build_customize_page(&settings_stack);
     let ProfilesPage { add_prof_btn, color_btns, new_profile_color_idx, new_profile_entry, new_profile_error_lbl, page_prof_scroll, profiles_list_box } = build_profiles_page(&settings_stack);
-    let DataPage { btn_clear_cache, btn_clear_hist, btn_copy_sync_url, btn_export_local, btn_import_local, btn_sync_now, btn_sync_restore, data_export_entry, data_import_entry, data_info_lbl, data_modal_status_lbl, sync_restore_entry, sync_url_result_entry } = build_data_page(&settings_stack);
+    let DataPage {
+        btn_clear_cache,
+        btn_clear_hist,
+        btn_clear_hist_tab,
+        btn_copy_sync_url,
+        btn_export_local,
+        btn_import_local,
+        btn_sync_now,
+        btn_sync_restore,
+        data_export_entry,
+        data_import_entry,
+        data_info_lbl,
+        data_modal_status_lbl,
+        hist_list_box,
+        hist_search_entry,
+        sub_history_btn,
+        sync_restore_entry,
+        sync_url_result_entry,
+    } = build_data_page(&settings_stack);
     build_privacy_page(&settings_stack);
     build_updates_page(&settings_stack);
     build_about_page(&settings_stack);
@@ -271,7 +289,30 @@ pub(crate) fn build(gapp: &gtk::Application) {
 
     wire_minimap(&app, map_close_btn, map_container, map_drawing_area, map_header_row, map_location_btn, overlay);
 
-    wire_settings(&app, add_prof_btn, btn_clear_cache, btn_clear_hist, btn_copy_sync_url, btn_export_local, btn_import_local, btn_sync_now, btn_sync_restore, engine_buttons, layout.clone(), new_profile_entry, settings_close_btn, settings_update_chip, sync_restore_entry, sync_url_result_entry, tab_buttons_vec, win.clone());
+    wire_settings(
+        &app,
+        add_prof_btn,
+        btn_clear_cache,
+        btn_clear_hist,
+        btn_clear_hist_tab,
+        btn_copy_sync_url,
+        btn_export_local,
+        btn_import_local,
+        btn_sync_now,
+        btn_sync_restore,
+        engine_buttons,
+        hist_list_box,
+        hist_search_entry,
+        layout.clone(),
+        new_profile_entry,
+        settings_close_btn,
+        settings_update_chip,
+        sub_history_btn,
+        sync_restore_entry,
+        sync_url_result_entry,
+        tab_buttons_vec,
+        win.clone(),
+    );
 
     let a = app.clone();
     layout.connect_resized(move || {

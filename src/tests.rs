@@ -100,6 +100,9 @@ fn test_settings_tab_enum() {
     assert_eq!(SettingsTab::General, SettingsTab::General);
     assert_eq!(settings_uri_for_tab(SettingsTab::Extensions), "rail://settings/extensions");
     assert_eq!(settings_tab_from_uri("rail://settings/extensions"), Some(SettingsTab::Extensions));
+    assert_eq!(crate::nav::normalize_internal_uri("rail://history"), "rail://settings/data");
+    assert_eq!(crate::nav::to_uri("history", "google"), "rail://settings/data");
+    assert_eq!(crate::nav::to_uri("chrome://history", "google"), "rail://settings/data");
 }
 
 #[test]

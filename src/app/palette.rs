@@ -201,8 +201,9 @@ impl App {
             return;
         }
 
-        // 1. Inline autofill if typing forward (not on backspace/deletion)
-        if is_typing_forward {
+        // 1. Inline autofill if typing forward (not on backspace/deletion) and NOT typing space
+        let has_space = text.contains(' ') || text.ends_with(' ');
+        if is_typing_forward && !has_space {
             if let Some(first) = suggestions.first() {
                 if first.kind != SuggestionKind::Search {
                     let clean_q = text.trim().to_lowercase();
