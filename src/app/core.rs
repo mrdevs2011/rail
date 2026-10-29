@@ -47,9 +47,15 @@ impl App {
                  for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);\
                  var f=new File([u],'image.png',{{type:'image/png'}});\
                  var dt=new DataTransfer();dt.items.add(f);\
-                 var t=document.activeElement||document.body;\
+                 var t=document.activeElement;\
+                 var edit=function(e){{return !!e&&(e.isContentEditable||/^(TEXTAREA|INPUT)$/.test(e.tagName));}};\
+                 if(!edit(t)){{var sel=window.getSelection();var n=sel&&sel.rangeCount?sel.anchorNode:null;\
+                   if(n)t=n.nodeType===1?n:n.parentElement;}}\
+                 if(!edit(t)){{var es=Array.from(document.querySelectorAll('[contenteditable=\"true\"],textarea,input[type=\"text\"]'));\
+                   t=es.find(function(e){{return e.getClientRects().length>0&&!e.disabled;}})||t;}}\
+                 t=t||document.body||document;\
                  t.dispatchEvent(new ClipboardEvent('paste',{{clipboardData:dt,bubbles:true,cancelable:true,composed:true}}));\
-                 }}catch(e){{}}}})();",
+                 }}catch(e){{console.error('Rail image paste failed',e);}}}})();",
                 b64
             );
             view.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
@@ -60,7 +66,10 @@ impl App {
     pub(crate) fn try_paste_image(self: &Rc<Self>) -> bool {
         let Some(view) = self.focused_view() else { return false };
         let page_focused = match gtk::prelude::GtkWindowExt::focus(&self.win) {
-            Some(w) => w == *view.upcast_ref::<gtk::Widget>() || w.is_ancestor(&view),
+            Some(w) => {
+                let v = view.upcast_ref::<gtk::Widget>();
+                w == *v || v.is_ancestor(&w) || w.is_ancestor(v)
+            },
             None => false,
         };
         if !page_focused || !self.clipboard_has_image() {
