@@ -251,6 +251,10 @@ impl App {
     /// chizig'i, chegara va burchaklar yo'q); chiqqanda hammasi joyiga qaytadi.
     pub(crate) fn apply_fullscreen_mode(self: &Rc<Self>) {
         let fs = self.win.is_fullscreen();
+        if !fs {
+            // oyna to'liq ekrandan chiqdi (F11 / tashqaridan) — sahifadagi element ham chiqsin
+            self.leave_solo_fullscreen(true);
+        }
         strip::set_content_only(fs);
         // ishlab turgan sidebar animatsiyasini bekor qilamiz
         self.side_gen.set(self.side_gen.get().wrapping_add(1));
@@ -277,6 +281,47 @@ impl App {
         self.shell.queue_allocate();
         self.strip.queue_allocate();
         self.reveal_focus();
+    }
+
+    /// Sahifa ichidagi element (video va h.k.) to'liq ekran bo'lganda: o'sha tab butun oynani
+    /// egallaydi, split / yon tomondagi tablar ko'rinmaydi — haqiqiy brauzerlardagidek.
+    pub(crate) fn enter_solo_fullscreen(self: &Rc<Self>, view: &WebView) {
+        let strip_w: gtk::Widget = self.strip.clone().upcast();
+        let mut w: gtk::Widget = view.clone().upcast();
+        while let Some(p) = w.parent() {
+            if p == strip_w {
+                self.layout.set_solo(Some(w));
+                return;
+            }
+            w = p;
+        }
+    }
+
+    /// Element to'liq ekrandan chiqdi. `exit_page` = oyna tashqaridan yopilgan (masalan F11):
+    /// bu holda sahifadagi elementni ham to'liq ekrandan chiqaramiz.
+    pub(crate) fn leave_solo_fullscreen(&self, exit_page: bool) {
+        let Some(solo) = self.layout.solo() else { return };
+        self.layout.set_solo(None);
+        self.strip.queue_allocate();
+        if !exit_page {
+            return;
+        }
+        let Ok(rows) = self.rows.try_borrow() else { return };
+        for row in rows.iter() {
+            for tab in &row.tabs {
+                let c: gtk::Widget = tab.container.clone().upcast();
+                if c == solo {
+                    tab.view.evaluate_javascript(
+                        "document.fullscreenElement&&document.exitFullscreen&&document.exitFullscreen()",
+                        None,
+                        None,
+                        None::<&gio::Cancellable>,
+                        |_| {},
+                    );
+                    return;
+                }
+            }
+        }
     }
 
     pub(crate) fn clear_tab_freeze(&self, view: &WebView) {

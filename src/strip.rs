@@ -112,6 +112,9 @@ mod imp {
         pub custom_heights: RefCell<Vec<Vec<Option<f64>>>>,
         /// Per row: column id of every tab. Consecutive equal ids are stacked in one column.
         pub col_ids: RefCell<Vec<Vec<u64>>>,
+        /// Sahifa elementi (video va h.k.) to'liq ekran: shu tab butun oynani egallaydi,
+        /// qolgan tablar (split, yon tomondagilar) yashiriladi.
+        pub solo: RefCell<Option<gtk::Widget>>,
     }
 
     #[glib::object_subclass]
@@ -183,6 +186,30 @@ mod imp {
             let c_heights = self.custom_heights.borrow();
             let mut child = widget.first_child();
             let focus = widget.root().and_then(|r| r.focus());
+
+            // Element to'liq ekran: faqat solo tab, butun oyna, hech qanday kamera siljishisiz
+            let solo = self.solo.borrow().clone();
+            if let Some(solo) = solo.filter(|s| s.parent().as_ref() == Some(widget)) {
+                let cb = self.on_visibility.borrow().clone();
+                while let Some(c) = child {
+                    child = c.next_sibling();
+                    if c == solo {
+                        if !c.is_child_visible() {
+                            c.set_child_visible(true);
+                            if let Some(cb) = &cb {
+                                cb(&c, true);
+                            }
+                        }
+                        c.allocate(width, height, -1, None);
+                    } else if c.is_child_visible() {
+                        if let Some(cb) = &cb {
+                            cb(&c, false);
+                        }
+                        c.set_child_visible(false);
+                    }
+                }
+                return;
+            }
 
             if grid.is_empty() {
                 let mut x = 0.0;
@@ -292,6 +319,14 @@ impl StripLayout {
     }
     pub fn set_zoom(&self, v: f64) {
         self.imp().zoom.set(v);
+    }
+    /// Element to'liq ekran rejimi: `Some(tab_container)` — faqat shu tab ko'rinadi, `None` — oddiy holat.
+    pub fn set_solo(&self, w: Option<gtk::Widget>) {
+        *self.imp().solo.borrow_mut() = w;
+        self.layout_changed();
+    }
+    pub fn solo(&self) -> Option<gtk::Widget> {
+        self.imp().solo.borrow().clone()
     }
     pub fn set_col_ids(&self, ids: Vec<Vec<u64>>) {
         *self.imp().col_ids.borrow_mut() = ids;

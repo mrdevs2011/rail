@@ -176,3 +176,10 @@
 - Build & Test: `cargo build --release` OK, `cargo test --release` 60/60 OK. GUI da ko'zdan kechirilmagan.
 - Keyingi qadam: real oynada tarix qatorlari balandligi va uzun url/sarlavha qisqarishini tekshirish.
 - Qilindi (qo'shimcha): Web Store o'rnatish `install_from_webstore` da curl `-m 60` umumiy limiti olib tashlandi (46 MB kengaytma ~290 KB/s da 60s ga sig'masdi); endi `--speed-limit 20000 --speed-time 30`, `--connect-timeout 20`, `-m 1800`. Build OK, test 60/60 OK.
+
+---
+### 2026-10-30
+- Qilindi: sahifa ichidagi element (video va h.k.) to'liq ekran bo'lganda endi o'sha tab butun oynani egallaydi, split / yon tomondagi tablar yashiriladi (haqiqiy brauzerlardagidek). `StripLayout::set_solo` (strip.rs), `enter_solo_fullscreen` / `leave_solo_fullscreen` (lifecycle.rs), signals.rs da ulandi. Oyna F11 bilan chiqsa, sahifadagi element ham to'liq ekrandan chiqariladi.
+- Qilindi: sidebar tab qatoridagi ovoz tugmasi (volume svg) endi jonli `is_muted()` bo'yicha shu tab ovozini o'chiradi/yoqadi (toggle), ikonka va tooltip bosilishi bilan yangilanadi; audio/mute notify sidebar'ni `refresh_sidebar_soon` bilan qayta chizadi (har notify'da sinxron qayta qurish yo'q).
+- Build & Test: `cargo build --release` OK, `cargo test --release` 60/60 OK. GUI da ko'zdan kechirilmagan.
+- Keyingi qadam: real oynada split holatda video fullscreen (YouTube) va tab ovoz tugmasini tekshirish.

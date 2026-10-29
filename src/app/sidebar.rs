@@ -235,22 +235,31 @@ impl App {
                 title_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
                 content_box.append(&title_lbl);
 
-                if t.view.is_muted() {
-                    let audio_btn = gtk::Button::from_icon_name("audio-volume-muted-symbolic");
-                    audio_btn.add_css_class("flat-icon");
-                    audio_btn.set_tooltip_text(Some(tr("Muted (click to unmute)")));
-                    let v_audio = t.view.clone();
-                    audio_btn.connect_clicked(move |_| {
-                        v_audio.set_is_muted(false);
+                // Ovoz tugmasi: shu tab uchun ovozni o'chiradi / yoqadi (toggle).
+                // Holat bosilgan paytdagi jonli `is_muted()` dan olinadi — eskirgan closure holatiga emas.
+                let muted_now = t.view.is_muted();
+                if muted_now || t.view.is_playing_audio() {
+                    let audio_btn = gtk::Button::from_icon_name(if muted_now {
+                        "audio-volume-muted-symbolic"
+                    } else {
+                        "audio-volume-high-symbolic"
                     });
-                    content_box.append(&audio_btn);
-                } else if t.view.is_playing_audio() {
-                    let audio_btn = gtk::Button::from_icon_name("audio-volume-high-symbolic");
                     audio_btn.add_css_class("flat-icon");
-                    audio_btn.set_tooltip_text(Some(tr("Playing audio (click to mute)")));
+                    audio_btn.set_tooltip_text(Some(tr(if muted_now {
+                        "Muted (click to unmute)"
+                    } else {
+                        "Playing audio (click to mute)"
+                    })));
                     let v_audio = t.view.clone();
-                    audio_btn.connect_clicked(move |_| {
-                        v_audio.set_is_muted(true);
+                    audio_btn.connect_clicked(move |b| {
+                        let mute = !v_audio.is_muted();
+                        v_audio.set_is_muted(mute);
+                        b.set_icon_name(if mute { "audio-volume-muted-symbolic" } else { "audio-volume-high-symbolic" });
+                        b.set_tooltip_text(Some(tr(if mute {
+                            "Muted (click to unmute)"
+                        } else {
+                            "Playing audio (click to mute)"
+                        })));
                     });
                     content_box.append(&audio_btn);
                 }

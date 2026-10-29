@@ -308,23 +308,26 @@ impl App {
             v.load_alternate_html(&html, uri, None);
             true
         });
-        let win_fs = self.win.clone();
-        view.connect_enter_fullscreen(move |_| {
-            win_fs.set_fullscreened(true);
+        let app_fs = self.clone();
+        view.connect_enter_fullscreen(move |v| {
+            // o'sha tab butun oynani egallaydi, boshqa tablar (split) yashirinadi
+            app_fs.enter_solo_fullscreen(v);
+            app_fs.win.set_fullscreened(true);
             false
         });
-        let win_unfs = self.win.clone();
+        let app_unfs = self.clone();
         view.connect_leave_fullscreen(move |_| {
-            win_unfs.set_fullscreened(false);
+            app_unfs.leave_solo_fullscreen(false);
+            app_unfs.win.set_fullscreened(false);
             false
         });
         let app_audio = self.clone();
         view.connect_is_playing_audio_notify(move |_| {
-            app_audio.refresh_sidebar();
+            app_audio.refresh_sidebar_soon();
         });
         let app_muted = self.clone();
         view.connect_is_muted_notify(move |_| {
-            app_muted.refresh_sidebar();
+            app_muted.refresh_sidebar_soon();
         });
         view.connect_load_failed_with_tls_errors(move |v, failing_uri, cert, _errors| {
             if let Some(session) = v.network_session() {
