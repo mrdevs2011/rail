@@ -237,17 +237,13 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
         .map(|s| s.to_string())
         .unwrap_or_else(|| "Just now".to_string());
 
-    let (lang_code, title, desc, fixes, fixtitle, reload_lbl, home_lbl, copy_lbl, copied_lbl, diag_lbl) = match lang {
+    let (lang_code, title, desc, fixes, fixtitle, diag_lbl) = match lang {
         crate::i18n::Lang::Ru => (
             "ru",
             detail.title_ru,
             detail.desc_ru,
             detail.fixes_ru,
             "Рекомендуемые действия:",
-            "Перезагрузить",
-            "На главную",
-            "Копировать",
-            "✓ Скопировано!",
             "Технические сведения об ошибке (DevTools)",
         ),
         crate::i18n::Lang::En => (
@@ -256,10 +252,6 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
             detail.desc_en,
             detail.fixes_en,
             "Suggested Troubleshooting:",
-            "Try Again",
-            "Home Page",
-            "Copy Report",
-            "✓ Copied!",
             "Technical Diagnostics (DevTools)",
         ),
         crate::i18n::Lang::Uz => (
@@ -268,10 +260,6 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
             detail.desc_uz,
             detail.fixes_uz,
             "Tavsiya etilgan yechimlar:",
-            "Qayta yuklash",
-            "Bosh sahifa",
-            "Nusxa olish",
-            "✓ Nusxalandi!",
             "Texnik diagnostika ma'lumotlari (DevTools)",
         ),
     };
@@ -296,27 +284,15 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: center;
-    padding: 24px 16px;
+    padding: 40px 60px;
+    max-width: 820px;
+    margin: 0 auto;
     user-select: text;
   }}
-  .error-card {{
-    background: #0d0e12;
-    border: 1px solid #1f232b;
-    border-radius: 14px;
-    max-width: 680px;
+  .error-container {{
+    background: transparent;
     width: 100%;
-    padding: 36px 32px;
-    box-shadow: 0 20px 45px rgba(0,0,0,0.85);
-  }}
-  .top-row {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    gap: 12px;
   }}
   .badge-category {{
     display: inline-flex;
@@ -326,14 +302,15 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    padding: 4px 10px;
-    border-radius: 6px;
+    padding: 3px 8px;
+    border-radius: 4px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 16px;
   }}
   .badge-dot {{
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: {badge_color};
     box-shadow: 0 0 8px {badge_color};
@@ -347,37 +324,30 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
     letter-spacing: 0.2px;
   }}
   .error-title {{
-    font-size: 24px;
+    font-size: 26px;
     font-weight: 800;
     color: #ffffff;
     line-height: 1.3;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     letter-spacing: -0.3px;
   }}
   .error-uri {{
-    display: inline-block;
     font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
     font-size: 12px;
-    color: #94a3b8;
-    background: #141720;
-    border: 1px solid #232733;
-    padding: 5px 10px;
-    border-radius: 6px;
+    color: #71717a;
     margin-bottom: 20px;
     word-break: break-all;
-    max-width: 100%;
   }}
   .error-desc {{
-    font-size: 14px;
+    font-size: 15px;
     line-height: 1.6;
-    color: #cbd5e1;
+    color: #a1a1aa;
     margin-bottom: 24px;
   }}
-  .fixes-card {{
-    background: #12141a;
-    border-left: 3px solid {badge_color};
-    border-radius: 0 8px 8px 0;
-    padding: 16px 18px;
+  .fixes-block {{
+    background: transparent;
+    border-left: 2px solid {badge_color};
+    padding: 4px 0 4px 16px;
     margin-bottom: 28px;
   }}
   .fixes-title {{
@@ -385,80 +355,47 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #94a3b8;
-    margin-bottom: 10px;
+    color: #71717a;
+    margin-bottom: 8px;
   }}
   .fixes-list {{
     font-size: 13px;
     line-height: 1.6;
-    color: #e2e8f0;
-    padding-left: 18px;
+    color: #d4d4d8;
+    padding-left: 16px;
   }}
   .fixes-list li {{
-    margin-bottom: 6px;
+    margin-bottom: 5px;
   }}
   .fixes-list code {{
     font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
-    background: #1e222d;
+    background: #18181b;
     padding: 2px 6px;
     border-radius: 4px;
     color: #38bdf8;
     font-size: 12px;
   }}
-  .actions-row {{
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 24px;
-  }}
-  .btn-primary {{
-    background: #2563eb;
-    color: #ffffff;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 20px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }}
-  .btn-primary:hover {{ background: #1d4ed8; }}
-  .btn-secondary {{
-    background: #1c1f28;
-    color: #e2e8f0;
-    border: 1px solid #2d3342;
-    border-radius: 8px;
-    padding: 10px 18px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }}
-  .btn-secondary:hover {{ background: #282d3b; border-color: #3f475b; }}
   details.diagnostics {{
-    border-top: 1px solid #1e222b;
+    border-top: 1px solid #18181b;
     padding-top: 16px;
   }}
   summary {{
     font-size: 12px;
-    color: #64748b;
+    color: #52525b;
     cursor: pointer;
     font-weight: 600;
     user-select: none;
   }}
-  summary:hover {{ color: #94a3b8; }}
+  summary:hover {{ color: #a1a1aa; }}
   .diag-box {{
-    margin-top: 12px;
-    background: #07080a;
-    border: 1px solid #1a1d24;
+    margin-top: 10px;
+    background: transparent;
+    border: 1px solid #27272a;
     border-radius: 6px;
     padding: 12px;
     font-family: ui-monospace, "JetBrains Mono", monospace;
     font-size: 11px;
-    color: #94a3b8;
+    color: #71717a;
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-all;
@@ -467,12 +404,10 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
 </head>
 <body>
 
-<div class="error-card">
-  <div class="top-row">
-    <div class="badge-category">
-      <span class="badge-dot"></span>
-      <span>{category}</span>
-    </div>
+<div class="error-container">
+  <div class="badge-category">
+    <span class="badge-dot"></span>
+    <span>{category}</span>
   </div>
 
   <div class="error-code">{code}</div>
@@ -481,20 +416,11 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
 
   <p class="error-desc">{desc}</p>
 
-  <div class="fixes-card">
+  <div class="fixes-block">
     <div class="fixes-title">{fixtitle}</div>
     <ul class="fixes-list">
       {fixes_html}
     </ul>
-  </div>
-
-  <div class="actions-row">
-    <button class="btn-primary" onclick="retryLoad()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-      <span>{reload_lbl}</span>
-    </button>
-    <button class="btn-secondary" onclick="window.location.href='rail://start/'">{home_lbl}</button>
-    <button class="btn-secondary" onclick="copyDiag()" id="t-copy">{copy_lbl}</button>
   </div>
 
   <details class="diagnostics">
@@ -507,21 +433,6 @@ Timestamp: {timestamp}</div>
   </details>
 </div>
 
-<script>
-function retryLoad() {{
-  window.location.href = {safe_uri_js};
-}}
-
-function copyDiag() {{
-  var text = document.getElementById('diag-content').innerText;
-  navigator.clipboard.writeText(text).then(function() {{
-    var btn = document.getElementById('t-copy');
-    var old = btn.textContent;
-    btn.textContent = "{copied_lbl}";
-    setTimeout(function() {{ btn.textContent = old; }}, 1500);
-  }});
-}}
-</script>
 </body>
 </html>"##,
         code = detail.code,
@@ -531,13 +442,8 @@ function copyDiag() {{
         desc = desc,
         fixtitle = fixtitle,
         fixes_html = fixes_html,
-        reload_lbl = reload_lbl,
-        home_lbl = home_lbl,
-        copy_lbl = copy_lbl,
-        copied_lbl = copied_lbl,
         diag_lbl = diag_lbl,
         safe_uri = safe_uri,
-        safe_uri_js = format!("\"{}\"", crate::minijson::escape(failing_uri)),
         safe_raw = safe_raw,
         timestamp = timestamp,
     )
