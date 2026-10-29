@@ -81,8 +81,6 @@ impl App {
         let ucm = webkit6::UserContentManager::new();
         ucm.register_script_message_handler("railgo", None);
         ucm.register_script_message_handler("railScreenshot", None);
-        ucm.register_script_message_handler("railWebstore", None);
-        ucm.register_script_message_handler("railExtBridge", None);
         ucm.register_script_message_handler("railContextMenu", None);
 
         // Cross-tab/webpage image drags often arrive as text/uri-list + text/html,
@@ -125,7 +123,6 @@ impl App {
         if !html_css.trim().is_empty() {
             ucm.add_style_sheet(&user_style_sheet(&html_css));
         }
-        apply_extensions_to_ucm(&ucm);
         crate::web::inject_web_optimizations(&ucm);
         STYLE_MANAGERS.with(|l| l.borrow_mut().push(ucm.downgrade()));
         ADBLOCK_FILTER.with(|f| {

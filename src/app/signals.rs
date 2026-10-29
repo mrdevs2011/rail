@@ -497,58 +497,6 @@ impl App {
                 app_ss.on_screenshot_message(&v, val.to_str().as_str());
             });
 
-            let app_ws = self.clone();
-            let wv_ws = view.downgrade();
-            ucm.connect_script_message_received(Some("railWebstore"), move |_, val| {
-                let Some(v) = wv_ws.upgrade() else { return };
-                let raw = val.to_str();
-                if let Some(json) = crate::minijson::parse(raw.as_str()) {
-                    if let Some(ext_id) = json.get("id").and_then(|id| id.as_str()) {
-                        let id = ext_id.to_string();
-                        let a = app_ws.clone();
-                        let view_cb = v.clone();
-                        let (tx, rx) = std::sync::mpsc::channel();
-                        std::thread::spawn(move || {
-                            let res = crate::extensions::install_from_webstore(&id);
-                            let _ = tx.send(res);
-                        });
-                        let id_for_js = ext_id.to_string();
-                        glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
-                            match rx.try_recv() {
-                                Ok(res) => {
-                                    match res {
-                                        Ok(ext) => {
-                                            a.show_copied_toast(&ext.name, tr("Extension installed successfully!"));
-                                            crate::extensions::apply_extensions_all();
-                                            view_cb.evaluate_javascript(
-                                                &format!("window.__railWebstoreInstalled && window.__railWebstoreInstalled('{}');", id_for_js),
-                                                None, None, gio::Cancellable::NONE, |_| {}
-                                            );
-                                        }
-                                        Err(e) => {
-                                            a.show_copied_toast(tr("Install error"), &e);
-                                            let safe_err = e.replace('\'', "\\'");
-                                            view_cb.evaluate_javascript(
-                                                &format!("window.__railWebstoreFailed && window.__railWebstoreFailed('{}');", safe_err),
-                                                None, None, gio::Cancellable::NONE, |_| {}
-                                            );
-                                        }
-                                    }
-                                    glib::ControlFlow::Break
-                                }
-                                Err(std::sync::mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
-                                Err(std::sync::mpsc::TryRecvError::Disconnected) => glib::ControlFlow::Break,
-                            }
-                        });
-                    }
-                }
-            });
-
-            let app_br = self.clone();
-            ucm.connect_script_message_received(Some("railExtBridge"), move |_, val| {
-                app_br.handle_ext_bridge_message(val.to_str().as_str());
-            });
-
             let wv_ctx = view.downgrade();
             ucm.connect_script_message_received(Some("railContextMenu"), move |_, _val| {
                 if let Some(v) = wv_ctx.upgrade() {
