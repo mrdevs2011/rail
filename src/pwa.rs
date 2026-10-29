@@ -452,7 +452,7 @@ pub(crate) fn open_pwa_window(
     settings.set_enable_javascript(true);
     settings.set_enable_webgl(true);
     settings.set_property("enable-2d-canvas-acceleration", true);
-    settings.set_enable_smooth_scrolling(false);
+    settings.set_enable_smooth_scrolling(true);
     settings.set_enable_mediasource(true);
     settings.set_enable_media(true);
     settings.set_enable_media_capabilities(true);

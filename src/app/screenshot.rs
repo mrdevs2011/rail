@@ -732,7 +732,7 @@ fn finish_capture(app: &Rc<App>, tex: &gdk::Texture, to_clipboard: bool) {
         app.show_copied_toast(tr("Nusxalandi!"), tr("Screenshot buferga nusxalandi"));
     } else if let Some(path) = save_texture_png(tex) {
         let name = path.file_name().unwrap_or_default().to_string_lossy();
-        app.show_copied_toast(tr("Saqlandi!"), &format!("screenshots/{}", name));
+        app.show_copied_toast(tr("Saqlandi!"), &format!("Downloads/Rail/{}", name));
     }
 }
 
@@ -769,8 +769,14 @@ fn crop_texture(tex: &gdk::Texture, r: Rect) -> Option<gdk::Texture> {
     )
 }
 
+pub(crate) fn screenshot_dir() -> std::path::PathBuf {
+    let dl_dir = glib::user_special_dir(glib::UserDirectory::Downloads)
+        .unwrap_or_else(|| glib::home_dir().join("Downloads"));
+    dl_dir.join("Rail")
+}
+
 fn save_texture_png(tex: &gdk::Texture) -> Option<std::path::PathBuf> {
-    let dir = rail_data_dir().join("screenshots");
+    let dir = screenshot_dir();
     let _ = std::fs::create_dir_all(&dir);
     let ts = chrono_like_timestamp();
     let path = dir.join(format!("Screenshot {ts}.png"));
