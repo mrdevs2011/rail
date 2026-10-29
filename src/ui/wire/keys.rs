@@ -25,6 +25,12 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
         let alt = state.contains(M::ALT_MASK);
         let super_key = state.contains(M::SUPER_MASK);
 
+        // Match the sibling Rail browser: let native WebKitGTK handle Ctrl+V.
+        // Do this before shortcut resolution so no configured action can consume paste.
+        if ctrl && key == gdk::Key::v {
+            return glib::Propagation::Proceed;
+        }
+
         // Ignore OS key-repeat events while our smooth overview zoom loop owns this key.
         if zoom_key.get() == Some(keycode) {
             return glib::Propagation::Stop;
@@ -49,21 +55,8 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
             return glib::Propagation::Stop;
         }
 
-        // Image paste: WebKitGTK gives pages an empty clipboardData for images
-        if ctrl && !alt && !state.contains(M::SHIFT_MASK)
-            && (key == gdk::Key::v || key == gdk::Key::V || keycode == 55)
-            && a.try_paste_image()
-        {
-            return glib::Propagation::Stop;
-        }
-
-        // File paste: copied files (text/uri-list) are replayed into the page as File objects
-        if ctrl && !alt && !state.contains(M::SHIFT_MASK)
-            && (key == gdk::Key::v || key == gdk::Key::V || keycode == 55)
-            && a.try_paste_files()
-        {
-            return glib::Propagation::Stop;
-        }
+        // Let Ctrl+V reach WebKitGTK unchanged, matching the sibling Rail browser.
+        // Synthetic clipboard events are not trusted by sites such as ChatGPT.
 
         // Extension mode: Rail's own shortcuts are off, only extension commands are handled.
         // Everything else goes straight to the page.
