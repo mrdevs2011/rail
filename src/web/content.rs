@@ -212,6 +212,47 @@ pub(crate) fn inject_web_optimizations(ucm: &webkit6::UserContentManager) {
       };
     }
   }, true);
+
+  // 3. HTML5 Video inline playback & play reliability:
+  // Modern web feeds (SpaceMR, Telegram Web, Instagram, Shorts) require 'playsinline'
+  // and responsive click-to-play handling.
+  function ensureVideoPlayback(root) {
+    try {
+      var vids = (root || document).querySelectorAll('video');
+      for (var i = 0; i < vids.length; i++) {
+        var v = vids[i];
+        if (!v.hasAttribute('playsinline')) {
+          v.setAttribute('playsinline', '');
+          v.setAttribute('webkit-playsinline', '');
+        }
+        if (!v.__railHooked) {
+          v.__railHooked = true;
+          v.addEventListener('click', function() {
+            if (this.paused) {
+              this.play().catch(function() {});
+            }
+          });
+        }
+      }
+    } catch(_) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { ensureVideoPlayback(); });
+  } else {
+    ensureVideoPlayback();
+  }
+  window.addEventListener('load', function() { ensureVideoPlayback(); });
+  if (window.MutationObserver && document.documentElement) {
+    try {
+      new MutationObserver(function(muts) {
+        for (var i = 0; i < muts.length; i++) {
+          if (muts[i].addedNodes && muts[i].addedNodes.length > 0) {
+            ensureVideoPlayback(muts[i].target);
+          }
+        }
+      }).observe(document.documentElement, { childList: true, subtree: true });
+    } catch(_) {}
+  }
 })();
 "#;
 

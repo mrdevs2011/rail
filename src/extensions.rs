@@ -76,6 +76,35 @@ pub(crate) fn extensions_json_path() -> PathBuf {
     rail_data_dir().join("extensions.json")
 }
 
+/// Create an icon widget for an extension: uses real default_icon/disk icon, or fallback to symbolic
+pub(crate) fn extension_icon_widget(ext: &Extension, size: i32) -> gtk4::Image {
+    if let Some(rel) = &ext.default_icon {
+        let p = ext.path.join(rel);
+        if p.is_file() {
+            let img = gtk4::Image::from_file(&p);
+            img.set_pixel_size(size);
+            return img;
+        }
+    }
+    let candidates = [
+        "icon128.png", "icon48.png", "icon32.png", "icon16.png",
+        "icons/128.png", "icons/48.png", "icons/32.png", "icons/16.png",
+        "icons/icon128.png", "icons/icon48.png", "icons/icon32.png", "icons/icon16.png",
+        "icon.png", "assets/icon.png", "images/icon.png",
+    ];
+    for cand in candidates {
+        let p = ext.path.join(cand);
+        if p.is_file() {
+            let img = gtk4::Image::from_file(&p);
+            img.set_pixel_size(size);
+            return img;
+        }
+    }
+    let img = gtk4::Image::from_icon_name("application-x-addon-symbolic");
+    img.set_pixel_size(size);
+    img
+}
+
 /// Parse an unpacked extension directory with manifest.json.
 pub(crate) fn parse_manifest(dir: &Path) -> Result<Extension, String> {
     let manifest_file = dir.join("manifest.json");
@@ -430,15 +459,17 @@ pub(crate) fn install_from_webstore(ext_id: &str) -> Result<Extension, String> {
 
     let tmp_file = std::env::temp_dir().join(format!("rail_ext_{}.crx", clean_id));
     let url = format!(
-        "https://clients2.google.com/service/update2/crx?response=redirect&os=linux&arch=x86-64&nacl_arch=x86-64&prod=chromecrx&prodchannel=&prodversion=120.0.0.0&acceptformat=crx2,crx3&x=id%3D{}%26uc",
+        "https://clients2.google.com/service/update2/crx?response=redirect&prod=chromecrx&prodchannel=&prodversion=130.0.0.0&lang=en-US&acceptformat=crx3,puff&x=id%3D{}%26installsource%3Dondemand%26uc",
         clean_id
     );
 
     let status = std::process::Command::new("curl")
         .args([
             "-fsSL",
-            "-m", "35",
-            "-A", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "-L",
+            "--compressed",
+            "-m", "45",
+            "-A", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
             "-o", tmp_file.to_str().unwrap_or(""),
             &url,
         ])
@@ -921,64 +952,126 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
     const WEBSTORE_HELPER_JS: &str = r#"(function() {
   if (!location.hostname.includes('chromewebstore.google.com') && !location.hostname.includes('chrome.google.com')) return;
 
-  function injectRailButton() {
-    var m = location.pathname.match(/\/detail\/[^\/]+\/([a-z]{32})/);
-    if (!m) return;
-    var extId = m[1];
+  function getExtId() {
+    var m = location.pathname.match(/\/detail\/(?:[^\/]+\/)?([a-z]{32})/);
+    return m ? m[1] : null;
+  }
 
-    if (document.getElementById('rail-webstore-install-btn')) return;
-
-    var btn = document.createElement('button');
-    btn.id = 'rail-webstore-install-btn';
-    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Rail\'ga o\'rnatish';
-    btn.style.cssText = 'position: fixed; bottom: 32px; right: 32px; z-index: 2147483647; background: #2563eb; color: #ffffff; border: none; border-radius: 9999px; padding: 14px 28px; font-size: 15px; font-weight: 700; box-shadow: 0 10px 30px rgba(37, 99, 235, 0.5); cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); display: flex; align-items: center; font-family: system-ui, -apple-system, sans-serif; letter-spacing: 0.3px;';
-
-    btn.onmouseenter = function() { btn.style.transform = 'translateY(-2px) scale(1.04)'; btn.style.boxShadow = '0 14px 36px rgba(37, 99, 235, 0.65)'; };
-    btn.onmouseleave = function() { btn.style.transform = 'none'; btn.style.boxShadow = '0 10px 30px rgba(37, 99, 235, 0.5)'; };
-
-    btn.onclick = function() {
+  function triggerInstall(btn, extId) {
+    if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '⏳ O\'rnatilmoqda...';
+      btn.setAttribute('aria-disabled', 'true');
+      btn.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;">⏳ Rail\'ga o\'rnatilmoqda...</span>';
       btn.style.opacity = '0.9';
-      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railWebstore) {
-        window.webkit.messageHandlers.railWebstore.postMessage(JSON.stringify({ action: "install", id: extId }));
+    }
+    var otherBtns = document.querySelectorAll('#rail-webstore-install-btn, [data-rail-webstore-hijacked="true"]');
+    for (var i = 0; i < otherBtns.length; i++) {
+      if (otherBtns[i] !== btn) {
+        otherBtns[i].disabled = true;
+        otherBtns[i].setAttribute('aria-disabled', 'true');
+        otherBtns[i].innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;">⏳ Rail\'ga o\'rnatilmoqda...</span>';
       }
-    };
+    }
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railWebstore) {
+      window.webkit.messageHandlers.railWebstore.postMessage(JSON.stringify({ action: "install", id: extId }));
+    }
+  }
 
-    document.body.appendChild(btn);
+  function hijackWebstorePage() {
+    var extId = getExtId();
+    if (!extId) return;
+
+    // 1. Hijack native gray/disabled "Add to Chrome" button on chromewebstore.google.com
+    var candidates = document.querySelectorAll('button, [role="button"], a[role="button"]');
+    for (var i = 0; i < candidates.length; i++) {
+      var el = candidates[i];
+      if (el.id === 'rail-webstore-install-btn' || el.getAttribute('data-rail-webstore-hijacked') === 'true') continue;
+      var txt = (el.textContent || '').trim().toLowerCase();
+      var aria = (el.getAttribute('aria-label') || '').toLowerCase();
+      var isChromeBtn = txt.includes('chrome') || txt.includes('add to') || txt.includes('добавить') ||
+                        txt.includes('доступно') || txt.includes('available') || aria.includes('chrome');
+      var isCtA = el.getAttribute('jsname') === 'wQO0od' || el.classList.contains('F9O37c') || el.closest('[data-item-id]');
+
+      if (isChromeBtn || isCtA) {
+        el.setAttribute('data-rail-webstore-hijacked', 'true');
+        el.removeAttribute('disabled');
+        el.setAttribute('aria-disabled', 'false');
+        el.style.setProperty('background', '#2563eb', 'important');
+        el.style.setProperty('background-color', '#2563eb', 'important');
+        el.style.setProperty('color', '#ffffff', 'important');
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.setProperty('cursor', 'pointer', 'important');
+        el.style.setProperty('pointer-events', 'auto', 'important');
+        el.style.setProperty('border-radius', '24px', 'important');
+        el.style.setProperty('font-weight', '700', 'important');
+        el.style.setProperty('box-shadow', '0 4px 14px rgba(37, 99, 235, 0.45)', 'important');
+        el.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Rail\'ga qo\'shish</span>';
+
+        el.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          triggerInstall(this, extId);
+        }, true);
+        break;
+      }
+    }
+
+    // 2. Guaranteed floating backup button at bottom-right
+    if (!document.getElementById('rail-webstore-install-btn')) {
+      var btn = document.createElement('button');
+      btn.id = 'rail-webstore-install-btn';
+      btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Rail\'ga qo\'shish';
+      btn.style.cssText = 'position: fixed; bottom: 32px; right: 32px; z-index: 2147483647; background: #2563eb; color: #ffffff; border: none; border-radius: 9999px; padding: 14px 28px; font-size: 15px; font-weight: 700; box-shadow: 0 10px 30px rgba(37, 99, 235, 0.5); cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); display: flex; align-items: center; font-family: system-ui, -apple-system, sans-serif; letter-spacing: 0.3px;';
+
+      btn.onmouseenter = function() { btn.style.transform = 'translateY(-2px) scale(1.04)'; btn.style.boxShadow = '0 14px 36px rgba(37, 99, 235, 0.65)'; };
+      btn.onmouseleave = function() { btn.style.transform = 'none'; btn.style.boxShadow = '0 10px 30px rgba(37, 99, 235, 0.5)'; };
+
+      btn.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerInstall(btn, extId);
+      };
+
+      document.body.appendChild(btn);
+    }
   }
 
   window.__railWebstoreInstalled = function(id) {
-    var btn = document.getElementById('rail-webstore-install-btn');
-    if (btn) {
-      btn.innerHTML = '✓ Rail\'ga o\'rnatildi';
-      btn.style.background = '#059669';
-      btn.style.boxShadow = '0 10px 30px rgba(5, 150, 105, 0.5)';
-      btn.disabled = true;
+    var btns = document.querySelectorAll('#rail-webstore-install-btn, [data-rail-webstore-hijacked="true"]');
+    for (var i = 0; i < btns.length; i++) {
+      var b = btns[i];
+      b.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;">✓ Rail\'ga o\'rnatildi</span>';
+      b.style.setProperty('background', '#059669', 'important');
+      b.style.setProperty('background-color', '#059669', 'important');
+      b.style.setProperty('box-shadow', '0 10px 30px rgba(5, 150, 105, 0.5)', 'important');
+      b.disabled = true;
     }
   };
 
   window.__railWebstoreFailed = function(err) {
-    var btn = document.getElementById('rail-webstore-install-btn');
-    if (btn) {
-      btn.innerHTML = '❌ ' + (err || "Xatolik yuz berdi");
-      btn.style.background = '#dc2626';
-      btn.disabled = false;
+    var btns = document.querySelectorAll('#rail-webstore-install-btn, [data-rail-webstore-hijacked="true"]');
+    for (var i = 0; i < btns.length; i++) {
+      var b = btns[i];
+      b.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;">❌ ' + (err || "Xatolik yuz berdi") + '</span>';
+      b.style.setProperty('background', '#dc2626', 'important');
+      b.style.setProperty('background-color', '#dc2626', 'important');
+      b.disabled = false;
     }
   };
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', injectRailButton);
+    document.addEventListener('DOMContentLoaded', hijackWebstorePage);
   } else {
-    injectRailButton();
+    hijackWebstorePage();
   }
   var prevUrl = location.href;
   setInterval(function() {
     if (location.href !== prevUrl) {
       prevUrl = location.href;
-      injectRailButton();
+      hijackWebstorePage();
     }
-  }, 1000);
+  }, 750);
 })();"#;
 
     let ws_script = webkit6::UserScript::new(

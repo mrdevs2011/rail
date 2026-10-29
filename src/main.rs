@@ -35,7 +35,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::OnceLock;
 use std::time::Duration;
-use spring::{coast_distance, Spring, SwipeTracker, SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS};
+use spring::{coast_distance, Spring, SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS};
 use strip::{col_width, gap, group_ranges, stack_height, ShellLayout, StripLayout, SIDE_W};
 use webkit6::prelude::*;
 use webkit6::{

@@ -39,8 +39,7 @@ fn render_extensions_list(list_box: &gtk::Box, refresh: Rc<dyn Fn()>) {
             // Row 1: Icon + Name + Version + Spacer + Switch + Remove
             let row1 = gtk::Box::new(gtk::Orientation::Horizontal, 8);
 
-            let icon = gtk::Image::from_icon_name("application-x-addon-symbolic");
-            icon.set_pixel_size(18);
+            let icon = extensions::extension_icon_widget(&ext, 20);
 
             let name_lbl = gtk::Label::new(Some(&ext.name));
             name_lbl.add_css_class("settings-card-title");

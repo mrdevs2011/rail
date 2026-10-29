@@ -89,12 +89,25 @@ impl App {
             .autoplay(webkit6::AutoplayPolicy::Allow)
             .build();
 
-        WebView::builder()
+        let view = WebView::builder()
             .network_session(session)
             .settings(&settings)
             .user_content_manager(&ucm)
             .website_policies(&website_policies)
-            .build()
+            .build();
+
+        view.connect_decide_policy(|_view, decision, decision_type| {
+            if decision_type == webkit6::PolicyDecisionType::NavigationAction {
+                let policies = webkit6::WebsitePolicies::builder()
+                    .autoplay(webkit6::AutoplayPolicy::Allow)
+                    .build();
+                decision.use_with_policies(&policies);
+                return true;
+            }
+            false
+        });
+
+        view
     }
 
     pub(crate) fn new_tab(self: &Rc<Self>) {

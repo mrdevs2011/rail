@@ -435,6 +435,7 @@ impl App {
                                     match res {
                                         Ok(ext) => {
                                             a.show_copied_toast(&ext.name, tr("Extension installed successfully!"));
+                                            crate::extensions::apply_extensions_all();
                                             view_cb.evaluate_javascript(
                                                 &format!("window.__railWebstoreInstalled && window.__railWebstoreInstalled('{}');", id_for_js),
                                                 None, None, gio::Cancellable::NONE, |_| {}

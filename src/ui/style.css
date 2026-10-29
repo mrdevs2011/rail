@@ -802,6 +802,18 @@ popover.extensions-popover > arrow {
     color: #ffffff;
 }
 
+/* ---- extension popup window (frameless natural auto-sizing) ---- */
+window.extension-popup-window {
+    background-color: #121214;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75);
+}
+window.extension-popup-window contents {
+    background-color: #121214;
+    border-radius: 12px;
+}
+
 /* ---- profiles manager modal (Alt+P) ---- */
 .profiles-modal {
     background: #000000;

@@ -31,6 +31,20 @@ impl Json {
             _ => None,
         }
     }
+    #[allow(dead_code)]
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Json::Num(n) => Some(*n),
+            _ => None,
+        }
+    }
+    #[allow(dead_code)]
+    pub fn as_i64(&self) -> Option<i64> {
+        match self {
+            Json::Num(n) => Some(*n as i64),
+            _ => None,
+        }
+    }
     pub fn as_arr(&self) -> Option<&[Json]> {
         match self {
             Json::Arr(a) => Some(a.as_slice()),

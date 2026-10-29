@@ -41,8 +41,7 @@ fn rebuild_extensions_popover(app: &Rc<App>, popover: &gtk::Popover) {
             let item_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
             item_row.add_css_class("ext-popover-item");
 
-            let icon = gtk::Image::from_icon_name("application-x-addon-symbolic");
-            icon.set_pixel_size(16);
+            let icon = crate::extensions::extension_icon_widget(&ext, 18);
             icon.set_valign(gtk::Align::Center);
 
             let text_box = gtk::Box::new(gtk::Orientation::Vertical, 1);

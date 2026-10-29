@@ -22,41 +22,12 @@ impl App {
             .transient_for(&self.win)
             .modal(false)
             .title(&ext.name)
-            .default_width(400)
-            .default_height(540)
+            .decorated(false)
             .destroy_with_parent(true)
             .build();
-        win.add_css_class("settings-modal-window");
+        win.add_css_class("extension-popup-window");
 
         let root_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
-
-        // Header bar
-        let header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        header.add_css_class("settings-header");
-        header.set_margin_start(12);
-        header.set_margin_end(12);
-        header.set_margin_top(8);
-        header.set_margin_bottom(8);
-
-        let icon = gtk::Image::from_icon_name("application-x-addon-symbolic");
-        let title_lbl = gtk::Label::new(Some(&ext.name));
-        title_lbl.add_css_class("settings-card-title");
-        title_lbl.set_halign(gtk::Align::Start);
-        title_lbl.set_hexpand(true);
-
-        let ver_lbl = gtk::Label::new(Some(&format!("v{}", ext.version)));
-        ver_lbl.add_css_class("settings-badge");
-
-        let close_btn = gtk::Button::from_icon_name("window-close-symbolic");
-        close_btn.add_css_class("flat-icon");
-        let win_close = win.clone();
-        close_btn.connect_clicked(move |_| win_close.close());
-
-        header.append(&icon);
-        header.append(&title_lbl);
-        header.append(&ver_lbl);
-        header.append(&close_btn);
-        root_box.append(&header);
 
         // Web view for the popup
         let settings = webkit6::Settings::new();
@@ -69,10 +40,6 @@ impl App {
 
         let ucm = webkit6::UserContentManager::new();
         ucm.register_script_message_handler("railExtBridge", None);
-        let a_bridge = self.clone();
-        ucm.connect_script_message_received(Some("railExtBridge"), move |_, val| {
-            a_bridge.handle_ext_bridge_message(val.to_str().as_str());
-        });
 
         let polyfill = crate::extensions::polyfill_for_ext(ext);
         let script = webkit6::UserScript::new(
@@ -84,6 +51,45 @@ impl App {
         );
         ucm.add_script(&script);
 
+        // Inject auto-sizing script that reports document dimensions
+        let resize_script_code = r#"
+(function() {
+  function sendSize() {
+    try {
+      var b = document.body;
+      var d = document.documentElement;
+      var w = Math.max(b ? b.scrollWidth : 0, d ? d.scrollWidth : 0, b ? b.offsetWidth : 0, d ? d.offsetWidth : 0);
+      var h = Math.max(b ? b.scrollHeight : 0, d ? d.scrollHeight : 0, b ? b.offsetHeight : 0, d ? d.offsetHeight : 0);
+      if (w > 20 && h > 20) {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railExtBridge) {
+          window.webkit.messageHandlers.railExtBridge.postMessage(JSON.stringify({ action: "resize", width: Math.ceil(w), height: Math.ceil(h) }));
+        }
+      }
+    } catch(_) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', sendSize);
+  } else {
+    sendSize();
+  }
+  window.addEventListener('load', sendSize);
+  if (window.ResizeObserver && document.documentElement) {
+    new ResizeObserver(sendSize).observe(document.documentElement);
+  }
+  setTimeout(sendSize, 40);
+  setTimeout(sendSize, 180);
+  setTimeout(sendSize, 500);
+})();
+"#;
+        let resize_script = webkit6::UserScript::new(
+            resize_script_code,
+            webkit6::UserContentInjectedFrames::TopFrame,
+            webkit6::UserScriptInjectionTime::End,
+            &[],
+            &[],
+        );
+        ucm.add_script(&resize_script);
+
         let view = WebView::builder()
             .network_session(&session)
             .settings(&settings)
@@ -91,6 +97,71 @@ impl App {
             .hexpand(true)
             .vexpand(true)
             .build();
+
+        let a_bridge = self.clone();
+        let win_bridge = win.downgrade();
+        let view_bridge = view.downgrade();
+        ucm.connect_script_message_received(Some("railExtBridge"), move |_, val| {
+            let msg = val.to_str();
+            if let Some(json) = crate::minijson::parse(&msg) {
+                if json.get("action").and_then(|a| a.as_str()) == Some("resize") {
+                    let w = json.get("width").and_then(|v| v.as_f64()).unwrap_or(360.0) as i32;
+                    let h = json.get("height").and_then(|v| v.as_f64()).unwrap_or(480.0) as i32;
+                    let clamped_w = w.clamp(200, 800);
+                    let clamped_h = h.clamp(100, 600);
+                    if let Some(wnd) = win_bridge.upgrade() {
+                        wnd.set_default_size(clamped_w, clamped_h);
+                        if let Some(wv) = view_bridge.upgrade() {
+                            wv.set_size_request(clamped_w, clamped_h);
+                        }
+                        wnd.queue_resize();
+                    }
+                }
+            }
+            a_bridge.handle_ext_bridge_message(msg.as_str());
+        });
+
+        // Trigger size measurement when page load finishes
+        let win_load = win.downgrade();
+        let view_load = view.downgrade();
+        view.connect_load_changed(move |v, evt| {
+            if evt == webkit6::LoadEvent::Finished {
+                let win_cb = win_load.clone();
+                let view_cb = view_load.clone();
+                v.evaluate_javascript(
+                    r#"
+(function() {
+  var b = document.body;
+  var d = document.documentElement;
+  var w = Math.max(b ? b.scrollWidth : 0, d ? d.scrollWidth : 0, b ? b.offsetWidth : 0, d ? d.offsetWidth : 0);
+  var h = Math.max(b ? b.scrollHeight : 0, d ? d.scrollHeight : 0, b ? b.offsetHeight : 0, d ? d.offsetHeight : 0);
+  return JSON.stringify({ w: Math.ceil(w), h: Math.ceil(h) });
+})()
+"#,
+                    None,
+                    None,
+                    gio::Cancellable::NONE,
+                    move |res| {
+                        if let Ok(js_val) = res {
+                            let json_str = js_val.to_string();
+                            if let Some(parsed) = crate::minijson::parse(&json_str) {
+                                let w = parsed.get("w").and_then(|v| v.as_f64()).unwrap_or(360.0) as i32;
+                                let h = parsed.get("h").and_then(|v| v.as_f64()).unwrap_or(480.0) as i32;
+                                let clamped_w = w.clamp(200, 800);
+                                let clamped_h = h.clamp(100, 600);
+                                if let Some(wnd) = win_cb.upgrade() {
+                                    wnd.set_default_size(clamped_w, clamped_h);
+                                    if let Some(wv) = view_cb.upgrade() {
+                                        wv.set_size_request(clamped_w, clamped_h);
+                                    }
+                                    wnd.queue_resize();
+                                }
+                            }
+                        }
+                    },
+                );
+            }
+        });
 
         let uri = format!("file://{}", file_path.display());
         view.load_uri(&uri);
@@ -110,6 +181,14 @@ impl App {
             }
         });
         win.add_controller(key_ctl);
+
+        // Dismiss on focus leave (click outside), matching Chrome/Brave extension popups
+        let win_focus = win.clone();
+        win.connect_is_active_notify(move |w| {
+            if !w.is_active() {
+                win_focus.close();
+            }
+        });
 
         self.sidebar_locked.set(true);
         let a_lock = self.clone();
