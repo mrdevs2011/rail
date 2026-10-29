@@ -56,14 +56,10 @@ impl App {
                    if(n)t=n.nodeType===1?n:n.parentElement;}}\
                  if(!edit(t)){{var es=Array.from(document.querySelectorAll('[contenteditable=\"true\"],textarea,input[type=\"text\"]'));\
                    t=es.find(function(e){{return e.getClientRects().length>0&&!e.disabled;}})||t;}}\
-                 /* Prefer the site's real file-input pathway: synthetic paste events are\
-                    untrusted and ChatGPT-like apps may deliberately ignore them. */\
-                 var fs=Array.from(document.querySelectorAll('input[type=\"file\"]')).filter(function(e){{return !e.disabled;}});\
-                 var fi=fs.find(function(e){{return !e.accept||e.accept.indexOf('image')>=0;}})||fs[0];\
-                 if(fi){{var fd=new DataTransfer();fd.items.add(f);fi.files=fd.files;\
-                   fi.dispatchEvent(new Event('input',{{bubbles:true}}));fi.dispatchEvent(new Event('change',{{bubbles:true}}));}}\
-                 else{{t=t||document.body||document;\
-                   t.dispatchEvent(new ClipboardEvent('paste',{{clipboardData:dt,bubbles:true,cancelable:true,composed:true}}));}}\
+                 /* Replay the clipboard as a paste event at the focused editor.\
+                    Assigning input.files directly does not reliably trigger upload UI state. */\
+                 t=t||document.body||document;\
+                 t.dispatchEvent(new ClipboardEvent('paste',{{clipboardData:dt,bubbles:true,cancelable:true,composed:true}}));\
                  }}catch(e){{console.error('Rail image paste failed',e);}}}})();",
                 b64
             );
