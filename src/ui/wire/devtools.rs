@@ -18,9 +18,21 @@ pub(crate) fn wire_devtools(
     dt_click.connect_pressed(move |g, _, x, y| {
         g.set_state(gtk::EventSequenceState::None);
         if (0.0..=36.0).contains(&y) {
-            LAST_DT_SLOT.with(|c| c.set((x / 24.0).floor() as i32));
+            let slot = (x / 24.0).floor() as i32;
+            LAST_DT_SLOT.with(|c| c.set(slot));
+            // WebKit's inspector toolbar order: close, bottom, right, undock.
+            // The native attach/detach signals do not include the requested side,
+            // so carry the clicked target through to the signal handler.
+            let target = match slot {
+                1 => Some(DevToolsDockSide::Bottom),
+                2 => Some(DevToolsDockSide::Right),
+                3 => Some(DevToolsDockSide::Undocked),
+                _ => None,
+            };
+            LAST_DT_TARGET.with(|c| c.set(target));
         } else {
             LAST_DT_SLOT.with(|c| c.set(-1));
+            LAST_DT_TARGET.with(|c| c.set(None));
         }
     });
     devtools_content_box.add_controller(dt_click);
