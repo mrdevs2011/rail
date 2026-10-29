@@ -1,11 +1,11 @@
-mod tuning;
-mod tab;
 mod minimap;
-mod ui_enums;
 mod session;
+mod tab;
+mod tuning;
+mod ui_enums;
 
-pub(crate) use tuning::*;
-pub(crate) use tab::*;
 pub(crate) use minimap::*;
-pub(crate) use ui_enums::*;
 pub(crate) use session::*;
+pub(crate) use tab::*;
+pub(crate) use tuning::*;
+pub(crate) use ui_enums::*;

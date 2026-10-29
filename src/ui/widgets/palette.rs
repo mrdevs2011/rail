@@ -20,7 +20,9 @@ pub(crate) fn build_palette(profile_mgr: &ProfileManager) -> PaletteWidgets {
     let entry = gtk::Entry::new();
     entry.add_css_class("palette-entry");
     entry.set_hexpand(true);
-    entry.set_placeholder_text(Some(&tr("Search with {} or enter URL").replace("{}", &engine_name)));
+    entry.set_placeholder_text(Some(
+        &tr("Search with {} or enter URL").replace("{}", &engine_name),
+    ));
 
     let palette_engine_icon = load_search_engine_icon(&initial_settings.search_engine, 20);
 
@@ -63,7 +65,11 @@ pub(crate) fn build_palette(profile_mgr: &ProfileManager) -> PaletteWidgets {
     palette_suggestions_scroll.set_propagate_natural_height(true);
 
     let phint = gtk::Label::new(None);
-    sc_bind_text(&phint, "Enter  go      Esc  cancel      Alt+P  profiles", &["profiles"]);
+    sc_bind_text(
+        &phint,
+        "Enter  go      Esc  cancel      Alt+P  profiles",
+        &["profiles"],
+    );
     phint.add_css_class("palette-hint");
     phint.set_xalign(0.0);
     let palette = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -84,5 +90,13 @@ pub(crate) fn build_palette(profile_mgr: &ProfileManager) -> PaletteWidgets {
         pop_c.popup();
     });
 
-    PaletteWidgets { entry, palette, palette_suggestions_box, palette_engine_icon, profile_btn, profile_btn_lbl, profile_popover }
+    PaletteWidgets {
+        entry,
+        palette,
+        palette_suggestions_box,
+        palette_engine_icon,
+        profile_btn,
+        profile_btn_lbl,
+        profile_popover,
+    }
 }

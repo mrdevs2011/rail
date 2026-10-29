@@ -37,5 +37,11 @@ pub(crate) fn build_strip(side: gtk::Box) -> StripWidgets {
     shell.append(&strip_host);
     shell.append(&side);
 
-    StripWidgets { layout, shell, shell_layout, strip, strip_host }
+    StripWidgets {
+        layout,
+        shell,
+        shell_layout,
+        strip,
+        strip_host,
+    }
 }

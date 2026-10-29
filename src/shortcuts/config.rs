@@ -33,26 +33,76 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("focus_url", G_TABS, "Focus URL / Address bar", ["Ctrl+L"]),
     sc!("close_tab", G_TABS, "Close focused tab", ["Ctrl+W"]),
     sc!("reload", G_TABS, "Reload active tab", ["Ctrl+R", "F5"]),
-    sc!("hard_reload", G_TABS, "Hard reload (bypass cache)", ["Ctrl+Shift+R", "Ctrl+F5", "Shift+F5"]),
+    sc!(
+        "hard_reload",
+        G_TABS,
+        "Hard reload (bypass cache)",
+        ["Ctrl+Shift+R", "Ctrl+F5", "Shift+F5"]
+    ),
     sc!("full_tab", G_TABS, "Toggle Full Tab View", ["Alt+F"]),
     sc!("new_workspace", G_TABS, "New Workspace", ["Alt+Shift+V"]),
     sc!("focus_left", G_TABS, "Focus column Left", ["Alt+H"]),
     sc!("focus_right", G_TABS, "Focus column Right", ["Alt+L"]),
     sc!("focus_down", G_TABS, "Focus window Down", ["Alt+J"]),
     sc!("focus_up", G_TABS, "Focus window Up", ["Alt+K"]),
-    sc!("win_left", G_TABS, "Focus column Left (Alt+Arrow)", ["Alt+Left"]),
-    sc!("win_right", G_TABS, "Focus column Right (Alt+Arrow)", ["Alt+Right"]),
-    sc!("win_up", G_TABS, "Focus workspace Up (Alt+Arrow)", ["Alt+Up"]),
-    sc!("win_down", G_TABS, "Focus workspace Down (Alt+Arrow)", ["Alt+Down"]),
+    sc!(
+        "win_left",
+        G_TABS,
+        "Focus column Left (Alt+Arrow)",
+        ["Alt+Left"]
+    ),
+    sc!(
+        "win_right",
+        G_TABS,
+        "Focus column Right (Alt+Arrow)",
+        ["Alt+Right"]
+    ),
+    sc!(
+        "win_up",
+        G_TABS,
+        "Focus workspace Up (Alt+Arrow)",
+        ["Alt+Up"]
+    ),
+    sc!(
+        "win_down",
+        G_TABS,
+        "Focus workspace Down (Alt+Arrow)",
+        ["Alt+Down"]
+    ),
     sc!("move_left", G_TABS, "Move tab column Left", ["Alt+Shift+H"]),
-    sc!("move_right", G_TABS, "Move tab column Right", ["Alt+Shift+L"]),
+    sc!(
+        "move_right",
+        G_TABS,
+        "Move tab column Right",
+        ["Alt+Shift+L"]
+    ),
     sc!("move_down", G_TABS, "Move window Down", ["Alt+Shift+J"]),
     sc!("move_up", G_TABS, "Move window Up", ["Alt+Shift+K"]),
     sc!("next_tab", G_TABS, "Cycle to next tab", ["Ctrl+Tab"]),
-    sc!("prev_tab", G_TABS, "Cycle to previous tab", ["Ctrl+Shift+Tab"]),
-    sc!("reopen_tab", G_TABS, "Reopen last closed tab", ["Ctrl+Shift+T"]),
-    sc!("stack_left", G_TABS, "Stack into left column / unstack left", ["Alt+["]),
-    sc!("stack_right", G_TABS, "Stack into right column / unstack right", ["Alt+]"]),
+    sc!(
+        "prev_tab",
+        G_TABS,
+        "Cycle to previous tab",
+        ["Ctrl+Shift+Tab"]
+    ),
+    sc!(
+        "reopen_tab",
+        G_TABS,
+        "Reopen last closed tab",
+        ["Ctrl+Shift+T"]
+    ),
+    sc!(
+        "stack_left",
+        G_TABS,
+        "Stack into left column / unstack left",
+        ["Alt+["]
+    ),
+    sc!(
+        "stack_right",
+        G_TABS,
+        "Stack into right column / unstack right",
+        ["Alt+]"]
+    ),
     sc!("tab_1", G_TABS, "Switch to tab 1", ["Ctrl+1"]),
     sc!("tab_2", G_TABS, "Switch to tab 2", ["Ctrl+2"]),
     sc!("tab_3", G_TABS, "Switch to tab 3", ["Ctrl+3"]),
@@ -81,15 +131,45 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("mv_8", G_TABS, "Move tab to workspace 8", ["Alt+Shift+8"]),
     sc!("mv_9", G_TABS, "Move tab to workspace 9", ["Alt+Shift+9"]),
     sc!("settings", G_PANELS, "Toggle Settings panel", ["Alt+S"]),
-    sc!("profiles", G_PANELS, "Profiles / profile switcher", ["Alt+P"]),
+    sc!(
+        "profiles",
+        G_PANELS,
+        "Profiles / profile switcher",
+        ["Alt+P"]
+    ),
     sc!("data", G_PANELS, "Data & Backup", ["Alt+I"]),
-    sc!("devtools", G_PANELS, "Toggle DevTools", ["F12", "Ctrl+Shift+I"]),
-    sc!("devtools_dock", G_PANELS, "Cycle DevTools dock position", ["Alt+Shift+D"]),
+    sc!(
+        "devtools",
+        G_PANELS,
+        "Toggle DevTools",
+        ["F12", "Ctrl+Shift+I"]
+    ),
+    sc!(
+        "devtools_dock",
+        G_PANELS,
+        "Cycle DevTools dock position",
+        ["Alt+Shift+D"]
+    ),
     sc!("map", G_PANELS, "Toggle Roadmap / Minimap", ["Alt+M"]),
     sc!("overview", G_PANELS, "Toggle Spatial Overview", ["Alt+O"]),
-    sc!("overview_zoom_in", G_PANELS, "Zoom in (page 20-500%, overview scale)", ["Ctrl+plus", "Ctrl+="]),
-    sc!("overview_zoom_out", G_PANELS, "Zoom out (page 20-500%, overview scale)", ["Ctrl+minus"]),
-    sc!("zoom_reset", G_PANELS, "Reset zoom (page 100%, overview default)", ["Ctrl+0"]),
+    sc!(
+        "overview_zoom_in",
+        G_PANELS,
+        "Zoom in (page 20-500%, overview scale)",
+        ["Ctrl+plus", "Ctrl+="]
+    ),
+    sc!(
+        "overview_zoom_out",
+        G_PANELS,
+        "Zoom out (page 20-500%, overview scale)",
+        ["Ctrl+minus"]
+    ),
+    sc!(
+        "zoom_reset",
+        G_PANELS,
+        "Reset zoom (page 100%, overview default)",
+        ["Ctrl+0"]
+    ),
     sc!("sidebar", G_PANELS, "Toggle Sidebar", ["Alt+B"]),
     sc!("downloads", G_PANELS, "Open Downloads", ["Ctrl+J"]),
     sc!("history", G_PANELS, "Open History", ["Ctrl+H"]),
@@ -97,8 +177,18 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!("view_source", G_PANELS, "View page source", ["Ctrl+U"]),
     sc!("find", G_PANELS, "Find in page", ["Ctrl+F"]),
     sc!("find_next", G_PANELS, "Find next match", ["F3", "Ctrl+G"]),
-    sc!("find_prev", G_PANELS, "Find previous match", ["Shift+F3", "Ctrl+Shift+G"]),
-    sc!("extension_mode", G_PANELS, "Toggle extension shortcut mode", ["Ctrl+Shift+E"]),
+    sc!(
+        "find_prev",
+        G_PANELS,
+        "Find previous match",
+        ["Shift+F3", "Ctrl+Shift+G"]
+    ),
+    sc!(
+        "extension_mode",
+        G_PANELS,
+        "Toggle extension shortcut mode",
+        ["Ctrl+Shift+E"]
+    ),
     sc!("fullscreen", G_PANELS, "Toggle Fullscreen", ["F11"]),
     sc!("quit", G_PANELS, "Quit Rail", ["Ctrl+Q"]),
 ];
@@ -170,8 +260,19 @@ pub(crate) fn load_shortcuts_config() -> ShortcutConfig {
     }
     if version < 2.0 {
         // v2: standart brauzer shortcutlari. Eski Alt+... defaultlari faylda qotib qolgan bo'lsa, yangi defaultga o'tkazamiz.
-        for (id, legacy) in [("new_tab", "Alt+T"), ("focus_url", "Alt+G"), ("close_tab", "Alt+W"), ("reload", "Alt+R"), ("quit", "Alt+Q")] {
-            if cfg.overrides.get(id).map(|l| l.len() == 1 && l[0] == legacy).unwrap_or(false) {
+        for (id, legacy) in [
+            ("new_tab", "Alt+T"),
+            ("focus_url", "Alt+G"),
+            ("close_tab", "Alt+W"),
+            ("reload", "Alt+R"),
+            ("quit", "Alt+Q"),
+        ] {
+            if cfg
+                .overrides
+                .get(id)
+                .map(|l| l.len() == 1 && l[0] == legacy)
+                .unwrap_or(false)
+            {
                 cfg.overrides.remove(id);
             }
         }
@@ -231,7 +332,11 @@ pub(crate) fn sc_normalize(cfg: &mut ShortcutConfig) {
         let is_default = cfg
             .overrides
             .get(def.id)
-            .map(|l| l.iter().map(|s| s.as_str()).eq(def.defaults.iter().copied()))
+            .map(|l| {
+                l.iter()
+                    .map(|s| s.as_str())
+                    .eq(def.defaults.iter().copied())
+            })
             .unwrap_or(false);
         if is_default {
             cfg.overrides.remove(def.id);
@@ -239,7 +344,12 @@ pub(crate) fn sc_normalize(cfg: &mut ShortcutConfig) {
     }
     // Locked shortcuts can never end up unbound or remapped.
     for id in SC_LOCKED {
-        if cfg.overrides.get(*id).map(|l| l.is_empty()).unwrap_or(false) {
+        if cfg
+            .overrides
+            .get(*id)
+            .map(|l| l.is_empty())
+            .unwrap_or(false)
+        {
             cfg.overrides.remove(*id);
         }
         // Force defaults for locked ids (read-only).
@@ -250,10 +360,14 @@ pub(crate) fn sc_normalize(cfg: &mut ShortcutConfig) {
 /// Puts `combo` into slot `slot` of `def`. Takes it away from any other shortcut that
 /// used it. Returns a short note about what moved, or why it was refused.
 /// Who already owns combo (excluding except_id)? Gray those keys on the picker.
-pub(crate) fn sc_combo_owner(cfg: &ShortcutConfig, combo: &str, except_id: &str) -> Option<&'static ShortcutDef> {
-    SHORTCUT_DEFS.iter().find(|d| {
-        d.id != except_id && sc_effective(d, cfg).iter().any(|c| c == combo)
-    })
+pub(crate) fn sc_combo_owner(
+    cfg: &ShortcutConfig,
+    combo: &str,
+    except_id: &str,
+) -> Option<&'static ShortcutDef> {
+    SHORTCUT_DEFS
+        .iter()
+        .find(|d| d.id != except_id && sc_effective(d, cfg).iter().any(|c| c == combo))
 }
 
 pub(crate) fn sc_set_slot(
@@ -287,7 +401,7 @@ pub(crate) fn sc_set_slot(
             ));
         }
     }
-    
+
     let note = String::new();
     let mut list = sc_effective(def, cfg);
     if slot < list.len() {
@@ -363,20 +477,62 @@ fn sc_mods_prefix(state: gdk::ModifierType, with_shift: bool) -> String {
 /// Latin letter for the key (e.g. Cyrillic-only), so Ctrl+T etc. keep working there.
 fn sc_us_label(keycode: u32) -> Option<&'static str> {
     Some(match keycode {
-        10 => "1", 11 => "2", 12 => "3", 13 => "4", 14 => "5", 15 => "6", 16 => "7", 17 => "8", 18 => "9", 19 => "0",
-        20 => "-", 21 => "=",
-        24 => "Q", 25 => "W", 26 => "E", 27 => "R", 28 => "T", 29 => "Y", 30 => "U", 31 => "I", 32 => "O", 33 => "P",
-        34 => "[", 35 => "]",
-        38 => "A", 39 => "S", 40 => "D", 41 => "F", 42 => "G", 43 => "H", 44 => "J", 45 => "K", 46 => "L",
-        47 => ";", 48 => "'", 51 => "\\",
-        52 => "Z", 53 => "X", 54 => "C", 55 => "V", 56 => "B", 57 => "N", 58 => "M",
-        59 => ",", 60 => ".", 61 => "/",
+        10 => "1",
+        11 => "2",
+        12 => "3",
+        13 => "4",
+        14 => "5",
+        15 => "6",
+        16 => "7",
+        17 => "8",
+        18 => "9",
+        19 => "0",
+        20 => "-",
+        21 => "=",
+        24 => "Q",
+        25 => "W",
+        26 => "E",
+        27 => "R",
+        28 => "T",
+        29 => "Y",
+        30 => "U",
+        31 => "I",
+        32 => "O",
+        33 => "P",
+        34 => "[",
+        35 => "]",
+        38 => "A",
+        39 => "S",
+        40 => "D",
+        41 => "F",
+        42 => "G",
+        43 => "H",
+        44 => "J",
+        45 => "K",
+        46 => "L",
+        47 => ";",
+        48 => "'",
+        51 => "\\",
+        52 => "Z",
+        53 => "X",
+        54 => "C",
+        55 => "V",
+        56 => "B",
+        57 => "N",
+        58 => "M",
+        59 => ",",
+        60 => ".",
+        61 => "/",
         _ => return None,
     })
 }
 
 /// Layout-independent name of a key press, e.g. "Alt+Shift+T" or "F12" (physical key, level 0).
-pub(crate) fn shortcut_combo(key: gdk::Key, keycode: u32, state: gdk::ModifierType) -> Option<String> {
+pub(crate) fn shortcut_combo(
+    key: gdk::Key,
+    keycode: u32,
+    state: gdk::ModifierType,
+) -> Option<String> {
     if is_modifier_key(key) {
         return None;
     }
@@ -441,7 +597,11 @@ fn sc_key_token(key: gdk::Key) -> Option<(String, bool)> {
     }
     if let Some(c) = key.to_unicode() {
         if c.is_ascii_graphic() {
-            let tok = if c == '+' { "plus".to_string() } else { c.to_ascii_uppercase().to_string() };
+            let tok = if c == '+' {
+                "plus".to_string()
+            } else {
+                c.to_ascii_uppercase().to_string()
+            };
             return Some((tok, !c.is_ascii_alphanumeric()));
         }
     }
@@ -452,7 +612,11 @@ fn sc_key_token(key: gdk::Key) -> Option<(String, bool)> {
 ///  1. physical key ("Ctrl+=" for the `=` key on any layout),
 ///  2. the key the layout produced ("Ctrl+plus" for Ctrl+Shift+= on US, keypad + / digits),
 ///  3. same without Shift for shifted symbols.
-pub(crate) fn shortcut_combos(key: gdk::Key, keycode: u32, state: gdk::ModifierType) -> Vec<String> {
+pub(crate) fn shortcut_combos(
+    key: gdk::Key,
+    keycode: u32,
+    state: gdk::ModifierType,
+) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut push = |c: String| {
         if !out.contains(&c) {
@@ -535,5 +699,9 @@ pub(crate) fn sc_resolve_any(combos: &[String]) -> ScResolve {
             ScResolve::Unknown => {}
         }
     }
-    if disabled { ScResolve::Disabled } else { ScResolve::Unknown }
+    if disabled {
+        ScResolve::Disabled
+    } else {
+        ScResolve::Unknown
+    }
 }

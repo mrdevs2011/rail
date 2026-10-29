@@ -26,22 +26,28 @@ pub(crate) fn setup_adblock() {
     let dir = rail_data_dir();
     let extra = std::fs::read_to_string(dir.join("blocklist.txt")).unwrap_or_default();
     let json = blocklist::rules_json(&extra);
-    let store = webkit6::UserContentFilterStore::new(dir.join("filters").to_str().unwrap_or("filters"));
+    let store =
+        webkit6::UserContentFilterStore::new(dir.join("filters").to_str().unwrap_or("filters"));
     let keep = store.clone();
-    store.save("rail-adblock", &glib::Bytes::from(json.as_bytes()), gio::Cancellable::NONE, move |res| {
-        let _keep = keep;
-        match res {
-            Ok(f) => {
-                STYLE_MANAGERS.with(|list| {
-                    for ucm in list.borrow().iter().filter_map(|w| w.upgrade()) {
-                        ucm.add_filter(&f);
-                    }
-                });
-                ADBLOCK_FILTER.with(|cell| *cell.borrow_mut() = Some(f));
+    store.save(
+        "rail-adblock",
+        &glib::Bytes::from(json.as_bytes()),
+        gio::Cancellable::NONE,
+        move |res| {
+            let _keep = keep;
+            match res {
+                Ok(f) => {
+                    STYLE_MANAGERS.with(|list| {
+                        for ucm in list.borrow().iter().filter_map(|w| w.upgrade()) {
+                            ucm.add_filter(&f);
+                        }
+                    });
+                    ADBLOCK_FILTER.with(|cell| *cell.borrow_mut() = Some(f));
+                }
+                Err(e) => eprintln!("rail: ad blocking rules failed to compile: {e}"),
             }
-            Err(e) => eprintln!("rail: ad blocking rules failed to compile: {e}"),
-        }
-    });
+        },
+    );
 }
 
 /// Editable Chrome-like default stylesheet, stored next to the rest of Rail's data.

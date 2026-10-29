@@ -4,9 +4,9 @@
 //! and synchronizes via Vercel / Supabase.
 
 use crate::minijson;
+use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::io::Write;
 
 pub const DEFAULT_SYNC_SERVER: &str = "https://rail-browser.vercel.app";
 
@@ -43,16 +43,26 @@ pub fn extract_sync_id(raw: &str) -> String {
 /// Packs data_dir (excluding disposable web cache), encrypts with password, and returns base64 ciphertext.
 pub fn pack_and_encrypt(data_dir: &Path, password: &str) -> Result<String, String> {
     if !data_dir.exists() {
-        return Err(format!("Storage directory does not exist: {}", data_dir.display()));
+        return Err(format!(
+            "Storage directory does not exist: {}",
+            data_dir.display()
+        ));
     }
     if password.trim().is_empty() {
         return Err("Password cannot be empty.".to_string());
     }
 
     let parent = data_dir.parent().unwrap_or(data_dir);
-    let name = data_dir.file_name().ok_or_else(|| "Invalid directory name".to_string())?;
+    let name = data_dir
+        .file_name()
+        .ok_or_else(|| "Invalid directory name".to_string())?;
 
-    let rand_id = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0) % 10000000).to_string();
+    let rand_id = (std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0)
+        % 10000000)
+        .to_string();
     let temp_tar = std::env::temp_dir().join(format!("rail_sync_pack_{}.tar.gz", rand_id));
 
     // Pack into tar.gz excluding temporary cache
@@ -84,9 +94,11 @@ pub fn pack_and_encrypt(data_dir: &Path, password: &str) -> Result<String, Strin
             "enc",
             "-aes-256-cbc",
             "-pbkdf2",
-            "-iter", "100000",
+            "-iter",
+            "100000",
             "-salt",
-            "-pass", &format!("pass:{}", password),
+            "-pass",
+            &format!("pass:{}", password),
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -98,7 +110,9 @@ pub fn pack_and_encrypt(data_dir: &Path, password: &str) -> Result<String, Strin
         let _ = stdin.write_all(&tar_bytes);
     }
 
-    let output = openssl.wait_with_output().map_err(|e| format!("OpenSSL error: {}", e))?;
+    let output = openssl
+        .wait_with_output()
+        .map_err(|e| format!("OpenSSL error: {}", e))?;
     if !output.status.success() {
         let err_msg = String::from_utf8_lossy(&output.stderr);
         return Err(format!("Encryption failed: {}", err_msg.trim()));
@@ -118,12 +132,16 @@ pub fn pack_and_encrypt(data_dir: &Path, password: &str) -> Result<String, Strin
         let _ = stdin.write_all(&output.stdout);
     }
 
-    let b64_output = b64_cmd.wait_with_output().map_err(|e| format!("Base64 error: {}", e))?;
+    let b64_output = b64_cmd
+        .wait_with_output()
+        .map_err(|e| format!("Base64 error: {}", e))?;
     if !b64_output.status.success() {
         return Err("Base64 encoding failed.".to_string());
     }
 
-    let b64_str = String::from_utf8_lossy(&b64_output.stdout).trim().to_string();
+    let b64_str = String::from_utf8_lossy(&b64_output.stdout)
+        .trim()
+        .to_string();
     if b64_str.is_empty() {
         return Err("Encrypted data is empty.".to_string());
     }
@@ -133,20 +151,33 @@ pub fn pack_and_encrypt(data_dir: &Path, password: &str) -> Result<String, Strin
 
 /// Uploads encrypted payload to Vercel/Supabase sync endpoint
 pub fn upload_sync_payload(encrypted_b64: &str, server_base: &str) -> Result<SyncResult, String> {
-    let rand_id = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0) % 10000000).to_string();
+    let rand_id = (std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0)
+        % 10000000)
+        .to_string();
     let temp_json = std::env::temp_dir().join(format!("rail_sync_upload_{}.json", rand_id));
 
-    let json_body = format!("{{\"encrypted_data\":\"{}\"}}", minijson::escape(encrypted_b64));
-    std::fs::write(&temp_json, json_body).map_err(|e| format!("Failed to write upload payload: {}", e))?;
+    let json_body = format!(
+        "{{\"encrypted_data\":\"{}\"}}",
+        minijson::escape(encrypted_b64)
+    );
+    std::fs::write(&temp_json, json_body)
+        .map_err(|e| format!("Failed to write upload payload: {}", e))?;
 
     let api_url = format!("{}/api/sync", server_base.trim_end_matches('/'));
     let out = Command::new("curl")
         .args([
             "-fsSL",
-            "-m", "45",
-            "-X", "POST",
-            "-H", "Content-Type: application/json",
-            "-d", &format!("@{}", temp_json.display()),
+            "-m",
+            "45",
+            "-X",
+            "POST",
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &format!("@{}", temp_json.display()),
             &api_url,
         ])
         .stdin(Stdio::null())
@@ -157,20 +188,31 @@ pub fn upload_sync_payload(encrypted_b64: &str, server_base: &str) -> Result<Syn
     let output = out.map_err(|e| format!("Network request failed: {}", e))?;
     if !output.status.success() {
         let err_text = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Sync server error (exit {}): {}", output.status, err_text.trim()));
+        return Err(format!(
+            "Sync server error (exit {}): {}",
+            output.status,
+            err_text.trim()
+        ));
     }
 
     let resp_str = String::from_utf8_lossy(&output.stdout);
-    let parsed = minijson::parse(&resp_str).ok_or_else(|| {
-        format!("Invalid server response: {}", resp_str)
-    })?;
+    let parsed = minijson::parse(&resp_str)
+        .ok_or_else(|| format!("Invalid server response: {}", resp_str))?;
 
     if let Some(err) = parsed.get("error").and_then(|e| e.as_str()) {
         return Err(format!("Server returned error: {}", err));
     }
 
-    let id = parsed.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let url = parsed.get("url").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let id = parsed
+        .get("id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let url = parsed
+        .get("url")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
 
     if id.is_empty() {
         return Err("Server did not return a valid Sync ID.".to_string());
@@ -186,7 +228,12 @@ pub fn upload_sync_payload(encrypted_b64: &str, server_base: &str) -> Result<Syn
 }
 
 /// Downloads encrypted payload from cloud, decrypts with password, and saves to dest_tar
-pub fn download_and_decrypt(sync_id_or_url: &str, password: &str, server_base: &str, dest_tar: &Path) -> Result<(), String> {
+pub fn download_and_decrypt(
+    sync_id_or_url: &str,
+    password: &str,
+    server_base: &str,
+    dest_tar: &Path,
+) -> Result<(), String> {
     let sync_id = extract_sync_id(sync_id_or_url);
     if sync_id.is_empty() {
         return Err("Please enter a valid Sync ID or URL.".to_string());
@@ -195,32 +242,36 @@ pub fn download_and_decrypt(sync_id_or_url: &str, password: &str, server_base: &
         return Err("Password cannot be empty.".to_string());
     }
 
-    let api_url = format!("{}/api/sync?id={}", server_base.trim_end_matches('/'), sync_id);
+    let api_url = format!(
+        "{}/api/sync?id={}",
+        server_base.trim_end_matches('/'),
+        sync_id
+    );
     let out = Command::new("curl")
-        .args([
-            "-fsSL",
-            "-m", "45",
-            &api_url,
-        ])
+        .args(["-fsSL", "-m", "45", &api_url])
         .stdin(Stdio::null())
         .output()
         .map_err(|e| format!("Failed to connect to sync server: {}", e))?;
 
     if !out.status.success() {
         let err_text = String::from_utf8_lossy(&out.stderr);
-        return Err(format!("Failed to download sync data (exit {}): {}", out.status, err_text.trim()));
+        return Err(format!(
+            "Failed to download sync data (exit {}): {}",
+            out.status,
+            err_text.trim()
+        ));
     }
 
     let resp_str = String::from_utf8_lossy(&out.stdout);
-    let parsed = minijson::parse(&resp_str).ok_or_else(|| {
-        format!("Invalid server response: {}", resp_str)
-    })?;
+    let parsed = minijson::parse(&resp_str)
+        .ok_or_else(|| format!("Invalid server response: {}", resp_str))?;
 
     if let Some(err) = parsed.get("error").and_then(|e| e.as_str()) {
         return Err(format!("Server returned error: {}", err));
     }
 
-    let encrypted_b64 = parsed.get("encrypted_data")
+    let encrypted_b64 = parsed
+        .get("encrypted_data")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "Sync payload missing encrypted_data.".to_string())?;
 
@@ -237,7 +288,9 @@ pub fn download_and_decrypt(sync_id_or_url: &str, password: &str, server_base: &
         let _ = stdin.write_all(encrypted_b64.as_bytes());
     }
 
-    let b64_out = b64_decode.wait_with_output().map_err(|e| format!("Base64 decode error: {}", e))?;
+    let b64_out = b64_decode
+        .wait_with_output()
+        .map_err(|e| format!("Base64 decode error: {}", e))?;
     if !b64_out.status.success() {
         return Err("Corrupted base64 ciphertext.".to_string());
     }
@@ -248,8 +301,10 @@ pub fn download_and_decrypt(sync_id_or_url: &str, password: &str, server_base: &
             "-d",
             "-aes-256-cbc",
             "-pbkdf2",
-            "-iter", "100000",
-            "-pass", &format!("pass:{}", password),
+            "-iter",
+            "100000",
+            "-pass",
+            &format!("pass:{}", password),
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -261,7 +316,9 @@ pub fn download_and_decrypt(sync_id_or_url: &str, password: &str, server_base: &
         let _ = stdin.write_all(&b64_out.stdout);
     }
 
-    let dec_output = openssl.wait_with_output().map_err(|e| format!("OpenSSL decrypt error: {}", e))?;
+    let dec_output = openssl
+        .wait_with_output()
+        .map_err(|e| format!("OpenSSL decrypt error: {}", e))?;
     if !dec_output.status.success() {
         return Err("INCORRECT_PASSWORD".to_string());
     }
@@ -270,9 +327,8 @@ pub fn download_and_decrypt(sync_id_or_url: &str, password: &str, server_base: &
         return Err("Decrypted data is empty.".to_string());
     }
 
-    std::fs::write(dest_tar, &dec_output.stdout).map_err(|e| {
-        format!("Failed to write decrypted archive: {}", e)
-    })?;
+    std::fs::write(dest_tar, &dec_output.stdout)
+        .map_err(|e| format!("Failed to write decrypted archive: {}", e))?;
 
     Ok(())
 }
@@ -284,7 +340,9 @@ mod tests {
     #[test]
     fn test_extract_sync_id() {
         assert_eq!(
-            extract_sync_id("https://rail-browser.vercel.app/sync?id=7bfb9920-8e12-4f32-849a-54316279f014"),
+            extract_sync_id(
+                "https://rail-browser.vercel.app/sync?id=7bfb9920-8e12-4f32-849a-54316279f014"
+            ),
             "7bfb9920-8e12-4f32-849a-54316279f014"
         );
         assert_eq!(

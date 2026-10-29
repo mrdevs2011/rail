@@ -3,10 +3,12 @@
 use crate::*;
 
 impl App {
-
     /// Show content as a top-center card that slides down from the top and slides back up on close.
     /// Returns a closer closure.
-    pub(crate) fn show_top_dialog(self: &Rc<Self>, content: gtk::Box) -> impl Fn() + Clone + 'static {
+    pub(crate) fn show_top_dialog(
+        self: &Rc<Self>,
+        content: gtk::Box,
+    ) -> impl Fn() + Clone + 'static {
         let revealer = gtk::Revealer::new();
         revealer.add_css_class("top-dialog-revealer");
         revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
@@ -23,7 +25,11 @@ impl App {
         revealer.set_child(Some(&card));
 
         // Attach to the main window overlay
-        if let Some(overlay) = self.win.child().and_then(|c| c.downcast::<gtk::Overlay>().ok()) {
+        if let Some(overlay) = self
+            .win
+            .child()
+            .and_then(|c| c.downcast::<gtk::Overlay>().ok())
+        {
             overlay.add_overlay(&revealer);
         }
 
@@ -48,9 +54,13 @@ impl App {
     pub(crate) fn show_script_dialog(self: &Rc<Self>, view: &WebView, dialog: &ScriptDialog) {
         let dialog_type = dialog.dialog_type();
         let message = dialog.message().map(|s| s.to_string()).unwrap_or_default();
-        let default_prompt = dialog.prompt_get_default_text().map(|s| s.to_string()).unwrap_or_default();
+        let default_prompt = dialog
+            .prompt_get_default_text()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
 
-        let host = view.uri()
+        let host = view
+            .uri()
             .and_then(|u| glib::Uri::parse(&u, glib::UriFlags::NONE).ok())
             .and_then(|u| u.host().map(|h| h.to_string()))
             .unwrap_or_else(|| tr("This page").to_string());
@@ -75,7 +85,8 @@ impl App {
         header_lbl.set_xalign(0.0);
         vbox.append(&header_lbl);
 
-        let msg_text = if dialog_type == ScriptDialogType::BeforeUnloadConfirm && message.is_empty() {
+        let msg_text = if dialog_type == ScriptDialogType::BeforeUnloadConfirm && message.is_empty()
+        {
             tr("Changes you made may not be saved. Are you sure you want to leave?").to_string()
         } else {
             message
@@ -122,7 +133,10 @@ impl App {
                         }
                         ScriptDialogType::Prompt => {
                             if confirmed {
-                                let text = prompt_entry.as_ref().map(|e| e.text().to_string()).unwrap_or_default();
+                                let text = prompt_entry
+                                    .as_ref()
+                                    .map(|e| e.text().to_string())
+                                    .unwrap_or_default();
                                 dialog.prompt_set_text(&text);
                                 dialog.confirm_set_confirmed(true);
                             } else {
@@ -140,7 +154,11 @@ impl App {
         };
 
         let cancel_btn = if dialog_type != ScriptDialogType::Alert {
-            let cancel_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm { tr("Stay") } else { tr("Cancel") };
+            let cancel_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm {
+                tr("Stay")
+            } else {
+                tr("Cancel")
+            };
             let cancel_btn = gtk::Button::with_label(cancel_label);
             cancel_btn.add_css_class("js-dialog-btn-cancel");
             btn_row.append(&cancel_btn);
@@ -149,7 +167,11 @@ impl App {
             None
         };
 
-        let ok_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm { tr("Leave") } else { tr("OK") };
+        let ok_label = if dialog_type == ScriptDialogType::BeforeUnloadConfirm {
+            tr("Leave")
+        } else {
+            tr("OK")
+        };
         let ok_btn = gtk::Button::with_label(ok_label);
         ok_btn.add_css_class("js-dialog-btn-ok");
         btn_row.append(&ok_btn);
@@ -206,7 +228,12 @@ impl App {
         }
     }
 
-    pub(crate) fn customize_context_menu(self: &Rc<Self>, view: &WebView, menu: &ContextMenu, hit: &HitTestResult) {
+    pub(crate) fn customize_context_menu(
+        self: &Rc<Self>,
+        view: &WebView,
+        menu: &ContextMenu,
+        hit: &HitTestResult,
+    ) {
         let is_link = hit.context_is_link();
         let link_uri = hit.link_uri().map(|s| s.to_string());
         let is_image = hit.context_is_image();
@@ -227,7 +254,11 @@ impl App {
                     app_t.new_tab_with_url(&uri_t);
                 });
                 self.win.add_action(&act_tab);
-                menu.append(&ContextMenuItem::from_gaction(&act_tab, tr("Open Link in New Tab"), None));
+                menu.append(&ContextMenuItem::from_gaction(
+                    &act_tab,
+                    tr("Open Link in New Tab"),
+                    None,
+                ));
 
                 let uri_s = uri.clone();
                 let app_s = self.clone();
@@ -236,7 +267,11 @@ impl App {
                     app_s.split_with_url(&uri_s);
                 });
                 self.win.add_action(&act_split);
-                menu.append(&ContextMenuItem::from_gaction(&act_split, tr("Open Link in Split View"), None));
+                menu.append(&ContextMenuItem::from_gaction(
+                    &act_split,
+                    tr("Open Link in Split View"),
+                    None,
+                ));
 
                 let uri_c = uri.clone();
                 let act_copy = gio::SimpleAction::new("ctx-copy-link", None);
@@ -246,7 +281,11 @@ impl App {
                     }
                 });
                 self.win.add_action(&act_copy);
-                menu.append(&ContextMenuItem::from_gaction(&act_copy, tr("Copy Link Address"), None));
+                menu.append(&ContextMenuItem::from_gaction(
+                    &act_copy,
+                    tr("Copy Link Address"),
+                    None,
+                ));
 
                 menu.append(&ContextMenuItem::from_stock_action_with_label(
                     ContextMenuAction::DownloadLinkToDisk,
@@ -267,7 +306,11 @@ impl App {
                     app_t.new_tab_with_url(&img_t);
                 });
                 self.win.add_action(&act_img);
-                menu.append(&ContextMenuItem::from_gaction(&act_img, tr("Open Image in New Tab"), None));
+                menu.append(&ContextMenuItem::from_gaction(
+                    &act_img,
+                    tr("Open Image in New Tab"),
+                    None,
+                ));
 
                 let img_c = img_url.clone();
                 let act_copy_img = gio::SimpleAction::new("ctx-copy-img-url", None);
@@ -277,7 +320,11 @@ impl App {
                     }
                 });
                 self.win.add_action(&act_copy_img);
-                menu.append(&ContextMenuItem::from_gaction(&act_copy_img, tr("Copy Image Address"), None));
+                menu.append(&ContextMenuItem::from_gaction(
+                    &act_copy_img,
+                    tr("Copy Image Address"),
+                    None,
+                ));
 
                 menu.append(&ContextMenuItem::from_stock_action_with_label(
                     ContextMenuAction::CopyImageToClipboard,
@@ -312,23 +359,45 @@ impl App {
 
         // 4. Editable text
         if is_editable {
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Cut, tr("Cut")));
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Copy, tr("Copy")));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::Cut,
+                tr("Cut"),
+            ));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::Copy,
+                tr("Copy"),
+            ));
             if self.clipboard_has_image() {
                 let app_p = self.clone();
                 let v_p = view.clone();
                 let act_paste = gio::SimpleAction::new("ctx-paste-image", None);
                 act_paste.connect_activate(move |_, _| app_p.paste_clipboard_image(v_p.clone()));
                 self.win.add_action(&act_paste);
-                menu.append(&ContextMenuItem::from_gaction(&act_paste, tr("Paste"), None));
+                menu.append(&ContextMenuItem::from_gaction(
+                    &act_paste,
+                    tr("Paste"),
+                    None,
+                ));
             } else {
-                menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Paste, tr("Paste")));
+                menu.append(&ContextMenuItem::from_stock_action_with_label(
+                    ContextMenuAction::Paste,
+                    tr("Paste"),
+                ));
             }
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::PasteAsPlainText, tr("Paste as Plain Text")));
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::SelectAll, tr("Select All")));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::PasteAsPlainText,
+                tr("Paste as Plain Text"),
+            ));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::SelectAll,
+                tr("Select All"),
+            ));
             menu.append(&ContextMenuItem::new_separator());
         } else if is_selection {
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Copy, tr("Copy")));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::Copy,
+                tr("Copy"),
+            ));
 
             let app_sel = self.clone();
             let v_sel = view.clone();
@@ -345,7 +414,10 @@ impl App {
                             let text = js_val.to_string();
                             let trimmed = text.trim();
                             if !trimmed.is_empty() {
-                                let search_url = format!("https://www.google.com/search?q={}", glib::Uri::escape_string(trimmed, None, false));
+                                let search_url = format!(
+                                    "https://www.google.com/search?q={}",
+                                    glib::Uri::escape_string(trimmed, None, false)
+                                );
                                 app_s.new_tab_with_url(&search_url);
                             }
                         }
@@ -353,19 +425,32 @@ impl App {
                 );
             });
             self.win.add_action(&act_search);
-            menu.append(&ContextMenuItem::from_gaction(&act_search, tr("Search Google for Selection"), None));
+            menu.append(&ContextMenuItem::from_gaction(
+                &act_search,
+                tr("Search Google for Selection"),
+                None,
+            ));
             menu.append(&ContextMenuItem::new_separator());
         }
 
         // 5. Page navigation
         if !is_link && !is_editable && !is_selection {
             if view.can_go_back() {
-                menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::GoBack, tr("Back")));
+                menu.append(&ContextMenuItem::from_stock_action_with_label(
+                    ContextMenuAction::GoBack,
+                    tr("Back"),
+                ));
             }
             if view.can_go_forward() {
-                menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::GoForward, tr("Forward")));
+                menu.append(&ContextMenuItem::from_stock_action_with_label(
+                    ContextMenuAction::GoForward,
+                    tr("Forward"),
+                ));
             }
-            menu.append(&ContextMenuItem::from_stock_action_with_label(ContextMenuAction::Reload, tr("Reload")));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::Reload,
+                tr("Reload"),
+            ));
             menu.append(&ContextMenuItem::new_separator());
         }
 
@@ -381,7 +466,10 @@ impl App {
                 let act_pwa = gio::SimpleAction::new("ctx-install-pwa", None);
                 act_pwa.connect_activate(move |_, _| {
                     let u = v_pwa.uri().map(|s| s.to_string()).unwrap_or_default();
-                    let t = v_pwa.title().map(|s| s.to_string()).unwrap_or_else(|| u.clone());
+                    let t = v_pwa
+                        .title()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| u.clone());
                     let pwa_info = crate::pwa::PwaAppInfo {
                         id: crate::pwa::slugify(&t),
                         name: t,
@@ -392,7 +480,11 @@ impl App {
                     crate::pwa::prompt_install_pwa_dialog(&app_pwa, &pwa_info);
                 });
                 self.win.add_action(&act_pwa);
-                menu.append(&ContextMenuItem::from_gaction(&act_pwa, tr("Install Page as Desktop App..."), None));
+                menu.append(&ContextMenuItem::from_gaction(
+                    &act_pwa,
+                    tr("Install Page as Desktop App..."),
+                    None,
+                ));
                 menu.append(&ContextMenuItem::new_separator());
             }
         }
@@ -425,13 +517,22 @@ fn permission_decisions_path() -> std::path::PathBuf {
 
 fn load_permission_decisions() -> std::collections::HashMap<(String, &'static str), bool> {
     let mut out = std::collections::HashMap::new();
-    let Ok(text) = std::fs::read_to_string(permission_decisions_path()) else { return out };
+    let Ok(text) = std::fs::read_to_string(permission_decisions_path()) else {
+        return out;
+    };
     for line in text.lines() {
         let mut parts = line.split('\t');
-        let (Some(host), Some(kind), Some(value)) = (parts.next(), parts.next(), parts.next()) else { continue };
+        let (Some(host), Some(kind), Some(value)) = (parts.next(), parts.next(), parts.next())
+        else {
+            continue;
+        };
         let kind: &'static str = match kind {
-            "mic" => "mic", "camera" => "camera", "camera+mic" => "camera+mic",
-            "geolocation" => "geolocation", "notifications" => "notifications", _ => continue,
+            "mic" => "mic",
+            "camera" => "camera",
+            "camera+mic" => "camera+mic",
+            "geolocation" => "geolocation",
+            "notifications" => "notifications",
+            _ => continue,
         };
         if !host.is_empty() && !host.chars().any(char::is_control) {
             out.insert((host.to_string(), kind), value == "allow");
@@ -443,15 +544,21 @@ fn load_permission_decisions() -> std::collections::HashMap<(String, &'static st
 fn save_permission_decisions(decisions: &std::collections::HashMap<(String, &'static str), bool>) {
     let path = permission_decisions_path();
     let Some(dir) = path.parent() else { return };
-    if std::fs::create_dir_all(dir).is_err() { return; }
+    if std::fs::create_dir_all(dir).is_err() {
+        return;
+    }
     let mut entries: Vec<_> = decisions.iter().collect();
     entries.sort_by(|a, b| a.0.cmp(b.0));
     let mut data = String::new();
     for ((host, kind), allowed) in entries {
-        if host.chars().any(char::is_control) { continue; }
+        if host.chars().any(char::is_control) {
+            continue;
+        }
         data.push_str(host);
-        data.push('\t'); data.push_str(kind);
-        data.push('\t'); data.push_str(if *allowed { "allow" } else { "deny" });
+        data.push('\t');
+        data.push_str(kind);
+        data.push('\t');
+        data.push_str(if *allowed { "allow" } else { "deny" });
         data.push('\n');
     }
     let tmp = path.with_extension("tsv.tmp");
@@ -490,22 +597,39 @@ fn permission_label(kind: &str) -> &'static str {
 }
 
 impl App {
-    pub(crate) fn handle_permission_request(self: &Rc<Self>, view: &WebView, req: &webkit6::PermissionRequest) -> bool {
-        let Some(kind) = permission_kind(req) else { return false };
-        let host = view.uri()
+    pub(crate) fn handle_permission_request(
+        self: &Rc<Self>,
+        view: &WebView,
+        req: &webkit6::PermissionRequest,
+    ) -> bool {
+        let Some(kind) = permission_kind(req) else {
+            return false;
+        };
+        let host = view
+            .uri()
             .and_then(|u| glib::Uri::parse(&u, glib::UriFlags::NONE).ok())
             .and_then(|u| u.host().map(|h| h.to_string()))
             .unwrap_or_else(|| tr("This page").to_string());
-        let remembered = PERMISSION_DECISIONS.with(|m| m.borrow().get(&(host.clone(), kind)).copied());
+        let remembered =
+            PERMISSION_DECISIONS.with(|m| m.borrow().get(&(host.clone(), kind)).copied());
         if let Some(allowed) = remembered {
-            if allowed { req.allow(); } else { req.deny(); }
+            if allowed {
+                req.allow();
+            } else {
+                req.deny();
+            }
             return true;
         }
         self.show_permission_popup(host, kind, req.clone());
         true
     }
 
-    fn show_permission_popup(self: &Rc<Self>, host: String, kind: &'static str, req: webkit6::PermissionRequest) {
+    fn show_permission_popup(
+        self: &Rc<Self>,
+        host: String,
+        kind: &'static str,
+        req: webkit6::PermissionRequest,
+    ) {
         let title_text = trf("{} wants to", &[&host]);
         let vbox = gtk::Box::new(gtk::Orientation::Vertical, 10);
         vbox.add_css_class("js-dialog-window");
@@ -536,7 +660,11 @@ impl App {
                 if done.replace(true) {
                     return;
                 }
-                if allow { req.allow(); } else { req.deny(); }
+                if allow {
+                    req.allow();
+                } else {
+                    req.deny();
+                }
                 if remember {
                     PERMISSION_DECISIONS.with(|m| {
                         let mut decisions = m.borrow_mut();
@@ -557,7 +685,12 @@ impl App {
             b.connect_clicked(move |_| f(allow, remember));
             vbox.append(&b);
         };
-        add_btn(tr("Always allow on this site"), "js-dialog-btn-ok", true, true);
+        add_btn(
+            tr("Always allow on this site"),
+            "js-dialog-btn-ok",
+            true,
+            true,
+        );
         add_btn(tr("Allow this time"), "js-dialog-btn-cancel", true, false);
         add_btn(tr("Never allow"), "js-dialog-btn-cancel", false, true);
 
@@ -580,9 +713,7 @@ impl App {
 
     /// Open File dialog (Ctrl+O) to view local HTML, PDF, image, video, audio or text files
     pub(crate) fn open_file_dialog(self: &Rc<Self>) {
-        let dialog = gtk::FileDialog::builder()
-            .title(tr("Open File"))
-            .build();
+        let dialog = gtk::FileDialog::builder().title(tr("Open File")).build();
         let app = self.clone();
         dialog.open(Some(&self.win), gio::Cancellable::NONE, move |res| {
             if let Ok(file) = res {

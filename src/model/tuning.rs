@@ -5,8 +5,10 @@ pub(crate) const OV_ZOOM: f64 = 0.4;
 pub(crate) const OV_ZOOM_MIN: f64 = 0.18;
 pub(crate) const OV_ZOOM_MAX: f64 = 0.85;
 /// Page zoom (Ctrl +/-/0): Chrome-style steps, 20%..500%.
-pub(crate) const PAGE_ZOOM_STEPS: [f64; 18] =
-    [0.20, 0.25, 0.33, 0.50, 0.67, 0.75, 0.80, 0.90, 1.0, 1.10, 1.25, 1.50, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0];
+pub(crate) const PAGE_ZOOM_STEPS: [f64; 18] = [
+    0.20, 0.25, 0.33, 0.50, 0.67, 0.75, 0.80, 0.90, 1.0, 1.10, 1.25, 1.50, 1.75, 2.0, 2.5, 3.0,
+    4.0, 5.0,
+];
 
 /// Next page zoom step above (`dir > 0`) or below (`dir < 0`) `cur`; clamped to 20%..500%.
 pub(crate) fn next_page_zoom(cur: f64, dir: i32) -> f64 {
@@ -14,9 +16,18 @@ pub(crate) fn next_page_zoom(cur: f64, dir: i32) -> f64 {
     let min = PAGE_ZOOM_STEPS[0];
     let max = PAGE_ZOOM_STEPS[PAGE_ZOOM_STEPS.len() - 1];
     if dir > 0 {
-        PAGE_ZOOM_STEPS.iter().copied().find(|z| *z > cur + EPS).unwrap_or(max)
+        PAGE_ZOOM_STEPS
+            .iter()
+            .copied()
+            .find(|z| *z > cur + EPS)
+            .unwrap_or(max)
     } else {
-        PAGE_ZOOM_STEPS.iter().rev().copied().find(|z| *z < cur - EPS).unwrap_or(min)
+        PAGE_ZOOM_STEPS
+            .iter()
+            .rev()
+            .copied()
+            .find(|z| *z < cur - EPS)
+            .unwrap_or(min)
     }
 }
 
@@ -42,7 +53,10 @@ pub(crate) const BLANK_TAB_SUSPEND_SECS: u64 = 20;
 pub(crate) fn memory_pressure_avg10() -> Option<f64> {
     let text = std::fs::read_to_string("/proc/pressure/memory").ok()?;
     let line = text.lines().find(|l| l.starts_with("some"))?;
-    line.split_whitespace().find_map(|t| t.strip_prefix("avg10="))?.parse().ok()
+    line.split_whitespace()
+        .find_map(|t| t.strip_prefix("avg10="))?
+        .parse()
+        .ok()
 }
 
 /// MemAvailable (MiB) from /proc/meminfo.
@@ -63,12 +77,22 @@ pub(crate) fn swap_under_pressure() -> bool {
     let mut free = 0u64;
     for line in text.lines() {
         if let Some(rest) = line.strip_prefix("SwapTotal:") {
-            total = rest.split_whitespace().next().and_then(|s| s.parse().ok()).unwrap_or(0);
+            total = rest
+                .split_whitespace()
+                .next()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
         } else if let Some(rest) = line.strip_prefix("SwapFree:") {
-            free = rest.split_whitespace().next().and_then(|s| s.parse().ok()).unwrap_or(0);
+            free = rest
+                .split_whitespace()
+                .next()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
         }
     }
-    if total < 1024 { return false; } // no meaningful swap
+    if total < 1024 {
+        return false;
+    } // no meaningful swap
     // <15% free or <256 MiB free while most swap is used
     free * 100 / total < 15 || (total - free > 512 * 1024 && free < 256 * 1024)
 }

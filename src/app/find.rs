@@ -42,14 +42,18 @@ impl FindUi {
             self.bar.add_css_class("find-none");
         } else {
             self.bar.remove_css_class("find-none");
-            self.count.set_text(&format!("{}/{}", self.idx.get().clamp(1, total), total));
+            self.count
+                .set_text(&format!("{}/{}", self.idx.get().clamp(1, total), total));
         }
     }
 }
 
 impl App {
     pub(crate) fn find_is_open(&self) -> bool {
-        self.find_ui.borrow().as_ref().is_some_and(|u| u.bar.is_visible())
+        self.find_ui
+            .borrow()
+            .as_ref()
+            .is_some_and(|u| u.bar.is_visible())
     }
 
     fn find_build(self: &Rc<Self>) -> Option<Rc<FindUi>> {
@@ -127,7 +131,9 @@ impl App {
     fn find_bind(&self, ui: &Rc<FindUi>, v: &WebView) {
         ui.unhook();
         *ui.view.borrow_mut() = Some(v.clone());
-        let Some(fc) = v.find_controller() else { return };
+        let Some(fc) = v.find_controller() else {
+            return;
+        };
         let u = ui.clone();
         let h1 = fc.connect_found_text(move |_, _| {
             // This signal only confirms a found match; never overwrite the total here.
@@ -170,8 +176,12 @@ impl App {
         if self.palette_open() || self.settings_modal_open() || self.overview_open() {
             return false;
         }
-        let Some(v) = self.focused_view() else { return false };
-        let Some(ui) = self.find_build() else { return false };
+        let Some(v) = self.focused_view() else {
+            return false;
+        };
+        let Some(ui) = self.find_build() else {
+            return false;
+        };
         let same = ui.view.borrow().as_ref() == Some(&v);
         if !same {
             if let Some(old) = ui.view.borrow().clone() {
@@ -192,7 +202,9 @@ impl App {
 
     /// Panelni yopadi, belgilashlarni olib tashlaydi. `refocus` — fokus sahifaga qaytsin.
     pub(crate) fn find_close(self: &Rc<Self>, refocus: bool) {
-        let Some(ui) = self.find_ui.borrow().clone() else { return };
+        let Some(ui) = self.find_ui.borrow().clone() else {
+            return;
+        };
         ui.bar.set_visible(false);
         let view = ui.view.borrow_mut().take();
         ui.unhook();
@@ -209,9 +221,15 @@ impl App {
     }
 
     fn find_run(self: &Rc<Self>) {
-        let Some(ui) = self.find_ui.borrow().clone() else { return };
-        let Some(v) = ui.view.borrow().clone() else { return };
-        let Some(fc) = v.find_controller() else { return };
+        let Some(ui) = self.find_ui.borrow().clone() else {
+            return;
+        };
+        let Some(v) = ui.view.borrow().clone() else {
+            return;
+        };
+        let Some(fc) = v.find_controller() else {
+            return;
+        };
         let text = ui.entry.text().to_string();
         ui.total.set(0);
         ui.idx.set(0);
@@ -232,9 +250,15 @@ impl App {
         if !self.find_is_open() {
             return false;
         }
-        let Some(ui) = self.find_ui.borrow().clone() else { return false };
-        let Some(v) = ui.view.borrow().clone() else { return false };
-        let Some(fc) = v.find_controller() else { return false };
+        let Some(ui) = self.find_ui.borrow().clone() else {
+            return false;
+        };
+        let Some(v) = ui.view.borrow().clone() else {
+            return false;
+        };
+        let Some(fc) = v.find_controller() else {
+            return false;
+        };
         if ui.entry.text().is_empty() {
             return true;
         }
@@ -260,7 +284,11 @@ impl App {
         if !self.find_is_open() {
             return;
         }
-        let bound = self.find_ui.borrow().as_ref().and_then(|u| u.view.borrow().clone());
+        let bound = self
+            .find_ui
+            .borrow()
+            .as_ref()
+            .and_then(|u| u.view.borrow().clone());
         if self.focused_view() != bound {
             self.find_close(false);
         }

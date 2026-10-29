@@ -93,7 +93,9 @@ impl App {
         let back = hdr_btn("back", view.can_go_back());
         let (v, p) = (view.clone(), pop.downgrade());
         back.connect_clicked(move |_| {
-            if let Some(p) = p.upgrade() { p.popdown(); }
+            if let Some(p) = p.upgrade() {
+                p.popdown();
+            }
             v.go_back();
         });
         hdr.append(&back);
@@ -101,7 +103,9 @@ impl App {
         let fwd = hdr_btn("forward", view.can_go_forward());
         let (v, p) = (view.clone(), pop.downgrade());
         fwd.connect_clicked(move |_| {
-            if let Some(p) = p.upgrade() { p.popdown(); }
+            if let Some(p) = p.upgrade() {
+                p.popdown();
+            }
             v.go_forward();
         });
         hdr.append(&fwd);
@@ -109,7 +113,9 @@ impl App {
         let reload = hdr_btn("reload", true);
         let (v, p) = (view.clone(), pop.downgrade());
         reload.connect_clicked(move |_| {
-            if let Some(p) = p.upgrade() { p.popdown(); }
+            if let Some(p) = p.upgrade() {
+                p.popdown();
+            }
             v.reload();
         });
         hdr.append(&reload);
@@ -119,7 +125,9 @@ impl App {
         let qr = menu_row("qr", tr("Create QR Code for page"), "", is_web_uri(&uri));
         let (app, p, u) = (self.clone(), pop.downgrade(), uri.clone());
         qr.connect_clicked(move |_| {
-            if let Some(p) = p.upgrade() { p.popdown(); }
+            if let Some(p) = p.upgrade() {
+                p.popdown();
+            }
             app.show_qr_window(&u);
         });
         col.append(&qr);
@@ -129,7 +137,9 @@ impl App {
             let row = menu_row("translate-menu", tr("Show Original Page"), "", true);
             let (v, p) = (view.clone(), pop.downgrade());
             row.connect_clicked(move |_| {
-                if let Some(p) = p.upgrade() { p.popdown(); }
+                if let Some(p) = p.upgrade() {
+                    p.popdown();
+                }
                 v.load_uri(&original);
             });
             col.append(&row);
@@ -139,7 +149,9 @@ impl App {
             let row = menu_row("translate-menu", &label, "", true);
             let (v, p) = (view.clone(), pop.downgrade());
             row.connect_clicked(move |_| {
-                if let Some(p) = p.upgrade() { p.popdown(); }
+                if let Some(p) = p.upgrade() {
+                    p.popdown();
+                }
                 translate_page(&v);
             });
             col.append(&row);
@@ -148,7 +160,9 @@ impl App {
         let shot = menu_row("screenshot", tr("Take Screenshot"), "", is_web_uri(&uri));
         let (app, p, v) = (self.clone(), pop.downgrade(), view.clone());
         shot.connect_clicked(move |_| {
-            if let Some(p) = p.upgrade() { p.popdown(); }
+            if let Some(p) = p.upgrade() {
+                p.popdown();
+            }
             app.start_screenshot_mode(&v);
         });
         col.append(&shot);
@@ -156,7 +170,9 @@ impl App {
         let src = menu_row("source", tr("View Page Source"), "Ctrl+U", is_web_uri(&uri));
         let (app, p, u) = (self.clone(), pop.downgrade(), uri.clone());
         src.connect_clicked(move |_| {
-            if let Some(p) = p.upgrade() { p.popdown(); }
+            if let Some(p) = p.upgrade() {
+                p.popdown();
+            }
             app.new_tab_with_url(&format!("view-source:{u}"));
         });
         col.append(&src);
@@ -168,7 +184,9 @@ impl App {
         let inspect = menu_row("inspect", tr("Inspect"), &insp_sc, true);
         let (app, p) = (self.clone(), pop.downgrade());
         inspect.connect_clicked(move |_| {
-            if let Some(p) = p.upgrade() { p.popdown(); }
+            if let Some(p) = p.upgrade() {
+                p.popdown();
+            }
             app.show_devtools();
         });
         col.append(&inspect);
@@ -210,7 +228,11 @@ impl App {
     pub(crate) fn show_qr_window(self: &Rc<Self>, url: &str) {
         self.hide_qr_modal();
 
-        let root_overlay = match self.win.child().and_then(|c| c.downcast::<gtk::Overlay>().ok()) {
+        let root_overlay = match self
+            .win
+            .child()
+            .and_then(|c| c.downcast::<gtk::Overlay>().ok())
+        {
             Some(ov) => ov,
             None => return,
         };
@@ -340,11 +362,14 @@ impl App {
                 if let Some(btn) = btn_c.upgrade() {
                     btn.set_label(tr("Copied!"));
                     let b = btn.downgrade();
-                    glib::timeout_add_local_once(std::time::Duration::from_millis(1500), move || {
-                        if let Some(btn) = b.upgrade() {
-                            btn.set_label(tr("Copy"));
-                        }
-                    });
+                    glib::timeout_add_local_once(
+                        std::time::Duration::from_millis(1500),
+                        move || {
+                            if let Some(btn) = b.upgrade() {
+                                btn.set_label(tr("Copy"));
+                            }
+                        },
+                    );
                 }
                 if let Some(app) = app_c.upgrade() {
                     app.show_copied_toast(tr("Copied!"), &url_c);

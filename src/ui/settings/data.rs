@@ -73,7 +73,9 @@ pub(crate) fn build_data_page(settings_stack: &gtk::Stack) -> DataPage {
     sync_title.add_css_class("data-section-title");
     sync_title.set_xalign(0.0);
 
-    let sync_desc = gtk::Label::new(Some(tr("Upload all workspaces, tabs, profiles, logins and settings with mandatory password encryption. Generates a secure sync link.")));
+    let sync_desc = gtk::Label::new(Some(tr(
+        "Upload all workspaces, tabs, profiles, logins and settings with mandatory password encryption. Generates a secure sync link.",
+    )));
     sync_desc.add_css_class("data-section-desc");
     sync_desc.set_xalign(0.0);
     sync_desc.set_wrap(true);
@@ -139,7 +141,9 @@ pub(crate) fn build_data_page(settings_stack: &gtk::Stack) -> DataPage {
     restore_title.add_css_class("data-section-title");
     restore_title.set_xalign(0.0);
 
-    let restore_desc = gtk::Label::new(Some(tr("Enter a sync URL or Sync ID. You must enter the decryption password to restore your data.")));
+    let restore_desc = gtk::Label::new(Some(tr(
+        "Enter a sync URL or Sync ID. You must enter the decryption password to restore your data.",
+    )));
     restore_desc.add_css_class("data-section-desc");
     restore_desc.set_xalign(0.0);
     restore_desc.set_wrap(true);
@@ -148,7 +152,9 @@ pub(crate) fn build_data_page(settings_stack: &gtk::Stack) -> DataPage {
     let sync_restore_entry = gtk::Entry::new();
     sync_restore_entry.add_css_class("profile-entry-box");
     sync_restore_entry.set_hexpand(true);
-    sync_restore_entry.set_placeholder_text(Some(tr("Enter Sync URL (e.g. https://.../sync?id=...) or Sync ID...")));
+    sync_restore_entry.set_placeholder_text(Some(tr(
+        "Enter Sync URL (e.g. https://.../sync?id=...) or Sync ID...",
+    )));
 
     let btn_sync_restore = gtk::Button::with_label(tr("Restore Data"));
     btn_sync_restore.add_css_class("btn-data-primary");
@@ -168,7 +174,9 @@ pub(crate) fn build_data_page(settings_stack: &gtk::Stack) -> DataPage {
     local_import_title.add_css_class("data-section-title");
     local_import_title.set_xalign(0.0);
 
-    let local_import_desc = gtk::Label::new(Some(tr("Restore workspaces and data from an offline .tar.gz archive.")));
+    let local_import_desc = gtk::Label::new(Some(tr(
+        "Restore workspaces and data from an offline .tar.gz archive.",
+    )));
     local_import_desc.add_css_class("data-section-desc");
     local_import_desc.set_xalign(0.0);
 
@@ -198,7 +206,9 @@ pub(crate) fn build_data_page(settings_stack: &gtk::Stack) -> DataPage {
     maint_title.add_css_class("data-section-title");
     maint_title.set_xalign(0.0);
 
-    let maint_desc = gtk::Label::new(Some(tr("Clear local Omnibar suggestions history or purge temporary network disk caches.")));
+    let maint_desc = gtk::Label::new(Some(tr(
+        "Clear local Omnibar suggestions history or purge temporary network disk caches.",
+    )));
     maint_desc.add_css_class("data-section-desc");
     maint_desc.set_xalign(0.0);
 
@@ -279,7 +289,11 @@ pub(crate) fn build_data_page(settings_stack: &gtk::Stack) -> DataPage {
     data_page_title.add_css_class("settings-page-title");
     data_page_title.set_xalign(0.0);
     let data_page_subtitle = gtk::Label::new(None);
-    sc_bind_text(&data_page_subtitle, "End-to-end encrypted backup, browsing history and instant cloud synchronization  (Alt+I)", &["data"]);
+    sc_bind_text(
+        &data_page_subtitle,
+        "End-to-end encrypted backup, browsing history and instant cloud synchronization  (Alt+I)",
+        &["data"],
+    );
     data_page_subtitle.add_css_class("settings-page-subtitle");
     data_page_subtitle.set_xalign(0.0);
 
@@ -347,7 +361,9 @@ pub(crate) fn render_history_list(
             } else if dt.year() == now.year() && dt.day_of_year() + 1 == now.day_of_year() {
                 tr("Yesterday").to_string()
             } else {
-                dt.format("%A, %d %B %Y").unwrap_or_else(|_| dt.format("%Y-%m-%d").unwrap()).to_string()
+                dt.format("%A, %d %B %Y")
+                    .unwrap_or_else(|_| dt.format("%Y-%m-%d").unwrap())
+                    .to_string()
             }
         } else {
             tr("Earlier").to_string()

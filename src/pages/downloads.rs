@@ -24,16 +24,24 @@ pub(crate) fn downloads_json_path() -> PathBuf {
 }
 
 pub(crate) fn load_downloads_from_disk() {
-    let Ok(text) = std::fs::read_to_string(downloads_json_path()) else { return; };
+    let Ok(text) = std::fs::read_to_string(downloads_json_path()) else {
+        return;
+    };
     // Simple line format: id\tstatus\tfilename\tpath\turl
     DOWNLOADS.with(|d| {
         let mut v = d.borrow_mut();
-        if !v.is_empty() { return; }
+        if !v.is_empty() {
+            return;
+        }
         for line in text.lines() {
             let parts: Vec<&str> = line.splitn(5, '\t').collect();
-            if parts.len() < 5 { continue; }
+            if parts.len() < 5 {
+                continue;
+            }
             let id: u64 = parts[0].parse().unwrap_or(0);
-            if id == 0 { continue; }
+            if id == 0 {
+                continue;
+            }
             v.push(DownloadEntry {
                 id,
                 status: parts[1].to_string(),
@@ -45,7 +53,9 @@ pub(crate) fn load_downloads_from_disk() {
                 received: 0,
             });
             DOWNLOAD_SEQ.with(|s| {
-                if id >= s.get() { s.set(id + 1); }
+                if id >= s.get() {
+                    s.set(id + 1);
+                }
             });
         }
     });
@@ -56,8 +66,13 @@ pub(crate) fn save_downloads_to_disk() {
         let mut out = String::new();
         for e in d.borrow().iter() {
             // keep finished/failed history
-            if e.status == "downloading" { continue; }
-            out.push_str(&format!("{}\t{}\t{}\t{}\t{}\n", e.id, e.status, e.filename, e.path, e.url));
+            if e.status == "downloading" {
+                continue;
+            }
+            out.push_str(&format!(
+                "{}\t{}\t{}\t{}\t{}\n",
+                e.id, e.status, e.filename, e.path, e.url
+            ));
         }
         let _ = std::fs::write(downloads_json_path(), out);
     });
@@ -68,16 +83,18 @@ pub(crate) fn downloads_page() -> String {
     let rows = DOWNLOADS.with(|d| {
         let list = d.borrow();
         if list.is_empty() {
-            return format!(
-                "<div class=\"empty\">{}</div>",
-                tr("No downloads yet")
-            );
+            return format!("<div class=\"empty\">{}</div>", tr("No downloads yet"));
         }
         let mut html = String::new();
         for e in list.iter().rev() {
             let pct = (e.progress * 100.0).round() as i32;
             let size = if e.total > 0 {
-                format!("{} / {} · {}%", format_bytes(e.received), format_bytes(e.total), pct)
+                format!(
+                    "{} / {} · {}%",
+                    format_bytes(e.received),
+                    format_bytes(e.total),
+                    pct
+                )
             } else if e.received > 0 {
                 format_bytes(e.received)
             } else {
@@ -108,7 +125,7 @@ pub(crate) fn downloads_page() -> String {
         html
     });
     format!(
-r#"<!doctype html>
+        r#"<!doctype html>
 <html lang="{lang}">
 <head>
 <meta charset="utf-8">
@@ -223,9 +240,15 @@ r#"<!doctype html>
 }
 
 pub(crate) fn format_bytes(n: i64) -> String {
-    if n < 1024 { return format!("{} B", n); }
-    if n < 1024 * 1024 { return format!("{:.1} KB", n as f64 / 1024.0); }
-    if n < 1024 * 1024 * 1024 { return format!("{:.1} MB", n as f64 / (1024.0 * 1024.0)); }
+    if n < 1024 {
+        return format!("{} B", n);
+    }
+    if n < 1024 * 1024 {
+        return format!("{:.1} KB", n as f64 / 1024.0);
+    }
+    if n < 1024 * 1024 * 1024 {
+        return format!("{:.1} MB", n as f64 / (1024.0 * 1024.0));
+    }
     format!("{:.2} GB", n as f64 / (1024.0 * 1024.0 * 1024.0))
 }
 
@@ -237,9 +260,16 @@ pub(crate) fn attach_download_handlers_once(session: &webkit6::NetworkSession) {
     let key = session.as_ptr() as usize;
     let already = HOOKED.with(|h| {
         let mut s = h.borrow_mut();
-        if s.contains(&key) { true } else { s.insert(key); false }
+        if s.contains(&key) {
+            true
+        } else {
+            s.insert(key);
+            false
+        }
     });
-    if already { return; }
+    if already {
+        return;
+    }
     attach_download_handlers(session);
 }
 
@@ -249,20 +279,29 @@ pub(crate) fn attach_download_handlers(session: &webkit6::NetworkSession) {
             .unwrap_or_else(|| glib::home_dir().join("Downloads"));
         let _ = std::fs::create_dir_all(&dest_dir);
 
-        let uri = download.request()
+        let uri = download
+            .request()
             .and_then(|r| r.uri())
             .map(|s| s.to_string())
             .unwrap_or_default();
-        let suggested = download.destination()
+        let suggested = download
+            .destination()
             .map(|s| s.to_string())
             .filter(|s| !s.is_empty())
             .or_else(|| {
                 // from URI path
-                uri.rsplit('/').next().map(|s| s.to_string()).filter(|s| !s.is_empty())
+                uri.rsplit('/')
+                    .next()
+                    .map(|s| s.to_string())
+                    .filter(|s| !s.is_empty())
             })
             .unwrap_or_else(|| "download".to_string());
         // strip query
-        let suggested = suggested.split('?').next().unwrap_or("download").to_string();
+        let suggested = suggested
+            .split('?')
+            .next()
+            .unwrap_or("download")
+            .to_string();
         let mut final_name = suggested.clone();
         let mut path = dest_dir.join(&final_name);
         if path.exists() {
@@ -313,7 +352,11 @@ pub(crate) fn attach_download_handlers(session: &webkit6::NetworkSession) {
             let received = dl.received_data_length() as i64;
             // estimated_progress is 0..1
             let prog = dl.estimated_progress();
-            let total = if prog > 0.01 { (received as f64 / prog) as i64 } else { 0 };
+            let total = if prog > 0.01 {
+                (received as f64 / prog) as i64
+            } else {
+                0
+            };
             DOWNLOADS.with(|d| {
                 if let Some(e) = d.borrow_mut().iter_mut().find(|e| e.id == id_c) {
                     e.received = received;

@@ -28,7 +28,8 @@ pub(crate) fn build_profiles_page(settings_stack: &gtk::Stack) -> ProfilesPage {
 
     let new_profile_entry = gtk::Entry::new();
     new_profile_entry.add_css_class("profile-entry-box");
-    new_profile_entry.set_placeholder_text(Some(tr("Enter unique profile name (e.g. Work, School)...")));
+    new_profile_entry
+        .set_placeholder_text(Some(tr("Enter unique profile name (e.g. Work, School)...")));
     new_profile_entry.set_hexpand(true);
 
     let new_profile_error_lbl = gtk::Label::new(None);
@@ -77,7 +78,11 @@ pub(crate) fn build_profiles_page(settings_stack: &gtk::Stack) -> ProfilesPage {
     prof_page_title.add_css_class("settings-page-title");
     prof_page_title.set_xalign(0.0);
     let prof_page_subtitle = gtk::Label::new(None);
-    sc_bind_text(&prof_page_subtitle, "Isolated workspaces, sessions & cookie storage  (Alt+P)", &["profiles"]);
+    sc_bind_text(
+        &prof_page_subtitle,
+        "Isolated workspaces, sessions & cookie storage  (Alt+P)",
+        &["profiles"],
+    );
     prof_page_subtitle.add_css_class("settings-page-subtitle");
     prof_page_subtitle.set_xalign(0.0);
     prof_page_subtitle.set_wrap(true);
@@ -98,5 +103,13 @@ pub(crate) fn build_profiles_page(settings_stack: &gtk::Stack) -> ProfilesPage {
     page_prof_scroll.set_child(Some(&page_profiles));
     settings_stack.add_named(&page_prof_scroll, Some("profiles"));
 
-    ProfilesPage { add_prof_btn, color_btns, new_profile_color_idx, new_profile_entry, new_profile_error_lbl, page_prof_scroll, profiles_list_box }
+    ProfilesPage {
+        add_prof_btn,
+        color_btns,
+        new_profile_color_idx,
+        new_profile_entry,
+        new_profile_error_lbl,
+        page_prof_scroll,
+        profiles_list_box,
+    }
 }

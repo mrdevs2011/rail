@@ -77,5 +77,11 @@ pub(crate) fn build_minimap() -> MinimapWidgets {
     map_container.append(&map_header_row);
     map_container.append(&map_overlay);
 
-    MinimapWidgets { map_close_btn, map_container, map_drawing_area, map_header_row, map_location_btn }
+    MinimapWidgets {
+        map_close_btn,
+        map_container,
+        map_drawing_area,
+        map_header_row,
+        map_location_btn,
+    }
 }

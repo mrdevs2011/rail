@@ -214,13 +214,37 @@ pub(crate) fn list_installed_pwas() -> Vec<PwaAppInfo> {
         let meta_file = entry.path().join("app.json");
         if let Ok(content) = std::fs::read_to_string(meta_file) {
             if let Some(json) = crate::minijson::parse(&content) {
-                let id = json.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let name = json.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let url = json.get("url").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let icon_url = json.get("icon").and_then(|v| v.as_str()).map(|s| s.to_string());
-                let theme_color = json.get("theme_color").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let id = json
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let name = json
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let url = json
+                    .get("url")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let icon_url = json
+                    .get("icon")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let theme_color = json
+                    .get("theme_color")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
                 if !name.is_empty() && !url.is_empty() {
-                    list.push(PwaAppInfo { id, name, url, icon_url, theme_color });
+                    list.push(PwaAppInfo {
+                        id,
+                        name,
+                        url,
+                        icon_url,
+                        theme_color,
+                    });
                 }
             }
         }
@@ -273,7 +297,9 @@ pub(crate) fn prompt_install_pwa_dialog(app: &Rc<App>, info: &PwaAppInfo) {
     title_lbl.add_css_class("js-dialog-title");
     title_lbl.set_xalign(0.0);
 
-    let desc_lbl = gtk::Label::new(Some(tr("The app will open in a fast standalone window and be added to your system application launcher.")));
+    let desc_lbl = gtk::Label::new(Some(tr(
+        "The app will open in a fast standalone window and be added to your system application launcher.",
+    )));
     desc_lbl.add_css_class("js-dialog-message");
     desc_lbl.set_xalign(0.0);
     desc_lbl.set_wrap(true);
@@ -318,7 +344,11 @@ pub(crate) fn prompt_install_pwa_dialog(app: &Rc<App>, info: &PwaAppInfo) {
 
     install_btn.connect_clicked(move |_| {
         let name = name_ent.text().to_string();
-        let name = if name.trim().is_empty() { info_inst.name.clone() } else { name };
+        let name = if name.trim().is_empty() {
+            info_inst.name.clone()
+        } else {
+            name
+        };
         win_inst.close();
 
         let app_cb = app_inst.clone();
@@ -352,11 +382,7 @@ pub(crate) fn prompt_install_pwa_dialog(app: &Rc<App>, info: &PwaAppInfo) {
 }
 
 /// Standalone PWA Window: opens when `rail --app="https://..."` is executed or app is launched
-pub(crate) fn open_pwa_window(
-    app: &gtk::Application,
-    url: &str,
-    title_override: Option<&str>,
-) {
+pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override: Option<&str>) {
     let win = gtk::ApplicationWindow::builder()
         .application(app)
         .title(title_override.unwrap_or(url))

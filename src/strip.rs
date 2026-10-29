@@ -56,7 +56,6 @@ pub fn col_width_animated(progress: f64, viewport: f64) -> f64 {
     }
 }
 
-
 /// Height of one window inside a column that stacks `k` windows (niri-style column).
 pub fn stack_height(vh: f64, k: usize, g: f64) -> f64 {
     if k <= 1 {
@@ -79,7 +78,6 @@ pub fn group_ranges(ids: &[u64]) -> Vec<(usize, usize)> {
     }
     out
 }
-
 
 mod imp {
     use super::*;
@@ -133,7 +131,17 @@ mod imp {
         /// A margin keeps neighbours mapped so they are already painted when they slide into view, and the
         /// column holding keyboard focus is never hidden.
         #[allow(clippy::too_many_arguments)]
-        fn apply_visibility(&self, c: &gtk::Widget, x: f64, y: f64, w: f64, h: f64, vw: f64, vh: f64, focus: Option<&gtk::Widget>) {
+        fn apply_visibility(
+            &self,
+            c: &gtk::Widget,
+            x: f64,
+            y: f64,
+            w: f64,
+            h: f64,
+            vw: f64,
+            vh: f64,
+            focus: Option<&gtk::Widget>,
+        ) {
             if vw <= 1.0 || vh <= 1.0 {
                 return;
             }
@@ -165,12 +173,18 @@ mod imp {
     }
 
     impl LayoutManagerImpl for StripLayout {
-        fn measure(&self, _w: &gtk::Widget, _o: gtk::Orientation, _for_size: i32) -> (i32, i32, i32, i32) {
+        fn measure(
+            &self,
+            _w: &gtk::Widget,
+            _o: gtk::Orientation,
+            _for_size: i32,
+        ) -> (i32, i32, i32, i32) {
             (0, 0, -1, -1)
         }
 
         fn allocate(&self, widget: &gtk::Widget, width: i32, height: i32, _baseline: i32) {
-            let resized = self.width.replace(width) != width || self.height.replace(height) != height;
+            let resized =
+                self.width.replace(width) != width || self.height.replace(height) != height;
             if resized {
                 if let Some(cb) = self.on_resize.borrow().clone() {
                     glib::idle_add_local_once(move || cb());
@@ -219,7 +233,16 @@ mod imp {
                     let t = gsk::Transform::new()
                         .translate(&graphene::Point::new(tx, ty))
                         .scale(z as f32, z as f32);
-                    self.apply_visibility(&c, tx as f64, ty as f64, cw * z, height as f64 * z, vw, vh, focus.as_ref());
+                    self.apply_visibility(
+                        &c,
+                        tx as f64,
+                        ty as f64,
+                        cw * z,
+                        height as f64 * z,
+                        vw,
+                        vh,
+                        focus.as_ref(),
+                    );
                     c.allocate(cw as i32, height, -1, Some(t));
                     x += cw + g;
                     child = c.next_sibling();
@@ -238,7 +261,9 @@ mod imp {
                 let mut col_x = 0.0;
                 for (start, len) in groups {
                     let is_full = row[start];
-                    let cw = if let Some(Some(cw_val)) = c_widths.get(r_idx).and_then(|r| r.get(start)) {
+                    let cw = if let Some(Some(cw_val)) =
+                        c_widths.get(r_idx).and_then(|r| r.get(start))
+                    {
                         cw_val.clamp(280.0, vw)
                     } else {
                         let prog = cur_prog
@@ -279,8 +304,21 @@ mod imp {
                         let t = gsk::Transform::new()
                             .translate(&graphene::Point::new(tx, ty))
                             .scale(z as f32, z as f32);
-                        let ch = if len == 1 { height } else { ch_f.round() as i32 };
-                        self.apply_visibility(&c, tx as f64, ty as f64, cw.round() * z, ch as f64 * z, vw, vh, focus.as_ref());
+                        let ch = if len == 1 {
+                            height
+                        } else {
+                            ch_f.round() as i32
+                        };
+                        self.apply_visibility(
+                            &c,
+                            tx as f64,
+                            ty as f64,
+                            cw.round() * z,
+                            ch as f64 * z,
+                            vw,
+                            vh,
+                            focus.as_ref(),
+                        );
                         c.allocate(cw.round() as i32, ch, -1, Some(t));
                         y_off += ch_f + g;
                         child = c.next_sibling();
@@ -344,7 +382,12 @@ impl StripLayout {
         *imp.target_grid.borrow_mut() = target.clone();
 
         let mut current = imp.current_grid.borrow_mut();
-        if current.len() != target.len() || current.iter().zip(target.iter()).any(|(c, t)| c.len() != t.len()) {
+        if current.len() != target.len()
+            || current
+                .iter()
+                .zip(target.iter())
+                .any(|(c, t)| c.len() != t.len())
+        {
             *current = target;
         }
         *imp.grid.borrow_mut() = grid;
@@ -456,26 +499,37 @@ mod shell_imp {
     impl ObjectImpl for ShellLayout {}
 
     impl LayoutManagerImpl for ShellLayout {
-        fn measure(&self, _w: &gtk::Widget, _o: gtk::Orientation, _for_size: i32) -> (i32, i32, i32, i32) {
+        fn measure(
+            &self,
+            _w: &gtk::Widget,
+            _o: gtk::Orientation,
+            _for_size: i32,
+        ) -> (i32, i32, i32, i32) {
             (0, 0, -1, -1)
         }
 
         fn allocate(&self, widget: &gtk::Widget, width: i32, height: i32, _baseline: i32) {
             let sw = self.side.get().round() as i32;
-            let Some(main) = widget.first_child() else { return };
-            let Some(side) = main.next_sibling() else { return };
+            let Some(main) = widget.first_child() else {
+                return;
+            };
+            let Some(side) = main.next_sibling() else {
+                return;
+            };
 
             if self.is_overlay.get() {
                 // Floating overlay mode: tab content stays at full window width and never jitters.
                 main.allocate(width, height, -1, None);
                 if side.is_visible() {
-                    let t = gsk::Transform::new().translate(&graphene::Point::new((sw - SIDE_W) as f32, 0.0));
+                    let t = gsk::Transform::new()
+                        .translate(&graphene::Point::new((sw - SIDE_W) as f32, 0.0));
                     side.allocate(SIDE_W, height, -1, Some(t));
                 }
             } else {
                 // Fixed pinned mode: sidebar docks alongside main content.
                 if side.is_visible() {
-                    let t = gsk::Transform::new().translate(&graphene::Point::new((sw - SIDE_W) as f32, 0.0));
+                    let t = gsk::Transform::new()
+                        .translate(&graphene::Point::new((sw - SIDE_W) as f32, 0.0));
                     side.allocate(SIDE_W, height, -1, Some(t));
                 }
                 let t = gsk::Transform::new().translate(&graphene::Point::new(sw as f32, 0.0));
@@ -513,7 +567,10 @@ mod tests {
 
     #[test]
     fn consecutive_equal_ids_make_one_column() {
-        assert_eq!(group_ranges(&[1, 1, 2, 3, 3, 3]), vec![(0, 2), (2, 1), (3, 3)]);
+        assert_eq!(
+            group_ranges(&[1, 1, 2, 3, 3, 3]),
+            vec![(0, 2), (2, 1), (3, 3)]
+        );
         assert_eq!(group_ranges(&[7]), vec![(0, 1)]);
         assert!(group_ranges(&[]).is_empty());
         // equal ids that are not adjacent stay separate columns

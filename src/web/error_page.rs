@@ -34,23 +34,27 @@ pub(crate) fn match_error_info(msg: &str) -> ErrorDetail {
             fixes_uz: &[
                 "Terminalda loyiha serveri ishlayotganini tekshiring (masalan: `npm run dev`, `yarn dev`, `python manage.py runserver`, `cargo run`).",
                 "Manzildagi port raqamini tekshiring (odatda `:3000`, `:5173`, `:8000`, `:8080`).",
-                "Firewall yoki lokal proksi ulanishni to'smayotganligiga ishonch hosil qiling."
+                "Firewall yoki lokal proksi ulanishni to'smayotganligiga ishonch hosil qiling.",
             ],
             fixes_ru: &[
                 "Убедитесь, что сервер проекта запущен в терминале (напр.: `npm run dev`, `python manage.py runserver`, `cargo run`).",
                 "Проверьте правильность порта в адресе (обычно `:3000`, `:5173`, `:8000`, `:8080`).",
-                "Проверьте, не блокирует ли соединение брандмауэр или локальный прокси."
+                "Проверьте, не блокирует ли соединение брандмауэр или локальный прокси.",
             ],
             fixes_en: &[
                 "Verify your project dev server is running in terminal (e.g. `npm run dev`, `python manage.py runserver`, `cargo run`).",
                 "Double check the port number in the address bar (typically `:3000`, `:5173`, `:8000`, `:8080`).",
-                "Ensure local firewall or proxy settings are not blocking the loopback address."
+                "Ensure local firewall or proxy settings are not blocking the loopback address.",
             ],
         };
     }
 
     // 2. DNS / Name Not Resolved
-    if lower.contains("resolve") || lower.contains("not found") || lower.contains("name_not_resolved") || lower.contains("cannot find") {
+    if lower.contains("resolve")
+        || lower.contains("not found")
+        || lower.contains("name_not_resolved")
+        || lower.contains("cannot find")
+    {
         return ErrorDetail {
             code: "net::ERR_NAME_NOT_RESOLVED",
             category: "DNS / Name Resolution",
@@ -64,17 +68,17 @@ pub(crate) fn match_error_info(msg: &str) -> ErrorDetail {
             fixes_uz: &[
                 "Domen nomining yozilishida harfiy xatolar yo'qligini tekshiring.",
                 "Internet ulanishingiz va Wi-Fi holatini tekshiring.",
-                "DNS server sozlamalarini (masalan: 1.1.1.1 yoki 8.8.8.8) tekshiring yoki DNS keshini tozalang."
+                "DNS server sozlamalarini (masalan: 1.1.1.1 yoki 8.8.8.8) tekshiring yoki DNS keshini tozalang.",
             ],
             fixes_ru: &[
                 "Проверьте правильность написания доменного имени в строке адреса.",
                 "Проверьте подключение к интернету и статус сети.",
-                "Попробуйте сменить DNS-сервер (напр.: 1.1.1.1 или 8.8.8.8) или очистить DNS-кэш."
+                "Попробуйте сменить DNS-сервер (напр.: 1.1.1.1 или 8.8.8.8) или очистить DNS-кэш.",
             ],
             fixes_en: &[
                 "Check the URL for spelling mistakes or typos.",
                 "Check your network and Wi-Fi connection.",
-                "Verify your DNS resolver settings (e.g. 1.1.1.1 or 8.8.8.8) or flush DNS cache."
+                "Verify your DNS resolver settings (e.g. 1.1.1.1 or 8.8.8.8) or flush DNS cache.",
             ],
         };
     }
@@ -94,17 +98,17 @@ pub(crate) fn match_error_info(msg: &str) -> ErrorDetail {
             fixes_uz: &[
                 "Sahifani bir necha soniyadan so'ng qayta yuklab ko'ring.",
                 "Internet tezligi va proksi ulanishini tekshiring.",
-                "Agar bu tashqi API bo'lsa, xizmat holatini (status page) tekshiring."
+                "Agar bu tashqi API bo'lsa, xizmat holatini (status page) tekshiring.",
             ],
             fixes_ru: &[
                 "Попробуйте перезагрузить страницу через несколько секунд.",
                 "Проверьте стабильность интернет-соединения и настройки прокси.",
-                "Если это внешний сервис, проверьте его статус доступности."
+                "Если это внешний сервис, проверьте его статус доступности.",
             ],
             fixes_en: &[
                 "Try reloading the page in a few moments.",
                 "Check your internet latency and VPN/proxy connection.",
-                "If using a third-party API, check their status page for outages."
+                "If using a third-party API, check their status page for outages.",
             ],
         };
     }
@@ -123,15 +127,15 @@ pub(crate) fn match_error_info(msg: &str) -> ErrorDetail {
             desc_en: "The connection to the server was unexpectedly closed or reset during communication.",
             fixes_uz: &[
                 "Server jarayoni qulab tushmaganligini (crash) tekshiring.",
-                "VPN yoki xavfsizlik devori (firewall) ulanishni to'xtatmaganligiga ishonch hosil qiling."
+                "VPN yoki xavfsizlik devori (firewall) ulanishni to'xtatmaganligiga ishonch hosil qiling.",
             ],
             fixes_ru: &[
                 "Убедитесь, что серверный процесс не упал с ошибкой.",
-                "Проверьте настройки VPN или корпоративного файрвола."
+                "Проверьте настройки VPN или корпоративного файрвола.",
             ],
             fixes_en: &[
                 "Check your backend logs to verify the server didn't crash.",
-                "Verify that a VPN or corporate firewall is not terminating the socket."
+                "Verify that a VPN or corporate firewall is not terminating the socket.",
             ],
         };
     }
@@ -151,17 +155,17 @@ pub(crate) fn match_error_info(msg: &str) -> ErrorDetail {
             fixes_uz: &[
                 "Kompyuteringiz sana va vaqti to'g'ri sozlanganligini tekshiring.",
                 "Lokal HTTPS sinovlari uchun Sozlamalar > Maxfiylik bo'limida 'Developer Security' opsiyasidan foydalaning.",
-                "Ishlab chiqaruvchi sertifikatini (CA) yangilang."
+                "Ishlab chiqaruvchi sertifikatini (CA) yangilang.",
             ],
             fixes_ru: &[
                 "Проверьте правильность системного времени и даты на компьютере.",
                 "Для локальных тестов используйте 'Developer Security' в Настройках > Конфиденциальность.",
-                "Обновите SSL-сертификат на веб-сервере."
+                "Обновите SSL-сертификат на веб-сервере.",
             ],
             fixes_en: &[
                 "Verify your computer's date and time are accurate.",
                 "For local testing, use 'Developer Security' overrides in Settings > Privacy.",
-                "Ensure valid certificate chains are installed on the web server."
+                "Ensure valid certificate chains are installed on the web server.",
             ],
         };
     }
@@ -180,15 +184,15 @@ pub(crate) fn match_error_info(msg: &str) -> ErrorDetail {
             desc_en: "The request was blocked by security policies, AdBlock shield, or Content Security Policy headers.",
             fixes_uz: &[
                 "Sozlamalar > Maxfiylik bo'limida kerakli cheklovlarni (AdBlock / CORS) moslang.",
-                "Veb-ilovaning CSP sarlavhalarini (Content-Security-Policy) tekshiring."
+                "Veb-ilovaning CSP sarlavhalarini (Content-Security-Policy) tekshiring.",
             ],
             fixes_ru: &[
                 "Настройте параметры в Настройках > Конфиденциальность (AdBlock / CORS).",
-                "Проверьте заголовки CSP (Content-Security-Policy) вашего веб-приложения."
+                "Проверьте заголовки CSP (Content-Security-Policy) вашего веб-приложения.",
             ],
             fixes_en: &[
                 "Adjust AdBlock or CORS settings in Settings > Privacy & Shield.",
-                "Inspect response Content-Security-Policy headers in DevTools (F12)."
+                "Inspect response Content-Security-Policy headers in DevTools (F12).",
             ],
         };
     }
@@ -207,17 +211,17 @@ pub(crate) fn match_error_info(msg: &str) -> ErrorDetail {
         fixes_uz: &[
             "Manzil to'g'ri kiritilganligiga ishonch hosil qiling.",
             "Qurilmangiz internet tarmog'iga ulanganligini tekshiring.",
-            "F12 (DevTools) orqali Network va Console oynasidagi batafsil loglarni ko'ring."
+            "F12 (DevTools) orqali Network va Console oynasidagi batafsil loglarni ko'ring.",
         ],
         fixes_ru: &[
             "Убедитесь в правильности введенного адреса.",
             "Проверьте сетевое подключение вашего устройства.",
-            "Откройте DevTools (F12) для просмотра подробных логов в Network и Console."
+            "Откройте DevTools (F12) для просмотра подробных логов в Network и Console.",
         ],
         fixes_en: &[
             "Verify that the web address is entered correctly.",
             "Check that your device has an active internet connection.",
-            "Press F12 to inspect detailed logs in Network and Console tabs."
+            "Press F12 to inspect detailed logs in Network and Console tabs.",
         ],
     }
 }
@@ -229,8 +233,15 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
         .and_then(|s| crate::i18n::Lang::from_code(&s))
         .unwrap_or_else(crate::i18n::current);
 
-    let safe_uri = failing_uri.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;");
-    let safe_raw = raw_error.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+    let safe_uri = failing_uri
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;");
+    let safe_raw = raw_error
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
     let timestamp = gtk4::glib::DateTime::now_local()
         .ok()
         .and_then(|d| d.format("%Y-%m-%d %H:%M:%S UTC%z").ok())
@@ -269,7 +280,8 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
         fixes_html.push_str(&format!("<li>{}</li>", f));
     }
 
-    format!(r##"<!doctype html>
+    format!(
+        r##"<!doctype html>
 <html lang="{lang_code}">
 <head>
 <meta charset="utf-8">

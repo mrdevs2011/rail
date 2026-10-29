@@ -177,7 +177,8 @@ impl Grid {
         let cnt = al.len();
         for i in 0..cnt {
             for j in 0..cnt {
-                let skip = (i == 0 && j == 0) || (i == 0 && j == cnt - 1) || (i == cnt - 1 && j == 0);
+                let skip =
+                    (i == 0 && j == 0) || (i == 0 && j == cnt - 1) || (i == cnt - 1 && j == 0);
                 if !skip {
                     self.alignment(al[i] as i32, al[j] as i32);
                 }
@@ -235,14 +236,20 @@ impl Grid {
     }
 
     fn penalty(&self) -> u32 {
-        const A: [bool; 11] = [true, false, true, true, true, false, true, false, false, false, false];
-        const B: [bool; 11] = [false, false, false, false, true, false, true, true, true, false, true];
+        const A: [bool; 11] = [
+            true, false, true, true, true, false, true, false, false, false, false,
+        ];
+        const B: [bool; 11] = [
+            false, false, false, false, true, false, true, true, true, false, true,
+        ];
         let n = self.size;
         let g = |x: usize, y: usize| self.dark[y * n + x];
         let mut p = 0u32;
         for dir in 0..2 {
             for a in 0..n {
-                let line: Vec<bool> = (0..n).map(|b| if dir == 0 { g(b, a) } else { g(a, b) }).collect();
+                let line: Vec<bool> = (0..n)
+                    .map(|b| if dir == 0 { g(b, a) } else { g(a, b) })
+                    .collect();
                 let mut run = 1u32;
                 for i in 1..n {
                     if line[i] == line[i - 1] {
@@ -304,7 +311,11 @@ pub(crate) fn encode(data: &[u8]) -> Option<Qr> {
 
     let mut bits: Vec<bool> = Vec::new();
     push_bits(&mut bits, 0b0100, 4);
-    push_bits(&mut bits, data.len() as u32, if version < 10 { 8 } else { 16 });
+    push_bits(
+        &mut bits,
+        data.len() as u32,
+        if version < 10 { 8 } else { 16 },
+    );
     for &b in data {
         push_bits(&mut bits, b as u32, 8);
     }
@@ -318,7 +329,10 @@ pub(crate) fn encode(data: &[u8]) -> Option<Qr> {
         push_bits(&mut bits, pad, 8);
         pad ^= 0xEC ^ 0x11;
     }
-    let cw: Vec<u8> = bits.chunks(8).map(|c| c.iter().fold(0u8, |a, &b| (a << 1) | b as u8)).collect();
+    let cw: Vec<u8> = bits
+        .chunks(8)
+        .map(|c| c.iter().fold(0u8, |a, &b| (a << 1) | b as u8))
+        .collect();
 
     let short_len = raw / nblocks;
     let num_short = nblocks - raw % nblocks;
@@ -346,7 +360,11 @@ pub(crate) fn encode(data: &[u8]) -> Option<Qr> {
     }
 
     let size = 17 + 4 * version;
-    let mut grid = Grid { size, dark: vec![false; size * size], func: vec![false; size * size] };
+    let mut grid = Grid {
+        size,
+        dark: vec![false; size * size],
+        func: vec![false; size * size],
+    };
     grid.draw_function_patterns(version);
     grid.place_codewords(&out);
     let mut best = 0u32;
@@ -363,7 +381,10 @@ pub(crate) fn encode(data: &[u8]) -> Option<Qr> {
     }
     grid.apply_mask(best);
     grid.draw_format(best);
-    Some(Qr { size, modules: grid.dark })
+    Some(Qr {
+        size,
+        modules: grid.dark,
+    })
 }
 
 #[cfg(test)]
@@ -391,14 +412,20 @@ mod tests {
     /// Writes matrices for an external decoder when QR_DUMP=<dir> is set.
     #[test]
     fn dump_for_external_decoder() {
-        let Ok(dir) = std::env::var("QR_DUMP") else { return };
+        let Ok(dir) = std::env::var("QR_DUMP") else {
+            return;
+        };
         // One sample at the capacity limit of every version 1..=10, plus a shorter one for each.
         const CAPS: [usize; 10] = [14, 26, 42, 62, 84, 106, 122, 152, 180, 213];
         let alphabet = b"abcXYZ019/:?=&-_.~%";
         let mut samples: Vec<Vec<u8>> = Vec::new();
         for &n in CAPS.iter() {
             for len in [n, n - 5] {
-                samples.push((0..len).map(|i| alphabet[(i * 7 + 3) % alphabet.len()]).collect());
+                samples.push(
+                    (0..len)
+                        .map(|i| alphabet[(i * 7 + 3) % alphabet.len()])
+                        .collect(),
+                );
             }
         }
         for (i, s) in samples.iter().enumerate() {

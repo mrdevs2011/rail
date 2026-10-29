@@ -40,7 +40,9 @@ pub(crate) fn wire_close(app: &Rc<App>, win: gtk::ApplicationWindow) {
         // Jank counter: late-fire buckets (>16/33/100 ms) summarised once a minute in jank.log.
         let jank = Rc::new(RefCell::new(jank::Jank::new()));
         glib::timeout_add_local(Duration::from_millis(100), move || {
-            let Some(a) = weak.upgrade() else { return glib::ControlFlow::Break };
+            let Some(a) = weak.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
             let now = std::time::Instant::now();
             let gap = now.duration_since(last.replace(now));
             // Ignore suspend/resume style gaps; they are not UI-thread work.

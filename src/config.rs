@@ -116,22 +116,50 @@ pub(crate) fn load_app_settings() -> AppSettings {
 }
 
 pub(crate) fn save_app_settings(s: &AppSettings) -> bool {
-    let mut out = String::from("{
-");
-    out.push_str(&format!("  \"search_engine\": \"{}\",
-", minijson::escape(&s.search_engine)));
-    out.push_str(&format!("  \"smooth_scrolling\": {},
-", s.smooth_scrolling));
-    out.push_str(&format!("  \"webrtc_enabled\": {},
-", s.webrtc_enabled));
-    out.push_str(&format!("  \"auto_update\": {},
-", s.auto_update));
-    out.push_str(&format!("  \"devtools_dock\": \"{}\",\n", minijson::escape(&s.devtools_dock)));
-    out.push_str(&format!("  \"translate_source_lang\": \"{}\",\n", minijson::escape(&s.translate_source_lang)));
-    out.push_str(&format!("  \"translate_target_lang\": \"{}\",\n", minijson::escape(&s.translate_target_lang)));
-    out.push_str(&format!("  \"sidebar_mode\": \"{}\"\n", minijson::escape(&s.sidebar_mode)));
-    out.push_str("}
-");
+    let mut out = String::from(
+        "{
+",
+    );
+    out.push_str(&format!(
+        "  \"search_engine\": \"{}\",
+",
+        minijson::escape(&s.search_engine)
+    ));
+    out.push_str(&format!(
+        "  \"smooth_scrolling\": {},
+",
+        s.smooth_scrolling
+    ));
+    out.push_str(&format!(
+        "  \"webrtc_enabled\": {},
+",
+        s.webrtc_enabled
+    ));
+    out.push_str(&format!(
+        "  \"auto_update\": {},
+",
+        s.auto_update
+    ));
+    out.push_str(&format!(
+        "  \"devtools_dock\": \"{}\",\n",
+        minijson::escape(&s.devtools_dock)
+    ));
+    out.push_str(&format!(
+        "  \"translate_source_lang\": \"{}\",\n",
+        minijson::escape(&s.translate_source_lang)
+    ));
+    out.push_str(&format!(
+        "  \"translate_target_lang\": \"{}\",\n",
+        minijson::escape(&s.translate_target_lang)
+    ));
+    out.push_str(&format!(
+        "  \"sidebar_mode\": \"{}\"\n",
+        minijson::escape(&s.sidebar_mode)
+    ));
+    out.push_str(
+        "}
+",
+    );
     let path = settings_json_path();
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
@@ -166,15 +194,27 @@ pub(crate) fn is_default_browser() -> bool {
 pub(crate) fn set_default_browser(enable: bool) -> bool {
     if enable {
         let all = gio::AppInfo::all();
-        if let Some(rail) = all.iter().find(|a| a.id().map_or(false, |id| id.to_lowercase().contains("rail"))) {
-            for mime in &["x-scheme-handler/http", "x-scheme-handler/https", "text/html", "x-scheme-handler/about"] {
+        if let Some(rail) = all.iter().find(|a| {
+            a.id()
+                .map_or(false, |id| id.to_lowercase().contains("rail"))
+        }) {
+            for mime in &[
+                "x-scheme-handler/http",
+                "x-scheme-handler/https",
+                "text/html",
+                "x-scheme-handler/about",
+            ] {
                 let _ = rail.set_as_default_for_type(mime);
             }
         }
         let _ = std::process::Command::new("xdg-settings")
             .args(["set", "default-web-browser", "rail.desktop"])
             .output();
-        for mime in &["x-scheme-handler/http", "x-scheme-handler/https", "text/html"] {
+        for mime in &[
+            "x-scheme-handler/http",
+            "x-scheme-handler/https",
+            "text/html",
+        ] {
             let _ = std::process::Command::new("xdg-mime")
                 .args(["default", "rail.desktop", mime])
                 .output();
@@ -182,8 +222,16 @@ pub(crate) fn set_default_browser(enable: bool) -> bool {
         is_default_browser()
     } else {
         let all = gio::AppInfo::all();
-        if let Some(other) = all.iter().find(|a| !a.id().map_or(false, |id| id.to_lowercase().contains("rail")) && a.supports_uris()) {
-            for mime in &["x-scheme-handler/http", "x-scheme-handler/https", "text/html"] {
+        if let Some(other) = all.iter().find(|a| {
+            !a.id()
+                .map_or(false, |id| id.to_lowercase().contains("rail"))
+                && a.supports_uris()
+        }) {
+            for mime in &[
+                "x-scheme-handler/http",
+                "x-scheme-handler/https",
+                "text/html",
+            ] {
                 let _ = other.set_as_default_for_type(mime);
             }
             if let Some(id) = other.id() {

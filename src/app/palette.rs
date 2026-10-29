@@ -225,7 +225,8 @@ impl App {
         // Active DNS prefetching in the background while typing to eliminate lookup latency
         if let Some(first) = suggestions.first() {
             if first.kind != SuggestionKind::Search {
-                let target_host = host_of(&first.target_url).or_else(|| host_of(&first.autofill_text));
+                let target_host =
+                    host_of(&first.target_url).or_else(|| host_of(&first.autofill_text));
                 if let Some(h) = target_host {
                     let prof_id = self.selected_palette_profile.borrow().clone();
                     let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
@@ -363,15 +364,23 @@ impl App {
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
         let rows = self.rows.borrow();
-        let tab_info = rows.get(cur_r).and_then(|r| r.tabs.get(cur_c)).map(|t| (t.profile_id.clone(), t.view.uri()));
+        let tab_info = rows
+            .get(cur_r)
+            .and_then(|r| r.tabs.get(cur_c))
+            .map(|t| (t.profile_id.clone(), t.view.uri()));
         drop(rows);
 
-        let Some((current_pid, current_uri)) = tab_info else { return };
+        let Some((current_pid, current_uri)) = tab_info else {
+            return;
+        };
         if current_pid == target_profile_id {
             return;
         }
 
-        let session = self.profiles.borrow_mut().get_or_create_session(target_profile_id);
+        let session = self
+            .profiles
+            .borrow_mut()
+            .get_or_create_session(target_profile_id);
         let new_view = Self::create_web_view(&session, target_profile_id);
         new_view.set_can_target(!self.ov.get());
         self.setup_view_signals(&new_view);
@@ -423,7 +432,10 @@ impl App {
             if is_internal_uri(&uri) {
                 let canon = normalize_internal_uri(&uri);
                 self.profiles.borrow_mut().set_active(&target_profile_id);
-                let session = self.profiles.borrow_mut().get_or_create_session(&target_profile_id);
+                let session = self
+                    .profiles
+                    .borrow_mut()
+                    .get_or_create_session(&target_profile_id);
                 let view = Self::create_web_view(&session, &target_profile_id);
                 load_internal_page(&view, &canon);
                 self.add_view(view.clone(), target_profile_id, false);
@@ -483,7 +495,8 @@ impl App {
                 }
 
                 if let Some(v) = self.focused_view() {
-                    self.pill_label.set_text(&host_of(&uri).unwrap_or(uri.clone()));
+                    self.pill_label
+                        .set_text(&host_of(&uri).unwrap_or(uri.clone()));
                     if is_internal_uri(&uri) {
                         load_internal_page(&v, &uri);
                     } else {

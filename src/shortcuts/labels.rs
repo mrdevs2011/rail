@@ -15,11 +15,16 @@ thread_local! {
 pub(crate) fn sc_display(id: &str) -> String {
     SHORTCUTS.with(|c| {
         let cfg = c.borrow();
-        let Some(def) = SHORTCUT_DEFS.iter().find(|d| d.id == id) else { return String::new() };
+        let Some(def) = SHORTCUT_DEFS.iter().find(|d| d.id == id) else {
+            return String::new();
+        };
         if !sc_enabled(&cfg, id) {
             return String::new();
         }
-        sc_effective(def, &cfg).into_iter().find(|s| !s.is_empty()).unwrap_or_default()
+        sc_effective(def, &cfg)
+            .into_iter()
+            .find(|s| !s.is_empty())
+            .unwrap_or_default()
     })
 }
 
@@ -54,7 +59,11 @@ pub(crate) fn sc_apply(text: &str, ids: &[&str]) -> String {
     for (i, id) in ids.iter().enumerate() {
         let t = tok(i);
         let cur = sc_display(id);
-        out = if cur.is_empty() { sc_strip_token(out, &t) } else { out.replace(&t, &cur) };
+        out = if cur.is_empty() {
+            sc_strip_token(out, &t)
+        } else {
+            out.replace(&t, &cur)
+        };
     }
     out
 }
@@ -104,7 +113,11 @@ pub(crate) fn sc_bind_chip(lbl: &gtk::Label, id: &'static str) {
     });
 }
 
-pub(crate) fn sc_bind_tooltip<W: gtk::prelude::IsA<gtk::Widget>>(w: &W, key: &'static str, ids: &'static [&'static str]) {
+pub(crate) fn sc_bind_tooltip<W: gtk::prelude::IsA<gtk::Widget>>(
+    w: &W,
+    key: &'static str,
+    ids: &'static [&'static str],
+) {
     let weak = w.upcast_ref::<gtk::Widget>().downgrade();
     sc_bind(move || match weak.upgrade() {
         Some(w) => {
@@ -115,11 +128,13 @@ pub(crate) fn sc_bind_tooltip<W: gtk::prelude::IsA<gtk::Widget>>(w: &W, key: &'s
     });
 }
 
-/// Website shortcuts always have priority over browser shortcuts (Bubble phase lets web view receive keys first).
+/// Resolve Rail shortcuts before WebKit can consume the key event.
+/// Unmatched keys still propagate to the page, so ordinary website typing and
+/// shortcuts remain available unless they conflict with a registered Rail binding.
 pub(crate) fn apply_shortcut_priority() {
     KEY_CTL.with(|k| {
         if let Some(ctl) = k.borrow().as_ref() {
-            ctl.set_propagation_phase(gtk::PropagationPhase::Bubble);
+            ctl.set_propagation_phase(gtk::PropagationPhase::Capture);
         }
     });
 }

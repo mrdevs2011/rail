@@ -221,7 +221,8 @@ impl App {
         let msg = format!("window.postMessage({{__railExtKeys:{}}},'*');", on);
         for row in self.rows.borrow().iter() {
             for t in row.tabs.iter() {
-                t.view.evaluate_javascript(&msg, None, None, None::<&gio::Cancellable>, |_| {});
+                t.view
+                    .evaluate_javascript(&msg, None, None, None::<&gio::Cancellable>, |_| {});
             }
         }
         if on {
@@ -238,7 +239,11 @@ impl App {
     }
 
     /// Check if keyboard combination matches any registered extension command
-    pub(crate) fn try_extension_command(self: &Rc<Self>, key: gdk::Key, state: gdk::ModifierType) -> bool {
+    pub(crate) fn try_extension_command(
+        self: &Rc<Self>,
+        key: gdk::Key,
+        state: gdk::ModifierType,
+    ) -> bool {
         use gdk::ModifierType as M;
         if !crate::extensions::ext_keys_on() {
             return false; // extension shortcuts are blocked outside extension mode
@@ -254,7 +259,8 @@ impl App {
             }
             for cmd in &ext.commands {
                 let sk = cmd.suggested_key.to_lowercase();
-                let need_ctrl = sk.contains("ctrl") || sk.contains("control") || sk.contains("command");
+                let need_ctrl =
+                    sk.contains("ctrl") || sk.contains("control") || sk.contains("command");
                 let need_alt = sk.contains("alt");
                 let need_shift = sk.contains("shift");
 
@@ -269,7 +275,10 @@ impl App {
                     "s" => key == gdk::Key::s || key == gdk::Key::S,
                     "o" => key == gdk::Key::o || key == gdk::Key::O,
                     "p" => key == gdk::Key::p || key == gdk::Key::P,
-                    k => key.name().map(|n| n.eq_ignore_ascii_case(k)).unwrap_or(false),
+                    k => key
+                        .name()
+                        .map(|n| n.eq_ignore_ascii_case(k))
+                        .unwrap_or(false),
                 };
 
                 if matched {
@@ -288,7 +297,9 @@ impl App {
 
     /// Dispatch non-popup extension commands (e.g. Crystal Text Alt+F)
     pub(crate) fn dispatch_extension_command(self: &Rc<Self>, ext_id: &str, cmd_name: &str) {
-        let Some(view) = self.focused_view() else { return };
+        let Some(view) = self.focused_view() else {
+            return;
+        };
         if ext_id == "crystal-text" && cmd_name == "crystal-fix" {
             let script = r#"
 (async function() {
@@ -439,7 +450,10 @@ impl App {
                     }
                 }
                 "notify" => {
-                    let title = json.get("title").and_then(|t| t.as_str()).unwrap_or("Extension");
+                    let title = json
+                        .get("title")
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("Extension");
                     let msg = json.get("message").and_then(|m| m.as_str()).unwrap_or("");
                     self.show_copied_toast(title, msg);
                 }

@@ -42,7 +42,9 @@ fn svg_data(name: &str) -> Option<&'static [u8]> {
 fn png_path(name: &str) -> Option<std::path::PathBuf> {
     let candidates = [
         PathBuf::from("icons/png").join(format!("{name}.png")),
-        rail_data_dir().join("icons/png").join(format!("{name}.png")),
+        rail_data_dir()
+            .join("icons/png")
+            .join(format!("{name}.png")),
     ];
     candidates.into_iter().find(|p| p.is_file())
 }

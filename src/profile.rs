@@ -150,7 +150,11 @@ impl ProfileManager {
                     let name = parts[1].trim().to_string();
                     let color_idx = parts[2].trim().parse::<usize>().unwrap_or(0);
                     if !id.is_empty() && !name.is_empty() {
-                        self.profiles.push(Profile { id, name, color_idx });
+                        self.profiles.push(Profile {
+                            id,
+                            name,
+                            color_idx,
+                        });
                     }
                 }
             }
@@ -220,7 +224,13 @@ impl ProfileManager {
         }
         let slug: String = clean
             .chars()
-            .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() {
+                    c.to_ascii_lowercase()
+                } else {
+                    '_'
+                }
+            })
             .collect();
 
         self.profiles.iter().any(|p| {
@@ -230,7 +240,11 @@ impl ProfileManager {
         })
     }
 
-    pub fn create_profile(&mut self, name: &str, color_idx: usize) -> Result<Profile, &'static str> {
+    pub fn create_profile(
+        &mut self,
+        name: &str,
+        color_idx: usize,
+    ) -> Result<Profile, &'static str> {
         let clean_name = name.trim();
         if clean_name.is_empty() {
             return Err("Profile name cannot be empty");
@@ -321,8 +335,17 @@ impl ProfileManager {
         let _ = fs::create_dir_all(&p_cache);
 
         // Migrate old cache from ~/.cache if present
-        let old_cache = glib::user_cache_dir().join("rail").join("profiles").join(profile_id).join("cache");
-        if old_cache.exists() && (!p_cache.exists() || fs::read_dir(&p_cache).map(|mut d| d.next().is_none()).unwrap_or(false)) {
+        let old_cache = glib::user_cache_dir()
+            .join("rail")
+            .join("profiles")
+            .join(profile_id)
+            .join("cache");
+        if old_cache.exists()
+            && (!p_cache.exists()
+                || fs::read_dir(&p_cache)
+                    .map(|mut d| d.next().is_none())
+                    .unwrap_or(false))
+        {
             let _ = fs::rename(&old_cache, &p_cache);
         }
 
@@ -348,7 +371,8 @@ impl ProfileManager {
             cookies.set_accept_policy(webkit6::CookieAcceptPolicy::Always);
         }
 
-        self.sessions.insert(profile_id.to_string(), session.clone());
+        self.sessions
+            .insert(profile_id.to_string(), session.clone());
         session
     }
 }
@@ -372,8 +396,16 @@ mod tests {
     fn test_profile_uniqueness() {
         let mut mgr = ProfileManager {
             profiles: vec![
-                Profile { id: "default".into(), name: "Default".into(), color_idx: 0 },
-                Profile { id: "work".into(), name: "Work".into(), color_idx: 1 },
+                Profile {
+                    id: "default".into(),
+                    name: "Default".into(),
+                    color_idx: 0,
+                },
+                Profile {
+                    id: "work".into(),
+                    name: "Work".into(),
+                    color_idx: 1,
+                },
             ],
             active_id: "default".into(),
             sessions: HashMap::new(),
@@ -395,8 +427,14 @@ mod tests {
 
         // Create duplicate should fail
         assert_eq!(mgr.create_profile("work", 2), Err("Profile already exists"));
-        assert_eq!(mgr.create_profile("Default", 0), Err("Profile already exists"));
-        assert_eq!(mgr.create_profile("", 0), Err("Profile name cannot be empty"));
+        assert_eq!(
+            mgr.create_profile("Default", 0),
+            Err("Profile already exists")
+        );
+        assert_eq!(
+            mgr.create_profile("", 0),
+            Err("Profile name cannot be empty")
+        );
 
         // Create new unique profile should succeed
         let new_p = mgr.create_profile("Personal", 3).expect("Should succeed");
@@ -435,13 +473,21 @@ mod tests {
 
     #[test]
     fn test_create_profile_does_not_auto_activate() {
-        let temp_dir = std::env::temp_dir().join(format!("rail_prof_no_auto_act_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let temp_dir = std::env::temp_dir().join(format!(
+            "rail_prof_no_auto_act_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let _ = fs::create_dir_all(&temp_dir);
 
         let mut mgr = ProfileManager::new(temp_dir.clone());
         assert_eq!(mgr.active_id(), "default");
 
-        let p = mgr.create_profile("New Account", 2).expect("create profile");
+        let p = mgr
+            .create_profile("New Account", 2)
+            .expect("create profile");
         assert_eq!(p.id, "newaccount");
         // Newly created profile must NOT become active automatically
         assert_eq!(mgr.active_id(), "default");
@@ -450,7 +496,13 @@ mod tests {
 
     #[test]
     fn test_create_profile_appends_to_bottom() {
-        let temp_dir = std::env::temp_dir().join(format!("rail_prof_appends_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let temp_dir = std::env::temp_dir().join(format!(
+            "rail_prof_appends_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let _ = fs::create_dir_all(&temp_dir);
 
         let mut mgr = ProfileManager::new(temp_dir.clone());
@@ -467,7 +519,10 @@ mod tests {
         // Test reorder
         mgr.reorder_profile(3, 1);
         let ids_reordered: Vec<&str> = mgr.profiles().iter().map(|p| p.id.as_str()).collect();
-        assert_eq!(ids_reordered, vec!["default", "profilec", "profilea", "profileb"]);
+        assert_eq!(
+            ids_reordered,
+            vec!["default", "profilec", "profilea", "profileb"]
+        );
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
@@ -495,25 +550,53 @@ mod tests {
 
     #[test]
     fn test_profile_initial_letter_multi_char() {
-        let p1 = Profile { id: "1".into(), name: "1".into(), color_idx: 0 };
+        let p1 = Profile {
+            id: "1".into(),
+            name: "1".into(),
+            color_idx: 0,
+        };
         assert_eq!(p1.initial_letter(), "1");
 
-        let p10 = Profile { id: "10".into(), name: "10".into(), color_idx: 0 };
+        let p10 = Profile {
+            id: "10".into(),
+            name: "10".into(),
+            color_idx: 0,
+        };
         assert_eq!(p10.initial_letter(), "10");
 
-        let p100 = Profile { id: "100".into(), name: "100".into(), color_idx: 0 };
+        let p100 = Profile {
+            id: "100".into(),
+            name: "100".into(),
+            color_idx: 0,
+        };
         assert_eq!(p100.initial_letter(), "100");
 
-        let p_prof10 = Profile { id: "prof10".into(), name: "Profile 10".into(), color_idx: 0 };
+        let p_prof10 = Profile {
+            id: "prof10".into(),
+            name: "Profile 10".into(),
+            color_idx: 0,
+        };
         assert_eq!(p_prof10.initial_letter(), "10");
 
-        let p_qa = Profile { id: "qa".into(), name: "QA".into(), color_idx: 0 };
+        let p_qa = Profile {
+            id: "qa".into(),
+            name: "QA".into(),
+            color_idx: 0,
+        };
         assert_eq!(p_qa.initial_letter(), "QA");
 
-        let p_dev = Profile { id: "dev".into(), name: "Dev".into(), color_idx: 0 };
+        let p_dev = Profile {
+            id: "dev".into(),
+            name: "Dev".into(),
+            color_idx: 0,
+        };
         assert_eq!(p_dev.initial_letter(), "DEV");
 
-        let p_default = Profile { id: "default".into(), name: "Default".into(), color_idx: 0 };
+        let p_default = Profile {
+            id: "default".into(),
+            name: "Default".into(),
+            color_idx: 0,
+        };
         assert_eq!(p_default.initial_letter(), "D");
     }
 }

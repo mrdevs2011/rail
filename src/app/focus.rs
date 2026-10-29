@@ -4,7 +4,9 @@ use crate::*;
 
 impl App {
     pub(crate) fn close_view(self: &Rc<Self>, view: &WebView) {
-        let Some((r_idx, c_idx)) = self.find_view_coords(view) else { return };
+        let Some((r_idx, c_idx)) = self.find_view_coords(view) else {
+            return;
+        };
         // Closing the settings tab (or any tab) dismisses the settings chrome
         if self.settings_modal_open() {
             let closing_settings = view
@@ -29,7 +31,11 @@ impl App {
             return;
         }
         let tab = rows[r_idx].detach(c_idx);
-        let closed_uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_else(|| self.saved_uri_of(&tab.view));
+        let closed_uri = tab
+            .view
+            .uri()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| self.saved_uri_of(&tab.view));
         if !closed_uri.is_empty() && !closed_uri.starts_with("rail://start") {
             let mut rc = self.recently_closed.borrow_mut();
             rc.push((closed_uri, tab.profile_id.clone()));
@@ -65,7 +71,9 @@ impl App {
             let next_r = r_idx.min(total_rows.saturating_sub(1));
             let rows = self.rows.borrow();
             if rows.is_empty() || rows[next_r].tabs.is_empty() {
-                if let Some((first_r, _)) = rows.iter().enumerate().find(|(_, r)| !r.tabs.is_empty()) {
+                if let Some((first_r, _)) =
+                    rows.iter().enumerate().find(|(_, r)| !r.tabs.is_empty())
+                {
                     let next_c = c_idx.min(rows[first_r].tabs.len().saturating_sub(1));
                     drop(rows);
                     self.focus_coords(first_r, next_c);
@@ -189,7 +197,11 @@ impl App {
         // Qidiruv paneli boshqa tabga bog'langan qolmasin
         self.find_sync_focus();
 
-        if !self.palette_open() && !self.ov.get() && !self.settings_modal_open() && !self.find_is_open() {
+        if !self.palette_open()
+            && !self.ov.get()
+            && !self.settings_modal_open()
+            && !self.find_is_open()
+        {
             if let Some(v) = self.focused_view() {
                 v.grab_focus();
             }
@@ -308,10 +320,7 @@ impl App {
             }
         }
         // Clicks only when this tab is focused and not in overview (overview picks the card)
-        let focused_is_settings = self
-            .focused_view()
-            .map(|fv| fv == v)
-            .unwrap_or(false);
+        let focused_is_settings = self.focused_view().map(|fv| fv == v).unwrap_or(false);
         self.settings_modal
             .set_can_target(focused_is_settings && !self.ov.get());
         // GTK Stack/TextView can go blank after tab switches — force a resize when active.
@@ -382,7 +391,10 @@ impl App {
         if from_r < rows.len() && from_c < rows[from_r].tabs.len() {
             let from_cols = rows[from_r].columns();
             let to_cols = rows[target_r].columns();
-            if let Some(ci) = from_cols.iter().position(|(s, len)| from_c >= *s && from_c < s + len) {
+            if let Some(ci) = from_cols
+                .iter()
+                .position(|(s, len)| from_c >= *s && from_c < s + len)
+            {
                 let (fs, _) = from_cols[ci];
                 let depth = from_c - fs;
                 if let Some(&(ts, tlen)) = to_cols.get(ci).or_else(|| to_cols.last()) {
@@ -485,10 +497,14 @@ impl App {
         let cur_c = self.focus_col.get();
         let n = {
             let rows = self.rows.borrow();
-            if cur_r >= rows.len() { return; }
+            if cur_r >= rows.len() {
+                return;
+            }
             rows[cur_r].tabs.len()
         };
-        if n < 2 { return; }
+        if n < 2 {
+            return;
+        }
         let next = (cur_c as isize + dir).rem_euclid(n as isize) as usize;
         self.focus_coords(cur_r, next);
     }

@@ -191,39 +191,59 @@ impl App {
         drop_y: f64,
     ) {
         const MAX_FILE: u64 = 20 * 1024 * 1024;
-        const MAX_FILES: usize = 10;
+        const MAX_FILES: usize = 200;
+        const MAX_TOTAL: u64 = 100 * 1024 * 1024;
         let app = self.clone();
         glib::spawn_future_local(async move {
             let files = gio::spawn_blocking(move || {
-                let mut out: Vec<(String, String, String)> = Vec::new();
-                for p in paths.into_iter().take(MAX_FILES) {
-                    let Ok(meta) = std::fs::metadata(&p) else {
+                let mut out: Vec<(String, String, String, String)> = Vec::new();
+                let mut stack: Vec<(std::path::PathBuf, std::path::PathBuf)> = paths
+                    .into_iter()
+                    .map(|p| {
+                        let base = p.file_name().map(std::path::PathBuf::from).unwrap_or_default();
+                        (p, base)
+                    })
+                    .collect();
+                let mut total = 0_u64;
+                while let Some((path, relative)) = stack.pop() {
+                    if out.len() >= MAX_FILES || total >= MAX_TOTAL {
+                        break;
+                    }
+                    let Ok(meta) = std::fs::symlink_metadata(&path) else {
                         continue;
                     };
-                    if !meta.is_file() || meta.len() > MAX_FILE {
+                    if meta.file_type().is_symlink() {
                         continue;
                     }
-                    let Ok(data) = std::fs::read(&p) else {
+                    if meta.is_dir() {
+                        let Ok(entries) = std::fs::read_dir(&path) else {
+                            continue;
+                        };
+                        let mut children: Vec<_> = entries.filter_map(Result::ok).collect();
+                        children.sort_by_key(|e| e.file_name());
+                        for entry in children.into_iter().rev() {
+                            let child_name = entry.file_name();
+                            stack.push((entry.path(), relative.join(child_name)));
+                        }
+                        continue;
+                    }
+                    if !meta.is_file() || meta.len() > MAX_FILE || total + meta.len() > MAX_TOTAL {
+                        continue;
+                    }
+                    let Ok(data) = std::fs::read(&path) else {
                         continue;
                     };
-                    let name = p
-                        .file_name()
-                        .map(|n| n.to_string_lossy().into_owned())
-                        .unwrap_or_else(|| "file".into())
-                        .chars()
-                        .map(|c| {
-                            if c.is_control() || matches!(c, '\\' | '"' | '\'') {
-                                '_'
-                            } else {
-                                c
-                            }
-                        })
-                        .collect::<String>();
-                    let (ct, _) = gio::content_type_guess(Some(&p), &data[..]);
+                    let clean = |value: String| value.chars().map(|c| {
+                        if c.is_control() || matches!(c, '\\' | '"' | '\'') { '_' } else { c }
+                    }).collect::<String>();
+                    let name = clean(path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "file".into()));
+                    let relative = clean(relative.to_string_lossy().replace('\\', "/"));
+                    let (ct, _) = gio::content_type_guess(Some(&path), &data[..]);
                     let mime = gio::content_type_get_mime_type(&ct)
                         .map(|m| m.to_string())
                         .unwrap_or_else(|| "application/octet-stream".into());
-                    out.push((name, mime, glib::base64_encode(&data).to_string()));
+                    total += data.len() as u64;
+                    out.push((name, relative, mime, glib::base64_encode(&data).to_string()));
                 }
                 out
             })
@@ -238,7 +258,7 @@ impl App {
             }
             let items: Vec<String> = files
                 .iter()
-                .map(|(n, m, b)| format!("['{}','{}','{}']", n, m, b))
+                .map(|(n, r, m, b)| format!("['{}','{}','{}','{}']", n, r, m, b))
                 .collect();
             let mut js = String::from("(function(){try{var L=[");
             js.push_str(&items.join(","));
@@ -246,9 +266,11 @@ impl App {
             // consume its change event, while synthetic DOM drop events are untrusted.
             // Fall back to a DOM drag sequence for drop-only targets.
             js.push_str(&format!(
-                "];var dt=new DataTransfer();L.forEach(function(x){{var b=atob(x[2]);var u=new Uint8Array(b.length);\
+                "];var dt=new DataTransfer();L.forEach(function(x){{var b=atob(x[3]);var u=new Uint8Array(b.length);\
                  for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);\
-                 dt.items.add(new File([u],x[0],{{type:x[1]}}));}});\
+                 var f=new File([u],x[0],{{type:x[2]}});\
+                 try{{Object.defineProperty(f,'webkitRelativePath',{{value:x[1]}});}}catch(_){{}}\
+                 dt.items.add(f);}});\
                  var inputs=Array.from(document.querySelectorAll('input[type=file]:not(:disabled)'));\
                  var input=inputs.find(function(i){{return i.multiple||dt.files.length===1;}})||inputs[0];\
                  if(input){{var set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'files').set;set.call(input,dt.files);\

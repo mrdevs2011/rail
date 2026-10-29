@@ -2,7 +2,15 @@
 
 use crate::*;
 
-pub(crate) fn wire_devtools(app: &Rc<App>, devtools_close_btn: gtk::Button, devtools_content_box: gtk::Box, devtools_detach_btn: gtk::Button, devtools_resize_handle: gtk::Box, footer_downloads: gtk::Button, footer_settings: gtk::Button) {
+pub(crate) fn wire_devtools(
+    app: &Rc<App>,
+    devtools_close_btn: gtk::Button,
+    devtools_content_box: gtk::Box,
+    devtools_detach_btn: gtk::Button,
+    devtools_resize_handle: gtk::Box,
+    footer_downloads: gtk::Button,
+    footer_settings: gtk::Button,
+) {
     // WebKit's own inspector toolbar handles close/dock/undock via closed/attach/detach signals.
     // The attach signal carries no side, so remember which toolbar slot was clicked (never claims the click).
     let dt_click = gtk::GestureClick::new();
@@ -76,7 +84,6 @@ pub(crate) fn wire_devtools(app: &Rc<App>, devtools_close_btn: gtk::Button, devt
 
     let a_dt_detach = app.clone();
     devtools_detach_btn.connect_clicked(move |_| a_dt_detach.toggle_devtools_undocked());
-
 
     {
         let a = app.clone();

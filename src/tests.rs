@@ -10,22 +10,28 @@ fn test_parse_session_content() {
     assert_eq!(state.sidebar_open, Some(true));
     assert_eq!(state.win_size, Some((1400, 850, false)));
     assert_eq!(state.tabs.len(), 2);
-    assert_eq!(state.tabs[0], SessionTabItem {
-        row: 0,
-        col: 0,
-        full: true,
-        profile_id: "default".to_string(),
-        url: "https://google.com".to_string(),
-        custom_width: None,
-    });
-    assert_eq!(state.tabs[1], SessionTabItem {
-        row: 1,
-        col: 0,
-        full: true,
-        profile_id: "work".to_string(),
-        url: "https://github.com".to_string(),
-        custom_width: None,
-    });
+    assert_eq!(
+        state.tabs[0],
+        SessionTabItem {
+            row: 0,
+            col: 0,
+            full: true,
+            profile_id: "default".to_string(),
+            url: "https://google.com".to_string(),
+            custom_width: None,
+        }
+    );
+    assert_eq!(
+        state.tabs[1],
+        SessionTabItem {
+            row: 1,
+            col: 0,
+            full: true,
+            profile_id: "work".to_string(),
+            url: "https://github.com".to_string(),
+            custom_width: None,
+        }
+    );
 }
 
 #[test]
@@ -42,14 +48,17 @@ fn test_parse_legacy_session() {
     let sample = "tab\t0\twork\thttps://news.ycombinator.com\n";
     let state = parse_session_content(sample);
     assert_eq!(state.tabs.len(), 1);
-    assert_eq!(state.tabs[0], SessionTabItem {
-        row: 0,
-        col: 0,
-        full: true,
-        profile_id: "work".to_string(),
-        url: "https://news.ycombinator.com".to_string(),
-        custom_width: None,
-    });
+    assert_eq!(
+        state.tabs[0],
+        SessionTabItem {
+            row: 0,
+            col: 0,
+            full: true,
+            profile_id: "work".to_string(),
+            url: "https://news.ycombinator.com".to_string(),
+            custom_width: None,
+        }
+    );
 }
 
 #[test]
@@ -70,23 +79,62 @@ fn test_parse_session_with_search_engine() {
 
 #[test]
 fn test_to_uri_search_engines() {
-    assert_eq!(to_uri("rust lang", "google"), "https://www.google.com/search?q=rust%20lang");
-    assert_eq!(to_uri("rust lang", "duckduckgo"), "https://duckduckgo.com/?q=rust%20lang");
-    assert_eq!(to_uri("rust lang", "brave"), "https://search.brave.com/search?q=rust%20lang");
-    assert_eq!(to_uri("rust lang", "bing"), "https://www.bing.com/search?q=rust%20lang");
-    assert_eq!(to_uri("rust lang", "ecosia"), "https://www.ecosia.org/search?q=rust%20lang");
-    assert_eq!(to_uri("rust lang", "yandex"), "https://yandex.com/search/?text=rust%20lang");
-    assert_eq!(to_uri("rust lang", "yahoo"), "https://search.yahoo.com/search?p=rust%20lang");
-    assert_eq!(to_uri("rust lang", "perplexity"), "https://www.perplexity.ai/search?q=rust%20lang");
-    assert_eq!(to_uri("rust lang", "kagi"), "https://kagi.com/search?q=rust%20lang");
+    assert_eq!(
+        to_uri("rust lang", "google"),
+        "https://www.google.com/search?q=rust%20lang"
+    );
+    assert_eq!(
+        to_uri("rust lang", "duckduckgo"),
+        "https://duckduckgo.com/?q=rust%20lang"
+    );
+    assert_eq!(
+        to_uri("rust lang", "brave"),
+        "https://search.brave.com/search?q=rust%20lang"
+    );
+    assert_eq!(
+        to_uri("rust lang", "bing"),
+        "https://www.bing.com/search?q=rust%20lang"
+    );
+    assert_eq!(
+        to_uri("rust lang", "ecosia"),
+        "https://www.ecosia.org/search?q=rust%20lang"
+    );
+    assert_eq!(
+        to_uri("rust lang", "yandex"),
+        "https://yandex.com/search/?text=rust%20lang"
+    );
+    assert_eq!(
+        to_uri("rust lang", "yahoo"),
+        "https://search.yahoo.com/search?p=rust%20lang"
+    );
+    assert_eq!(
+        to_uri("rust lang", "perplexity"),
+        "https://www.perplexity.ai/search?q=rust%20lang"
+    );
+    assert_eq!(
+        to_uri("rust lang", "kagi"),
+        "https://kagi.com/search?q=rust%20lang"
+    );
     assert_eq!(to_uri("https://github.com", "google"), "https://github.com");
     assert_eq!(to_uri("github.com", "duckduckgo"), "https://github.com");
-    assert_eq!(to_uri("/home/user/page.html", "google"), "file:///home/user/page.html");
-    assert_eq!(to_uri("home/muhamad/computer-analysis/index.html", "google"), "file:///home/muhamad/computer-analysis/index.html");
+    assert_eq!(
+        to_uri("/home/user/page.html", "google"),
+        "file:///home/user/page.html"
+    );
+    assert_eq!(
+        to_uri("home/muhamad/computer-analysis/index.html", "google"),
+        "file:///home/muhamad/computer-analysis/index.html"
+    );
     assert_eq!(to_uri("tmp/test.html", "google"), "file:///tmp/test.html");
     assert_eq!(to_uri("etc/hosts", "google"), "file:///etc/hosts");
-    assert_eq!(to_uri("file:///tmp/test.html", "google"), "file:///tmp/test.html");
-    assert_eq!(to_uri("file:/tmp/test.html", "google"), "file:///tmp/test.html");
+    assert_eq!(
+        to_uri("file:///tmp/test.html", "google"),
+        "file:///tmp/test.html"
+    );
+    assert_eq!(
+        to_uri("file:/tmp/test.html", "google"),
+        "file:///tmp/test.html"
+    );
     assert_eq!(to_uri("localhost:3000", "google"), "http://localhost:3000");
     assert_eq!(to_uri("127.0.0.1:8080", "google"), "http://127.0.0.1:8080");
     assert_eq!(to_uri("192.168.1.1", "google"), "http://192.168.1.1");
@@ -98,16 +146,37 @@ fn test_settings_tab_enum() {
     assert_ne!(SettingsTab::Data, SettingsTab::Customize);
     assert_ne!(SettingsTab::General, SettingsTab::Extensions);
     assert_eq!(SettingsTab::General, SettingsTab::General);
-    assert_eq!(settings_uri_for_tab(SettingsTab::Extensions), "rail://settings/extensions");
-    assert_eq!(settings_tab_from_uri("rail://settings/extensions"), Some(SettingsTab::Extensions));
-    assert_eq!(crate::nav::normalize_internal_uri("rail://history"), "rail://settings/data");
-    assert_eq!(crate::nav::to_uri("history", "google"), "rail://settings/data");
-    assert_eq!(crate::nav::to_uri("chrome://history", "google"), "rail://settings/data");
+    assert_eq!(
+        settings_uri_for_tab(SettingsTab::Extensions),
+        "rail://settings/extensions"
+    );
+    assert_eq!(
+        settings_tab_from_uri("rail://settings/extensions"),
+        Some(SettingsTab::Extensions)
+    );
+    assert_eq!(
+        crate::nav::normalize_internal_uri("rail://history"),
+        "rail://settings/data"
+    );
+    assert_eq!(
+        crate::nav::to_uri("history", "google"),
+        "rail://settings/data"
+    );
+    assert_eq!(
+        crate::nav::to_uri("chrome://history", "google"),
+        "rail://settings/data"
+    );
 }
 
 #[test]
 fn test_extension_manifest_parsing() {
-    let tmp = std::env::temp_dir().join(format!("rail_test_ext_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+    let tmp = std::env::temp_dir().join(format!(
+        "rail_test_ext_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
     let _ = std::fs::create_dir_all(&tmp);
     let manifest = r#"{
         "manifest_version": 3,
@@ -199,16 +268,31 @@ fn test_app_settings_roundtrip() {
         sidebar_mode: "fixed".to_string(),
     };
     let mut out = String::from("{\n");
-    out.push_str(&format!("  \"search_engine\": \"{}\",\n", minijson::escape(&s.search_engine)));
-    out.push_str(&format!("  \"smooth_scrolling\": {},\n", s.smooth_scrolling));
+    out.push_str(&format!(
+        "  \"search_engine\": \"{}\",\n",
+        minijson::escape(&s.search_engine)
+    ));
+    out.push_str(&format!(
+        "  \"smooth_scrolling\": {},\n",
+        s.smooth_scrolling
+    ));
     out.push_str(&format!("  \"webrtc_enabled\": {}\n", s.webrtc_enabled));
     out.push_str("}\n");
     std::fs::write(&path, &out).unwrap();
 
     let parsed = minijson::parse(&out).unwrap();
-    assert_eq!(parsed.get("search_engine").and_then(|v| v.as_str()), Some("duckduckgo"));
-    assert_eq!(parsed.get("smooth_scrolling").and_then(|v| v.as_bool()), Some(false));
-    assert_eq!(parsed.get("webrtc_enabled").and_then(|v| v.as_bool()), Some(true));
+    assert_eq!(
+        parsed.get("search_engine").and_then(|v| v.as_str()),
+        Some("duckduckgo")
+    );
+    assert_eq!(
+        parsed.get("smooth_scrolling").and_then(|v| v.as_bool()),
+        Some(false)
+    );
+    assert_eq!(
+        parsed.get("webrtc_enabled").and_then(|v| v.as_bool()),
+        Some(true)
+    );
     let _ = std::fs::remove_dir_all(dir);
 }
 
@@ -245,7 +329,10 @@ fn test_shortcut_master_and_individual_priority() {
 fn test_ctrl_tab_shortcuts_definitions() {
     for num in 1..=9 {
         let id = format!("tab_{}", num);
-        let def = SHORTCUT_DEFS.iter().find(|d| d.id == id).expect("tab shortcut exists");
+        let def = SHORTCUT_DEFS
+            .iter()
+            .find(|d| d.id == id)
+            .expect("tab shortcut exists");
         let expected = format!("Ctrl+{}", num);
         assert_eq!(def.defaults[0], expected.as_str());
     }
@@ -253,19 +340,33 @@ fn test_ctrl_tab_shortcuts_definitions() {
 
 #[test]
 fn test_standard_browser_shortcuts() {
-    for (id, combo) in [("new_tab", "Ctrl+T"), ("focus_url", "Ctrl+L"), ("close_tab", "Ctrl+W"), ("reload", "Ctrl+R"), ("quit", "Ctrl+Q")] {
-        let def = SHORTCUT_DEFS.iter().find(|d| d.id == id).expect("shortcut exists");
+    for (id, combo) in [
+        ("new_tab", "Ctrl+T"),
+        ("focus_url", "Ctrl+L"),
+        ("close_tab", "Ctrl+W"),
+        ("reload", "Ctrl+R"),
+        ("quit", "Ctrl+Q"),
+    ] {
+        let def = SHORTCUT_DEFS
+            .iter()
+            .find(|d| d.id == id)
+            .expect("shortcut exists");
         assert_eq!(def.defaults[0], combo);
     }
 }
 
 #[test]
 fn test_parse_session_stack_lines() {
-    let sample = "tab\t0\t0\t1\tdefault\thttps://a.com\ntab\t0\t1\t1\tdefault\thttps://b.com\nstack\t0\t1\n";
+    let sample =
+        "tab\t0\t0\t1\tdefault\thttps://a.com\ntab\t0\t1\t1\tdefault\thttps://b.com\nstack\t0\t1\n";
     let state = parse_session_content(sample);
     assert_eq!(state.tabs.len(), 2);
     assert_eq!(state.stacked, vec![(0, 1)]);
-    assert!(parse_session_content("tab\t0\t0\t1\tdefault\thttps://a.com\n").stacked.is_empty());
+    assert!(
+        parse_session_content("tab\t0\t0\t1\tdefault\thttps://a.com\n")
+            .stacked
+            .is_empty()
+    );
 }
 
 #[test]
@@ -278,12 +379,21 @@ fn test_internal_uris_are_not_loadable() {
 #[test]
 fn test_stack_shortcuts() {
     for (id, combo) in [("stack_left", "Alt+["), ("stack_right", "Alt+]")] {
-        let def = SHORTCUT_DEFS.iter().find(|d| d.id == id).expect("shortcut exists");
+        let def = SHORTCUT_DEFS
+            .iter()
+            .find(|d| d.id == id)
+            .expect("shortcut exists");
         assert_eq!(def.defaults[0], combo);
     }
     SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
-    assert!(matches!(sc_resolve("Alt+["), ScResolve::Action("stack_left")));
-    assert!(matches!(sc_resolve("Alt+]"), ScResolve::Action("stack_right")));
+    assert!(matches!(
+        sc_resolve("Alt+["),
+        ScResolve::Action("stack_left")
+    ));
+    assert!(matches!(
+        sc_resolve("Alt+]"),
+        ScResolve::Action("stack_right")
+    ));
 }
 
 /// One action = one shortcut, and one shortcut = one action (or multiple non-conflicting default shortcuts).
@@ -291,7 +401,11 @@ fn test_stack_shortcuts() {
 fn test_no_duplicate_default_shortcuts() {
     let mut seen: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
     for def in SHORTCUT_DEFS {
-        assert!(!def.defaults.is_empty(), "\"{}\" must have at least one default shortcut", def.id);
+        assert!(
+            !def.defaults.is_empty(),
+            "\"{}\" must have at least one default shortcut",
+            def.id
+        );
         for d in def.defaults {
             if let Some(prev) = seen.insert(*d, def.id) {
                 panic!("{} is bound to both \"{}\" and \"{}\"", d, prev, def.id);
@@ -302,11 +416,17 @@ fn test_no_duplicate_default_shortcuts() {
 
 #[test]
 fn test_devtools_shortcuts() {
-    let def = SHORTCUT_DEFS.iter().find(|d| d.id == "devtools").expect("devtools shortcut exists");
+    let def = SHORTCUT_DEFS
+        .iter()
+        .find(|d| d.id == "devtools")
+        .expect("devtools shortcut exists");
     assert!(def.defaults.contains(&"F12"));
     assert!(def.defaults.contains(&"Ctrl+Shift+I"));
     SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
-    assert!(matches!(sc_resolve("Ctrl+Shift+I"), ScResolve::Action("devtools")));
+    assert!(matches!(
+        sc_resolve("Ctrl+Shift+I"),
+        ScResolve::Action("devtools")
+    ));
     assert!(matches!(sc_resolve("F12"), ScResolve::Action("devtools")));
 }
 
@@ -314,10 +434,18 @@ fn test_devtools_shortcuts() {
 #[test]
 fn test_every_shortcut_has_a_handler() {
     for def in SHORTCUT_DEFS {
-        assert!(App::action_known(def.id), "\"{}\" Customize ro'yxatida bor, lekin run_action da handleri yo'q", def.id);
+        assert!(
+            App::action_known(def.id),
+            "\"{}\" Customize ro'yxatida bor, lekin run_action da handleri yo'q",
+            def.id
+        );
     }
     for id in crate::app::STATIC_ACTIONS {
-        assert!(SHORTCUT_DEFS.iter().any(|d| d.id == *id), "\"{}\" handler bor, lekin Customize ro'yxatida yo'q", id);
+        assert!(
+            SHORTCUT_DEFS.iter().any(|d| d.id == *id),
+            "\"{}\" handler bor, lekin Customize ro'yxatida yo'q",
+            id
+        );
     }
 }
 
@@ -339,13 +467,18 @@ fn test_default_combos_resolve_to_own_action() {
 #[test]
 fn test_customized_shortcut_follows_action_not_key() {
     let mut cfg = ShortcutConfig::default();
-    cfg.overrides.insert("find".to_string(), vec!["Alt+G".to_string()]);
-    cfg.overrides.insert("full_tab".to_string(), vec!["Ctrl+Shift+F".to_string()]);
+    cfg.overrides
+        .insert("find".to_string(), vec!["Alt+G".to_string()]);
+    cfg.overrides
+        .insert("full_tab".to_string(), vec!["Ctrl+Shift+F".to_string()]);
     cfg.disabled.insert("fullscreen".to_string());
     SHORTCUTS.with(|c| *c.borrow_mut() = cfg);
     assert!(matches!(sc_resolve("Alt+G"), ScResolve::Action("find")));
     assert!(matches!(sc_resolve("Ctrl+F"), ScResolve::Disabled));
-    assert!(matches!(sc_resolve("Ctrl+Shift+F"), ScResolve::Action("full_tab")));
+    assert!(matches!(
+        sc_resolve("Ctrl+Shift+F"),
+        ScResolve::Action("full_tab")
+    ));
     assert!(matches!(sc_resolve("Alt+F"), ScResolve::Disabled));
     assert!(matches!(sc_resolve("F11"), ScResolve::Disabled));
     // ro'yxatda umuman yo'q tugma qat'iy tugmalarga (Esc, overview) qoladi
@@ -368,14 +501,25 @@ fn test_combo_spelling_is_canonical() {
 fn test_find_reload_zoom_defaults() {
     SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
     for (combo, id) in [
-        ("Ctrl+F", "find"), ("F3", "find_next"), ("Ctrl+G", "find_next"),
-        ("Shift+F3", "find_prev"), ("Ctrl+Shift+G", "find_prev"),
-        ("F5", "reload"), ("Ctrl+R", "reload"),
-        ("Ctrl+F5", "hard_reload"), ("Shift+F5", "hard_reload"), ("Ctrl+Shift+R", "hard_reload"),
-        ("Ctrl+=", "overview_zoom_in"), ("Ctrl+plus", "overview_zoom_in"),
-        ("Ctrl+-", "overview_zoom_out"), ("Ctrl+0", "zoom_reset"),
-        ("Ctrl+Shift+T", "reopen_tab"), ("Ctrl+H", "history"), ("Ctrl+Shift+E", "extension_mode"),
-        ("Alt+F", "full_tab"), ("F11", "fullscreen"),
+        ("Ctrl+F", "find"),
+        ("F3", "find_next"),
+        ("Ctrl+G", "find_next"),
+        ("Shift+F3", "find_prev"),
+        ("Ctrl+Shift+G", "find_prev"),
+        ("F5", "reload"),
+        ("Ctrl+R", "reload"),
+        ("Ctrl+F5", "hard_reload"),
+        ("Shift+F5", "hard_reload"),
+        ("Ctrl+Shift+R", "hard_reload"),
+        ("Ctrl+=", "overview_zoom_in"),
+        ("Ctrl+plus", "overview_zoom_in"),
+        ("Ctrl+-", "overview_zoom_out"),
+        ("Ctrl+0", "zoom_reset"),
+        ("Ctrl+Shift+T", "reopen_tab"),
+        ("Ctrl+H", "history"),
+        ("Ctrl+Shift+E", "extension_mode"),
+        ("Alt+F", "full_tab"),
+        ("F11", "fullscreen"),
     ] {
         match sc_resolve(combo) {
             ScResolve::Action(got) => assert_eq!(got, id, "{}", combo),
@@ -390,17 +534,44 @@ fn test_key_events_resolve_through_all_spellings() {
     use gdk::ModifierType as M;
     SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
     let r = |k: gdk::Key, code: u32, m: M| sc_resolve_any(&shortcut_combos(k, code, m));
-    assert!(matches!(r(gdk::Key::plus, 21, M::CONTROL_MASK | M::SHIFT_MASK), ScResolve::Action("overview_zoom_in")));
-    assert!(matches!(r(gdk::Key::equal, 21, M::CONTROL_MASK), ScResolve::Action("overview_zoom_in")));
-    assert!(matches!(r(gdk::Key::KP_Add, 86, M::CONTROL_MASK), ScResolve::Action("overview_zoom_in")));
-    assert!(matches!(r(gdk::Key::KP_Subtract, 82, M::CONTROL_MASK), ScResolve::Action("overview_zoom_out")));
-    assert!(matches!(r(gdk::Key::KP_0, 90, M::CONTROL_MASK), ScResolve::Action("zoom_reset")));
-    assert!(matches!(r(gdk::Key::KP_3, 89, M::CONTROL_MASK), ScResolve::Action("tab_3")));
-    assert!(matches!(r(gdk::Key::KP_Left, 83, M::ALT_MASK), ScResolve::Action("win_left")));
-    assert!(matches!(r(gdk::Key::ISO_Left_Tab, 23, M::CONTROL_MASK | M::SHIFT_MASK), ScResolve::Action("prev_tab")));
+    assert!(matches!(
+        r(gdk::Key::plus, 21, M::CONTROL_MASK | M::SHIFT_MASK),
+        ScResolve::Action("overview_zoom_in")
+    ));
+    assert!(matches!(
+        r(gdk::Key::equal, 21, M::CONTROL_MASK),
+        ScResolve::Action("overview_zoom_in")
+    ));
+    assert!(matches!(
+        r(gdk::Key::KP_Add, 86, M::CONTROL_MASK),
+        ScResolve::Action("overview_zoom_in")
+    ));
+    assert!(matches!(
+        r(gdk::Key::KP_Subtract, 82, M::CONTROL_MASK),
+        ScResolve::Action("overview_zoom_out")
+    ));
+    assert!(matches!(
+        r(gdk::Key::KP_0, 90, M::CONTROL_MASK),
+        ScResolve::Action("zoom_reset")
+    ));
+    assert!(matches!(
+        r(gdk::Key::KP_3, 89, M::CONTROL_MASK),
+        ScResolve::Action("tab_3")
+    ));
+    assert!(matches!(
+        r(gdk::Key::KP_Left, 83, M::ALT_MASK),
+        ScResolve::Action("win_left")
+    ));
+    assert!(matches!(
+        r(gdk::Key::ISO_Left_Tab, 23, M::CONTROL_MASK | M::SHIFT_MASK),
+        ScResolve::Action("prev_tab")
+    ));
     // oddiy harf / Esc ro'yxatga kirmaydi
     assert!(matches!(r(gdk::Key::h, 43, M::empty()), ScResolve::Unknown));
-    assert!(matches!(r(gdk::Key::Escape, 9, M::empty()), ScResolve::Unknown));
+    assert!(matches!(
+        r(gdk::Key::Escape, 9, M::empty()),
+        ScResolve::Unknown
+    ));
 }
 
 #[test]
@@ -408,18 +579,32 @@ fn test_ui_shortcut_labels_follow_config() {
     // Standart: matn o'zgarmaydi
     SHORTCUTS.with(|c| *c.borrow_mut() = ShortcutConfig::default());
     assert_eq!(sc_display("focus_url"), "Ctrl+L");
-    assert_eq!(sc_apply("+ New Workspace (Alt+Shift+V)", &["new_workspace"]), "+ New Workspace (Alt+Shift+V)");
+    assert_eq!(
+        sc_apply("+ New Workspace (Alt+Shift+V)", &["new_workspace"]),
+        "+ New Workspace (Alt+Shift+V)"
+    );
 
     // Foydalanuvchi o'zgartirgan: matn joriy qiymatni ko'rsatadi (tarjima qilingan matnda ham)
     let mut cfg = ShortcutConfig::default();
-    cfg.overrides.insert("new_workspace".to_string(), vec!["Ctrl+Shift+N".to_string()]);
+    cfg.overrides.insert(
+        "new_workspace".to_string(),
+        vec!["Ctrl+Shift+N".to_string()],
+    );
     // ikki shortcut o'rin almashsa ham to'qnashmaydi
-    cfg.overrides.insert("new_tab".to_string(), vec!["Ctrl+L".to_string()]);
-    cfg.overrides.insert("focus_url".to_string(), vec!["Ctrl+K".to_string()]);
+    cfg.overrides
+        .insert("new_tab".to_string(), vec!["Ctrl+L".to_string()]);
+    cfg.overrides
+        .insert("focus_url".to_string(), vec!["Ctrl+K".to_string()]);
     SHORTCUTS.with(|c| *c.borrow_mut() = cfg);
     assert_eq!(sc_display("new_workspace"), "Ctrl+Shift+N");
-    assert_eq!(sc_apply("+ Yangi ish maydoni (Alt+Shift+V)", &["new_workspace"]), "+ Yangi ish maydoni (Ctrl+Shift+N)");
-    assert_eq!(sc_apply("Omnibar (Ctrl+T / Ctrl+L)", &["new_tab", "focus_url"]), "Omnibar (Ctrl+L / Ctrl+K)");
+    assert_eq!(
+        sc_apply("+ Yangi ish maydoni (Alt+Shift+V)", &["new_workspace"]),
+        "+ Yangi ish maydoni (Ctrl+Shift+N)"
+    );
+    assert_eq!(
+        sc_apply("Omnibar (Ctrl+T / Ctrl+L)", &["new_tab", "focus_url"]),
+        "Omnibar (Ctrl+L / Ctrl+K)"
+    );
 
     // O'chirilgan: qavs va ajratgich chiroyli olib tashlanadi
     let mut cfg = ShortcutConfig::default();
@@ -427,8 +612,14 @@ fn test_ui_shortcut_labels_follow_config() {
     cfg.disabled.insert("profiles".to_string());
     SHORTCUTS.with(|c| *c.borrow_mut() = cfg);
     assert_eq!(sc_display("devtools"), "");
-    assert_eq!(sc_apply("Close DevTools (Esc / F12)", &["devtools"]), "Close DevTools (Esc)");
-    assert_eq!(sc_apply("Manage Profiles in Settings (Alt+P)", &["profiles"]), "Manage Profiles in Settings");
+    assert_eq!(
+        sc_apply("Close DevTools (Esc / F12)", &["devtools"]),
+        "Close DevTools (Esc)"
+    );
+    assert_eq!(
+        sc_apply("Manage Profiles in Settings (Alt+P)", &["profiles"]),
+        "Manage Profiles in Settings"
+    );
 }
 
 #[test]
@@ -468,15 +659,23 @@ fn test_zoom_keys_plus_works_without_shift() {
 
 #[test]
 fn test_translate_host_escapes_hyphens() {
-    assert_eq!(translate_host("www.example.com"), "www-example-com.translate.goog");
-    assert_eq!(translate_host("my-site.co.uk"), "my--site-co-uk.translate.goog");
+    assert_eq!(
+        translate_host("www.example.com"),
+        "www-example-com.translate.goog"
+    );
+    assert_eq!(
+        translate_host("my-site.co.uk"),
+        "my--site-co-uk.translate.goog"
+    );
 }
 
 #[test]
 fn test_translate_url_building() {
     assert_eq!(
         translate_url("https://en.wikipedia.org/wiki/Rust?x=1#top", "auto", "uz").as_deref(),
-        Some("https://en-wikipedia-org.translate.goog/wiki/Rust?x=1&_x_tr_sl=auto&_x_tr_tl=uz&_x_tr_hl=uz#top")
+        Some(
+            "https://en-wikipedia-org.translate.goog/wiki/Rust?x=1&_x_tr_sl=auto&_x_tr_tl=uz&_x_tr_hl=uz#top"
+        )
     );
     assert_eq!(
         translate_url("http://example.com", "en", "ru").as_deref(),
@@ -496,14 +695,28 @@ fn test_translate_url_building() {
 
 #[test]
 fn test_translate_url_rejects_untranslatable() {
-    for u in ["rail://start/", "about:blank", "file:///tmp/a.html", "http://localhost:8080/", "http://localhost/", "http://192.168.1.1/", "http://[::1]/", "https://a.com:8443/", "https://a-com.translate.goog/"] {
+    for u in [
+        "rail://start/",
+        "about:blank",
+        "file:///tmp/a.html",
+        "http://localhost:8080/",
+        "http://localhost/",
+        "http://192.168.1.1/",
+        "http://[::1]/",
+        "https://a.com:8443/",
+        "https://a-com.translate.goog/",
+    ] {
         assert!(translate_url(u, "auto", "uz").is_none(), "{u}");
     }
 }
 
 #[test]
 fn test_untranslate_round_trip() {
-    for u in ["https://en.wikipedia.org/wiki/Rust?x=1#top", "https://my-site.co.uk/a/b", "https://example.com/"] {
+    for u in [
+        "https://en.wikipedia.org/wiki/Rust?x=1#top",
+        "https://my-site.co.uk/a/b",
+        "https://example.com/",
+    ] {
         let t = translate_url(u, "auto", "uz").unwrap();
         assert!(is_translated_uri(&t));
         let back = untranslate_url(&t).unwrap();
@@ -567,10 +780,20 @@ fn test_pwa_slugify_and_cli_app() {
     assert_eq!(crate::pwa::slugify("SpaceMR — App!"), "spacemr-app");
 
     let args1 = vec!["rail".into(), "--app=https://youtube.com".into()];
-    assert_eq!(crate::parse_cli_app(&args1), Some("https://youtube.com".into()));
+    assert_eq!(
+        crate::parse_cli_app(&args1),
+        Some("https://youtube.com".into())
+    );
 
-    let args2 = vec!["rail".into(), "--app".into(), "https://spacemr.vercel.app".into()];
-    assert_eq!(crate::parse_cli_app(&args2), Some("https://spacemr.vercel.app".into()));
+    let args2 = vec![
+        "rail".into(),
+        "--app".into(),
+        "https://spacemr.vercel.app".into(),
+    ];
+    assert_eq!(
+        crate::parse_cli_app(&args2),
+        Some("https://spacemr.vercel.app".into())
+    );
 
     let args3 = vec!["rail".into(), "https://google.com".into()];
     assert_eq!(crate::parse_cli_app(&args3), None);

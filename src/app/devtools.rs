@@ -16,8 +16,12 @@ impl App {
     // ---- DevTools (Alt+Shift+I / F12 / Alt+Shift+D) ----
 
     pub(crate) fn devtools_open(&self) -> bool {
-        let Some(view) = self.focused_view() else { return false };
-        let Some((r, c)) = self.find_view_coords(&view) else { return false };
+        let Some(view) = self.focused_view() else {
+            return false;
+        };
+        let Some((r, c)) = self.find_view_coords(&view) else {
+            return false;
+        };
         let rows = self.rows.borrow();
         rows.get(r)
             .and_then(|row| row.tabs.get(c))
@@ -51,9 +55,13 @@ impl App {
         }
         let _guard = Guard;
 
-        let Some((r, c)) = self.find_view_coords(view) else { return };
+        let Some((r, c)) = self.find_view_coords(view) else {
+            return;
+        };
         let rows = self.rows.borrow();
-        let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) else { return };
+        let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) else {
+            return;
+        };
         let Some(insp) = view.inspector() else { return };
 
         let side = self.devtools_dock_side.get();
@@ -183,7 +191,7 @@ impl App {
                         widget.set_hexpand(true);
                         widget.set_vexpand(true);
                         dt_box.append(&widget);
-                        }
+                    }
                 }
             }
         };
@@ -219,7 +227,12 @@ impl App {
         });
     }
 
-    pub(crate) fn show_floating_devtools(self: &Rc<Self>, view: &WebView, _tab: &Tab, insp: &WebInspector) {
+    pub(crate) fn show_floating_devtools(
+        self: &Rc<Self>,
+        view: &WebView,
+        _tab: &Tab,
+        insp: &WebInspector,
+    ) {
         let app = self.clone();
         let v = view.clone();
         let win = if let Some(existing) = self.devtools_window.borrow().clone() {
@@ -227,7 +240,14 @@ impl App {
         } else {
             let w = gtk::Window::new();
             let page_title = view.title().map(|s| s.to_string()).unwrap_or_default();
-            w.set_title(Some(&format!("Developer Tools - {}", if page_title.is_empty() { "Web Inspector" } else { &page_title })));
+            w.set_title(Some(&format!(
+                "Developer Tools - {}",
+                if page_title.is_empty() {
+                    "Web Inspector"
+                } else {
+                    &page_title
+                }
+            )));
             w.set_default_size(950, 680);
             w.add_css_class("devtools-window");
             let v_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -269,9 +289,13 @@ impl App {
     }
 
     pub(crate) fn hide_view_devtools(&self, view: &WebView) {
-        let Some((r, c)) = self.find_view_coords(view) else { return };
+        let Some((r, c)) = self.find_view_coords(view) else {
+            return;
+        };
         let rows = self.rows.borrow();
-        let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) else { return };
+        let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) else {
+            return;
+        };
 
         self.dt_close_window();
 
@@ -300,10 +324,16 @@ impl App {
     }
 
     pub(crate) fn toggle_devtools(self: &Rc<Self>) {
-        let Some(view) = self.focused_view() else { return };
-        let Some((r, c)) = self.find_view_coords(&view) else { return };
+        let Some(view) = self.focused_view() else {
+            return;
+        };
+        let Some((r, c)) = self.find_view_coords(&view) else {
+            return;
+        };
         let rows = self.rows.borrow();
-        let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) else { return };
+        let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) else {
+            return;
+        };
 
         if tab.dt_open.get() {
             self.hide_view_devtools(&view);
@@ -351,9 +381,13 @@ impl App {
             if close_inspector {
                 self.hide_view_devtools(&view);
             } else {
-                let Some((r, c)) = self.find_view_coords(&view) else { return };
+                let Some((r, c)) = self.find_view_coords(&view) else {
+                    return;
+                };
                 let rows = self.rows.borrow();
-                let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) else { return };
+                let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) else {
+                    return;
+                };
                 self.dt_close_window();
                 tab.dt_open.set(false);
                 tab.dt_box.set_visible(false);

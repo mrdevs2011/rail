@@ -20,11 +20,40 @@ pub(crate) fn build(gapp: &gtk::Application) {
     let history_mgr = HistoryManager::new(rail_data_dir());
     let initial_prof_id = profile_mgr.active_profile().id;
 
-    let SidebarWidgets { footer_downloads, footer_settings, head_close_side, head_back, head_forward, head_reload, head_ext, brand_logo, list, pill, pill_label, pill_engine_icon, pill_pwa_btn, side } = build_sidebar();
+    let SidebarWidgets {
+        footer_downloads,
+        footer_settings,
+        head_close_side,
+        head_back,
+        head_forward,
+        head_reload,
+        head_ext,
+        brand_logo,
+        list,
+        pill,
+        pill_label,
+        pill_engine_icon,
+        pill_pwa_btn,
+        side,
+    } = build_sidebar();
 
-    let StripWidgets { layout, shell, shell_layout, strip, strip_host } = build_strip(side.clone());
+    let StripWidgets {
+        layout,
+        shell,
+        shell_layout,
+        strip,
+        strip_host,
+    } = build_strip(side.clone());
 
-    let PaletteWidgets { entry, palette, palette_suggestions_box, palette_engine_icon, profile_btn, profile_btn_lbl, profile_popover } = build_palette(&profile_mgr);
+    let PaletteWidgets {
+        entry,
+        palette,
+        palette_suggestions_box,
+        palette_engine_icon,
+        profile_btn,
+        profile_btn_lbl,
+        profile_popover,
+    } = build_palette(&profile_mgr);
 
     // ---- settings page in the tab square (Alt+S) — rail://settings, not window fullscreen ----
     let settings_modal = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -88,13 +117,37 @@ pub(crate) fn build(gapp: &gtk::Application) {
     settings_stack.set_vexpand(true);
 
     let sidebar_items = [
-        (SettingsTab::General, "preferences-system-symbolic", tr("General")),
-        (SettingsTab::Profiles, "system-users-symbolic", tr("Profiles")),
-        (SettingsTab::Extensions, "application-x-addon-symbolic", tr("Extensions")),
+        (
+            SettingsTab::General,
+            "preferences-system-symbolic",
+            tr("General"),
+        ),
+        (
+            SettingsTab::Profiles,
+            "system-users-symbolic",
+            tr("Profiles"),
+        ),
+        (
+            SettingsTab::Extensions,
+            "application-x-addon-symbolic",
+            tr("Extensions"),
+        ),
         (SettingsTab::Data, "drive-harddisk-symbolic", tr("Data")),
-        (SettingsTab::Privacy, "security-high-symbolic", tr("Privacy & Shield")),
-        (SettingsTab::Customize, "document-edit-symbolic", tr("Customize")),
-        (SettingsTab::Update, "software-update-available-symbolic", tr("Updates")),
+        (
+            SettingsTab::Privacy,
+            "security-high-symbolic",
+            tr("Privacy & Shield"),
+        ),
+        (
+            SettingsTab::Customize,
+            "document-edit-symbolic",
+            tr("Customize"),
+        ),
+        (
+            SettingsTab::Update,
+            "software-update-available-symbolic",
+            tr("Updates"),
+        ),
         (SettingsTab::About, "help-about-symbolic", tr("About Rail")),
     ];
 
@@ -132,9 +185,20 @@ pub(crate) fn build(gapp: &gtk::Application) {
     settings_body.append(&settings_stack);
     settings_modal.append(&settings_body);
 
-    let GeneralPage { engine_buttons, initial_settings } = build_general_page(&settings_stack);
+    let GeneralPage {
+        engine_buttons,
+        initial_settings,
+    } = build_general_page(&settings_stack);
     let CustomizePage { css_buffer } = build_customize_page(&settings_stack);
-    let ProfilesPage { add_prof_btn, color_btns, new_profile_color_idx, new_profile_entry, new_profile_error_lbl, page_prof_scroll, profiles_list_box } = build_profiles_page(&settings_stack);
+    let ProfilesPage {
+        add_prof_btn,
+        color_btns,
+        new_profile_color_idx,
+        new_profile_entry,
+        new_profile_error_lbl,
+        page_prof_scroll,
+        profiles_list_box,
+    } = build_profiles_page(&settings_stack);
     let DataPage {
         btn_clear_cache,
         btn_clear_hist,
@@ -160,9 +224,22 @@ pub(crate) fn build(gapp: &gtk::Application) {
 
     let HintWidgets { load_bar, ov_hint } = build_hints();
 
-    let MinimapWidgets { map_close_btn, map_container, map_drawing_area, map_header_row, map_location_btn } = build_minimap();
+    let MinimapWidgets {
+        map_close_btn,
+        map_container,
+        map_drawing_area,
+        map_header_row,
+        map_location_btn,
+    } = build_minimap();
 
-    let DevtoolsWidgets { devtools_close_btn, devtools_content_box, devtools_detach_btn, devtools_panel, devtools_resize_handle, devtools_url_lbl } = build_devtools();
+    let DevtoolsWidgets {
+        devtools_close_btn,
+        devtools_content_box,
+        devtools_detach_btn,
+        devtools_panel,
+        devtools_resize_handle,
+        devtools_url_lbl,
+    } = build_devtools();
 
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&shell));
@@ -304,7 +381,15 @@ pub(crate) fn build(gapp: &gtk::Application) {
 
     app.select_palette_profile(&initial_prof_id);
 
-    wire_minimap(&app, map_close_btn, map_container, map_drawing_area, map_header_row, map_location_btn, overlay);
+    wire_minimap(
+        &app,
+        map_close_btn,
+        map_container,
+        map_drawing_area,
+        map_header_row,
+        map_location_btn,
+        overlay,
+    );
 
     wire_settings(
         &app,
@@ -342,8 +427,23 @@ pub(crate) fn build(gapp: &gtk::Application) {
         }
     });
 
-    wire_devtools(&app, devtools_close_btn, devtools_content_box, devtools_detach_btn, devtools_resize_handle, footer_downloads, footer_settings);
-    wire_sidebar_header(&app, head_back, head_forward, head_reload, head_ext, head_close_side);
+    wire_devtools(
+        &app,
+        devtools_close_btn,
+        devtools_content_box,
+        devtools_detach_btn,
+        devtools_resize_handle,
+        footer_downloads,
+        footer_settings,
+    );
+    wire_sidebar_header(
+        &app,
+        head_back,
+        head_forward,
+        head_reload,
+        head_ext,
+        head_close_side,
+    );
 
     let a_pwa = app.clone();
     app.pill_pwa_btn.connect_clicked(move |_| {
@@ -372,9 +472,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         let uri = to_uri(url, &app.search_engine.borrow());
         let can_reuse = {
             let rows = app.rows.borrow();
-            rows.len() == 1
-                && rows[0].tabs.len() == 1
-                && rows[0].tabs[0].real_uri().is_empty()
+            rows.len() == 1 && rows[0].tabs.len() == 1 && rows[0].tabs[0].real_uri().is_empty()
         };
         if can_reuse {
             app.navigate(&uri);

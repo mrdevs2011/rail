@@ -17,8 +17,12 @@ impl App {
             for i in 0..8 {
                 self.profile_btn.remove_css_class(&format!("prof-bg-{}", i));
             }
-            self.profile_btn.add_css_class(&format!("prof-bg-{}", p.color_idx));
-            self.profile_btn.set_tooltip_text(Some(&trf("Profile: {} (isolated storage)", &[&p.display_name()])));
+            self.profile_btn
+                .add_css_class(&format!("prof-bg-{}", p.color_idx));
+            self.profile_btn.set_tooltip_text(Some(&trf(
+                "Profile: {} (isolated storage)",
+                &[&p.display_name()],
+            )));
         }
     }
 
@@ -38,7 +42,10 @@ impl App {
 
         let (profiles, selected_id) = {
             let mgr = self.profiles.borrow();
-            (mgr.profiles().to_vec(), self.selected_palette_profile.borrow().clone())
+            (
+                mgr.profiles().to_vec(),
+                self.selected_palette_profile.borrow().clone(),
+            )
         };
 
         for p in profiles {
@@ -116,7 +123,11 @@ impl App {
         let manage_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let manage_icon = gtk::Image::from_icon_name("preferences-system-symbolic");
         let manage_lbl = gtk::Label::new(None);
-        sc_bind_text(&manage_lbl, "Manage Profiles in Settings (Alt+P)", &["profiles"]);
+        sc_bind_text(
+            &manage_lbl,
+            "Manage Profiles in Settings (Alt+P)",
+            &["profiles"],
+        );
         manage_lbl.add_css_class("profile-item-name");
         manage_lbl.set_xalign(0.0);
         manage_box.append(&manage_icon);
@@ -146,7 +157,8 @@ impl App {
                         let cx = b.x() + b.width() / 2.0;
                         self.palette.set_size_request(cw, -1);
                         self.palette.set_halign(gtk::Align::Start);
-                        self.palette.set_margin_start(((cx - cw as f32 / 2.0).round() as i32).max(0));
+                        self.palette
+                            .set_margin_start(((cx - cw as f32 / 2.0).round() as i32).max(0));
                         let top = b.y() + b.height() / 2.0 + 36.0 + 28.0;
                         self.palette.set_margin_top(top.round() as i32);
                         return;
@@ -212,9 +224,15 @@ impl App {
             "{{\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}]}}",
             e(&format!("{} {}...", tr("Search with"), display_name)),
             e(svg_str),
-            e(&sc_apply(tr("Enter  go      Esc  cancel      Alt+P  profiles"), &["profiles"])),
+            e(&sc_apply(
+                tr("Enter  go      Esc  cancel      Alt+P  profiles"),
+                &["profiles"]
+            )),
             e(tr("Select Profile")),
-            e(&sc_apply(tr("Manage Profiles in Settings (Alt+P)"), &["profiles"])),
+            e(&sc_apply(
+                tr("Manage Profiles in Settings (Alt+P)"),
+                &["profiles"]
+            )),
             e(tr("History")),
             e(tr("Top")),
             e(tr("Search")),
@@ -231,10 +249,12 @@ impl App {
         self.entry.set_placeholder_text(Some(&placeholder));
 
         let pal_icon = load_search_engine_icon(&engine, 20);
-        self.palette_engine_icon.set_paintable(pal_icon.paintable().as_ref());
+        self.palette_engine_icon
+            .set_paintable(pal_icon.paintable().as_ref());
 
         let pill_icon = load_search_engine_icon(&engine, 18);
-        self.pill_engine_icon.set_paintable(pill_icon.paintable().as_ref());
+        self.pill_engine_icon
+            .set_paintable(pill_icon.paintable().as_ref());
 
         if let Ok(rows) = self.rows.try_borrow() {
             for row in rows.iter() {
@@ -250,7 +270,10 @@ impl App {
     }
 
     pub(crate) fn push_start_state(&self, view: &WebView) {
-        let js = format!("window.railState&&window.railState({})", self.start_state_json(view));
+        let js = format!(
+            "window.railState&&window.railState({})",
+            self.start_state_json(view)
+        );
         Self::start_eval(view, &js);
     }
 
@@ -296,7 +319,11 @@ impl App {
                         )
                     })
                     .collect();
-                let js = format!("window.railSugg&&window.railSugg(\"{}\",[{}])", e(rest), items.join(","));
+                let js = format!(
+                    "window.railSugg&&window.railSugg(\"{}\",[{}])",
+                    e(rest),
+                    items.join(",")
+                );
                 Self::start_eval(view, &js);
             }
             "go" => {
@@ -311,7 +338,8 @@ impl App {
                     .flat_map(|r| r.tabs.iter())
                     .find(|t| &t.view == view)
                     .map(|t| t.profile_id.clone());
-                let chosen = if !pid.is_empty() && self.profiles.borrow().get_profile(pid).is_some() {
+                let chosen = if !pid.is_empty() && self.profiles.borrow().get_profile(pid).is_some()
+                {
                     Some(pid.to_string())
                 } else {
                     tab_prof
@@ -329,7 +357,9 @@ impl App {
 
     /// Focused tab is the welcome / start page (rail://start).
     pub(crate) fn focused_is_welcome(&self) -> bool {
-        let Some(v) = self.focused_view() else { return false };
+        let Some(v) = self.focused_view() else {
+            return false;
+        };
         let mut u = v.uri().map(|s| s.to_string()).unwrap_or_default();
         if u.is_empty() || u.starts_with("about:") {
             u = self.saved_uri_of(&v);

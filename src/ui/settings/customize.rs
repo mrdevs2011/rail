@@ -215,7 +215,8 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
             ui.prio.set_active(true);
             ui.is_syncing.set(false);
             sc_commit(&ui);
-            ui.status.set_text(tr("All shortcuts are back to their defaults."));
+            ui.status
+                .set_text(tr("All shortcuts are back to their defaults."));
             sc_build(&ui);
         });
     }

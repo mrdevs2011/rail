@@ -9,7 +9,8 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     let priv_title = gtk::Label::new(Some(tr("Privacy & Security Shield")));
     priv_title.add_css_class("settings-page-title");
     priv_title.set_xalign(0.0);
-    let priv_subtitle = gtk::Label::new(Some(tr("Container isolation and network leak prevention")));
+    let priv_subtitle =
+        gtk::Label::new(Some(tr("Container isolation and network leak prevention")));
     priv_subtitle.add_css_class("settings-page-subtitle");
     priv_subtitle.set_xalign(0.0);
     priv_subtitle.set_wrap(true);
@@ -34,7 +35,9 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     let adb_lbl = gtk::Label::new(Some(tr("Block advertisements and tracking scripts")));
     adb_lbl.add_css_class("shortcut-desc");
     adb_lbl.set_xalign(0.0);
-    let adb_sub = gtk::Label::new(Some(tr("Filters intrusive ads, crypto miners, and behavioral telemetry.")));
+    let adb_sub = gtk::Label::new(Some(tr(
+        "Filters intrusive ads, crypto miners, and behavioral telemetry.",
+    )));
     adb_sub.add_css_class("settings-card-desc");
     adb_sub.set_xalign(0.0);
     adb_sub.set_wrap(true);
@@ -69,7 +72,9 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     let dev_title = gtk::Label::new(Some(tr("Developer Security & Testing")));
     dev_title.add_css_class("settings-card-title");
     dev_title.set_xalign(0.0);
-    let dev_desc = gtk::Label::new(Some(tr("Advanced security overrides for web development, API testing, and local debugging.")));
+    let dev_desc = gtk::Label::new(Some(tr(
+        "Advanced security overrides for web development, API testing, and local debugging.",
+    )));
     dev_desc.add_css_class("settings-card-desc");
     dev_desc.set_xalign(0.0);
     dev_desc.set_wrap(true);
@@ -80,10 +85,14 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     let cors_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     let cors_lbl_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
     cors_lbl_box.set_hexpand(true);
-    let cors_lbl = gtk::Label::new(Some(tr("Bypass CORS for Local Development (localhost & file://)")));
+    let cors_lbl = gtk::Label::new(Some(tr(
+        "Bypass CORS for Local Development (localhost & file://)",
+    )));
     cors_lbl.add_css_class("shortcut-desc");
     cors_lbl.set_xalign(0.0);
-    let cors_hint = gtk::Label::new(Some(tr("Allows cross-origin fetch/XHR requests between local dev ports without header restrictions.")));
+    let cors_hint = gtk::Label::new(Some(tr(
+        "Allows cross-origin fetch/XHR requests between local dev ports without header restrictions.",
+    )));
     cors_hint.add_css_class("settings-card-desc");
     cors_hint.set_xalign(0.0);
     cors_hint.set_wrap(true);
@@ -113,7 +122,9 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     let cache_lbl = gtk::Label::new(Some(tr("Disable Cache during Development")));
     cache_lbl.add_css_class("shortcut-desc");
     cache_lbl.set_xalign(0.0);
-    let cache_hint = gtk::Label::new(Some(tr("Always fetches fresh HTML, CSS, and JS from the server on reload instead of using memory cache.")));
+    let cache_hint = gtk::Label::new(Some(tr(
+        "Always fetches fresh HTML, CSS, and JS from the server on reload instead of using memory cache.",
+    )));
     cache_hint.add_css_class("settings-card-desc");
     cache_hint.set_xalign(0.0);
     cache_hint.set_wrap(true);
@@ -143,7 +154,9 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     let mixed_lbl = gtk::Label::new(Some(tr("Allow Mixed Insecure Content (HTTP on HTTPS)")));
     mixed_lbl.add_css_class("shortcut-desc");
     mixed_lbl.set_xalign(0.0);
-    let mixed_hint = gtk::Label::new(Some(tr("Allows loading local HTTP assets (e.g. localhost:8000) inside HTTPS frontend web apps.")));
+    let mixed_hint = gtk::Label::new(Some(tr(
+        "Allows loading local HTTP assets (e.g. localhost:8000) inside HTTPS frontend web apps.",
+    )));
     mixed_hint.add_css_class("settings-card-desc");
     mixed_hint.set_xalign(0.0);
     mixed_hint.set_wrap(true);
@@ -168,7 +181,9 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
 
     // Dev 4: DevTools badge
     let dt_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let dt_lbl = gtk::Label::new(Some(tr("Developer Tools & Web Inspector (F12 / Ctrl+Shift+I)")));
+    let dt_lbl = gtk::Label::new(Some(tr(
+        "Developer Tools & Web Inspector (F12 / Ctrl+Shift+I)",
+    )));
     dt_lbl.add_css_class("shortcut-desc");
     dt_lbl.set_hexpand(true);
     dt_lbl.set_xalign(0.0);
@@ -192,7 +207,9 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     leak_card.append(&leak_title);
 
     let webrtc_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let webrtc_lbl = gtk::Label::new(Some(tr("WebRTC Peer Connections (Enabled for video calls & audio)")));
+    let webrtc_lbl = gtk::Label::new(Some(tr(
+        "WebRTC Peer Connections (Enabled for video calls & audio)",
+    )));
     webrtc_lbl.add_css_class("shortcut-desc");
     webrtc_lbl.set_hexpand(true);
     webrtc_lbl.set_xalign(0.0);
@@ -211,7 +228,9 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     leak_card.append(&webrtc_row);
 
     let dns_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let dns_lbl = gtk::Label::new(Some(tr("DNS Prefetching Shield (Blocks unrequested domain lookup leaks)")));
+    let dns_lbl = gtk::Label::new(Some(tr(
+        "DNS Prefetching Shield (Blocks unrequested domain lookup leaks)",
+    )));
     dns_lbl.add_css_class("shortcut-desc");
     dns_lbl.set_hexpand(true);
     dns_lbl.set_xalign(0.0);
@@ -223,7 +242,9 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     leak_card.append(&dns_row);
 
     let ping_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    let ping_lbl = gtk::Label::new(Some(tr("Hyperlink Auditing (Blocks <a ping> click beacons)")));
+    let ping_lbl = gtk::Label::new(Some(tr(
+        "Hyperlink Auditing (Blocks <a ping> click beacons)",
+    )));
     ping_lbl.add_css_class("shortcut-desc");
     ping_lbl.set_hexpand(true);
     ping_lbl.set_xalign(0.0);
@@ -244,7 +265,9 @@ pub(crate) fn build_privacy_page(settings_stack: &gtk::Stack) {
     let iso_title = gtk::Label::new(Some(tr("Multi-Container Storage Isolation")));
     iso_title.add_css_class("settings-card-title");
     iso_title.set_xalign(0.0);
-    let iso_desc = gtk::Label::new(Some(tr("Each profile has its own WebKit data directory with separate cookies, IndexedDB and localStorage, so websites cannot link profiles through stored data. IP address, TLS fingerprint, GPU and fonts are shared between profiles and can still be used to correlate them.")));
+    let iso_desc = gtk::Label::new(Some(tr(
+        "Each profile has its own WebKit data directory with separate cookies, IndexedDB and localStorage, so websites cannot link profiles through stored data. IP address, TLS fingerprint, GPU and fonts are shared between profiles and can still be used to correlate them.",
+    )));
     iso_desc.add_css_class("settings-card-desc");
     iso_desc.set_xalign(0.0);
     iso_desc.set_wrap(true);

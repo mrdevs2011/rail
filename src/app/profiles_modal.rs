@@ -10,7 +10,11 @@ impl App {
 
         let (profiles, active_id, can_delete) = {
             let mgr = self.profiles.borrow();
-            (mgr.profiles().to_vec(), mgr.active_id().to_string(), mgr.profiles().len() > 1)
+            (
+                mgr.profiles().to_vec(),
+                mgr.active_id().to_string(),
+                mgr.profiles().len() > 1,
+            )
         };
         let total_profiles = profiles.len();
         let rows_vec: Rc<RefCell<Vec<gtk::Box>>> = Rc::new(RefCell::new(Vec::new()));
@@ -48,7 +52,8 @@ impl App {
                     row_drag.add_css_class("dragging");
                     row_drag.set_cursor_from_name(Some("grabbing"));
                     handle_drag.set_cursor_from_name(Some("grabbing"));
-                    drag_provider_begin.load_from_string(".profile-card.dragging { z-index: 1000 !important; }");
+                    drag_provider_begin
+                        .load_from_string(".profile-card.dragging { z-index: 1000 !important; }");
                 });
 
                 let rows_vec_update = rows_vec.clone();
@@ -113,10 +118,16 @@ impl App {
 
                     let stride = 60.0f64;
                     let delta = (offset_y / stride).round() as isize;
-                    let target_idx = ((from_idx as isize) + delta).clamp(0, (total_profiles - 1) as isize) as usize;
+                    let target_idx = ((from_idx as isize) + delta)
+                        .clamp(0, (total_profiles - 1) as isize)
+                        as usize;
 
                     if target_idx != from_idx {
-                        if app_end.profiles.borrow_mut().reorder_profile(from_idx, target_idx) {
+                        if app_end
+                            .profiles
+                            .borrow_mut()
+                            .reorder_profile(from_idx, target_idx)
+                        {
                             let a = app_end.clone();
                             glib::idle_add_local_once(move || {
                                 a.rebuild_profiles_modal_list();
@@ -246,7 +257,8 @@ impl App {
             self.add_prof_btn.set_sensitive(false);
             self.add_prof_btn.remove_css_class("active-ready");
         } else if self.profiles.borrow().profile_exists(clean) {
-            self.new_profile_error_lbl.set_text(tr("Profile already exists"));
+            self.new_profile_error_lbl
+                .set_text(tr("Profile already exists"));
             self.new_profile_error_lbl.set_visible(true);
             self.new_profile_entry.add_css_class("error");
             self.add_prof_btn.set_sensitive(false);

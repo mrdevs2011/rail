@@ -132,7 +132,9 @@ impl App {
         let zanim = Cell::new(None::<(i64, f64, f64, f64, f64, f64, f64)>);
         self.strip.add_tick_callback(move |strip, clock| {
             let now = clock.frame_time();
-            let dt = last.replace(Some(now)).map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
+            let dt = last
+                .replace(Some(now))
+                .map_or(1.0 / 60.0, |l| (now - l) as f64 / 1e6);
             let k = (1.0 - (-dt / 0.038).exp()).clamp(0.04, 1.0);
 
             let oxc = app.layout.offset_x();
@@ -161,9 +163,7 @@ impl App {
                 let target_wcy = oyt + vh / (2.0 * zt_safe);
 
                 let (t0, z0, wcx0, wcy0, wcxt, wcyt) = match zanim.get() {
-                    Some(a) if (a.2 - zt).abs() < 1e-9 => {
-                        (a.0, a.1, a.3, a.4, a.5, a.6)
-                    }
+                    Some(a) if (a.2 - zt).abs() < 1e-9 => (a.0, a.1, a.3, a.4, a.5, a.6),
                     _ => {
                         let wcx_start = oxc + vw / (2.0 * zc_safe);
                         let wcy_start = oyc + vh / (2.0 * zc_safe);
@@ -208,7 +208,9 @@ impl App {
             } else {
                 zanim.set(None);
                 let mut z = zc + (zt - zc) * k;
-                if near(zt, z, 0.002) { z = zt; }
+                if near(zt, z, 0.002) {
+                    z = zt;
+                }
                 nz = z;
                 // Niri-style critically damped spring on the real frame time (no per-frame lerp)
                 let (sx, _) = step_cam_axis(&app.cam_spring_x, oxc, oxt, &app.cam_v0_x, now);
@@ -216,8 +218,12 @@ impl App {
                 nx = sx;
                 ny = sy;
             }
-            if near(oxt, nx, 0.5) && nz == zt { nx = oxt; }
-            if near(oyt, ny, 0.5) && nz == zt { ny = oyt; }
+            if near(oxt, nx, 0.5) && nz == zt {
+                nx = oxt;
+            }
+            if near(oyt, ny, 0.5) && nz == zt {
+                ny = oyt;
+            }
 
             let grid_busy = app.layout.step_grid_progress(k);
 
@@ -242,7 +248,6 @@ impl App {
         });
     }
 
-
     /// Live 1:1 horizontal pan (finger tracks content). Used by touchpad slide mode.
     /// Offsets update every event; strip allocate is coalesced to one per frame.
     pub(crate) fn pan_canvas_x(self: &Rc<Self>, dx: f64) {
@@ -256,7 +261,9 @@ impl App {
         if cur_r >= rows.len() {
             return;
         }
-        let row_w = row_cols(&rows[cur_r], vw, g).last().map_or(0.0, |&(_, _, x, w)| x + w);
+        let row_w = row_cols(&rows[cur_r], vw, g)
+            .last()
+            .map_or(0.0, |&(_, _, x, w)| x + w);
         drop(rows);
         let max_x = (row_w - vw).max(0.0);
         let nx = (self.layout.offset_x() + dx).clamp(0.0, max_x);
@@ -329,7 +336,9 @@ impl App {
             cols.iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| {
-                    ((a.2 + a.3 / 2.0) - center).abs().total_cmp(&((b.2 + b.3 / 2.0) - center).abs())
+                    ((a.2 + a.3 / 2.0) - center)
+                        .abs()
+                        .total_cmp(&((b.2 + b.3 / 2.0) - center).abs())
                 })
                 .map_or(0, |(i, _)| i)
         } else if snap >= cur_off {
@@ -339,7 +348,11 @@ impl App {
         };
         let (start, len, _, _) = cols[pick];
         let cur_c = self.focus_col.get();
-        let new_c = if cur_c >= start && cur_c < start + len { cur_c } else { start };
+        let new_c = if cur_c >= start && cur_c < start + len {
+            cur_c
+        } else {
+            start
+        };
 
         self.target_x.set(snap);
         self.cam_v0_x.set(vel);

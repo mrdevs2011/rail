@@ -10,7 +10,9 @@ pub(crate) fn build_updates_page(settings_stack: &gtk::Stack) {
     let update_title = gtk::Label::new(Some(tr("Updates")));
     update_title.add_css_class("settings-page-title");
     update_title.set_xalign(0.0);
-    let update_subtitle = gtk::Label::new(Some(tr("Check for new versions and install updates from GitHub releases")));
+    let update_subtitle = gtk::Label::new(Some(tr(
+        "Check for new versions and install updates from GitHub releases",
+    )));
     update_subtitle.add_css_class("settings-page-subtitle");
     update_subtitle.set_xalign(0.0);
     update_subtitle.set_wrap(true);
@@ -25,7 +27,9 @@ pub(crate) fn build_updates_page(settings_stack: &gtk::Stack) {
     let auto_title = gtk::Label::new(Some(tr("Automatic updates")));
     auto_title.add_css_class("settings-card-title");
     auto_title.set_xalign(0.0);
-    let auto_desc = gtk::Label::new(Some(tr("When enabled, Rail checks for a new version every launch and installs it")));
+    let auto_desc = gtk::Label::new(Some(tr(
+        "When enabled, Rail checks for a new version every launch and installs it",
+    )));
     auto_desc.add_css_class("settings-card-desc");
     auto_desc.set_xalign(0.0);
     auto_desc.set_wrap(true);
@@ -92,13 +96,16 @@ pub(crate) fn build_updates_page(settings_stack: &gtk::Stack) {
     err_lbl.set_visible(false);
     update_card.append(&err_lbl);
 
-    let update_info: Rc<std::cell::RefCell<Option<update::UpdateInfo>>> = Rc::new(std::cell::RefCell::new(None));
+    let update_info: Rc<std::cell::RefCell<Option<update::UpdateInfo>>> =
+        Rc::new(std::cell::RefCell::new(None));
 
     {
         let update_info = update_info.clone();
         let err_lbl = err_lbl.clone();
         update_btn.connect_clicked(move |b| {
-            let Some(inf) = update_info.borrow().clone() else { return; };
+            let Some(inf) = update_info.borrow().clone() else {
+                return;
+            };
             b.set_sensitive(false);
             b.set_label(tr("Updating..."));
             err_lbl.set_visible(false);
@@ -112,8 +119,14 @@ pub(crate) fn build_updates_page(settings_stack: &gtk::Stack) {
                     Ok(Ok(())) => {
                         b.set_label(tr("Restarting..."));
                         b.set_sensitive(false);
-                        if let Some(w) = b.root().and_then(|r| r.downcast::<gtk::ApplicationWindow>().ok()) {
-                            glib::timeout_add_local_once(std::time::Duration::from_millis(700), move || update::restart(&w));
+                        if let Some(w) = b
+                            .root()
+                            .and_then(|r| r.downcast::<gtk::ApplicationWindow>().ok())
+                        {
+                            glib::timeout_add_local_once(
+                                std::time::Duration::from_millis(700),
+                                move || update::restart(&w),
+                            );
                         }
                     }
                     Ok(Err(e)) => {
@@ -130,9 +143,6 @@ pub(crate) fn build_updates_page(settings_stack: &gtk::Stack) {
             });
         });
     }
-
-
-
 
     page_update.append(&update_card);
 
@@ -169,9 +179,14 @@ pub(crate) fn build_updates_page(settings_stack: &gtk::Stack) {
                     dropdown.set_selected(selected as u32);
 
                     if let Some(inf) = info {
-                        let behind = format!("{}{}", inf.newer_count, if inf.more { "+" } else { "" });
+                        let behind =
+                            format!("{}{}", inf.newer_count, if inf.more { "+" } else { "" });
                         status_lbl.set_text(&trf(
-                            if inf.newer_count == 1 { "You are on v{}, {} version behind. Latest: {}" } else { "You are on v{}, {} versions behind. Latest: {}" },
+                            if inf.newer_count == 1 {
+                                "You are on v{}, {} version behind. Latest: {}"
+                            } else {
+                                "You are on v{}, {} versions behind. Latest: {}"
+                            },
                             &[&current, &behind, &inf.latest_tag],
                         ));
                         update_btn.set_sensitive(true);
@@ -198,8 +213,12 @@ pub(crate) fn build_updates_page(settings_stack: &gtk::Stack) {
         let update_info = update_info.clone();
         let err_lbl = err_lbl.clone();
         dropdown.connect_selected_notify(move |dd| {
-            let Some(item) = dd.selected_item() else { return; };
-            let Some(str_obj) = item.downcast_ref::<gtk::StringObject>() else { return; };
+            let Some(item) = dd.selected_item() else {
+                return;
+            };
+            let Some(str_obj) = item.downcast_ref::<gtk::StringObject>() else {
+                return;
+            };
             let tag = str_obj.string().to_string();
             let current = update::current_version();
             let current_parsed = update::parse_ver(&current);

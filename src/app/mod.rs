@@ -3,33 +3,33 @@
 use crate::*;
 
 mod core;
+pub(crate) mod devtools;
 mod scroll;
 mod tabs;
-pub(crate) mod devtools;
 pub(crate) use devtools::*;
-mod dialogs;
-mod signals;
-mod lifecycle;
-mod focus;
-mod moving;
-mod session;
-mod sidebar;
-mod load_bar;
-mod welcome;
-mod palette;
-mod settings_modal;
 mod data_actions;
-mod minimap;
-mod profiles_modal;
-mod overview;
+mod dialogs;
+mod focus;
 mod keys;
+mod lifecycle;
+mod load_bar;
+mod minimap;
+mod moving;
+mod overview;
+mod palette;
+mod profiles_modal;
+mod session;
+mod settings_modal;
+mod sidebar;
+mod signals;
+mod welcome;
 #[cfg(test)]
 pub(crate) use keys::STATIC_ACTIONS;
-mod find;
-mod translate;
 mod ctxmenu;
-mod screenshot;
 mod extensions_ui;
+mod find;
+mod screenshot;
+mod translate;
 
 pub(crate) struct App {
     pub(crate) win: gtk::ApplicationWindow,

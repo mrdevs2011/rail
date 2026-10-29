@@ -9,7 +9,9 @@ pub(crate) struct HintWidgets {
 
 pub(crate) fn build_hints() -> HintWidgets {
     // ---- overview hint ----
-    let ov_hint = gtk::Label::new(Some(tr("h/l/j/k  move      Enter  open      x  close      Esc  cancel")));
+    let ov_hint = gtk::Label::new(Some(tr(
+        "h/l/j/k  move      Enter  open      x  close      Esc  cancel",
+    )));
     ov_hint.add_css_class("ov-hint");
     ov_hint.set_halign(gtk::Align::Center);
     ov_hint.set_valign(gtk::Align::End);

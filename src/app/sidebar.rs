@@ -33,7 +33,9 @@ impl App {
         }
         let label = Self::tab_label(t);
         let letter = label.chars().find(|c| c.is_alphanumeric()).unwrap_or('R');
-        let seed = label.bytes().fold(0u32, |a, b| a.wrapping_mul(31).wrapping_add(b as u32));
+        let seed = label
+            .bytes()
+            .fold(0u32, |a, b| a.wrapping_mul(31).wrapping_add(b as u32));
         let badge = gtk::Label::new(Some(&letter.to_uppercase().to_string()));
         badge.add_css_class("fav");
         badge.add_css_class(&format!("fav-{}", seed % 8));
@@ -70,10 +72,17 @@ impl App {
             .map(|d| d.as_secs())
             .unwrap_or(0);
         let path = rail_data_dir().join("stalls.log");
-        if std::fs::metadata(&path).map(|m| m.len() > 256 * 1024).unwrap_or(false) {
+        if std::fs::metadata(&path)
+            .map(|m| m.len() > 256 * 1024)
+            .unwrap_or(false)
+        {
             let _ = std::fs::write(&path, "");
         }
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
             let _ = writeln!(
                 f,
                 "{} stall={}ms tabs={} live={} loading={} overview={} [{}]",
@@ -134,7 +143,8 @@ impl App {
         let rows = self.rows.borrow();
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
-        let tab_items_registry: Rc<RefCell<Vec<(usize, usize, gtk::Box)>>> = Rc::new(RefCell::new(Vec::new()));
+        let tab_items_registry: Rc<RefCell<Vec<(usize, usize, gtk::Box)>>> =
+            Rc::new(RefCell::new(Vec::new()));
         let mut ws_headers: Vec<(usize, gtk::Box)> = Vec::new();
 
         for (ri, row) in rows.iter().enumerate() {
@@ -168,7 +178,10 @@ impl App {
 
             let add_btn = gtk::Button::from_icon_name("list-add-symbolic");
             add_btn.add_css_class("btn-ws-add");
-            add_btn.set_tooltip_text(Some(&trf("Add tab to Workspace {}", &[&(ri + 1).to_string()])));
+            add_btn.set_tooltip_text(Some(&trf(
+                "Add tab to Workspace {}",
+                &[&(ri + 1).to_string()],
+            )));
             let app = self.clone();
             add_btn.connect_clicked(move |_| {
                 app.focus_row(ri);
@@ -254,7 +267,11 @@ impl App {
                     audio_btn.connect_clicked(move |b| {
                         let mute = !v_audio.is_muted();
                         v_audio.set_is_muted(mute);
-                        b.set_icon_name(if mute { "audio-volume-muted-symbolic" } else { "audio-volume-high-symbolic" });
+                        b.set_icon_name(if mute {
+                            "audio-volume-muted-symbolic"
+                        } else {
+                            "audio-volume-high-symbolic"
+                        });
                         b.set_tooltip_text(Some(tr(if mute {
                             "Muted (click to unmute)"
                         } else {
@@ -319,7 +336,14 @@ impl App {
                             } else if new_col_idx >= cur_tabs_len as isize && ri + 1 < total_rows {
                                 Some((ri + 1, 0))
                             } else {
-                                Some((ri, if delta > 0 { cur_tabs_len.saturating_sub(1) } else { 0 }))
+                                Some((
+                                    ri,
+                                    if delta > 0 {
+                                        cur_tabs_len.saturating_sub(1)
+                                    } else {
+                                        0
+                                    },
+                                ))
                             }
                         };
                         drop(rows_borrow);
@@ -420,7 +444,11 @@ impl App {
         new_ws_box.set_halign(gtk::Align::Fill);
         new_ws_box.set_overflow(gtk::Overflow::Hidden);
         let new_ws_lbl = gtk::Label::new(None);
-        sc_bind_text(&new_ws_lbl, "+ New Workspace (Alt+Shift+V)", &["new_workspace"]);
+        sc_bind_text(
+            &new_ws_lbl,
+            "+ New Workspace (Alt+Shift+V)",
+            &["new_workspace"],
+        );
         new_ws_lbl.set_xalign(0.0);
         new_ws_lbl.set_hexpand(true);
         new_ws_lbl.set_width_chars(1);
@@ -444,7 +472,10 @@ impl App {
     pub(crate) fn prompt_install_current_pwa(self: &Rc<Self>) {
         if let Some(view) = self.focused_view() {
             let u = view.uri().map(|s| s.to_string()).unwrap_or_default();
-            let t = view.title().map(|s| s.to_string()).unwrap_or_else(|| u.clone());
+            let t = view
+                .title()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| u.clone());
             if !u.is_empty() && (u.starts_with("http://") || u.starts_with("https://")) {
                 let info = crate::pwa::PwaAppInfo {
                     id: crate::pwa::slugify(&t),
@@ -516,15 +547,13 @@ impl App {
             if x <= 5.0 {
                 if self.side_open_timer.borrow().is_none() {
                     let app = self.clone();
-                    let source = glib::timeout_add_local_once(
-                        Duration::from_millis(160),
-                        move || {
+                    let source =
+                        glib::timeout_add_local_once(Duration::from_millis(160), move || {
                             app.side_open_timer.borrow_mut().take();
                             if app.sidebar_auto.get() && !app.side_open.get() {
                                 app.set_sidebar(true);
                             }
-                        },
-                    );
+                        });
                     *self.side_open_timer.borrow_mut() = Some(source);
                 }
             } else {
@@ -539,15 +568,13 @@ impl App {
             if x > (SIDE_W as f64) + 24.0 {
                 if self.side_close_timer.borrow().is_none() {
                     let app = self.clone();
-                    let source = glib::timeout_add_local_once(
-                        Duration::from_millis(200),
-                        move || {
+                    let source =
+                        glib::timeout_add_local_once(Duration::from_millis(200), move || {
                             app.side_close_timer.borrow_mut().take();
                             if app.sidebar_auto.get() && app.side_open.get() {
                                 app.set_sidebar(false);
                             }
-                        },
-                    );
+                        });
                     *self.side_close_timer.borrow_mut() = Some(source);
                 }
             }
@@ -578,21 +605,16 @@ impl App {
         if last_x > 4.0 {
             if self.side_close_timer.borrow().is_none() {
                 let app = self.clone();
-                let source = glib::timeout_add_local_once(
-                    Duration::from_millis(160),
-                    move || {
-                        app.side_close_timer.borrow_mut().take();
-                        if app.sidebar_auto.get() && app.side_open.get() {
-                            app.set_sidebar(false);
-                        }
-                    },
-                );
+                let source = glib::timeout_add_local_once(Duration::from_millis(160), move || {
+                    app.side_close_timer.borrow_mut().take();
+                    if app.sidebar_auto.get() && app.side_open.get() {
+                        app.set_sidebar(false);
+                    }
+                });
                 *self.side_close_timer.borrow_mut() = Some(source);
             }
         }
     }
-
-
 
     /// Open rail://downloads in a **new tab** (target=_blank style).
     pub(crate) fn open_downloads(self: &Rc<Self>) {

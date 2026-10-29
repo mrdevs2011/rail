@@ -13,16 +13,16 @@
 
 mod blocklist;
 mod history;
+mod i18n;
+mod i18n_tables;
 mod jank;
 mod minijson;
 mod profile;
-mod strip;
-mod i18n;
-mod i18n_tables;
-mod update;
-mod sync;
-mod spring;
 mod qr;
+mod spring;
+mod strip;
+mod sync;
+mod update;
 use i18n::{tr, trf};
 
 use gtk::glib;
@@ -30,30 +30,30 @@ use gtk::{gdk, gio};
 use gtk4 as gtk;
 use history::{HistoryManager, HistorySuggestion, SuggestionKind};
 use profile::ProfileManager;
+use spring::{SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS, Spring, coast_distance};
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::OnceLock;
 use std::time::Duration;
-use spring::{coast_distance, Spring, SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS};
-use strip::{col_width, gap, group_ranges, stack_height, ShellLayout, StripLayout, SIDE_W};
+use strip::{SIDE_W, ShellLayout, StripLayout, col_width, gap, group_ranges, stack_height};
 use webkit6::prelude::*;
 use webkit6::{
-    ContextMenu, ContextMenuAction, ContextMenuItem, HitTestResult,
-    ScriptDialog, ScriptDialogType, WebView,
+    ContextMenu, ContextMenuAction, ContextMenuItem, HitTestResult, ScriptDialog, ScriptDialogType,
+    WebView,
 };
 
 mod app;
 mod cli;
 mod config;
+mod extensions;
 mod model;
 mod nav;
 mod pages;
+mod pwa;
 mod shortcuts;
 mod ui;
 mod web;
-mod extensions;
-mod pwa;
 
 use app::*;
 use cli::*;
@@ -92,14 +92,12 @@ fn main() -> glib::ExitCode {
                 }
             }
         }
-        Err(_) => {
-            unsafe {
-                std::env::set_var(
-                    "GST_PLUGIN_FEATURE_RANK",
-                    "vp8alphadecodebin:0,vp9alphadecodebin:0",
-                );
-            }
-        }
+        Err(_) => unsafe {
+            std::env::set_var(
+                "GST_PLUGIN_FEATURE_RANK",
+                "vp8alphadecodebin:0,vp9alphadecodebin:0",
+            );
+        },
     }
 
     if std::env::var_os("RAIL_SOFTWARE_RENDER").is_some_and(|v| v != "0") {
@@ -180,16 +178,44 @@ fn main() -> glib::ExitCode {
             println!("{}", tr("Usage: rail [OPTIONS] [URL]"));
             println!();
             println!("{}", tr("Options:"));
-            println!("{}", tr("  -d, --data-dir <PATH>      Use custom storage directory for 100% portable environment"));
-            println!("{}", tr("      --export <FILE.tar.gz> Export all tabs, profiles, logins & cookies into archive"));
-            println!("{}", tr("      --import <FILE.tar.gz> Import all tabs, profiles, logins & cookies from archive"));
-            println!("{}", tr("      --data-info            Show current storage directory and environment details"));
-            println!("{}", tr("      --update               Download and install the newest release"));
+            println!(
+                "{}",
+                tr(
+                    "  -d, --data-dir <PATH>      Use custom storage directory for 100% portable environment"
+                )
+            );
+            println!(
+                "{}",
+                tr(
+                    "      --export <FILE.tar.gz> Export all tabs, profiles, logins & cookies into archive"
+                )
+            );
+            println!(
+                "{}",
+                tr(
+                    "      --import <FILE.tar.gz> Import all tabs, profiles, logins & cookies from archive"
+                )
+            );
+            println!(
+                "{}",
+                tr(
+                    "      --data-info            Show current storage directory and environment details"
+                )
+            );
+            println!(
+                "{}",
+                tr("      --update               Download and install the newest release")
+            );
             println!("{}", tr("  -v, --version              Show version"));
             println!("{}", tr("  -h, --help                 Show help message"));
             println!();
             println!("{}", tr("Environment Variables:"));
-            println!("{}", tr("  RAIL_DATA_DIR              Override default storage directory (~/.local/share/rail)"));
+            println!(
+                "{}",
+                tr(
+                    "  RAIL_DATA_DIR              Override default storage directory (~/.local/share/rail)"
+                )
+            );
             return glib::ExitCode::SUCCESS;
         }
         if arg == "--data-info" {
@@ -205,7 +231,12 @@ fn main() -> glib::ExitCode {
                 }
                 return glib::ExitCode::SUCCESS;
             } else {
-                eprintln!("{}", tr("Error: --export requires an output filename (e.g. rail --export backup.tar.gz)"));
+                eprintln!(
+                    "{}",
+                    tr(
+                        "Error: --export requires an output filename (e.g. rail --export backup.tar.gz)"
+                    )
+                );
                 return glib::ExitCode::FAILURE;
             }
         }
@@ -218,7 +249,12 @@ fn main() -> glib::ExitCode {
                 }
                 return glib::ExitCode::SUCCESS;
             } else {
-                eprintln!("{}", tr("Error: --import requires an archive filename (e.g. rail --import backup.tar.gz)"));
+                eprintln!(
+                    "{}",
+                    tr(
+                        "Error: --import requires an archive filename (e.g. rail --import backup.tar.gz)"
+                    )
+                );
                 return glib::ExitCode::FAILURE;
             }
         }
@@ -304,7 +340,11 @@ fn main() -> glib::ExitCode {
         }
     });
     app.connect_command_line(|gapp, cmdline| {
-        let args: Vec<String> = cmdline.arguments().iter().map(|a| a.to_string_lossy().into_owned()).collect();
+        let args: Vec<String> = cmdline
+            .arguments()
+            .iter()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
         if let Some(app_url) = parse_cli_app(&args) {
             crate::pwa::open_pwa_window(gapp, &app_url, None);
             return glib::ExitCode::SUCCESS;
@@ -328,7 +368,10 @@ fn main() -> glib::ExitCode {
                         a.new_tab_with_url(&uri);
                     }
                 }
-                if let Some(token) = cmdline.getenv("XDG_ACTIVATION_TOKEN").or_else(|| cmdline.getenv("DESKTOP_STARTUP_ID")) {
+                if let Some(token) = cmdline
+                    .getenv("XDG_ACTIVATION_TOKEN")
+                    .or_else(|| cmdline.getenv("DESKTOP_STARTUP_ID"))
+                {
                     a.win.set_startup_id(&token);
                 }
                 a.win.set_visible(true);

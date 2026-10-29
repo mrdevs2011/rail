@@ -162,7 +162,8 @@ if(m&&m.content&&m.content.trim())return m.content.trim();\
 /// Language code safe to put into a URL (`[A-Za-z0-9-]`, up to 8 chars), else `default`.
 pub(crate) fn clean_lang_code(code: &str, default: &str) -> String {
     let c = code.trim();
-    if !c.is_empty() && c.len() <= 8 && c.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '-') {
+    if !c.is_empty() && c.len() <= 8 && c.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '-')
+    {
         c.to_string()
     } else {
         default.to_string()
@@ -191,7 +192,10 @@ pub(crate) fn normalize_detected_lang(raw: &str) -> String {
 
 /// `my-site.co.uk` -> `my--site-co-uk.translate.goog` (hyphen doubles first, then dots become hyphens).
 pub(crate) fn translate_host(host: &str) -> String {
-    format!("{}.translate.goog", host.replace('-', "--").replace('.', "-"))
+    format!(
+        "{}.translate.goog",
+        host.replace('-', "--").replace('.', "-")
+    )
 }
 
 /// Reverse of `translate_host` (without the `.translate.goog` suffix check done by the caller).
@@ -216,10 +220,19 @@ fn untranslate_host(translated: &str) -> Option<String> {
 
 fn rebuild_url(host: &str, u: &glib::Uri, extra: &[(&str, &str)]) -> String {
     let path = u.path();
-    let mut out = format!("https://{}{}", host, if path.is_empty() { "/" } else { path.as_str() });
+    let mut out = format!(
+        "https://{}{}",
+        host,
+        if path.is_empty() { "/" } else { path.as_str() }
+    );
     let mut pairs: Vec<String> = u
         .query()
-        .map(|q| q.split('&').filter(|p| !p.is_empty() && !p.starts_with("_x_tr_")).map(|p| p.to_string()).collect())
+        .map(|q| {
+            q.split('&')
+                .filter(|p| !p.is_empty() && !p.starts_with("_x_tr_"))
+                .map(|p| p.to_string())
+                .collect()
+        })
         .unwrap_or_default();
     for (k, v) in extra {
         pairs.push(format!("{}={}", k, v));
@@ -262,7 +275,12 @@ pub(crate) fn translate_url(current: &str, source: &str, target: &str) -> Option
         return None;
     }
     let host = u.host()?.to_string();
-    if host.is_empty() || !host.contains('.') || host.contains(':') || host.ends_with(".translate.goog") || host.parse::<std::net::IpAddr>().is_ok() {
+    if host.is_empty()
+        || !host.contains('.')
+        || host.contains(':')
+        || host.ends_with(".translate.goog")
+        || host.parse::<std::net::IpAddr>().is_ok()
+    {
         return None;
     }
     let port = u.port();
@@ -271,7 +289,11 @@ pub(crate) fn translate_url(current: &str, source: &str, target: &str) -> Option
     }
     let sl = google_lang_code(&clean_lang_code(source, "auto"));
     let tl = google_lang_code(&clean_lang_code(target, "uz"));
-    Some(rebuild_url(&translate_host(&host), &u, &[("_x_tr_sl", &sl), ("_x_tr_tl", &tl), ("_x_tr_hl", &tl)]))
+    Some(rebuild_url(
+        &translate_host(&host),
+        &u,
+        &[("_x_tr_sl", &sl), ("_x_tr_tl", &tl), ("_x_tr_hl", &tl)],
+    ))
 }
 
 /// Original page URL for a `*.translate.goog` address (None if `current` is not one).

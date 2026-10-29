@@ -1,5 +1,5 @@
-mod uri;
 mod translate;
+mod uri;
 
-pub(crate) use uri::*;
 pub(crate) use translate::*;
+pub(crate) use uri::*;

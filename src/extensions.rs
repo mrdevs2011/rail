@@ -8,8 +8,8 @@
 //! runtime.connect, tabs, i18n, action, browserAction, window.browser).
 
 use crate::minijson::{self, Json};
-use crate::{load_html_css, user_style_sheet, STYLE_MANAGERS};
 use crate::rail_data_dir;
+use crate::{STYLE_MANAGERS, load_html_css, user_style_sheet};
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
@@ -141,10 +141,21 @@ pub(crate) fn extension_icon_widget(ext: &Extension, size: i32) -> gtk4::Image {
         }
     }
     let candidates = [
-        "icon128.png", "icon48.png", "icon32.png", "icon16.png",
-        "icons/128.png", "icons/48.png", "icons/32.png", "icons/16.png",
-        "icons/icon128.png", "icons/icon48.png", "icons/icon32.png", "icons/icon16.png",
-        "icon.png", "assets/icon.png", "images/icon.png",
+        "icon128.png",
+        "icon48.png",
+        "icon32.png",
+        "icon16.png",
+        "icons/128.png",
+        "icons/48.png",
+        "icons/32.png",
+        "icons/16.png",
+        "icons/icon128.png",
+        "icons/icon48.png",
+        "icons/icon32.png",
+        "icons/icon16.png",
+        "icon.png",
+        "assets/icon.png",
+        "images/icon.png",
     ];
     for cand in candidates {
         let p = ext.path.join(cand);
@@ -171,21 +182,25 @@ pub(crate) fn parse_manifest(dir: &Path) -> Result<Extension, String> {
     let root = minijson::parse(&content)
         .ok_or_else(|| "manifest.json formati noto'g'ri (JSON parsing xatosi)".to_string())?;
 
-    let fallback_name = dir.file_name()
+    let fallback_name = dir
+        .file_name()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| "Nomsiz kengaytma".to_string());
 
-    let mut name = root.get("name")
+    let mut name = root
+        .get("name")
         .and_then(|v| v.as_str())
         .unwrap_or(&fallback_name)
         .to_string();
 
-    let version = root.get("version")
+    let version = root
+        .get("version")
         .and_then(|v| v.as_str())
         .unwrap_or("1.0")
         .to_string();
 
-    let mut description = root.get("description")
+    let mut description = root
+        .get("description")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
@@ -199,13 +214,23 @@ pub(crate) fn parse_manifest(dir: &Path) -> Result<Extension, String> {
                 if let Some(msg_json) = minijson::parse(&msg_text) {
                     if name.starts_with("__MSG_") {
                         let key = name.trim_start_matches("__MSG_").trim_end_matches("__");
-                        if let Some(msg_val) = msg_json.get(key).and_then(|o| o.get("message")).and_then(|m| m.as_str()) {
+                        if let Some(msg_val) = msg_json
+                            .get(key)
+                            .and_then(|o| o.get("message"))
+                            .and_then(|m| m.as_str())
+                        {
                             name = msg_val.to_string();
                         }
                     }
                     if description.starts_with("__MSG_") {
-                        let key = description.trim_start_matches("__MSG_").trim_end_matches("__");
-                        if let Some(msg_val) = msg_json.get(key).and_then(|o| o.get("message")).and_then(|m| m.as_str()) {
+                        let key = description
+                            .trim_start_matches("__MSG_")
+                            .trim_end_matches("__");
+                        if let Some(msg_val) = msg_json
+                            .get(key)
+                            .and_then(|o| o.get("message"))
+                            .and_then(|m| m.as_str())
+                        {
                             description = msg_val.to_string();
                         }
                     }
@@ -245,12 +270,14 @@ pub(crate) fn parse_manifest(dir: &Path) -> Result<Extension, String> {
                 }
             }
 
-            let run_at = cs_val.get("run_at")
+            let run_at = cs_val
+                .get("run_at")
                 .and_then(|v| v.as_str())
                 .unwrap_or("document_idle")
                 .to_string();
 
-            let all_frames = cs_val.get("all_frames")
+            let all_frames = cs_val
+                .get("all_frames")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
 
@@ -313,17 +340,24 @@ pub(crate) fn parse_manifest(dir: &Path) -> Result<Extension, String> {
     let mut commands = Vec::new();
     if let Some(cmds) = root.get("commands").and_then(|v| v.as_obj()) {
         for (cmd_name, cmd_val) in cmds {
-            let desc = cmd_val.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let key = cmd_val.get("suggested_key").and_then(|k| {
-                if let Some(s) = k.as_str() {
-                    Some(s.to_string())
-                } else {
-                    k.get("linux")
-                        .or_else(|| k.get("default"))
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())
-                }
-            }).unwrap_or_default();
+            let desc = cmd_val
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let key = cmd_val
+                .get("suggested_key")
+                .and_then(|k| {
+                    if let Some(s) = k.as_str() {
+                        Some(s.to_string())
+                    } else {
+                        k.get("linux")
+                            .or_else(|| k.get("default"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                    }
+                })
+                .unwrap_or_default();
 
             if !key.is_empty() {
                 commands.push(ExtensionCommand {
@@ -336,12 +370,24 @@ pub(crate) fn parse_manifest(dir: &Path) -> Result<Extension, String> {
     }
 
     let id = {
-        let clean: String = name.chars()
-            .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        let clean: String = name
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() {
+                    c.to_ascii_lowercase()
+                } else {
+                    '-'
+                }
+            })
             .collect();
         let trimmed = clean.trim_matches('-');
         if trimmed.is_empty() {
-            format!("ext-{}", dir.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| "1".into()))
+            format!(
+                "ext-{}",
+                dir.file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "1".into())
+            )
         } else {
             trimmed.to_string()
         }
@@ -371,9 +417,16 @@ pub(crate) fn init_extensions() {
     if let Ok(text) = std::fs::read_to_string(extensions_json_path()) {
         if let Some(Json::Arr(items)) = minijson::parse(&text) {
             for item in items {
-                let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let id = item
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 let path_str = item.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                let enabled = item.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+                let enabled = item
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
                 let p = PathBuf::from(path_str);
                 if p.is_dir() {
                     if let Ok(mut ext) = parse_manifest(&p) {
@@ -418,10 +471,22 @@ pub(crate) fn save_extensions() {
     for (i, ext) in list.iter().enumerate() {
         out.push_str("  {\n");
         out.push_str(&format!("    \"id\": \"{}\",\n", minijson::escape(&ext.id)));
-        out.push_str(&format!("    \"name\": \"{}\",\n", minijson::escape(&ext.name)));
-        out.push_str(&format!("    \"version\": \"{}\",\n", minijson::escape(&ext.version)));
-        out.push_str(&format!("    \"description\": \"{}\",\n", minijson::escape(&ext.description)));
-        out.push_str(&format!("    \"path\": \"{}\",\n", minijson::escape(&ext.path.to_string_lossy())));
+        out.push_str(&format!(
+            "    \"name\": \"{}\",\n",
+            minijson::escape(&ext.name)
+        ));
+        out.push_str(&format!(
+            "    \"version\": \"{}\",\n",
+            minijson::escape(&ext.version)
+        ));
+        out.push_str(&format!(
+            "    \"description\": \"{}\",\n",
+            minijson::escape(&ext.description)
+        ));
+        out.push_str(&format!(
+            "    \"path\": \"{}\",\n",
+            minijson::escape(&ext.path.to_string_lossy())
+        ));
         out.push_str(&format!("    \"enabled\": {}\n", ext.enabled));
         if i + 1 < list.len() {
             out.push_str("  },\n");
@@ -470,16 +535,24 @@ pub(crate) fn register_unpacked_extension(folder: &Path) -> Result<Extension, St
 /// Unpack and register a .zip or .crx extension archive or unpacked folder.
 pub(crate) fn register_unpacked_or_archive(path: &Path) -> Result<Extension, String> {
     if path.is_file() {
-        let ext_str = path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+        let ext_str = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
         if ext_str == "zip" || ext_str == "crx" {
-            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("extension");
+            let stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("extension");
             let target_dir = extensions_dir().join(stem);
             let _ = std::fs::create_dir_all(&target_dir);
 
             // Python zip extractor handles both plain .zip and .crx (finds zip magic bytes)
             let status = std::process::Command::new("python3")
                 .arg("-c")
-                .arg(r#"
+                .arg(
+                    r#"
 import sys, zipfile, io
 p, out = sys.argv[1], sys.argv[2]
 with open(p, 'rb') as f:
@@ -489,12 +562,15 @@ if idx == -1:
     sys.exit(1)
 with zipfile.ZipFile(io.BytesIO(data[idx:])) as z:
     z.extractall(out)
-"#)
+"#,
+                )
                 .arg(path)
                 .arg(&target_dir)
                 .status();
 
-            if status.map(|s| s.success()).unwrap_or(false) && target_dir.join("manifest.json").is_file() {
+            if status.map(|s| s.success()).unwrap_or(false)
+                && target_dir.join("manifest.json").is_file()
+            {
                 return register_unpacked_extension(&target_dir);
             } else {
                 return Err("Arxivni ochib bo'lmadi yoki ichida manifest.json topilmadi".into());
@@ -555,7 +631,9 @@ pub(crate) fn install_from_webstore(ext_id: &str) -> Result<Extension, String> {
     }
 
     if !downloaded {
-        return Err("Chrome Web Store serveridan yuklab bo'lmadi (Google API javob bermadi)".into());
+        return Err(
+            "Chrome Web Store serveridan yuklab bo'lmadi (Google API javob bermadi)".into(),
+        );
     }
 
     let target_dir = extensions_dir().join(clean_id);
@@ -564,7 +642,8 @@ pub(crate) fn install_from_webstore(ext_id: &str) -> Result<Extension, String> {
 
     let py_status = std::process::Command::new("python3")
         .arg("-c")
-        .arg(r#"
+        .arg(
+            r#"
 import sys, zipfile, io
 p, out = sys.argv[1], sys.argv[2]
 with open(p, 'rb') as f:
@@ -574,14 +653,16 @@ if idx == -1:
     sys.exit(1)
 with zipfile.ZipFile(io.BytesIO(data[idx:])) as z:
     z.extractall(out)
-"#)
+"#,
+        )
         .arg(&tmp_file)
         .arg(&target_dir)
         .status();
 
     let _ = std::fs::remove_file(&tmp_file);
 
-    if py_status.map(|s| s.success()).unwrap_or(false) && target_dir.join("manifest.json").is_file() {
+    if py_status.map(|s| s.success()).unwrap_or(false) && target_dir.join("manifest.json").is_file()
+    {
         register_unpacked_extension(&target_dir)
     } else {
         let _ = std::fs::remove_dir_all(&target_dir);
@@ -961,7 +1042,8 @@ pub(crate) fn apply_extensions_to_ucm(ucm: &webkit6::UserContentManager) {
                 webkit6::UserContentInjectedFrames::TopFrame
             };
 
-            let gate_js = EXT_KEY_GATE_JS.replace("__INIT__", if ext_keys_on() { "true" } else { "false" });
+            let gate_js =
+                EXT_KEY_GATE_JS.replace("__INIT__", if ext_keys_on() { "true" } else { "false" });
 
             // Inject JavaScript
             for js_file in &cs.js {
@@ -1006,13 +1088,7 @@ try {{
                         webkit6::UserScriptInjectionTime::End
                     };
 
-                    let script = webkit6::UserScript::new(
-                        &wrapped_code,
-                        frames,
-                        time,
-                        &[],
-                        &[],
-                    );
+                    let script = webkit6::UserScript::new(&wrapped_code, frames, time, &[], &[]);
                     ucm.add_script(&script);
                 }
             }
@@ -1033,7 +1109,6 @@ try {{
             }
         }
     }
-
 }
 
 /// Re-apply all user scripts, user styles and extensions to all open WebViews.

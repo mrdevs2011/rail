@@ -35,7 +35,9 @@ impl App {
         let app_hover = self.clone();
         let hovered_view = view.downgrade();
         view.connect_mouse_target_changed(move |_, hit, _| {
-            let Some(v) = hovered_view.upgrade() else { return };
+            let Some(v) = hovered_view.upgrade() else {
+                return;
+            };
             if app_hover.focused_view().as_ref() != Some(&v) {
                 app_hover.hovered_link_label.set_visible(false);
                 return;
@@ -43,7 +45,9 @@ impl App {
             if hit.context_is_link() {
                 if let Some(uri) = hit.link_uri().filter(|u| !u.is_empty()) {
                     app_hover.hovered_link_label.set_text(uri.as_str());
-                    app_hover.hovered_link_label.set_tooltip_text(Some(uri.as_str()));
+                    app_hover
+                        .hovered_link_label
+                        .set_tooltip_text(Some(uri.as_str()));
                     app_hover.hovered_link_label.set_visible(true);
                     return;
                 }
@@ -87,7 +91,9 @@ impl App {
             let v_detach = view.downgrade();
             insp.connect_detach(move |_| {
                 if let Some(_v) = v_detach.upgrade() {
-                    let target = LAST_DT_TARGET.with(|c| c.take()).unwrap_or(DevToolsDockSide::Undocked);
+                    let target = LAST_DT_TARGET
+                        .with(|c| c.take())
+                        .unwrap_or(DevToolsDockSide::Undocked);
                     app_detach.set_devtools_dock_side(target);
                 }
                 true
@@ -157,14 +163,19 @@ impl App {
             request.connect_finished(move |_| {
                 c_clone.cancel();
             });
-            dialog.choose_rgba(Some(&app.win), Some(&initial), Some(&cancellable), move |res| {
-                if let Ok(rgba) = res {
-                    req.set_rgba(&rgba);
-                    req.finish();
-                } else {
-                    req.cancel();
-                }
-            });
+            dialog.choose_rgba(
+                Some(&app.win),
+                Some(&initial),
+                Some(&cancellable),
+                move |res| {
+                    if let Ok(rgba) = res {
+                        req.set_rgba(&rgba);
+                        req.finish();
+                    } else {
+                        req.cancel();
+                    }
+                },
+            );
             true
         });
 
@@ -186,9 +197,9 @@ impl App {
 
             let ptr = v.as_ptr() as usize;
             let recently_prevented = LAST_CONTEXT_PREVENTED.with(|m| {
-                m.borrow_mut()
-                    .remove(&ptr)
-                    .map_or(false, |t| t.elapsed() < std::time::Duration::from_millis(400))
+                m.borrow_mut().remove(&ptr).map_or(false, |t| {
+                    t.elapsed() < std::time::Duration::from_millis(400)
+                })
             });
 
             if recently_prevented && !is_shift {
@@ -330,13 +341,18 @@ impl App {
                     }
                 }
             }
-            let html = crate::web::format_error_html(failing_uri, "net::ERR_CERT_AUTHORITY_INVALID: SSL / TLS certificate validation failed.");
+            let html = crate::web::format_error_html(
+                failing_uri,
+                "net::ERR_CERT_AUTHORITY_INVALID: SSL / TLS certificate validation failed.",
+            );
             v.load_alternate_html(&html, failing_uri, None);
             true
         });
         let app = self.clone();
         view.connect_create(move |v, nav| {
-            let parent_prof = app.find_view_profile(v).unwrap_or_else(|| app.profiles.borrow().active_profile().id);
+            let parent_prof = app
+                .find_view_profile(v)
+                .unwrap_or_else(|| app.profiles.borrow().active_profile().id);
             let nv = WebView::builder().related_view(v).build();
             if let Some(req) = nav.request() {
                 if let Some(uri) = req.uri() {
@@ -364,10 +380,11 @@ impl App {
                 static LAST: Cell<Option<std::time::Instant>> = const { Cell::new(None) };
             }
             let now = std::time::Instant::now();
-            let too_soon = LAST.with(|c| {
-                match c.get() {
-                    Some(t) if now.duration_since(t) < Duration::from_secs(4) => true,
-                    _ => { c.set(Some(now)); false }
+            let too_soon = LAST.with(|c| match c.get() {
+                Some(t) if now.duration_since(t) < Duration::from_secs(4) => true,
+                _ => {
+                    c.set(Some(now));
+                    false
                 }
             });
             if too_soon {
@@ -425,8 +442,12 @@ impl App {
         let v_weak_update = v_dt.clone();
         let app_dt_update = app_dt.clone();
         dt_drag.connect_drag_update(move |_, offset_x, offset_y| {
-            let Some(b) = b_weak_update.upgrade() else { return };
-            let Some(v) = v_weak_update.upgrade() else { return };
+            let Some(b) = b_weak_update.upgrade() else {
+                return;
+            };
+            let Some(v) = v_weak_update.upgrade() else {
+                return;
+            };
             let side = app_dt_update.devtools_dock_side.get();
             let base = s_dim_update.get() as f64;
             match side {
@@ -565,10 +586,18 @@ impl App {
                     let vw = app.strip.width() as f64;
                     let rows = app.rows.borrow();
                     if let Some(row) = rows.get(r) {
-                        let w0 = row.tabs.get(c).and_then(|t| t.custom_width.get()).unwrap_or_else(|| {
-                            let is_full = row.tabs.get(c).map(|t| t.container.has_css_class("full")).unwrap_or(false);
-                            col_width(is_full, vw)
-                        });
+                        let w0 = row
+                            .tabs
+                            .get(c)
+                            .and_then(|t| t.custom_width.get())
+                            .unwrap_or_else(|| {
+                                let is_full = row
+                                    .tabs
+                                    .get(c)
+                                    .map(|t| t.container.has_css_class("full"))
+                                    .unwrap_or(false);
+                                col_width(is_full, vw)
+                            });
                         start_w0.set(w0);
 
                         let w1 = row.tabs.get(next_c).map(|t| {
@@ -688,12 +717,21 @@ impl App {
                     let vh = app.strip.height() as f64;
                     let rows = app.rows.borrow();
                     let Some(row) = rows.get(r) else { return };
-                    let Some(next) = row.tabs.get(c + 1).filter(|t| t.col_id.get() == row.tabs[c].col_id.get()) else {
+                    let Some(next) = row
+                        .tabs
+                        .get(c + 1)
+                        .filter(|t| t.col_id.get() == row.tabs[c].col_id.get())
+                    else {
                         return;
                     };
                     // Equal share baseline if unset
                     let id = row.tabs[c].col_id.get();
-                    let k = row.tabs.iter().filter(|t| t.col_id.get() == id).count().max(1);
+                    let k = row
+                        .tabs
+                        .iter()
+                        .filter(|t| t.col_id.get() == id)
+                        .count()
+                        .max(1);
                     let equal = stack_height(vh, k, gap(1.0));
                     let h0 = row.tabs[c].custom_height.get().unwrap_or(equal);
                     let h1 = next.custom_height.get().unwrap_or(equal);

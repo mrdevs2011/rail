@@ -11,12 +11,24 @@ pub(crate) const SEARCH_ENGINE_LIST: &[(&str, &str, &str)] = &[
     ("brave", "Brave", "https://search.brave.com/search?q={}"),
     ("baidu", "Baidu", "https://www.baidu.com/s?wd={}"),
     ("ecosia", "Ecosia", "https://www.ecosia.org/search?q={}"),
-    ("startpage", "Startpage", "https://www.startpage.com/sp/search?query={}"),
+    (
+        "startpage",
+        "Startpage",
+        "https://www.startpage.com/sp/search?query={}",
+    ),
     ("qwant", "Qwant", "https://www.qwant.com/?q={}"),
-    ("perplexity", "Perplexity", "https://www.perplexity.ai/search?q={}"),
+    (
+        "perplexity",
+        "Perplexity",
+        "https://www.perplexity.ai/search?q={}",
+    ),
     ("searxng", "SearXNG", "https://searx.be/search?q={}"),
     ("kagi", "Kagi", "https://kagi.com/search?q={}"),
-    ("naver", "Naver", "https://search.naver.com/search.naver?query={}"),
+    (
+        "naver",
+        "Naver",
+        "https://search.naver.com/search.naver?query={}",
+    ),
     ("ask", "Ask.com", "https://www.ask.com/web?q={}"),
 ];
 
@@ -29,7 +41,9 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
     // Short internal names → rail:// URLs
     match s.to_ascii_lowercase().as_str() {
         "settings" | "rail:settings" => return "rail://settings".into(),
-        "history" | "rail:history" | "chrome://history" | "rail://history" => return "rail://settings/data".into(),
+        "history" | "rail:history" | "chrome://history" | "rail://history" => {
+            return "rail://settings/data".into();
+        }
         "downloads" | "rail:downloads" => return "rail://downloads".into(),
         "start" | "newtab" | "rail:start" => return "rail://start/".into(),
         _ => {}
@@ -80,7 +94,8 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
     // Check if `s` exists directly on the filesystem (e.g. "analyze.py", "index.html")
     let direct_path = std::path::Path::new(s);
     if direct_path.exists() {
-        let target = std::fs::canonicalize(direct_path).unwrap_or_else(|_| direct_path.to_path_buf());
+        let target =
+            std::fs::canonicalize(direct_path).unwrap_or_else(|_| direct_path.to_path_buf());
         if let Ok(uri) = glib::filename_to_uri(&target, None) {
             return uri.to_string();
         }
@@ -110,14 +125,20 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
 
     // Common Linux root paths without leading slash (e.g. "home/...", "tmp/...", "etc/...")
     let lower_s = s.to_ascii_lowercase();
-    for prefix in &["home/", "etc/", "usr/", "var/", "opt/", "tmp/", "mnt/", "media/", "root/", "dev/"] {
+    for prefix in &[
+        "home/", "etc/", "usr/", "var/", "opt/", "tmp/", "mnt/", "media/", "root/", "dev/",
+    ] {
         if lower_s.starts_with(prefix) {
             return format!("file:///{s}");
         }
     }
 
     // 2. Protocols (http, https, about, data, blob)
-    if s.contains("://") || s.starts_with("about:") || s.starts_with("data:") || s.starts_with("blob:") {
+    if s.contains("://")
+        || s.starts_with("about:")
+        || s.starts_with("data:")
+        || s.starts_with("blob:")
+    {
         return s.into();
     }
 
@@ -136,7 +157,9 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
                 .map_or(false, |b| (16..=31).contains(&b)))
         || (s.contains(':')
             && !s.contains(' ')
-            && s.split(':').nth(1).map_or(false, |p| p.chars().all(|c| c.is_ascii_digit())))
+            && s.split(':')
+                .nth(1)
+                .map_or(false, |p| p.chars().all(|c| c.is_ascii_digit())))
     {
         return format!("http://{s}");
     }
@@ -174,14 +197,11 @@ fn is_likely_domain(host: &str) -> bool {
         return false;
     }
     const NON_DOMAIN_EXTS: &[&str] = &[
-        "html", "htm", "shtml", "xhtml", "php", "asp", "aspx", "jsp",
-        "txt", "md", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-        "png", "jpg", "jpeg", "gif", "svg", "webp", "ico",
-        "mp3", "mp4", "webm", "wav", "ogg", "flac", "mkv", "avi",
-        "css", "js", "ts", "json", "xml", "yaml", "yml", "toml",
-        "zip", "tar", "gz", "bz2", "xz", "7z", "zst",
-        "c", "cpp", "h", "hpp", "rs", "py", "go", "java", "rb", "sh",
-        "exe", "bin", "deb", "rpm", "pkg",
+        "html", "htm", "shtml", "xhtml", "php", "asp", "aspx", "jsp", "txt", "md", "pdf", "doc",
+        "docx", "xls", "xlsx", "ppt", "pptx", "png", "jpg", "jpeg", "gif", "svg", "webp", "ico",
+        "mp3", "mp4", "webm", "wav", "ogg", "flac", "mkv", "avi", "css", "js", "ts", "json", "xml",
+        "yaml", "yml", "toml", "zip", "tar", "gz", "bz2", "xz", "7z", "zst", "c", "cpp", "h",
+        "hpp", "rs", "py", "go", "java", "rb", "sh", "exe", "bin", "deb", "rpm", "pkg",
     ];
     let lower_tld = tld.to_ascii_lowercase();
     if NON_DOMAIN_EXTS.contains(&lower_tld.as_str()) {
@@ -237,7 +257,10 @@ pub(crate) fn settings_tab_from_uri(uri: &str) -> Option<SettingsTab> {
     if !u.starts_with("rail://settings") {
         return None;
     }
-    let rest = u.strip_prefix("rail://settings").unwrap_or("").trim_start_matches('/');
+    let rest = u
+        .strip_prefix("rail://settings")
+        .unwrap_or("")
+        .trim_start_matches('/');
     Some(match rest {
         "" | "general" => SettingsTab::General,
         "profiles" | "profile" => SettingsTab::Profiles,
@@ -261,7 +284,8 @@ pub(crate) fn normalize_internal_uri(uri: &str) -> String {
         return "rail://settings/data".into();
     }
     if u.starts_with("rail://settings") {
-        return settings_uri_for_tab(settings_tab_from_uri(u).unwrap_or(SettingsTab::General)).into();
+        return settings_uri_for_tab(settings_tab_from_uri(u).unwrap_or(SettingsTab::General))
+            .into();
     }
     if u.starts_with("rail://start") || u == "rail://" || u == "rail:" {
         return "rail://start/".into();
@@ -350,7 +374,10 @@ pub(crate) fn format_view_source_html(target_url: &str, raw_code: &str) -> Strin
 
 pub(crate) fn load_view_source_page(v: &WebView, target: &str) {
     if target.is_empty() {
-        v.load_html(&format_view_source_html("about:blank", ""), Some("about:blank"));
+        v.load_html(
+            &format_view_source_html("about:blank", ""),
+            Some("about:blank"),
+        );
         return;
     }
     let target_clean = target.to_string();
@@ -358,7 +385,8 @@ pub(crate) fn load_view_source_page(v: &WebView, target: &str) {
 
     if target_clean.starts_with("file://") {
         let path_str = target_clean.trim_start_matches("file://");
-        let content = std::fs::read_to_string(path_str).unwrap_or_else(|e| format!("/* Error reading file: {e} */"));
+        let content = std::fs::read_to_string(path_str)
+            .unwrap_or_else(|e| format!("/* Error reading file: {e} */"));
         let html = format_view_source_html(&target_clean, &content);
         v.load_html(&html, Some("about:blank"));
         return;
@@ -372,7 +400,11 @@ pub(crate) fn load_view_source_page(v: &WebView, target: &str) {
             .output();
         let code = match out {
             Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).into_owned(),
-            Ok(o) => format!("/* Error loading source: HTTP status {:?} */\n{}", o.status.code(), String::from_utf8_lossy(&o.stderr)),
+            Ok(o) => format!(
+                "/* Error loading source: HTTP status {:?} */\n{}",
+                o.status.code(),
+                String::from_utf8_lossy(&o.stderr)
+            ),
             Err(e) => format!("/* Error fetching source: {e} */"),
         };
         let _ = tx.send(code);
@@ -397,7 +429,10 @@ pub(crate) fn load_internal_page(v: &WebView, uri: &str) {
     if uri.starts_with("rail://downloads") {
         v.load_html(&downloads_page(), Some("rail://downloads"));
     } else if uri.starts_with("rail://settings") {
-        v.load_html(&settings_shell_page(), Some(uri.split('#').next().unwrap_or("rail://settings")));
+        v.load_html(
+            &settings_shell_page(),
+            Some(uri.split('#').next().unwrap_or("rail://settings")),
+        );
     } else if uri.starts_with("view-source:") {
         let target = uri.trim_start_matches("view-source:").trim();
         load_view_source_page(v, target);

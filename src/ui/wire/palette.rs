@@ -24,7 +24,13 @@ pub(crate) fn wire_palette(app: &Rc<App>, entry: gtk::Entry, pill: gtk::Button) 
 
         a.delete_key.set(
             matches!(key, gdk::Key::BackSpace | gdk::Key::Delete)
-                || (ctrl && !alt && (k == gdk::Key::x || k == gdk::Key::w || k == gdk::Key::u || k == gdk::Key::k || k == gdk::Key::h)),
+                || (ctrl
+                    && !alt
+                    && (k == gdk::Key::x
+                        || k == gdk::Key::w
+                        || k == gdk::Key::u
+                        || k == gdk::Key::k
+                        || k == gdk::Key::h)),
         );
 
         if ctrl && !shift && !alt && (k == gdk::Key::v || k == gdk::Key::V || keycode == 55) {

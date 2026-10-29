@@ -2,7 +2,10 @@
 //!
 //! Manage unpacked / local Chrome and WebExtension add-ons.
 
-use crate::extensions::{self, register_unpacked_extension, register_unpacked_or_archive, remove_extension, toggle_extension};
+use crate::extensions::{
+    self, register_unpacked_extension, register_unpacked_or_archive, remove_extension,
+    toggle_extension,
+};
 use crate::*;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -127,7 +130,9 @@ pub(crate) fn build_extensions_page(settings_stack: &gtk::Stack, win: gtk::Appli
     title.add_css_class("settings-page-title");
     title.set_xalign(0.0);
 
-    let subtitle = gtk::Label::new(Some(tr("Manage local unpacked Chrome and WebExtension add-ons")));
+    let subtitle = gtk::Label::new(Some(tr(
+        "Manage local unpacked Chrome and WebExtension add-ons",
+    )));
     subtitle.add_css_class("settings-page-subtitle");
     subtitle.set_xalign(0.0);
     subtitle.set_wrap(true);
@@ -183,23 +188,21 @@ pub(crate) fn build_extensions_page(settings_stack: &gtk::Stack, win: gtk::Appli
             .build();
         let status = status_c.clone();
         let refresh = Rc::clone(&refresh_c);
-        dialog.select_folder(Some(&w), gio::Cancellable::NONE, move |res| {
-            match res {
-                Ok(file) => {
-                    if let Some(path) = file.path() {
-                        match register_unpacked_extension(&path) {
-                            Ok(ext) => {
-                                status.set_text(&format!("{}: {}!", ext.name, tr("Saved")));
-                                refresh();
-                            }
-                            Err(e) => {
-                                status.set_text(&format!("Error: {e}"));
-                            }
+        dialog.select_folder(Some(&w), gio::Cancellable::NONE, move |res| match res {
+            Ok(file) => {
+                if let Some(path) = file.path() {
+                    match register_unpacked_extension(&path) {
+                        Ok(ext) => {
+                            status.set_text(&format!("{}: {}!", ext.name, tr("Saved")));
+                            refresh();
+                        }
+                        Err(e) => {
+                            status.set_text(&format!("Error: {e}"));
                         }
                     }
                 }
-                Err(_) => {}
             }
+            Err(_) => {}
         });
     });
 
@@ -208,7 +211,9 @@ pub(crate) fn build_extensions_page(settings_stack: &gtk::Stack, win: gtk::Appli
     let status_zip = status_lbl.clone();
     let refresh_zip = Rc::clone(&refresh_fn);
     btn_zip.connect_clicked(move |_| {
-        let Some(w) = win_weak_zip.upgrade() else { return };
+        let Some(w) = win_weak_zip.upgrade() else {
+            return;
+        };
         let filter = gtk::FileFilter::new();
         filter.set_name(Some("Extension Packages (*.zip, *.crx)"));
         filter.add_pattern("*.zip");
@@ -222,23 +227,21 @@ pub(crate) fn build_extensions_page(settings_stack: &gtk::Stack, win: gtk::Appli
             .build();
         let status = status_zip.clone();
         let refresh = Rc::clone(&refresh_zip);
-        dialog.open(Some(&w), gio::Cancellable::NONE, move |res| {
-            match res {
-                Ok(file) => {
-                    if let Some(path) = file.path() {
-                        match register_unpacked_or_archive(&path) {
-                            Ok(ext) => {
-                                status.set_text(&format!("{}: {}!", ext.name, tr("Saved")));
-                                refresh();
-                            }
-                            Err(e) => {
-                                status.set_text(&format!("Error: {e}"));
-                            }
+        dialog.open(Some(&w), gio::Cancellable::NONE, move |res| match res {
+            Ok(file) => {
+                if let Some(path) = file.path() {
+                    match register_unpacked_or_archive(&path) {
+                        Ok(ext) => {
+                            status.set_text(&format!("{}: {}!", ext.name, tr("Saved")));
+                            refresh();
+                        }
+                        Err(e) => {
+                            status.set_text(&format!("Error: {e}"));
                         }
                     }
                 }
-                Err(_) => {}
             }
+            Err(_) => {}
         });
     });
 

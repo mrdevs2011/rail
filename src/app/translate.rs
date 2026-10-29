@@ -17,10 +17,16 @@ pub(super) fn translate_page(view: &WebView) {
     }
     // Source "auto": ask the page itself (<html lang>, then og:locale); "auto" if neither is set.
     let v = view.clone();
-    view.evaluate_javascript(DETECT_LANG_JS, None, None, None::<&gio::Cancellable>, move |res| {
-        let raw = res.ok().map(|j| j.to_string()).unwrap_or_default();
-        open_translated(&v, &normalize_detected_lang(&raw), &s.translate_target_lang);
-    });
+    view.evaluate_javascript(
+        DETECT_LANG_JS,
+        None,
+        None,
+        None::<&gio::Cancellable>,
+        move |res| {
+            let raw = res.ok().map(|j| j.to_string()).unwrap_or_default();
+            open_translated(&v, &normalize_detected_lang(&raw), &s.translate_target_lang);
+        },
+    );
 }
 
 impl App {
@@ -33,7 +39,11 @@ impl App {
             let act = gio::SimpleAction::new("ctx-translate-original", None);
             act.connect_activate(move |_, _| v.load_uri(&original));
             self.win.add_action(&act);
-            menu.append(&ContextMenuItem::from_gaction(&act, tr("Show Original Page"), None));
+            menu.append(&ContextMenuItem::from_gaction(
+                &act,
+                tr("Show Original Page"),
+                None,
+            ));
             menu.append(&ContextMenuItem::new_separator());
             return;
         }
@@ -44,7 +54,11 @@ impl App {
         let act = gio::SimpleAction::new("ctx-translate-page", None);
         act.connect_activate(move |_, _| translate_page(&v));
         self.win.add_action(&act);
-        menu.append(&ContextMenuItem::from_gaction(&act, tr("Translate Page"), None));
+        menu.append(&ContextMenuItem::from_gaction(
+            &act,
+            tr("Translate Page"),
+            None,
+        ));
         menu.append(&ContextMenuItem::new_separator());
     }
 }
@@ -82,11 +96,15 @@ impl App {
     /// WebKit builds the context-menu popover (a GtkPopoverMenu child of the view) after the
     /// `context-menu` signal returns, so look for it a few times and add the translate icon.
     pub(crate) fn decorate_context_menu_icons(view: &WebView) {
-        let Some(icon) = translate_icon_variant() else { return };
+        let Some(icon) = translate_icon_variant() else {
+            return;
+        };
         let v = view.downgrade();
         let tries = std::rc::Rc::new(std::cell::Cell::new(0u8));
         glib::timeout_add_local(std::time::Duration::from_millis(10), move || {
-            let Some(v) = v.upgrade() else { return glib::ControlFlow::Break };
+            let Some(v) = v.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
             tries.set(tries.get() + 1);
             let labels = [tr("Translate Page"), tr("Show Original Page")];
             let mut any = false;
@@ -99,7 +117,11 @@ impl App {
                 }
                 child = w.next_sibling();
             }
-            if any || tries.get() >= 20 { glib::ControlFlow::Break } else { glib::ControlFlow::Continue }
+            if any || tries.get() >= 20 {
+                glib::ControlFlow::Break
+            } else {
+                glib::ControlFlow::Continue
+            }
         });
     }
 }

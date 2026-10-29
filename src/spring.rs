@@ -33,7 +33,13 @@ impl Spring {
     pub fn new(from: f64, to: f64, v0: f64, damping_ratio: f64, stiffness: f64) -> Self {
         let omega0 = stiffness.max(0.0).sqrt();
         let beta = damping_ratio.max(0.0) * omega0;
-        Self { from, to, v0, beta, omega0 }
+        Self {
+            from,
+            to,
+            v0,
+            beta,
+            omega0,
+        }
     }
 
     /// Position `t` seconds after the spring started.
@@ -152,7 +158,10 @@ mod tests {
         let mut prev = 0.0;
         for i in 0..400 {
             let v = s.value_at(i as f64 / 1000.0);
-            assert!(v >= prev - 1e-9 && v <= 500.0 + 1e-6, "monotonic, no overshoot");
+            assert!(
+                v >= prev - 1e-9 && v <= 500.0 + 1e-6,
+                "monotonic, no overshoot"
+            );
             prev = v;
         }
         assert!(s.is_settled(0.5));
@@ -174,7 +183,10 @@ mod tests {
         }
         assert!((t.velocity() - 1000.0 * 10.0 / 9.0).abs() < 1.0);
         let v = t.release_velocity(0.3);
-        assert!(v.abs() < 1.0, "long pause before release means no fling, got {v}");
+        assert!(
+            v.abs() < 1.0,
+            "long pause before release means no fling, got {v}"
+        );
     }
 
     #[test]

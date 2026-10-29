@@ -13,16 +13,51 @@ use crate::*;
 /// Yangi `sc!` qo'shilsa, bu yerga va `run_action` ga ham qo'shiladi (test shuni tekshiradi).
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) const STATIC_ACTIONS: &[&str] = &[
-    "new_tab", "focus_url", "close_tab", "reload", "hard_reload", "full_tab", "new_workspace",
-    "focus_left", "focus_right", "focus_down", "focus_up",
-    "win_left", "win_right", "win_up", "win_down",
-    "move_left", "move_right", "move_down", "move_up",
-    "next_tab", "prev_tab", "stack_left", "stack_right",
-    "settings", "profiles", "data", "devtools", "devtools_dock", "map", "overview",
-    "overview_zoom_in", "overview_zoom_out", "zoom_reset",
-    "sidebar", "downloads", "fullscreen", "quit",
-    "reopen_tab", "history", "open_file", "view_source",
-    "find", "find_next", "find_prev", "extension_mode",
+    "new_tab",
+    "focus_url",
+    "close_tab",
+    "reload",
+    "hard_reload",
+    "full_tab",
+    "new_workspace",
+    "focus_left",
+    "focus_right",
+    "focus_down",
+    "focus_up",
+    "win_left",
+    "win_right",
+    "win_up",
+    "win_down",
+    "move_left",
+    "move_right",
+    "move_down",
+    "move_up",
+    "next_tab",
+    "prev_tab",
+    "stack_left",
+    "stack_right",
+    "settings",
+    "profiles",
+    "data",
+    "devtools",
+    "devtools_dock",
+    "map",
+    "overview",
+    "overview_zoom_in",
+    "overview_zoom_out",
+    "zoom_reset",
+    "sidebar",
+    "downloads",
+    "fullscreen",
+    "quit",
+    "reopen_tab",
+    "history",
+    "open_file",
+    "view_source",
+    "find",
+    "find_next",
+    "find_prev",
+    "extension_mode",
 ];
 
 impl App {
@@ -51,7 +86,11 @@ impl App {
     pub(crate) fn page_zoom(self: &Rc<Self>, dir: i32) {
         let Some(v) = self.focused_view() else { return };
         let cur = v.zoom_level();
-        let z = if dir == 0 { 1.0 } else { next_page_zoom(cur, dir) };
+        let z = if dir == 0 {
+            1.0
+        } else {
+            next_page_zoom(cur, dir)
+        };
         v.set_zoom_level(z);
     }
 
@@ -59,13 +98,19 @@ impl App {
 
     /// `tab_3` → Some(3) (faqat 1..=9).
     fn action_num(id: &str, prefix: &str) -> Option<usize> {
-        id.strip_prefix(prefix)?.parse::<usize>().ok().filter(|n| (1..=9).contains(n))
+        id.strip_prefix(prefix)?
+            .parse::<usize>()
+            .ok()
+            .filter(|n| (1..=9).contains(n))
     }
 
     /// Customize ro'yxatidagi `id` uchun handler bormi?
     #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn action_known(id: &str) -> bool {
-        STATIC_ACTIONS.contains(&id) || ["tab_", "ws_", "mv_"].iter().any(|p| Self::action_num(id, p).is_some())
+        STATIC_ACTIONS.contains(&id)
+            || ["tab_", "ws_", "mv_"]
+                .iter()
+                .any(|p| Self::action_num(id, p).is_some())
     }
 
     /// Shortcut amalini bajaradi. `false` — tugma ishlatilmadi va sahifaga o'tishi kerak.
@@ -206,7 +251,12 @@ impl App {
 
     /// Customize ro'yxatiga kirmaydigan qat'iy tugmalar: Esc, overview ichidagi oddiy tugmalar,
     /// kengaytma buyruqlari, Shift+Enter (qidiruvda oldingi natija).
-    pub(crate) fn on_key(self: &Rc<Self>, key: gdk::Key, _keycode: u32, state: gdk::ModifierType) -> bool {
+    pub(crate) fn on_key(
+        self: &Rc<Self>,
+        key: gdk::Key,
+        _keycode: u32,
+        state: gdk::ModifierType,
+    ) -> bool {
         use gdk::ModifierType as M;
         let ctrl = state.contains(M::CONTROL_MASK);
         let shift = state.contains(M::SHIFT_MASK);
@@ -237,7 +287,10 @@ impl App {
                 self.find_close(true);
                 return true;
             }
-            let enter = matches!(k, gdk::Key::Return | gdk::Key::KP_Enter | gdk::Key::ISO_Enter);
+            let enter = matches!(
+                k,
+                gdk::Key::Return | gdk::Key::KP_Enter | gdk::Key::ISO_Enter
+            );
             if enter && shift && !ctrl && !alt {
                 self.find_step(false);
                 return true;

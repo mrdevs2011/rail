@@ -28,7 +28,14 @@ pub struct Jank {
 
 impl Jank {
     pub fn new() -> Self {
-        Self { window_start: Instant::now(), ticks: 0, over16: 0, over33: 0, over100: 0, max_ms: 0 }
+        Self {
+            window_start: Instant::now(),
+            ticks: 0,
+            over16: 0,
+            over33: 0,
+            over100: 0,
+            max_ms: 0,
+        }
     }
 
     /// `late` = how much later than scheduled the watchdog timer fired.
@@ -74,10 +81,17 @@ impl Jank {
             .map(|d| d.as_secs())
             .unwrap_or(0);
         let path = data_dir.join("jank.log");
-        if std::fs::metadata(&path).map(|m| m.len() > MAX_LOG_BYTES).unwrap_or(false) {
+        if std::fs::metadata(&path)
+            .map(|m| m.len() > MAX_LOG_BYTES)
+            .unwrap_or(false)
+        {
             let _ = std::fs::write(&path, "");
         }
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
             let _ = writeln!(f, "{}", self.summary(secs));
         }
         self.reset();

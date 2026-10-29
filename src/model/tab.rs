@@ -48,7 +48,11 @@ impl Tab {
         if is_internal_uri(&live) {
             return String::new();
         }
-        if live.is_empty() { self.saved_uri.borrow().clone() } else { live }
+        if live.is_empty() {
+            self.saved_uri.borrow().clone()
+        } else {
+            live
+        }
     }
 }
 
@@ -101,15 +105,23 @@ impl Row {
     /// A column's width lives on its first tab; hands it over from one tab to another.
     pub(crate) fn move_col_props(&self, from: usize, to: usize) {
         let full = self.tabs[from].container.has_css_class("full");
-        self.tabs[to].custom_width.set(self.tabs[from].custom_width.get());
+        self.tabs[to]
+            .custom_width
+            .set(self.tabs[from].custom_width.get());
         set_full_class(&self.tabs[to].container, full);
         self.tabs[from].reset_col_props();
     }
 
     /// Swaps two tabs but leaves the column width where it was (it belongs to the position).
     pub(crate) fn swap_keep_props(&mut self, i: usize, j: usize) {
-        let (wi, wj) = (self.tabs[i].custom_width.get(), self.tabs[j].custom_width.get());
-        let (fi, fj) = (self.tabs[i].container.has_css_class("full"), self.tabs[j].container.has_css_class("full"));
+        let (wi, wj) = (
+            self.tabs[i].custom_width.get(),
+            self.tabs[j].custom_width.get(),
+        );
+        let (fi, fj) = (
+            self.tabs[i].container.has_css_class("full"),
+            self.tabs[j].container.has_css_class("full"),
+        );
         self.tabs.swap(i, j);
         self.tabs[i].custom_width.set(wi);
         self.tabs[j].custom_width.set(wj);
@@ -157,7 +169,11 @@ pub(crate) fn step_cam_axis(
     match cs {
         Some(c) if (c.spring.to - target).abs() > 0.01 => {
             let t = (now_us - c.start_us) as f64 / 1e6;
-            let v = if hint != 0.0 { hint } else { c.spring.velocity_at(t) };
+            let v = if hint != 0.0 {
+                hint
+            } else {
+                c.spring.velocity_at(t)
+            };
             cs = Some(CamSpring {
                 spring: Spring::new(cur, target, v, SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS),
                 start_us: now_us,
@@ -189,7 +205,10 @@ pub(crate) fn row_cols(row: &Row, vw: f64, g: f64) -> Vec<(usize, usize, f64, f6
     let mut x = 0.0;
     for (start, len) in row.columns() {
         let head = &row.tabs[start];
-        let w = head.custom_width.get().unwrap_or_else(|| col_width(head.container.has_css_class("full"), vw));
+        let w = head
+            .custom_width
+            .get()
+            .unwrap_or_else(|| col_width(head.container.has_css_class("full"), vw));
         out.push((start, len, x, w));
         x += w + g;
     }

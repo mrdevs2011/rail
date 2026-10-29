@@ -59,13 +59,27 @@ pub(crate) fn parse_session_content(content: &str) -> SessionState {
                 let pid = parts[4].to_string();
                 let url = parts[5].to_string();
                 let custom_width = parts.get(6).and_then(|s| s.parse::<f64>().ok());
-                tabs.push(SessionTabItem { row: r, col: c, full, profile_id: pid, url, custom_width });
+                tabs.push(SessionTabItem {
+                    row: r,
+                    col: c,
+                    full,
+                    profile_id: pid,
+                    url,
+                    custom_width,
+                });
             }
             "tab" if parts.len() == 4 => {
                 let c = parts[1].parse().unwrap_or(0);
                 let pid = parts[2].to_string();
                 let url = parts[3].to_string();
-                tabs.push(SessionTabItem { row: 0, col: c, full: true, profile_id: pid, url, custom_width: None });
+                tabs.push(SessionTabItem {
+                    row: 0,
+                    col: c,
+                    full: true,
+                    profile_id: pid,
+                    url,
+                    custom_width: None,
+                });
             }
             "stack" if parts.len() >= 3 => {
                 stacked.push((parts[1].parse().unwrap_or(0), parts[2].parse().unwrap_or(0)));
@@ -75,7 +89,8 @@ pub(crate) fn parse_session_content(content: &str) -> SessionState {
     }
     SessionState {
         focus,
-        sidebar_open, search_engine,
+        sidebar_open,
+        search_engine,
         win_size,
         tabs,
         stacked,

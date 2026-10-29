@@ -269,7 +269,11 @@ pub(crate) fn lang_flag_texture(lang: &'static str) -> Option<gdk::Texture> {
         c.borrow_mut()
             .entry(lang)
             .or_insert_with(|| {
-                let bytes = if lang == "auto" { svg_bytes("auto-lang")? } else { lang_flag_bytes(lang)? };
+                let bytes = if lang == "auto" {
+                    svg_bytes("auto-lang")?
+                } else {
+                    lang_flag_bytes(lang)?
+                };
                 gdk::Texture::from_bytes(&glib::Bytes::from_static(bytes)).ok()
             })
             .clone()

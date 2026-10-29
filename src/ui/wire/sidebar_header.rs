@@ -261,7 +261,11 @@ pub(crate) fn wire_sidebar_header(
 
     let a_active = app.clone();
     app.win.connect_is_active_notify(move |w| {
-        if !w.is_active() && a_active.sidebar_auto.get() && a_active.side_open.get() && !a_active.sidebar_locked.get() {
+        if !w.is_active()
+            && a_active.sidebar_auto.get()
+            && a_active.side_open.get()
+            && !a_active.sidebar_locked.get()
+        {
             a_active.set_sidebar(false);
         }
     });

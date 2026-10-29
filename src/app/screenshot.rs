@@ -687,8 +687,12 @@ impl App {
         let doc_h = get_json_num(payload, "docH").unwrap_or(1080.0).max(1.0);
         let scroll_x = get_json_num(payload, "scrollX").unwrap_or(0.0);
         let scroll_y = get_json_num(payload, "scrollY").unwrap_or(0.0);
-        let vp_w = get_json_num(payload, "viewportW").unwrap_or(1920.0).max(1.0);
-        let vp_h = get_json_num(payload, "viewportH").unwrap_or(1080.0).max(1.0);
+        let vp_w = get_json_num(payload, "viewportW")
+            .unwrap_or(1920.0)
+            .max(1.0);
+        let vp_h = get_json_num(payload, "viewportH")
+            .unwrap_or(1080.0)
+            .max(1.0);
 
         if w < 2.0 || h < 2.0 {
             cleanup_screenshot(view);
@@ -812,8 +816,14 @@ fn crop_texture(tex: &gdk::Texture, r: Rect) -> Option<gdk::Texture> {
     }
     let bytes = glib::Bytes::from_owned(out);
     Some(
-        gdk::MemoryTexture::new(iw, ih, gdk::MemoryFormat::R8g8b8a8, &bytes, (iw * 4) as usize)
-            .upcast(),
+        gdk::MemoryTexture::new(
+            iw,
+            ih,
+            gdk::MemoryFormat::R8g8b8a8,
+            &bytes,
+            (iw * 4) as usize,
+        )
+        .upcast(),
     )
 }
 

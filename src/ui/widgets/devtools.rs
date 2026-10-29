@@ -41,7 +41,11 @@ pub(crate) fn build_devtools() -> DevtoolsWidgets {
 
     let devtools_close_btn = gtk::Button::from_icon_name("window-close-symbolic");
     devtools_close_btn.add_css_class("flat-icon");
-    sc_bind_tooltip(&devtools_close_btn, "Close DevTools (Esc / F12)", &["devtools"]);
+    sc_bind_tooltip(
+        &devtools_close_btn,
+        "Close DevTools (Esc / F12)",
+        &["devtools"],
+    );
 
     devtools_header.append(&devtools_icon);
     devtools_header.append(&devtools_title);
@@ -70,5 +74,12 @@ pub(crate) fn build_devtools() -> DevtoolsWidgets {
     devtools_panel.append(&devtools_resize_handle);
     devtools_panel.append(&devtools_content_box);
 
-    DevtoolsWidgets { devtools_close_btn, devtools_content_box, devtools_detach_btn, devtools_panel, devtools_resize_handle, devtools_url_lbl }
+    DevtoolsWidgets {
+        devtools_close_btn,
+        devtools_content_box,
+        devtools_detach_btn,
+        devtools_panel,
+        devtools_resize_handle,
+        devtools_url_lbl,
+    }
 }

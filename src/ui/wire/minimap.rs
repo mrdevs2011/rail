@@ -2,7 +2,15 @@
 
 use crate::*;
 
-pub(crate) fn wire_minimap(app: &Rc<App>, map_close_btn: gtk::Button, map_container: gtk::Box, map_drawing_area: gtk::DrawingArea, map_header_row: gtk::Box, map_location_btn: gtk::Button, overlay: gtk::Overlay) {
+pub(crate) fn wire_minimap(
+    app: &Rc<App>,
+    map_close_btn: gtk::Button,
+    map_container: gtk::Box,
+    map_drawing_area: gtk::DrawingArea,
+    map_header_row: gtk::Box,
+    map_location_btn: gtk::Button,
+    overlay: gtk::Overlay,
+) {
     let a_close = app.clone();
     map_close_btn.connect_clicked(move |_| a_close.hide_map());
 
@@ -104,7 +112,9 @@ pub(crate) fn wire_minimap(app: &Rc<App>, map_close_btn: gtk::Button, map_contai
     let is_pinching_click = is_pinching.clone();
     let pinch_end_time_click = pinch_end_time.clone();
     click.connect_released(move |_gesture, _n_press, x, y| {
-        if is_pinching_click.get() || (glib::monotonic_time() - pinch_end_time_click.get()) < 250_000 {
+        if is_pinching_click.get()
+            || (glib::monotonic_time() - pinch_end_time_click.get()) < 250_000
+        {
             return;
         }
         if drag_dist_for_click.get() < 6.0 {
@@ -113,9 +123,7 @@ pub(crate) fn wire_minimap(app: &Rc<App>, map_close_btn: gtk::Button, map_contai
     });
     map_drawing_area.add_controller(click);
 
-    let scroll = gtk::EventControllerScroll::new(
-        gtk::EventControllerScrollFlags::BOTH_AXES,
-    );
+    let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
     let a_scroll = app.clone();
     scroll.connect_scroll(move |_ctrl, _dx, dy| {
         if dy.abs() > 0.001 {

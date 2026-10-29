@@ -23,7 +23,8 @@ impl App {
         // Settings rides on its tab overlay (like downloads HTML) — keep it visible
         // so the overview card shows real content, not a blank shell.
         self.ov.set(true);
-        self.ov_return.set((self.focus_row.get(), self.focus_col.get()));
+        self.ov_return
+            .set((self.focus_row.get(), self.focus_col.get()));
         self.ov_saved_x.set(self.target_x.get());
         self.ov_saved_y.set(self.target_y.get());
         self.strip.add_css_class("zoomed");
@@ -159,10 +160,11 @@ impl App {
         self.target_y.set(ty);
     }
 
-
     /// Overview: keep live cards visible; if a tab was already suspended, show its freeze frame.
     pub(crate) fn ensure_overview_previews(self: &Rc<Self>) {
-        let Ok(rows) = self.rows.try_borrow() else { return };
+        let Ok(rows) = self.rows.try_borrow() else {
+            return;
+        };
         for row in rows.iter() {
             for tab in row.tabs.iter() {
                 if tab.suspended.get() {
@@ -221,7 +223,8 @@ impl App {
                 for (start, len, x, w) in row_cols(row, vw, g) {
                     if unscaled_x >= x && unscaled_x <= x + w {
                         let h = stack_height(vh, len, g);
-                        let j = (((unscaled_y - row_y) / (h + g)).floor().max(0.0) as usize).min(len - 1);
+                        let j = (((unscaled_y - row_y) / (h + g)).floor().max(0.0) as usize)
+                            .min(len - 1);
                         hit = Some((r_idx, start + j));
                         break;
                     }

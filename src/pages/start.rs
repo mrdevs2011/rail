@@ -14,6 +14,14 @@ thread_local! {
 /// Boshlang'ich sahifa: til, sarlavha, tavsif va qidiruv placeholder joriy tilga o'giriladi.
 pub(crate) fn start_page() -> String {
     START_PAGE
-        .replacen("<html lang=\"en\">", &format!("<html lang=\"{}\">", i18n::current().code()), 1)
-        .replacen("fast pages many workspaces with RAIL", tr("fast pages many workspaces with RAIL"), 1)
+        .replacen(
+            "<html lang=\"en\">",
+            &format!("<html lang=\"{}\">", i18n::current().code()),
+            1,
+        )
+        .replacen(
+            "fast pages many workspaces with RAIL",
+            tr("fast pages many workspaces with RAIL"),
+            1,
+        )
 }

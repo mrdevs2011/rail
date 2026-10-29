@@ -176,7 +176,9 @@ impl Parser<'_> {
 
     fn number(&mut self) -> Option<Json> {
         let start = self.i;
-        while self.i < self.c.len() && matches!(self.c[self.i], '0'..='9' | '-' | '+' | '.' | 'e' | 'E') {
+        while self.i < self.c.len()
+            && matches!(self.c[self.i], '0'..='9' | '-' | '+' | '.' | 'e' | 'E')
+        {
             self.i += 1;
         }
         let s: String = self.c[start..self.i].iter().collect();
@@ -218,7 +220,9 @@ impl Parser<'_> {
                             let mut cp = self.hex4()?;
                             if (0xD800..0xDC00).contains(&cp) && self.lit("\\u") {
                                 let lo = self.hex4()?;
-                                cp = 0x10000 + ((cp - 0xD800) << 10) + (lo.wrapping_sub(0xDC00) & 0x3FF);
+                                cp = 0x10000
+                                    + ((cp - 0xD800) << 10)
+                                    + (lo.wrapping_sub(0xDC00) & 0x3FF);
                             }
                             out.push(char::from_u32(cp).unwrap_or('\u{FFFD}'));
                         }

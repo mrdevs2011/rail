@@ -10,7 +10,9 @@ pub(crate) fn build_about_page(settings_stack: &gtk::Stack) {
     let about_title = gtk::Label::new(Some(tr("About Rail Browser")));
     about_title.add_css_class("settings-page-title");
     about_title.set_xalign(0.0);
-    let about_subtitle = gtk::Label::new(Some(tr("High-performance native browser engineered in Rust")));
+    let about_subtitle = gtk::Label::new(Some(tr(
+        "High-performance native browser engineered in Rust",
+    )));
     about_subtitle.add_css_class("settings-page-subtitle");
     about_subtitle.set_xalign(0.0);
     about_subtitle.set_wrap(true);
@@ -34,7 +36,10 @@ pub(crate) fn build_about_page(settings_stack: &gtk::Stack) {
         (tr("Core Engine"), "WebKitGTK 4.1 / WebKit 6.0"),
         (tr("GUI Framework"), "GTK 4.0 + GSK GPU Compositor"),
         (tr("Language"), tr("100% Pure Native Rust")),
-        (tr("Architecture"), tr("Zero-Electron / Sandboxed Storage Profiles")),
+        (
+            tr("Architecture"),
+            tr("Zero-Electron / Sandboxed Storage Profiles"),
+        ),
         (tr("Data Directory"), "~/.local/share/rail/"),
         (tr("License"), "MIT License"),
     ];

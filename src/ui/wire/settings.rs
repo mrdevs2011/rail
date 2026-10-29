@@ -155,7 +155,9 @@ pub(crate) fn wire_settings(
     let a = app.clone();
     let win_weak = win.downgrade();
     btn_export_local.connect_clicked(move |_| {
-        let Some(win) = win_weak.upgrade() else { return };
+        let Some(win) = win_weak.upgrade() else {
+            return;
+        };
         let timestamp = glib::DateTime::now_local()
             .ok()
             .and_then(|d| d.format("%Y%m%d_%H%M%S").ok())
@@ -180,7 +182,9 @@ pub(crate) fn wire_settings(
     let a = app.clone();
     let win_weak = win.downgrade();
     btn_import_local.connect_clicked(move |_| {
-        let Some(win) = win_weak.upgrade() else { return };
+        let Some(win) = win_weak.upgrade() else {
+            return;
+        };
         let dialog = gtk::FileDialog::builder()
             .title(tr("Select Rail Backup Archive (.tar.gz)"))
             .build();
@@ -216,7 +220,9 @@ pub(crate) fn wire_settings(
         let weak = Rc::downgrade(&app);
         layout.connect_visibility(move |child, visible| {
             let Some(a) = weak.upgrade() else { return };
-            let Ok(rows) = a.rows.try_borrow() else { return };
+            let Ok(rows) = a.rows.try_borrow() else {
+                return;
+            };
             for row in rows.iter() {
                 for tab in row.tabs.iter() {
                     if tab.container.upcast_ref::<gtk::Widget>() != child {

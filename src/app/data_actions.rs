@@ -82,14 +82,20 @@ impl App {
             let p1 = ep.text().to_string();
             // Spec: 1-inputda kamida 1 belgi bo'lsa shifrlash ishlasin; 2-input bo'sh bo'lishi mumkin
             if p1.is_empty() {
-                el.set_markup(&format!("<span foreground='#f87171'>{}</span>", tr("Password cannot be empty.")));
+                el.set_markup(&format!(
+                    "<span foreground='#f87171'>{}</span>",
+                    tr("Password cannot be empty.")
+                ));
                 el.set_visible(true);
                 return;
             }
             if let Some(ref c) = ec {
                 let p2 = c.text().to_string();
                 if !p2.is_empty() && p1 != p2 {
-                    el.set_markup(&format!("<span foreground='#f87171'>{}</span>", tr("Passwords do not match.")));
+                    el.set_markup(&format!(
+                        "<span foreground='#f87171'>{}</span>",
+                        tr("Passwords do not match.")
+                    ));
                     el.set_visible(true);
                     return;
                 }
@@ -281,7 +287,11 @@ impl App {
         let path_str = self.data_export_entry.text().to_string();
         let path = PathBuf::from(path_str.trim());
         if path.as_os_str().is_empty() {
-            self.data_modal_status_lbl.set_markup(&format!("<span foreground='#f87171'><b>{}</b> {}</span>", tr("Error:"), tr("Please specify an export destination file.")));
+            self.data_modal_status_lbl.set_markup(&format!(
+                "<span foreground='#f87171'><b>{}</b> {}</span>",
+                tr("Error:"),
+                tr("Please specify an export destination file.")
+            ));
             return;
         }
 
@@ -292,13 +302,16 @@ impl App {
                     .unwrap_or_else(|_| tr("saved").to_string());
                 self.data_modal_status_lbl.set_markup(&format!(
                     "<span foreground='#4ade80'><b>{}</b> {} ({})</span>",
-                    tr("Export Successful:"), glib::markup_escape_text(&path.to_string_lossy()), size_str
+                    tr("Export Successful:"),
+                    glib::markup_escape_text(&path.to_string_lossy()),
+                    size_str
                 ));
             }
             Err(e) => {
                 self.data_modal_status_lbl.set_markup(&format!(
                     "<span foreground='#f87171'><b>{}</b> {}</span>",
-                    tr("Export Failed:"), glib::markup_escape_text(&e)
+                    tr("Export Failed:"),
+                    glib::markup_escape_text(&e)
                 ));
             }
         }
@@ -308,7 +321,11 @@ impl App {
         let path_str = self.data_import_entry.text().to_string();
         let path = PathBuf::from(path_str.trim());
         if path.as_os_str().is_empty() || !path.exists() {
-            self.data_modal_status_lbl.set_markup(&format!("<span foreground='#f87171'><b>{}</b> {}</span>", tr("Error:"), tr("Please select a valid .tar.gz backup file.")));
+            self.data_modal_status_lbl.set_markup(&format!(
+                "<span foreground='#f87171'><b>{}</b> {}</span>",
+                tr("Error:"),
+                tr("Please select a valid .tar.gz backup file.")
+            ));
             return;
         }
 
@@ -332,13 +349,15 @@ impl App {
 
                 self.data_modal_status_lbl.set_markup(&format!(
                     "<span foreground='#4ade80'><b>{}</b> {}</span>",
-                    tr("Import Successful:"), tr("All workspaces, tabs, accounts & cookies restored!")
+                    tr("Import Successful:"),
+                    tr("All workspaces, tabs, accounts & cookies restored!")
                 ));
             }
             Err(e) => {
                 self.data_modal_status_lbl.set_markup(&format!(
                     "<span foreground='#f87171'><b>{}</b> {}</span>",
-                    tr("Import Failed:"), glib::markup_escape_text(&e)
+                    tr("Import Failed:"),
+                    glib::markup_escape_text(&e)
                 ));
             }
         }

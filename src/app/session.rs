@@ -19,8 +19,15 @@ impl App {
         }
 
         let mut out = String::new();
-        out.push_str(&format!("focus\t{}\t{}\n", self.focus_row.get(), self.focus_col.get()));
-        out.push_str(&format!("sidebar\t{}\n", if self.side_open.get() { 1 } else { 0 }));
+        out.push_str(&format!(
+            "focus\t{}\t{}\n",
+            self.focus_row.get(),
+            self.focus_col.get()
+        ));
+        out.push_str(&format!(
+            "sidebar\t{}\n",
+            if self.side_open.get() { 1 } else { 0 }
+        ));
         out.push_str(&format!("engine\t{}\n", self.search_engine.borrow()));
         let win_w = self.win.width();
         let win_h = self.win.height();
@@ -29,12 +36,22 @@ impl App {
 
         for (ri, row) in rows.iter().enumerate() {
             for (ci, tab) in row.tabs.iter().enumerate() {
-                let is_full = if tab.container.has_css_class("full") { 1 } else { 0 };
+                let is_full = if tab.container.has_css_class("full") {
+                    1
+                } else {
+                    0
+                };
                 let uri = tab.real_uri();
                 if let Some(cw) = tab.custom_width.get() {
-                    out.push_str(&format!("tab\t{}\t{}\t{}\t{}\t{}\t{:.1}\n", ri, ci, is_full, tab.profile_id, uri, cw));
+                    out.push_str(&format!(
+                        "tab\t{}\t{}\t{}\t{}\t{}\t{:.1}\n",
+                        ri, ci, is_full, tab.profile_id, uri, cw
+                    ));
                 } else {
-                    out.push_str(&format!("tab\t{}\t{}\t{}\t{}\t{}\n", ri, ci, is_full, tab.profile_id, uri));
+                    out.push_str(&format!(
+                        "tab\t{}\t{}\t{}\t{}\t{}\n",
+                        ri, ci, is_full, tab.profile_id, uri
+                    ));
                 }
                 if ci > 0 && row.tabs[ci - 1].col_id.get() == tab.col_id.get() {
                     out.push_str(&format!("stack\t{}\t{}\n", ri, ci));
@@ -82,13 +99,16 @@ impl App {
     }
 
     pub(crate) fn save_session_immediate(&self) {
-        self.save_session_gen.set(self.save_session_gen.get().wrapping_add(1));
+        self.save_session_gen
+            .set(self.save_session_gen.get().wrapping_add(1));
         self.save_session_internal(true);
     }
 
     pub(crate) fn restore_session(self: &Rc<Self>) -> bool {
         let path = rail_data_dir().join("session.txt");
-        let Ok(content) = std::fs::read_to_string(path) else { return false; };
+        let Ok(content) = std::fs::read_to_string(path) else {
+            return false;
+        };
         let state = parse_session_content(&content);
         if state.tabs.is_empty() {
             return false;
@@ -104,7 +124,6 @@ impl App {
             }
         }
 
-
         if let Some(engine) = state.search_engine {
             *self.search_engine.borrow_mut() = engine;
         }
@@ -112,7 +131,8 @@ impl App {
         if let Some(open) = state.sidebar_open {
             self.side_open.set(open);
             self.side.set_visible(open);
-            self.shell_layout.set_side(if open { SIDE_W as f64 } else { 0.0 });
+            self.shell_layout
+                .set_side(if open { SIDE_W as f64 } else { 0.0 });
         }
 
         let mut tab_items = state.tabs;
@@ -120,7 +140,9 @@ impl App {
 
         let mut max_row = 0;
         for t in &tab_items {
-            if t.row > max_row { max_row = t.row; }
+            if t.row > max_row {
+                max_row = t.row;
+            }
         }
 
         // Clear any existing tabs before loading restored session
@@ -136,9 +158,15 @@ impl App {
 
         let mut loaded_tabs: Vec<(usize, Tab)> = Vec::new();
         for item in tab_items {
-            let session = self.profiles.borrow_mut().get_or_create_session(&item.profile_id);
+            let session = self
+                .profiles
+                .borrow_mut()
+                .get_or_create_session(&item.profile_id);
             let view = Self::create_web_view(&session, &item.profile_id);
-            if item.url.is_empty() || item.url.starts_with("about:") || item.url.starts_with("rail://start") {
+            if item.url.is_empty()
+                || item.url.starts_with("about:")
+                || item.url.starts_with("rail://start")
+            {
                 view.load_html(&start_page(), Some("rail://start/"));
             } else if item.url.starts_with("rail://settings") {
                 view.load_html(&settings_shell_page(), Some(&item.url));
@@ -159,28 +187,39 @@ impl App {
                 &tw.dt_handle,
                 &tw.dt_box,
             );
-            loaded_tabs.push((item.row, Tab {
-                container: tw.container,
-                view,
-                freeze: tw.freeze,
-                height_handle: tw.height_handle,
-                profile_id: item.profile_id,
-                custom_width: Cell::new(item.custom_width),
-                custom_height: Cell::new(None),
-                col_id: Cell::new(new_col_id()),
-                saved_uri: RefCell::new(if item.url.starts_with("http") || item.url.starts_with("rail://") { item.url.clone() } else if item.url.is_empty() || item.url.starts_with("about:") { "rail://start/".to_string() } else { String::new() }),
-                suspended: Cell::new(false),
-                keep_alive: Cell::new(false),
-                last_active: Cell::new(std::time::Instant::now()),
-                dt_box: tw.dt_box,
-                dt_handle: tw.dt_handle,
-                tab_inner: tw.tab_inner,
-                overlay: tw.overlay,
-                dt_open: Cell::new(false),
-                dt_height: Cell::new(self.default_devtools_height.get()),
-                dt_width: Cell::new(self.default_devtools_width.get()),
-                dt_dock: Cell::new(self.devtools_dock_side.get()),
-            }));
+            loaded_tabs.push((
+                item.row,
+                Tab {
+                    container: tw.container,
+                    view,
+                    freeze: tw.freeze,
+                    height_handle: tw.height_handle,
+                    profile_id: item.profile_id,
+                    custom_width: Cell::new(item.custom_width),
+                    custom_height: Cell::new(None),
+                    col_id: Cell::new(new_col_id()),
+                    saved_uri: RefCell::new(
+                        if item.url.starts_with("http") || item.url.starts_with("rail://") {
+                            item.url.clone()
+                        } else if item.url.is_empty() || item.url.starts_with("about:") {
+                            "rail://start/".to_string()
+                        } else {
+                            String::new()
+                        },
+                    ),
+                    suspended: Cell::new(false),
+                    keep_alive: Cell::new(false),
+                    last_active: Cell::new(std::time::Instant::now()),
+                    dt_box: tw.dt_box,
+                    dt_handle: tw.dt_handle,
+                    tab_inner: tw.tab_inner,
+                    overlay: tw.overlay,
+                    dt_open: Cell::new(false),
+                    dt_height: Cell::new(self.default_devtools_height.get()),
+                    dt_width: Cell::new(self.default_devtools_width.get()),
+                    dt_dock: Cell::new(self.devtools_dock_side.get()),
+                },
+            ));
         }
 
         let mut rows = self.rows.borrow_mut();

@@ -1,7 +1,7 @@
 mod config;
-mod labels;
 mod editor;
+mod labels;
 
 pub(crate) use config::*;
-pub(crate) use labels::*;
 pub(crate) use editor::*;
+pub(crate) use labels::*;

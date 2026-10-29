@@ -35,7 +35,7 @@ impl App {
         }
 
         match tab {
-            SettingsTab::General => {            }
+            SettingsTab::General => {}
             SettingsTab::Profiles => {
                 self.rebuild_profiles_modal_list();
                 self.new_profile_entry.set_text("");
@@ -50,8 +50,10 @@ impl App {
                     .and_then(|d| d.format("%Y%m%d_%H%M%S").ok())
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| "backup".to_string());
-                let default_export = glib::home_dir().join(format!("rail_backup_{}.tar.gz", timestamp));
-                self.data_export_entry.set_text(&default_export.to_string_lossy());
+                let default_export =
+                    glib::home_dir().join(format!("rail_backup_{}.tar.gz", timestamp));
+                self.data_export_entry
+                    .set_text(&default_export.to_string_lossy());
                 self.data_modal_status_lbl.set_text("");
                 self.data_export_entry.grab_focus();
             }
@@ -73,7 +75,11 @@ impl App {
             let mut found = None;
             'outer: for (r_idx, row) in rows.iter().enumerate() {
                 for (c_idx, tab_item) in row.tabs.iter().enumerate() {
-                    let u = tab_item.view.uri().map(|s| s.to_string()).unwrap_or_default();
+                    let u = tab_item
+                        .view
+                        .uri()
+                        .map(|s| s.to_string())
+                        .unwrap_or_default();
                     let s = tab_item.saved_uri.borrow().clone();
                     if u.starts_with("rail://settings") || s.starts_with("rail://settings") {
                         found = Some((r_idx, c_idx));
@@ -205,7 +211,8 @@ impl App {
         self.history.borrow_mut().clear();
         self.data_modal_status_lbl.set_markup(&format!(
             "<span foreground='#4ade80'><b>{}</b> {}</span>",
-            tr("History Cleared:"), tr("All Omnibar history and suggestions have been purged.")
+            tr("History Cleared:"),
+            tr("All Omnibar history and suggestions have been purged.")
         ));
     }
 
@@ -215,7 +222,12 @@ impl App {
         if let Ok(entries) = std::fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
-                if p.is_dir() && p.file_name().and_then(|n| n.to_str()).map(|n| n.starts_with("profile_")).unwrap_or(false) {
+                if p.is_dir()
+                    && p.file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|n| n.starts_with("profile_"))
+                        .unwrap_or(false)
+                {
                     let cache_dir = p.join("cache");
                     let _ = std::fs::remove_dir_all(&cache_dir);
                 }
@@ -223,7 +235,8 @@ impl App {
         }
         self.data_modal_status_lbl.set_markup(&format!(
             "<span foreground='#4ade80'><b>{}</b> {}</span>",
-            tr("Cache Cleared:"), tr("Profile network disk caches purged successfully.")
+            tr("Cache Cleared:"),
+            tr("Profile network disk caches purged successfully.")
         ));
     }
 
@@ -237,7 +250,12 @@ impl App {
 
         let info_text = trf(
             "Directory: {}\nStatus:    {} open tab(s) in {} workspace(s) | {} profiles (cookies/logins active)",
-            &[&dir.display().to_string(), &total_tabs.to_string(), &ws_count.to_string(), &prof_count.to_string()],
+            &[
+                &dir.display().to_string(),
+                &total_tabs.to_string(),
+                &ws_count.to_string(),
+                &prof_count.to_string(),
+            ],
         );
         self.data_modal_info_lbl.set_text(&info_text);
     }
@@ -250,16 +268,22 @@ impl App {
         let is_narrow = w > 0 && w < 820;
         if is_narrow {
             self.settings_modal.add_css_class("responsive-narrow");
-            self.settings_body.set_orientation(gtk::Orientation::Vertical);
-            self.settings_sidebar.set_orientation(gtk::Orientation::Horizontal);
-            self.settings_sidebar_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Never);
+            self.settings_body
+                .set_orientation(gtk::Orientation::Vertical);
+            self.settings_sidebar
+                .set_orientation(gtk::Orientation::Horizontal);
+            self.settings_sidebar_scroll
+                .set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Never);
             self.settings_sidebar_scroll.set_hexpand(true);
             self.settings_sidebar_scroll.set_vexpand(false);
         } else {
             self.settings_modal.remove_css_class("responsive-narrow");
-            self.settings_body.set_orientation(gtk::Orientation::Horizontal);
-            self.settings_sidebar.set_orientation(gtk::Orientation::Vertical);
-            self.settings_sidebar_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+            self.settings_body
+                .set_orientation(gtk::Orientation::Horizontal);
+            self.settings_sidebar
+                .set_orientation(gtk::Orientation::Vertical);
+            self.settings_sidebar_scroll
+                .set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
             self.settings_sidebar_scroll.set_hexpand(false);
             self.settings_sidebar_scroll.set_vexpand(true);
         }

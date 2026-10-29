@@ -10,7 +10,9 @@ impl App {
         let new_c;
         {
             let mut rows = self.rows.borrow_mut();
-            let Some(row) = rows.get_mut(cur_r) else { return };
+            let Some(row) = rows.get_mut(cur_r) else {
+                return;
+            };
             if cur_c >= row.tabs.len() {
                 return;
             }
@@ -223,7 +225,13 @@ impl App {
         self.focus_coords(target_r, dest_c);
     }
 
-    pub(crate) fn move_tab_to_row_pos(self: &Rc<Self>, from_r: usize, from_c: usize, to_r: usize, to_c: usize) {
+    pub(crate) fn move_tab_to_row_pos(
+        self: &Rc<Self>,
+        from_r: usize,
+        from_c: usize,
+        to_r: usize,
+        to_c: usize,
+    ) {
         if from_r == to_r {
             self.reorder_tab_in_row(from_r, from_c, to_c);
             return;

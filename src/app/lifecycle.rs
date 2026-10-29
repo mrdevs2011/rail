@@ -59,30 +59,35 @@ impl App {
                     0
                 } else {
                     // a new tab opens in a column of its own, right after the focused column
-                    rows[cur_r].col_span(cur_c.min(rows[cur_r].tabs.len() - 1)).1
+                    rows[cur_r]
+                        .col_span(cur_c.min(rows[cur_r].tabs.len() - 1))
+                        .1
                 };
-                rows[cur_r].tabs.insert(col_idx, Tab {
-                    container: tw.container.clone(),
-                    view: view.clone(),
-                    freeze: tw.freeze.clone(),
-                    height_handle: tw.height_handle.clone(),
-                    profile_id,
-                    custom_width: Cell::new(None),
-                    custom_height: Cell::new(None),
-                    col_id: Cell::new(new_col_id()),
-                    saved_uri: RefCell::new(String::new()),
-                    suspended: Cell::new(false),
-                    keep_alive: Cell::new(false),
-                    last_active: Cell::new(std::time::Instant::now()),
-                    dt_box: tw.dt_box.clone(),
-                    dt_handle: tw.dt_handle.clone(),
-                    tab_inner: tw.tab_inner.clone(),
-                    overlay: tw.overlay.clone(),
-                    dt_open: Cell::new(false),
-                    dt_height: Cell::new(self.default_devtools_height.get()),
-                    dt_width: Cell::new(self.default_devtools_width.get()),
-                    dt_dock: Cell::new(self.devtools_dock_side.get()),
-                });
+                rows[cur_r].tabs.insert(
+                    col_idx,
+                    Tab {
+                        container: tw.container.clone(),
+                        view: view.clone(),
+                        freeze: tw.freeze.clone(),
+                        height_handle: tw.height_handle.clone(),
+                        profile_id,
+                        custom_width: Cell::new(None),
+                        custom_height: Cell::new(None),
+                        col_id: Cell::new(new_col_id()),
+                        saved_uri: RefCell::new(String::new()),
+                        suspended: Cell::new(false),
+                        keep_alive: Cell::new(false),
+                        last_active: Cell::new(std::time::Instant::now()),
+                        dt_box: tw.dt_box.clone(),
+                        dt_handle: tw.dt_handle.clone(),
+                        tab_inner: tw.tab_inner.clone(),
+                        overlay: tw.overlay.clone(),
+                        dt_open: Cell::new(false),
+                        dt_height: Cell::new(self.default_devtools_height.get()),
+                        dt_width: Cell::new(self.default_devtools_width.get()),
+                        dt_dock: Cell::new(self.devtools_dock_side.get()),
+                    },
+                );
                 (cur_r, col_idx)
             }
         };
@@ -100,7 +105,9 @@ impl App {
     }
 
     pub(crate) fn saved_uri_of(&self, view: &WebView) -> String {
-        let Ok(rows) = self.rows.try_borrow() else { return String::new() };
+        let Ok(rows) = self.rows.try_borrow() else {
+            return String::new();
+        };
         for row in rows.iter() {
             for tab in &row.tabs {
                 if &tab.view == view {
@@ -115,13 +122,12 @@ impl App {
     pub(crate) fn remember_uri(&self, view: &WebView) {
         let Some(u) = view.uri() else { return };
         let u = u.to_string();
-        if !(u.starts_with("http://")
-            || u.starts_with("https://")
-            || u.starts_with("rail://"))
-        {
+        if !(u.starts_with("http://") || u.starts_with("https://") || u.starts_with("rail://")) {
             return;
         }
-        let Ok(rows) = self.rows.try_borrow() else { return };
+        let Ok(rows) = self.rows.try_borrow() else {
+            return;
+        };
         for row in rows.iter() {
             for tab in &row.tabs {
                 if &tab.view == view {
@@ -133,7 +139,9 @@ impl App {
     }
 
     pub(crate) fn set_view_saved_uri(&self, view: &WebView, uri: &str) {
-        let Ok(rows) = self.rows.try_borrow() else { return };
+        let Ok(rows) = self.rows.try_borrow() else {
+            return;
+        };
         for row in rows.iter() {
             for tab in &row.tabs {
                 if &tab.view == view {
@@ -181,7 +189,9 @@ impl App {
     }
 
     pub(crate) fn mark_keep_alive(&self, view: &WebView) {
-        let Ok(rows) = self.rows.try_borrow() else { return };
+        let Ok(rows) = self.rows.try_borrow() else {
+            return;
+        };
         for row in rows.iter() {
             for tab in &row.tabs {
                 if &tab.view == view {
@@ -203,7 +213,9 @@ impl App {
         if !self.anim_frozen.borrow().is_empty() {
             return;
         }
-        let Ok(rows) = self.rows.try_borrow() else { return };
+        let Ok(rows) = self.rows.try_borrow() else {
+            return;
+        };
         let mut frozen = Vec::new();
         for row in rows.iter() {
             for tab in &row.tabs {
@@ -211,7 +223,8 @@ impl App {
                 if tab.suspended.get() || tab.freeze.is_visible() || !tab.view.is_mapped() {
                     continue;
                 }
-                if tab.view.is_loading() || tab.view.is_playing_audio() || !self.tab_is_visible(tab) {
+                if tab.view.is_loading() || tab.view.is_playing_audio() || !self.tab_is_visible(tab)
+                {
                     continue;
                 }
                 let wp = gtk::WidgetPaintable::new(Some(&tab.view));
@@ -237,7 +250,13 @@ impl App {
         };
         let frozen = std::mem::take(&mut *self.anim_frozen.borrow_mut());
         for (pic, view) in frozen {
-            let Some(tab) = rows.iter().flat_map(|r| r.tabs.iter()).find(|t| t.view == view) else { continue };
+            let Some(tab) = rows
+                .iter()
+                .flat_map(|r| r.tabs.iter())
+                .find(|t| t.view == view)
+            else {
+                continue;
+            };
             // suspend ulgurgan bo'lsa, freeze endi suspend'ning o'zi
             if tab.suspended.get() {
                 continue;
@@ -270,7 +289,8 @@ impl App {
         } else {
             self.win.remove_css_class("fs-content");
             let open = self.side_open.get();
-            self.shell_layout.set_side(if open { SIDE_W as f64 } else { 0.0 });
+            self.shell_layout
+                .set_side(if open { SIDE_W as f64 } else { 0.0 });
             self.side.set_visible(open);
             self.strip.set_margin_top(8);
             self.strip.set_margin_bottom(8);
@@ -300,13 +320,17 @@ impl App {
     /// Element to'liq ekrandan chiqdi. `exit_page` = oyna tashqaridan yopilgan (masalan F11):
     /// bu holda sahifadagi elementni ham to'liq ekrandan chiqaramiz.
     pub(crate) fn leave_solo_fullscreen(&self, exit_page: bool) {
-        let Some(solo) = self.layout.solo() else { return };
+        let Some(solo) = self.layout.solo() else {
+            return;
+        };
         self.layout.set_solo(None);
         self.strip.queue_allocate();
         if !exit_page {
             return;
         }
-        let Ok(rows) = self.rows.try_borrow() else { return };
+        let Ok(rows) = self.rows.try_borrow() else {
+            return;
+        };
         for row in rows.iter() {
             for tab in &row.tabs {
                 let c: gtk::Widget = tab.container.clone().upcast();
@@ -325,7 +349,9 @@ impl App {
     }
 
     pub(crate) fn clear_tab_freeze(&self, view: &WebView) {
-        let Ok(rows) = self.rows.try_borrow() else { return };
+        let Ok(rows) = self.rows.try_borrow() else {
+            return;
+        };
         for row in rows.iter() {
             for tab in &row.tabs {
                 if &tab.view == view && !tab.suspended.get() {
@@ -343,7 +369,9 @@ impl App {
         if self.ov.get() {
             return true; // overview: hamma tab ekranda
         }
-        let Some(b) = tab.container.compute_bounds(&self.strip) else { return false };
+        let Some(b) = tab.container.compute_bounds(&self.strip) else {
+            return false;
+        };
         let (vw, vh) = (self.strip.width() as f64, self.strip.height() as f64);
         let (x0, y0) = (b.x() as f64, b.y() as f64);
         let ow = (x0 + b.width() as f64).min(vw) - x0.max(0.0);
@@ -354,13 +382,19 @@ impl App {
     /// Is this tab just showing the built-in start page (nothing worth keeping alive)?
     pub(crate) fn is_blank_start_tab(tab: &Tab) -> bool {
         let live = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
-        let uri = if live.is_empty() { tab.saved_uri.borrow().clone() } else { live };
+        let uri = if live.is_empty() {
+            tab.saved_uri.borrow().clone()
+        } else {
+            live
+        };
         uri.starts_with("rail://start")
     }
 
     /// Terminate every tab web process (window close / quit). Network process dies with the app.
     pub(crate) fn shutdown_all_web_processes(&self) {
-        let Ok(rows) = self.rows.try_borrow() else { return };
+        let Ok(rows) = self.rows.try_borrow() else {
+            return;
+        };
         for row in rows.iter() {
             for tab in &row.tabs {
                 tab.view.terminate_web_process();
@@ -395,7 +429,10 @@ impl App {
     const FREEZE_MAX_W: i32 = 480;
 
     /// Copy any Paintable into a standalone (optionally downscaled) MemoryTexture.
-    pub(crate) fn durableize_paintable(p: &gdk::Paintable, allow_black: bool) -> Option<gdk::Texture> {
+    pub(crate) fn durableize_paintable(
+        p: &gdk::Paintable,
+        allow_black: bool,
+    ) -> Option<gdk::Texture> {
         let tex = p.downcast_ref::<gdk::Texture>()?;
         let w = tex.width();
         let h = tex.height();
@@ -428,13 +465,12 @@ impl App {
             }
             let bytes = glib::Bytes::from_owned(out);
             return Some(
-                gdk::MemoryTexture::new(nw, nh, gdk::MemoryFormat::R8g8b8a8, &bytes, nstride).upcast(),
+                gdk::MemoryTexture::new(nw, nh, gdk::MemoryFormat::R8g8b8a8, &bytes, nstride)
+                    .upcast(),
             );
         }
         let bytes = glib::Bytes::from_owned(buf);
-        Some(
-            gdk::MemoryTexture::new(w, h, gdk::MemoryFormat::R8g8b8a8, &bytes, stride).upcast(),
-        )
+        Some(gdk::MemoryTexture::new(w, h, gdk::MemoryFormat::R8g8b8a8, &bytes, stride).upcast())
     }
 
     /// True if >98% of samples are very dark (blank / unpainted WebView).
@@ -481,7 +517,11 @@ impl App {
             return;
         }
         let live = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
-        let uri = if !live.is_empty() { live } else { tab.saved_uri.borrow().clone() };
+        let uri = if !live.is_empty() {
+            live
+        } else {
+            tab.saved_uri.borrow().clone()
+        };
         if uri.is_empty() {
             return;
         }
@@ -513,7 +553,9 @@ impl App {
         if self.ov.get() {
             return;
         }
-        let Ok(rows) = self.rows.try_borrow() else { return };
+        let Ok(rows) = self.rows.try_borrow() else {
+            return;
+        };
         let fr = self.focus_row.get();
         let fc = self.focus_col.get();
         let in_overview = self.ov.get();
@@ -543,7 +585,11 @@ impl App {
                 if !in_overview && self.tab_is_visible(tab) {
                     continue;
                 }
-                let after = if Self::is_blank_start_tab(tab) { suspend_after.min(BLANK_TAB_SUSPEND_SECS) } else { suspend_after };
+                let after = if Self::is_blank_start_tab(tab) {
+                    suspend_after.min(BLANK_TAB_SUSPEND_SECS)
+                } else {
+                    suspend_after
+                };
                 if tab.last_active.get().elapsed() < Duration::from_secs(after) {
                     continue;
                 }
@@ -560,7 +606,10 @@ impl App {
                 }
                 let uri = tab.view.uri().map(|s| s.to_string()).unwrap_or_default();
                 let saved = tab.saved_uri.borrow().clone();
-                let is_real = uri.starts_with("http") || uri.starts_with("rail://") || saved.starts_with("http") || saved.starts_with("rail://");
+                let is_real = uri.starts_with("http")
+                    || uri.starts_with("rail://")
+                    || saved.starts_with("http")
+                    || saved.starts_with("rail://");
                 if !is_real {
                     continue;
                 }

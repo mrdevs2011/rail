@@ -14,7 +14,12 @@ pub(crate) struct ScUi {
 }
 
 pub(crate) const SC_MODS: &[&str] = &["Alt", "Ctrl", "Alt+Shift", "Ctrl+Shift", "None"];
-pub(crate) const SC_KEY_ROWS: &[&str] = &["`1234567890-=", "QWERTYUIOP[]", "ASDFGHJKL;'", "ZXCVBNM,./\\"];
+pub(crate) const SC_KEY_ROWS: &[&str] = &[
+    "`1234567890-=",
+    "QWERTYUIOP[]",
+    "ASDFGHJKL;'",
+    "ZXCVBNM,./\\",
+];
 
 pub(crate) fn sc_key_label(v: &str) -> String {
     match v {
@@ -54,7 +59,6 @@ pub(crate) fn sc_join(mod_idx: u32, key: &str) -> String {
     };
     format!("{}{}", prefix, key)
 }
-
 
 /// Shared on-screen keyboard — one instance, shown relative to the row being edited.
 pub(crate) fn sc_open_picker(
@@ -151,7 +155,8 @@ pub(crate) fn sc_commit(ui: &ScUi) {
         apply_shortcut_priority();
         sc_refresh_bound();
     } else {
-        ui.status.set_text(tr("Could not write shortcuts-customize.json"));
+        ui.status
+            .set_text(tr("Could not write shortcuts-customize.json"));
     }
 }
 
@@ -196,9 +201,15 @@ pub(crate) fn sc_apply_slot(ui: &ScUi, def: &'static ShortcutDef, slot: usize, c
 
 /// Numbered series (Ctrl+1..9 etc.) collapsed into one stacked card.
 pub(crate) fn sc_series_for(id: &str) -> Option<(&'static str, &'static [&'static str])> {
-    const TABS: &[&str] = &["tab_1", "tab_2", "tab_3", "tab_4", "tab_5", "tab_6", "tab_7", "tab_8", "tab_9"];
-    const WS: &[&str] = &["ws_1", "ws_2", "ws_3", "ws_4", "ws_5", "ws_6", "ws_7", "ws_8", "ws_9"];
-    const MV: &[&str] = &["mv_1", "mv_2", "mv_3", "mv_4", "mv_5", "mv_6", "mv_7", "mv_8", "mv_9"];
+    const TABS: &[&str] = &[
+        "tab_1", "tab_2", "tab_3", "tab_4", "tab_5", "tab_6", "tab_7", "tab_8", "tab_9",
+    ];
+    const WS: &[&str] = &[
+        "ws_1", "ws_2", "ws_3", "ws_4", "ws_5", "ws_6", "ws_7", "ws_8", "ws_9",
+    ];
+    const MV: &[&str] = &[
+        "mv_1", "mv_2", "mv_3", "mv_4", "mv_5", "mv_6", "mv_7", "mv_8", "mv_9",
+    ];
     match id {
         "tab_1" => Some(("Switch to tab 1–9", TABS)),
         "ws_1" => Some(("Switch to workspace 1–9", WS)),
@@ -254,11 +265,19 @@ pub(crate) fn sc_build(ui: &ScUi) {
             d.set_hexpand(true);
             row.append(&d);
             let last_id = ids.last().copied().unwrap_or(def.id);
-            let last_def = SHORTCUT_DEFS.iter().find(|d| d.id == last_id).unwrap_or(def);
-            let last_combo = sc_effective(last_def, &cfg).first().cloned().unwrap_or_default();
+            let last_def = SHORTCUT_DEFS
+                .iter()
+                .find(|d| d.id == last_id)
+                .unwrap_or(def);
+            let last_combo = sc_effective(last_def, &cfg)
+                .first()
+                .cloned()
+                .unwrap_or_default();
             let kbd = gtk::Label::new(Some(&last_combo));
             kbd.add_css_class("shortcut-kbd");
-            kbd.set_tooltip_text(Some(tr("Numbered series — change individually via defaults or reset")));
+            kbd.set_tooltip_text(Some(tr(
+                "Numbered series — change individually via defaults or reset",
+            )));
             row.append(&kbd);
             container.append(&row);
             i += ids.len();
@@ -282,7 +301,9 @@ pub(crate) fn sc_build(ui: &ScUi) {
         if sc_is_locked(def.id) {
             let lock = gtk::Image::from_icon_name("changes-prevent-symbolic");
             lock.set_opacity(0.7);
-            lock.set_tooltip_text(Some(tr("Locked (read-only): system navigation, cannot be edited.")));
+            lock.set_tooltip_text(Some(tr(
+                "Locked (read-only): system navigation, cannot be edited.",
+            )));
             row.append(&lock);
             d.set_opacity(0.55);
             let combo = sc_effective(def, &cfg).first().cloned().unwrap_or_default();
@@ -326,7 +347,10 @@ pub(crate) fn sc_build(ui: &ScUi) {
                 // Update opacity without full rebuild
                 if let Some(parent) = s.parent() {
                     if let Some(boxp) = parent.downcast_ref::<gtk::Box>() {
-                        if let Some(lab) = boxp.first_child().and_then(|w| w.downcast::<gtk::Label>().ok()) {
+                        if let Some(lab) = boxp
+                            .first_child()
+                            .and_then(|w| w.downcast::<gtk::Label>().ok())
+                        {
                             lab.set_opacity(if is_on { 1.0 } else { 0.45 });
                         }
                     }
@@ -360,7 +384,9 @@ pub(crate) fn sc_build(ui: &ScUi) {
                 let n = ((sel.get() + 1) % SC_MODS.len() as u32);
                 sel.set(n);
                 mod_btn2.set_label(SC_MODS[n as usize]);
-                let is_f = key.len() >= 2 && key.starts_with('F') && key[1..].chars().all(|c| c.is_ascii_digit());
+                let is_f = key.len() >= 2
+                    && key.starts_with('F')
+                    && key[1..].chars().all(|c| c.is_ascii_digit());
                 if n == 4 && !is_f {
                     ui3.status.set_text(tr("No modifier: pick an F-key"));
                 } else if !key.is_empty() {
@@ -427,4 +453,3 @@ pub(crate) fn sc_build(ui: &ScUi) {
         ui_done.is_syncing.set(false);
     });
 }
-

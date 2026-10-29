@@ -59,8 +59,18 @@ fn table(l: Lang) -> &'static HashMap<&'static str, &'static str> {
     static UZ: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
     static RU: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
     match l {
-        Lang::Ru => RU.get_or_init(|| crate::i18n_tables::TABLE.iter().map(|(en, _, ru)| (*en, *ru)).collect()),
-        _ => UZ.get_or_init(|| crate::i18n_tables::TABLE.iter().map(|(en, uz, _)| (*en, *uz)).collect()),
+        Lang::Ru => RU.get_or_init(|| {
+            crate::i18n_tables::TABLE
+                .iter()
+                .map(|(en, _, ru)| (*en, *ru))
+                .collect()
+        }),
+        _ => UZ.get_or_init(|| {
+            crate::i18n_tables::TABLE
+                .iter()
+                .map(|(en, uz, _)| (*en, *uz))
+                .collect()
+        }),
     }
 }
 
@@ -97,10 +107,21 @@ mod tests {
     fn table_is_complete_and_unique() {
         let mut seen = std::collections::HashSet::new();
         for (en, uz, ru) in crate::i18n_tables::TABLE {
-            assert!(!en.is_empty() && !uz.is_empty() && !ru.is_empty(), "bo'sh: {en}");
+            assert!(
+                !en.is_empty() && !uz.is_empty() && !ru.is_empty(),
+                "bo'sh: {en}"
+            );
             assert!(seen.insert(*en), "takror kalit: {en}");
-            assert_eq!(en.matches("{}").count(), uz.matches("{}").count(), "uz {{}} soni: {en}");
-            assert_eq!(en.matches("{}").count(), ru.matches("{}").count(), "ru {{}} soni: {en}");
+            assert_eq!(
+                en.matches("{}").count(),
+                uz.matches("{}").count(),
+                "uz {{}} soni: {en}"
+            );
+            assert_eq!(
+                en.matches("{}").count(),
+                ru.matches("{}").count(),
+                "ru {{}} soni: {en}"
+            );
         }
     }
 
@@ -112,16 +133,28 @@ mod tests {
     /// Manba kodidagi har bir tr("...") / trf("...") kaliti jadvalda bo'lishi shart.
     #[test]
     fn every_source_key_is_in_table() {
-        let keys: std::collections::HashSet<&str> = crate::i18n_tables::TABLE.iter().map(|(en, _, _)| *en).collect();
+        let keys: std::collections::HashSet<&str> = crate::i18n_tables::TABLE
+            .iter()
+            .map(|(en, _, _)| *en)
+            .collect();
         let mut missing = Vec::new();
-        for (file, src) in [("main.rs", include_str!("main.rs")), ("update.rs", include_str!("update.rs"))] {
+        for (file, src) in [
+            ("main.rs", include_str!("main.rs")),
+            ("update.rs", include_str!("update.rs")),
+        ] {
             let b = src.as_bytes();
             let mut i = 0;
             while i < b.len() {
                 let (skip, ok) = if b[i..].starts_with(b"trf(\"") {
-                    (5, i == 0 || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_'))
+                    (
+                        5,
+                        i == 0 || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_'),
+                    )
                 } else if b[i..].starts_with(b"tr(\"") {
-                    (4, i == 0 || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_'))
+                    (
+                        4,
+                        i == 0 || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_'),
+                    )
                 } else {
                     (0, false)
                 };
@@ -152,6 +185,10 @@ mod tests {
                 i = j + 1;
             }
         }
-        assert!(missing.is_empty(), "jadvalda yo'q kalitlar:\n{}", missing.join("\n"));
+        assert!(
+            missing.is_empty(),
+            "jadvalda yo'q kalitlar:\n{}",
+            missing.join("\n")
+        );
     }
 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread::JoinHandle;
 
 pub const POPULAR_DOMAINS: &[(&str, &str)] = &[
@@ -48,7 +48,15 @@ impl HistoryEntry {
         let url_lower = url.to_lowercase();
         let domain = extract_clean_domain(&url_lower);
         let title_lower = title.to_lowercase();
-        Self { url, title, visit_count, last_visit, url_lower, domain, title_lower }
+        Self {
+            url,
+            title,
+            visit_count,
+            last_visit,
+            url_lower,
+            domain,
+            title_lower,
+        }
     }
     fn set_title(&mut self, title: &str) {
         self.title = title.to_string();
@@ -111,7 +119,11 @@ impl DiskWriter {
                 }
             })
             .ok();
-        Self { tx: Some(tx), handle, epoch }
+        Self {
+            tx: Some(tx),
+            handle,
+            epoch,
+        }
     }
     fn send(&self, rows: Vec<Row>) {
         let ep = *self.epoch.lock().unwrap_or_else(|e| e.into_inner());
@@ -446,8 +458,14 @@ mod tests {
 
     #[test]
     fn test_extract_clean_domain() {
-        assert_eq!(extract_clean_domain("https://www.google.com/search?q=rust"), "google.com");
-        assert_eq!(extract_clean_domain("http://github.com/mrdevs2011/rail"), "github.com");
+        assert_eq!(
+            extract_clean_domain("https://www.google.com/search?q=rust"),
+            "google.com"
+        );
+        assert_eq!(
+            extract_clean_domain("http://github.com/mrdevs2011/rail"),
+            "github.com"
+        );
         assert_eq!(extract_clean_domain("google.com"), "google.com");
         assert_eq!(extract_clean_domain("localhost:8080/test"), "localhost");
     }
@@ -480,13 +498,22 @@ mod tests {
             let mut mgr = HistoryManager::new(temp_dir.clone());
             mgr.record_visit("https://example.org/docs", "Example Docs");
             mgr.record_visit("https://example.org/docs", "Example Docs");
-            assert_eq!(mgr.entries.get("https://example.org/docs").unwrap().visit_count, 2);
+            assert_eq!(
+                mgr.entries
+                    .get("https://example.org/docs")
+                    .unwrap()
+                    .visit_count,
+                2
+            );
         }
 
         // Re-read from disk
         {
             let mgr2 = HistoryManager::new(temp_dir.clone());
-            let entry = mgr2.entries.get("https://example.org/docs").expect("Should exist");
+            let entry = mgr2
+                .entries
+                .get("https://example.org/docs")
+                .expect("Should exist");
             assert_eq!(entry.visit_count, 2);
             assert_eq!(entry.title, "Example Docs");
         }

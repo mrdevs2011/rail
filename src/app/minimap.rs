@@ -58,8 +58,12 @@ impl App {
         let height = (self.map_drawing_area.height() as f64).max(260.0);
         let active_sx = width / 2.0 - st.target_offset_x * st.zoom;
         let active_sy = height / 2.0 - st.target_offset_y * st.zoom;
-        let off_screen = active_sx < 20.0 || active_sx > width - 20.0 || active_sy < 20.0 || active_sy > height - 20.0;
-        let far_from_center = (st.target_offset_x * st.zoom).hypot(st.target_offset_y * st.zoom) > 40.0;
+        let off_screen = active_sx < 20.0
+            || active_sx > width - 20.0
+            || active_sy < 20.0
+            || active_sy > height - 20.0;
+        let far_from_center =
+            (st.target_offset_x * st.zoom).hypot(st.target_offset_y * st.zoom) > 40.0;
         let should_show = st.user_panned && (off_screen || far_from_center);
         self.map_location_btn.set_visible(should_show);
     }
@@ -138,16 +142,17 @@ impl App {
             }
 
             let now = clock.frame_time();
-            let dt = last_time.replace(Some(now)).map_or(1.0 / 60.0, |l| {
-                ((now - l) as f64 / 1e6).clamp(0.001, 0.1)
-            });
+            let dt = last_time
+                .replace(Some(now))
+                .map_or(1.0 / 60.0, |l| ((now - l) as f64 / 1e6).clamp(0.001, 0.1));
 
             let k_pos = 1.0 - (-dt / 0.065).exp();
             let k_zoom = 1.0 - (-dt / 0.075).exp();
 
             let rows = app.rows.borrow();
             let (target_active_cx, target_active_cy) = app.compute_active_tab_center(&rows);
-            let (target_rect_x, target_rect_y, target_rect_w, target_rect_h) = app.compute_active_tab_rect(&rows);
+            let (target_rect_x, target_rect_y, target_rect_w, target_rect_h) =
+                app.compute_active_tab_rect(&rows);
             drop(rows);
 
             let mut st = app.map_state.borrow_mut();
@@ -159,8 +164,12 @@ impl App {
                 let friction = (-dt * 7.5).exp();
                 st.vel_x *= friction;
                 st.vel_y *= friction;
-                if st.vel_x.abs() < 0.05 { st.vel_x = 0.0; }
-                if st.vel_y.abs() < 0.05 { st.vel_y = 0.0; }
+                if st.vel_x.abs() < 0.05 {
+                    st.vel_x = 0.0;
+                }
+                if st.vel_y.abs() < 0.05 {
+                    st.vel_y = 0.0;
+                }
                 st.user_panned = true;
             }
 
@@ -208,10 +217,30 @@ impl App {
             let mut diff_rw = target_rect_w - st.cursor_w;
             let mut diff_rh = target_rect_h - st.cursor_h;
 
-            if diff_rx.abs() < 0.2 { st.cursor_x = target_rect_x; diff_rx = 0.0; } else { st.cursor_x += diff_rx * k_pos; }
-            if diff_ry.abs() < 0.2 { st.cursor_y = target_rect_y; diff_ry = 0.0; } else { st.cursor_y += diff_ry * k_pos; }
-            if diff_rw.abs() < 0.2 { st.cursor_w = target_rect_w; diff_rw = 0.0; } else { st.cursor_w += diff_rw * k_pos; }
-            if diff_rh.abs() < 0.2 { st.cursor_h = target_rect_h; diff_rh = 0.0; } else { st.cursor_h += diff_rh * k_pos; }
+            if diff_rx.abs() < 0.2 {
+                st.cursor_x = target_rect_x;
+                diff_rx = 0.0;
+            } else {
+                st.cursor_x += diff_rx * k_pos;
+            }
+            if diff_ry.abs() < 0.2 {
+                st.cursor_y = target_rect_y;
+                diff_ry = 0.0;
+            } else {
+                st.cursor_y += diff_ry * k_pos;
+            }
+            if diff_rw.abs() < 0.2 {
+                st.cursor_w = target_rect_w;
+                diff_rw = 0.0;
+            } else {
+                st.cursor_w += diff_rw * k_pos;
+            }
+            if diff_rh.abs() < 0.2 {
+                st.cursor_h = target_rect_h;
+                diff_rh = 0.0;
+            } else {
+                st.cursor_h += diff_rh * k_pos;
+            }
 
             let still_animating = diff_cx != 0.0
                 || diff_cy != 0.0
@@ -237,13 +266,32 @@ impl App {
         });
     }
 
-    pub(crate) fn draw_rounded_rect(cr: &gtk::cairo::Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
+    pub(crate) fn draw_rounded_rect(
+        cr: &gtk::cairo::Context,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+        r: f64,
+    ) {
         let r = r.min(w / 2.0).min(h / 2.0);
         cr.new_sub_path();
         cr.arc(x + w - r, y + r, r, -std::f64::consts::FRAC_PI_2, 0.0);
         cr.arc(x + w - r, y + h - r, r, 0.0, std::f64::consts::FRAC_PI_2);
-        cr.arc(x + r, y + h - r, r, std::f64::consts::FRAC_PI_2, std::f64::consts::PI);
-        cr.arc(x + r, y + r, r, std::f64::consts::PI, 3.0 * std::f64::consts::FRAC_PI_2);
+        cr.arc(
+            x + r,
+            y + h - r,
+            r,
+            std::f64::consts::FRAC_PI_2,
+            std::f64::consts::PI,
+        );
+        cr.arc(
+            x + r,
+            y + r,
+            r,
+            std::f64::consts::PI,
+            3.0 * std::f64::consts::FRAC_PI_2,
+        );
         cr.close_path();
     }
 
@@ -326,7 +374,13 @@ impl App {
 
             // Bright center core indicator
             let dot_r = (2.2 * zoom).clamp(1.5, 3.2);
-            cr.arc(cur_sx + cur_sw / 2.0, cur_sy + cur_sh / 2.0, dot_r, 0.0, std::f64::consts::PI * 2.0);
+            cr.arc(
+                cur_sx + cur_sw / 2.0,
+                cur_sy + cur_sh / 2.0,
+                dot_r,
+                0.0,
+                std::f64::consts::PI * 2.0,
+            );
             cr.set_source_rgb(1.0, 1.0, 1.0);
             let _ = cr.fill();
         }
