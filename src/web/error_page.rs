@@ -224,6 +224,11 @@ pub(crate) fn match_error_info(msg: &str) -> ErrorDetail {
 
 pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
     let detail = match_error_info(raw_error);
+    let lang = std::fs::read_to_string(crate::rail_data_dir().join("language.txt"))
+        .ok()
+        .and_then(|s| crate::i18n::Lang::from_code(&s))
+        .unwrap_or_else(crate::i18n::current);
+
     let safe_uri = failing_uri.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;");
     let safe_raw = raw_error.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
     let timestamp = gtk4::glib::DateTime::now_local()
@@ -232,21 +237,52 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
         .map(|s| s.to_string())
         .unwrap_or_else(|| "Just now".to_string());
 
-    let mut fixes_uz_html = String::new();
-    for f in detail.fixes_uz {
-        fixes_uz_html.push_str(&format!("<li>{}</li>", f));
-    }
-    let mut fixes_ru_html = String::new();
-    for f in detail.fixes_ru {
-        fixes_ru_html.push_str(&format!("<li>{}</li>", f));
-    }
-    let mut fixes_en_html = String::new();
-    for f in detail.fixes_en {
-        fixes_en_html.push_str(&format!("<li>{}</li>", f));
+    let (lang_code, title, desc, fixes, fixtitle, reload_lbl, home_lbl, copy_lbl, copied_lbl, diag_lbl) = match lang {
+        crate::i18n::Lang::Ru => (
+            "ru",
+            detail.title_ru,
+            detail.desc_ru,
+            detail.fixes_ru,
+            "Рекомендуемые действия:",
+            "Перезагрузить",
+            "На главную",
+            "Копировать",
+            "✓ Скопировано!",
+            "Технические сведения об ошибке (DevTools)",
+        ),
+        crate::i18n::Lang::En => (
+            "en",
+            detail.title_en,
+            detail.desc_en,
+            detail.fixes_en,
+            "Suggested Troubleshooting:",
+            "Try Again",
+            "Home Page",
+            "Copy Report",
+            "✓ Copied!",
+            "Technical Diagnostics (DevTools)",
+        ),
+        crate::i18n::Lang::Uz => (
+            "uz",
+            detail.title_uz,
+            detail.desc_uz,
+            detail.fixes_uz,
+            "Tavsiya etilgan yechimlar:",
+            "Qayta yuklash",
+            "Bosh sahifa",
+            "Nusxa olish",
+            "✓ Nusxalandi!",
+            "Texnik diagnostika ma'lumotlari (DevTools)",
+        ),
+    };
+
+    let mut fixes_html = String::new();
+    for f in fixes {
+        fixes_html.push_str(&format!("<li>{}</li>", f));
     }
 
     format!(r##"<!doctype html>
-<html lang="uz">
+<html lang="{lang_code}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -301,28 +337,6 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
     border-radius: 50%;
     background: {badge_color};
     box-shadow: 0 0 8px {badge_color};
-  }}
-  .lang-switcher {{
-    display: flex;
-    background: #16181f;
-    border: 1px solid #272a34;
-    border-radius: 8px;
-    padding: 2px;
-  }}
-  .lang-btn {{
-    background: transparent;
-    border: none;
-    color: #9ca3af;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 4px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }}
-  .lang-btn.active {{
-    background: #2563eb;
-    color: #ffffff;
   }}
   .error-code {{
     font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
@@ -459,37 +473,32 @@ pub(crate) fn format_error_html(failing_uri: &str, raw_error: &str) -> String {
       <span class="badge-dot"></span>
       <span>{category}</span>
     </div>
-    <div class="lang-switcher">
-      <button class="lang-btn active" onclick="setLang('uz')">O'zbekcha</button>
-      <button class="lang-btn" onclick="setLang('ru')">Русский</button>
-      <button class="lang-btn" onclick="setLang('en')">English</button>
-    </div>
   </div>
 
   <div class="error-code">{code}</div>
-  <h1 class="error-title" id="t-title">{title_uz}</h1>
+  <h1 class="error-title">{title}</h1>
   <div class="error-uri">{safe_uri}</div>
 
-  <p class="error-desc" id="t-desc">{desc_uz}</p>
+  <p class="error-desc">{desc}</p>
 
   <div class="fixes-card">
-    <div class="fixes-title" id="t-fixtitle">Tavsiya etilgan yechimlar:</div>
-    <ul class="fixes-list" id="t-fixes">
-      {fixes_uz_html}
+    <div class="fixes-title">{fixtitle}</div>
+    <ul class="fixes-list">
+      {fixes_html}
     </ul>
   </div>
 
   <div class="actions-row">
     <button class="btn-primary" onclick="retryLoad()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-      <span id="t-reload">Qayta yuklash</span>
+      <span>{reload_lbl}</span>
     </button>
-    <button class="btn-secondary" onclick="window.location.href='rail://start/'" id="t-home">Bosh sahifa</button>
-    <button class="btn-secondary" onclick="copyDiag()" id="t-copy">Nusxa olish</button>
+    <button class="btn-secondary" onclick="window.location.href='rail://start/'">{home_lbl}</button>
+    <button class="btn-secondary" onclick="copyDiag()" id="t-copy">{copy_lbl}</button>
   </div>
 
   <details class="diagnostics">
-    <summary id="t-diag">Texnik diagnostika ma'lumotlari (DevTools)</summary>
+    <summary>{diag_lbl}</summary>
     <div class="diag-box" id="diag-content">Error: {safe_raw}
 Code: {code}
 URL: {safe_uri}
@@ -499,68 +508,6 @@ Timestamp: {timestamp}</div>
 </div>
 
 <script>
-var data = {{
-  uz: {{
-    title: {title_uz_json},
-    desc: {desc_uz_json},
-    fixtitle: "Tavsiya etilgan yechimlar:",
-    fixes: {fixes_uz_json},
-    reload: "Qayta yuklash",
-    home: "Bosh sahifa",
-    copy: "Nusxa olish",
-    diag: "Texnik diagnostika ma'lumotlari (DevTools)"
-  }},
-  ru: {{
-    title: {title_ru_json},
-    desc: {desc_ru_json},
-    fixtitle: "Рекомендуемые действия:",
-    fixes: {fixes_ru_json},
-    reload: "Перезагрузить",
-    home: "На главную",
-    copy: "Копировать",
-    diag: "Технические сведения об ошибке (DevTools)"
-  }},
-  en: {{
-    title: {title_en_json},
-    desc: {desc_en_json},
-    fixtitle: "Suggested Troubleshooting:",
-    fixes: {fixes_en_json},
-    reload: "Try Again",
-    home: "Home Page",
-    copy: "Copy Report",
-    diag: "Technical Diagnostics (DevTools)"
-  }}
-}};
-
-function setLang(lang) {{
-  var d = data[lang];
-  if (!d) return;
-  document.getElementById('t-title').textContent = d.title;
-  document.getElementById('t-desc').textContent = d.desc;
-  document.getElementById('t-fixtitle').textContent = d.fixtitle;
-  document.getElementById('t-reload').textContent = d.reload;
-  document.getElementById('t-home').textContent = d.home;
-  document.getElementById('t-copy').textContent = d.copy;
-  document.getElementById('t-diag').textContent = d.diag;
-
-  var fixesEl = document.getElementById('t-fixes');
-  fixesEl.innerHTML = '';
-  d.fixes.forEach(function(item) {{
-    var li = document.createElement('li');
-    li.innerHTML = item;
-    fixesEl.appendChild(li);
-  }});
-
-  var btns = document.querySelectorAll('.lang-btn');
-  btns.forEach(function(b) {{
-    if (b.textContent.toLowerCase().indexOf(lang === 'uz' ? 'o\'z' : (lang === 'ru' ? 'рус' : 'eng')) !== -1) {{
-      b.classList.add('active');
-    }} else {{
-      b.classList.remove('active');
-    }}
-  }});
-}}
-
 function retryLoad() {{
   window.location.href = {safe_uri_js};
 }}
@@ -570,7 +517,7 @@ function copyDiag() {{
   navigator.clipboard.writeText(text).then(function() {{
     var btn = document.getElementById('t-copy');
     var old = btn.textContent;
-    btn.textContent = "✓ Nusxalandi!";
+    btn.textContent = "{copied_lbl}";
     setTimeout(function() {{ btn.textContent = old; }}, 1500);
   }});
 }}
@@ -580,18 +527,15 @@ function copyDiag() {{
         code = detail.code,
         category = detail.category,
         badge_color = detail.badge_color,
-        title_uz = detail.title_uz,
-        desc_uz = detail.desc_uz,
-        fixes_uz_html = fixes_uz_html,
-        title_uz_json = format!("\"{}\"", crate::minijson::escape(detail.title_uz)),
-        desc_uz_json = format!("\"{}\"", crate::minijson::escape(detail.desc_uz)),
-        fixes_uz_json = format!("[{}]", detail.fixes_uz.iter().map(|s| format!("\"{}\"", crate::minijson::escape(s))).collect::<Vec<_>>().join(",")),
-        title_ru_json = format!("\"{}\"", crate::minijson::escape(detail.title_ru)),
-        desc_ru_json = format!("\"{}\"", crate::minijson::escape(detail.desc_ru)),
-        fixes_ru_json = format!("[{}]", detail.fixes_ru.iter().map(|s| format!("\"{}\"", crate::minijson::escape(s))).collect::<Vec<_>>().join(",")),
-        title_en_json = format!("\"{}\"", crate::minijson::escape(detail.title_en)),
-        desc_en_json = format!("\"{}\"", crate::minijson::escape(detail.desc_en)),
-        fixes_en_json = format!("[{}]", detail.fixes_en.iter().map(|s| format!("\"{}\"", crate::minijson::escape(s))).collect::<Vec<_>>().join(",")),
+        title = title,
+        desc = desc,
+        fixtitle = fixtitle,
+        fixes_html = fixes_html,
+        reload_lbl = reload_lbl,
+        home_lbl = home_lbl,
+        copy_lbl = copy_lbl,
+        copied_lbl = copied_lbl,
+        diag_lbl = diag_lbl,
         safe_uri = safe_uri,
         safe_uri_js = format!("\"{}\"", crate::minijson::escape(failing_uri)),
         safe_raw = safe_raw,
