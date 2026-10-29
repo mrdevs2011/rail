@@ -25,9 +25,15 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
         let alt = state.contains(M::ALT_MASK);
         let super_key = state.contains(M::SUPER_MASK);
 
-        // Match the sibling Rail browser: let native WebKitGTK handle Ctrl+V.
-        // Do this before shortcut resolution so no configured action can consume paste.
-        if ctrl && key == gdk::Key::v {
+        // Route image Ctrl+V through Rail's native clipboard fallback; keep text
+        // paste native in WebKitGTK. This check must precede shortcut resolution.
+        if ctrl
+            && key == gdk::Key::v
+            && !state.intersects(M::ALT_MASK | M::SUPER_MASK | M::SHIFT_MASK)
+        {
+            if a.try_paste_image() {
+                return glib::Propagation::Stop;
+            }
             return glib::Propagation::Proceed;
         }
 
