@@ -27,7 +27,10 @@ impl App {
     pub(crate) fn clipboard_has_image(&self) -> bool {
         let formats = self.win.clipboard().formats();
         formats.contains_type(<gdk::Texture as glib::prelude::StaticType>::static_type())
-            || formats.mime_types().iter().any(|mime| mime.starts_with("image/"))
+            || formats
+                .mime_types()
+                .iter()
+                .any(|mime| mime.starts_with("image/"))
     }
 
     /// Reads the clipboard image natively and dispatches a synthetic `paste` event
@@ -200,7 +203,10 @@ impl App {
                 let mut stack: Vec<(std::path::PathBuf, std::path::PathBuf)> = paths
                     .into_iter()
                     .map(|p| {
-                        let base = p.file_name().map(std::path::PathBuf::from).unwrap_or_default();
+                        let base = p
+                            .file_name()
+                            .map(std::path::PathBuf::from)
+                            .unwrap_or_default();
                         (p, base)
                     })
                     .collect();
@@ -233,10 +239,23 @@ impl App {
                     let Ok(data) = std::fs::read(&path) else {
                         continue;
                     };
-                    let clean = |value: String| value.chars().map(|c| {
-                        if c.is_control() || matches!(c, '\\' | '"' | '\'') { '_' } else { c }
-                    }).collect::<String>();
-                    let name = clean(path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "file".into()));
+                    let clean = |value: String| {
+                        value
+                            .chars()
+                            .map(|c| {
+                                if c.is_control() || matches!(c, '\\' | '"' | '\'') {
+                                    '_'
+                                } else {
+                                    c
+                                }
+                            })
+                            .collect::<String>()
+                    };
+                    let name = clean(
+                        path.file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_else(|| "file".into()),
+                    );
                     let relative = clean(relative.to_string_lossy().replace('\\', "/"));
                     let (ct, _) = gio::content_type_guess(Some(&path), &data[..]);
                     let mime = gio::content_type_get_mime_type(&ct)
