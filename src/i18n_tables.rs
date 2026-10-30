@@ -2,6 +2,18 @@
 
 pub const TABLE: &[(&str, &str, &str)] = &[
     (
+        "Keyboard shortcuts",
+        "Klaviatura yorliqlari",
+        "Комбинации клавиш",
+    ),
+    ("Quick reference", "Tezkor ko'rinish", "Краткая справка"),
+    (
+        "Show all shortcuts",
+        "Barcha yorliqlarni ko'rsatish",
+        "Показать все сочетания",
+    ),
+    ("Show fewer", "Kamroq ko'rsatish", "Свернуть список"),
+    (
         "+ New Workspace (Alt+Shift+V)",
         "+ Yangi ish maydoni (Alt+Shift+V)",
         "+ Новое рабочее пространство (Alt+Shift+V)",

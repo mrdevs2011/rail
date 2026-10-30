@@ -2,6 +2,36 @@
 
 use crate::*;
 
+pub(crate) fn is_external_uri_scheme(scheme: &str) -> bool {
+    matches!(
+        scheme,
+        "mailto"
+            | "tel"
+            | "sms"
+            | "sip"
+            | "sips"
+            | "webcal"
+            | "xmpp"
+            | "facetime"
+            | "tg"
+            | "telegram"
+            | "magnet"
+            | "slack"
+            | "discord"
+            | "zoommtg"
+            | "zoomus"
+            | "skype"
+            | "callto"
+            | "signal"
+            | "viber"
+            | "whatsapp"
+            | "msteams"
+            | "ms-teams"
+            | "steam"
+            | "spotify"
+    )
+}
+
 impl App {
     // ---- tabs & workspaces -----------------------------------------------
 
@@ -27,15 +57,10 @@ impl App {
         None
     }
 
-    fn build_web_view(
-        session: Option<&webkit6::NetworkSession>,
-        related_view: Option<&WebView>,
-    ) -> WebView {
-        let settings = webkit6::Settings::new();
-        // Keep one browser configuration for normal tabs and window.open() popups.
+    /// One site-capability configuration shared by browser tabs, popups and PWA windows.
+    pub(crate) fn configure_web_settings(settings: &webkit6::Settings) {
         settings.set_enable_webrtc(webrtc_allowed());
         settings.set_enable_dns_prefetching(true);
-        settings.set_property("enable-offline-web-application-cache", true);
         settings.set_enable_smooth_scrolling(load_app_settings().smooth_scrolling);
         settings.set_enable_webgl(true);
         settings.set_property("enable-2d-canvas-acceleration", true);
@@ -44,8 +69,7 @@ impl App {
         settings.set_enable_media(true);
         settings.set_enable_media_capabilities(true);
         settings.set_media_playback_allows_inline(true);
-        settings.set_media_playback_requires_user_gesture(false);
-        // Widevine CDM is not installed in this Linux WebKitGTK environment.
+        // EME stays disabled because this Linux environment has no Widevine CDM.
         settings.set_enable_encrypted_media(false);
         settings.set_enable_developer_extras(true);
         settings.set_enable_back_forward_navigation_gestures(true);
@@ -56,10 +80,8 @@ impl App {
         settings.set_enable_site_specific_quirks(true);
         settings.set_javascript_can_access_clipboard(true);
         settings.set_allow_file_access_from_file_urls(true);
-        settings.set_allow_universal_access_from_file_urls(true);
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
         settings.set_auto_load_images(true);
-        settings.set_load_icons_ignoring_image_load_setting(true);
         let dev_no_cache = rail_data_dir().join("dev-disable-cache").exists();
         settings.set_enable_page_cache(!dev_no_cache);
 
@@ -71,52 +93,25 @@ impl App {
             settings.set_allow_file_access_from_file_urls(true);
             settings.set_allow_top_navigation_to_data_urls(true);
         }
+    }
+
+    fn build_web_view(
+        session: Option<&webkit6::NetworkSession>,
+        related_view: Option<&WebView>,
+    ) -> WebView {
+        let settings = webkit6::Settings::new();
+        Self::configure_web_settings(&settings);
 
         let ucm = webkit6::UserContentManager::new();
         ucm.register_script_message_handler("railgo", None);
         ucm.register_script_message_handler("railScreenshot", None);
         ucm.register_script_message_handler("railContextMenu", None);
 
-        // Cross-tab/webpage image drags often arrive as text/uri-list + text/html,
-        // not as files. Best-effort fetch the dragged image and route it through the
-        // page's normal file input without swallowing the native drop fallback.
-        let drop_image_script = r#"(function(){
-          document.addEventListener('drop', function(ev) {
-            try {
-              var d=ev.dataTransfer;
-              if(!d || (d.files && d.files.length)) return;
-              var url=(d.getData('text/uri-list')||'').split(/\r?\n/).find(function(s){return s && s[0]!=='#';})||'';
-              var html=d.getData('text/html')||'';
-              if(html){var doc=new DOMParser().parseFromString(html,'text/html');var img=doc.querySelector('img[src]');if(img && img.src)url=img.src;}
-              if(!url || !/^https?:\/\//i.test(url)) return;
-              var looksImage=/\.(png|jpe?g|gif|webp|bmp|avif|svg)(?:[?#]|$)/i.test(url) || /<img\b/i.test(html);
-              if(!looksImage) return;
-              fetch(url,{mode:'cors',credentials:'omit'}).then(function(r){if(!r.ok)throw new Error('image fetch failed');return r.blob();}).then(function(blob){
-                var name='dropped-image';try{name=decodeURIComponent(new URL(url).pathname.split('/').pop())||name;}catch(_){}
-                name=name.replace(/[\\\/'"\r\n]/g,'_');
-                var file=new File([blob],name,{type:blob.type||'image/png'}),dt=new DataTransfer();dt.items.add(file);
-                var ins=Array.from(document.querySelectorAll('input[type=file]')).filter(function(i){return !i.disabled;});
-                var input=ins.find(function(i){return !i.accept||i.accept.indexOf('image')>=0;})||ins[0];
-                if(input){input.files=dt.files;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));}
-                else {var t=document.activeElement;if(t)t.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true,composed:true}));}
-              }).catch(function(err){console.debug('Rail image drop fallback:',err);});
-            } catch(err) { console.debug('Rail drop fallback:',err); }
-          }, true);
-        })();"#;
-        let drop_image_user_script = webkit6::UserScript::new(
-            drop_image_script,
-            webkit6::UserContentInjectedFrames::AllFrames,
-            webkit6::UserScriptInjectionTime::Start,
-            &[],
-            &[],
-        );
-        ucm.add_script(&drop_image_user_script);
-
         let html_css = load_html_css();
         if css_has_active_content(&html_css) {
             ucm.add_style_sheet(&user_style_sheet(&html_css));
         }
-        crate::web::inject_web_optimizations(&ucm);
+        crate::web::inject_context_menu_bridge(&ucm);
         STYLE_MANAGERS.with(|l| l.borrow_mut().push(ucm.downgrade()));
         ADBLOCK_FILTER.with(|f| {
             if let Some(f) = f.borrow().as_ref() {
@@ -125,7 +120,7 @@ impl App {
         });
 
         let website_policies = webkit6::WebsitePolicies::builder()
-            .autoplay(webkit6::AutoplayPolicy::Allow)
+            .autoplay(webkit6::AutoplayPolicy::AllowWithoutSound)
             .build();
 
         let view = if let Some(parent) = related_view {
@@ -164,7 +159,7 @@ impl App {
         Self::build_web_view(None, Some(parent))
     }
 
-    fn configure_native_web_view(view: &WebView) {
+    pub(crate) fn configure_native_web_view(view: &WebView) {
         // Use a native GTK chooser for every web file input. This is more reliable
         // than WebKit's default chooser on Linux and supports multi-file uploads.
         view.connect_run_file_chooser(|view, request| {
@@ -230,24 +225,13 @@ impl App {
                         if let Some(uri) = req.uri() {
                             let uri_s = uri.to_string();
                             let scheme = uri_s.split(':').next().unwrap_or("").to_lowercase();
-                            let is_external = matches!(
-                                scheme.as_str(),
-                                "mailto"
-                                    | "tel"
-                                    | "tg"
-                                    | "telegram"
-                                    | "magnet"
-                                    | "slack"
-                                    | "discord"
-                                    | "zoommtg"
-                                    | "skype"
-                                    | "callto"
-                            );
-                            if is_external {
-                                let _ = gio::AppInfo::launch_default_for_uri(
+                            if is_external_uri_scheme(&scheme)
+                                && gio::AppInfo::launch_default_for_uri(
                                     &uri_s,
                                     None::<&gio::AppLaunchContext>,
-                                );
+                                )
+                                .is_ok()
+                            {
                                 decision.ignore();
                                 return true;
                             }
@@ -255,7 +239,7 @@ impl App {
                     }
                 }
                 let policies = webkit6::WebsitePolicies::builder()
-                    .autoplay(webkit6::AutoplayPolicy::Allow)
+                    .autoplay(webkit6::AutoplayPolicy::AllowWithoutSound)
                     .build();
                 decision.use_with_policies(&policies);
                 return true;

@@ -7,6 +7,8 @@ pub(crate) mod devtools;
 mod scroll;
 mod tabs;
 pub(crate) use devtools::*;
+#[cfg(test)]
+pub(crate) use tabs::is_external_uri_scheme;
 mod data_actions;
 mod dialogs;
 mod focus;

@@ -34,17 +34,16 @@ pub(crate) fn next_page_zoom(cur: f64, dir: i32) -> f64 {
 /// Overview zoom in/out duration (fixed, ease-out): zoom, pan and grid land together.
 pub(crate) const OV_ANIM_SECS: f64 = 0.18;
 
-/// Xotira tanqis (yoki RAIL_LOW_MEM=1 yoki swap to'liq): tez uxlatish, 3 ta tirik tab.
+/// Severe memory pressure only: reclaim a small number of inactive pages quickly.
 pub(crate) const SUSPEND_AFTER_SECS: u64 = 60;
-pub(crate) const MAX_LIVE_TABS: usize = 3;
+pub(crate) const MAX_LIVE_TABS: usize = 4;
 
-/// Xotira yetarli: 10 daqiqa, 6 ta tirik tab (har biri ~80–200 MB web process).
-pub(crate) const ROOMY_SUSPEND_AFTER_SECS: u64 = 600;
-pub(crate) const ROOMY_MAX_LIVE_TABS: usize = 6;
+/// Healthy-memory mode: keep a background page alive for an hour before reclaiming it.
+pub(crate) const ROOMY_SUSPEND_AFTER_SECS: u64 = 3600;
 
-/// O'rta pog'ona: 3 daqiqa, 4 ta tirik tab.
-pub(crate) const TIGHT_SUSPEND_AFTER_SECS: u64 = 180;
-pub(crate) const TIGHT_MAX_LIVE_TABS: usize = 4;
+/// Moderate memory pressure: preserve a useful working set for at least ten minutes.
+pub(crate) const TIGHT_SUSPEND_AFTER_SECS: u64 = 600;
+pub(crate) const TIGHT_MAX_LIVE_TABS: usize = 8;
 
 /// Bo'sh start-page tab — tez uxlatiladi.
 pub(crate) const BLANK_TAB_SUSPEND_SECS: u64 = 20;
@@ -65,6 +64,21 @@ pub(crate) fn mem_available_mb() -> Option<u64> {
     let line = text.lines().find(|l| l.starts_with("MemAvailable:"))?;
     let kb: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
     Some(kb / 1024)
+}
+
+/// Total physical memory (MiB) from /proc/meminfo.
+pub(crate) fn mem_total_mb() -> Option<u64> {
+    let text = std::fs::read_to_string("/proc/meminfo").ok()?;
+    let line = text.lines().find(|l| l.starts_with("MemTotal:"))?;
+    let kb: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
+    Some(kb / 1024)
+}
+
+/// Scale the healthy-memory cap to installed RAM (roughly one live tab per GiB,
+/// bounded to avoid unbounded WebKit process growth on very large workstations).
+pub(crate) fn roomy_max_live_tabs(total_mb: Option<u64>) -> usize {
+    let total_mb = total_mb.unwrap_or(8 * 1024);
+    total_mb.saturating_add(1023).div_euclid(1024).clamp(6, 20) as usize
 }
 
 /// Swap nearly full? System is paging — suspend aggressively even if MemAvailable looks OK.
@@ -112,6 +126,9 @@ pub(crate) fn suspend_policy() -> (u64, usize) {
         _ if pressure >= 8.0 => (SUSPEND_AFTER_SECS, MAX_LIVE_TABS),
         Some(m) if m < 3000 => (TIGHT_SUSPEND_AFTER_SECS, TIGHT_MAX_LIVE_TABS),
         _ if pressure >= 1.0 => (TIGHT_SUSPEND_AFTER_SECS, TIGHT_MAX_LIVE_TABS),
-        _ => (ROOMY_SUSPEND_AFTER_SECS, ROOMY_MAX_LIVE_TABS),
+        _ => (
+            ROOMY_SUSPEND_AFTER_SECS,
+            roomy_max_live_tabs(mem_total_mb()),
+        ),
     }
 }

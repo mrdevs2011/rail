@@ -382,181 +382,36 @@ pub(crate) fn save_css_editor(buffer: &gtk::TextBuffer, btn: &gtk::Button) {
     glib::timeout_add_local_once(Duration::from_millis(1500), move || b.set_label(tr("Save")));
 }
 
-/// Injects high-performance web & media optimizations across web views:
-/// - Speculative Hover Preconnect & DNS warmup (InstantClick / Turbo architecture)
-/// - Zero-stale realtime revalidation on BFCache restore (pageshow)
-/// - Passive scroll compositor promotion (120 FPS buttery smooth scrolling)
-/// - Off-thread asynchronous image decoding
-/// - Avoids heavy CPU-bound AV1 software decoding; prioritizes hardware-accelerated VP9/H.264
-pub(crate) fn inject_web_optimizations(ucm: &webkit6::UserContentManager) {
-    let script_code = r#"
+/// A tiny observational hook so Rail can respect a site's custom context menu.
+/// It never changes page DOM, media capabilities, listeners, or default actions.
+const PAGE_COMPATIBILITY_SCRIPT: &str = r#"
 (function() {
-  if (window.__railWebOptimized) return;
-  window.__railWebOptimized = true;
+  if (window.__railContextMenuObserver) return;
+  window.__railContextMenuObserver = true;
 
-  // 1. Speculative Hover Preconnect (InstantClick / Turbo architecture)
-  // When user hovers or touches a link, resolve DNS and warm TCP/TLS in advance.
-  var warmedHosts = new Set();
-  function preconnectUrl(href) {
-    try {
-      if (!href || href.indexOf('http') !== 0) return;
-      var url = new URL(href, location.href);
-      if (url.origin === location.origin || warmedHosts.has(url.origin)) return;
-      warmedHosts.add(url.origin);
-      if (warmedHosts.size > 20) {
-        var first = warmedHosts.values().next().value;
-        warmedHosts.delete(first);
-      }
-      var linkPreconnect = document.createElement('link');
-      linkPreconnect.rel = 'preconnect';
-      linkPreconnect.href = url.origin;
-      linkPreconnect.crossOrigin = 'anonymous';
-      document.head.appendChild(linkPreconnect);
-
-      var linkDns = document.createElement('link');
-      linkDns.rel = 'dns-prefetch';
-      linkDns.href = url.origin;
-      document.head.appendChild(linkDns);
-    } catch(_) {}
-  }
-
-  document.addEventListener('pointerover', function(e) {
-    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
-    if (a && a.href) preconnectUrl(a.href);
-  }, { passive: true, capture: true });
-
-  document.addEventListener('touchstart', function(e) {
-    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
-    if (a && a.href) preconnectUrl(a.href);
-  }, { passive: true, capture: true });
-
-  // Never synthesize visibilitychange/online/focus events on behalf of a site.
-  // Those events carry real browser state; faking them can trigger duplicate network
-  // requests, race Firestore/Firebase listeners and temporarily empty dynamic lists.
-  // WebKit dispatches the genuine lifecycle events when their state actually changes.
-
-  // Do not monkey-patch addEventListener to force passive touch listeners.
-  // Sites and web apps need to be able to call preventDefault() for nested scrolling,
-  // drawing canvases, touch gestures and custom scroll containers. WebKit handles native
-  // compositor scrolling itself; changing listener options globally breaks site behavior.
-
-  // 4. Asynchronous image decoding: offloads image decompression from UI thread
-  function makeImagesAsync(root) {
-    try {
-      var imgs = (root || document).querySelectorAll('img:not([decoding])');
-      for (var i = 0; i < imgs.length; i++) {
-        imgs[i].decoding = 'async';
-      }
-    } catch(_) {}
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() { makeImagesAsync(); });
-  } else {
-    makeImagesAsync();
-  }
-
-  // 5. Hardware-accelerated video decoding on YouTube
-  var isYT = location.hostname.indexOf('youtube.com') !== -1;
-  if (isYT) {
-    if (window.MediaSource && MediaSource.isTypeSupported) {
-      var origIsTypeSupported = MediaSource.isTypeSupported.bind(MediaSource);
-      MediaSource.isTypeSupported = function(type) {
-        if (typeof type === 'string' && type.indexOf('av01') !== -1) {
-          return false;
-        }
-        return origIsTypeSupported(type);
-      };
-    }
-  }
-
-  // 6. Custom context menu & preventDefault detection
   function notifyContextPrevented() {
     try {
-      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railContextMenu) {
-        window.webkit.messageHandlers.railContextMenu.postMessage("prevented");
-      }
-    } catch(_) {}
+      var handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railContextMenu;
+      if (handler) handler.postMessage("prevented");
+    } catch (_) {}
   }
 
-  window.addEventListener('contextmenu', function(e) {
-    if (e.defaultPrevented) {
+  // Wrap only this one event instance so notification is synchronous. The original
+  // method is always called with the same receiver/arguments; no global prototype,
+  // event propagation, or page listener registration is changed.
+  window.addEventListener('contextmenu', function(event) {
+    var originalPreventDefault = event.preventDefault;
+    event.preventDefault = function() {
       notifyContextPrevented();
-      return;
-    }
-    var orig = e.preventDefault;
-    e.preventDefault = function() {
-      notifyContextPrevented();
-      return orig.apply(this, arguments);
+      return originalPreventDefault.apply(this, arguments);
     };
   }, true);
-
-  window.addEventListener('contextmenu', function(e) {
-    if (e.defaultPrevented) {
-      notifyContextPrevented();
-      return;
-    }
-    var target = e.target;
-    if (target && target.closest) {
-      if (target.closest('.html5-video-player, ytd-player, #movie_player, .monaco-editor, [data-context-menu], [role="menu"]')) {
-        notifyContextPrevented();
-      }
-    }
-  }, false);
-
-  window.addEventListener('pointerdown', function(e) {
-    if (e.button === 2) {
-      var orig = e.preventDefault;
-      e.preventDefault = function() {
-        notifyContextPrevented();
-        return orig.apply(this, arguments);
-      };
-    }
-  }, true);
-
-  // 7. HTML5 Video inline playback & play reliability
-  function ensureVideoPlayback(root) {
-    try {
-      var vids = (root || document).querySelectorAll('video');
-      for (var i = 0; i < vids.length; i++) {
-        var v = vids[i];
-        if (!v.hasAttribute('playsinline')) {
-          v.setAttribute('playsinline', '');
-          v.setAttribute('webkit-playsinline', '');
-        }
-        if (!v.__railHooked) {
-          v.__railHooked = true;
-          v.addEventListener('click', function() {
-            if (this.paused) {
-              this.play().catch(function() {});
-            }
-          });
-        }
-      }
-    } catch(_) {}
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() { ensureVideoPlayback(); });
-  } else {
-    ensureVideoPlayback();
-  }
-  window.addEventListener('load', function() { ensureVideoPlayback(); });
-  if (window.MutationObserver && document.documentElement) {
-    try {
-      new MutationObserver(function(muts) {
-        for (var i = 0; i < muts.length; i++) {
-          if (muts[i].addedNodes && muts[i].addedNodes.length > 0) {
-            ensureVideoPlayback(muts[i].target);
-            makeImagesAsync(muts[i].target);
-          }
-        }
-      }).observe(document.documentElement, { childList: true, subtree: true });
-    } catch(_) {}
-  }
 })();
 "#;
 
+pub(crate) fn inject_context_menu_bridge(ucm: &webkit6::UserContentManager) {
     let script = webkit6::UserScript::new(
-        script_code,
+        PAGE_COMPATIBILITY_SCRIPT,
         webkit6::UserContentInjectedFrames::AllFrames,
         webkit6::UserScriptInjectionTime::Start,
         &[],
@@ -568,6 +423,31 @@ pub(crate) fn inject_web_optimizations(ucm: &webkit6::UserContentManager) {
 #[cfg(test)]
 mod stylesheet_safety_tests {
     use super::*;
+
+    #[test]
+    fn injected_page_hook_only_observes_context_menu_cancellation() {
+        assert!(PAGE_COMPATIBILITY_SCRIPT.contains("event.preventDefault = function()"));
+        assert!(
+            PAGE_COMPATIBILITY_SCRIPT.contains("originalPreventDefault.apply(this, arguments)")
+        );
+        assert!(PAGE_COMPATIBILITY_SCRIPT.contains("railContextMenu"));
+        for forbidden in [
+            "Event.prototype.preventDefault =",
+            "EventTarget.prototype.addEventListener =",
+            "addEventListener =",
+            "MediaSource.isTypeSupported",
+            "playsinline",
+            "decoding =",
+            "dispatchEvent(",
+            "addEventListener('drop'",
+            "preconnect",
+        ] {
+            assert!(
+                !PAGE_COMPATIBILITY_SCRIPT.contains(forbidden),
+                "page compatibility hook must not mutate site behavior: {forbidden}"
+            );
+        }
+    }
 
     #[test]
     fn legacy_global_reset_is_detected_but_developer_template_is_not() {

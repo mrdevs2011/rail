@@ -234,7 +234,7 @@ impl App {
             }).collect::<Vec<_>>().join(",")
         });
         format!(
-            "{{\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}],\"shortcuts\":[{}]}}",
+            "{{\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}],\"shortcuts\":[{}],\"shortcutTitle\":\"{}\",\"shortcutCaption\":\"{}\",\"showAll\":\"{}\",\"showLess\":\"{}\"}}",
             e(&tr("Search with {} or enter URL").replace("{}", &display_name)),
             e(svg_str),
             e(&sc_apply(
@@ -251,7 +251,11 @@ impl App {
             e(tr("Search")),
             e(&tab_prof),
             profs.join(","),
-            shortcuts
+            shortcuts,
+            e(tr("Keyboard shortcuts")),
+            e(tr("Quick reference")),
+            e(tr("Show all shortcuts")),
+            e(tr("Show fewer"))
         )
     }
 

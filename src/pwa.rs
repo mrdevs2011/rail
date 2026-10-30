@@ -475,32 +475,24 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
     let session = mgr.get_or_create_session(&prof_id);
 
     let settings = webkit6::Settings::new();
-    settings.set_enable_javascript(true);
-    settings.set_enable_webgl(true);
-    settings.set_property("enable-2d-canvas-acceleration", true);
-    settings.set_enable_smooth_scrolling(load_app_settings().smooth_scrolling);
-    settings.set_enable_mediasource(true);
-    settings.set_enable_media(true);
-    settings.set_enable_media_capabilities(true);
-    settings.set_media_playback_allows_inline(true);
-    settings.set_media_playback_requires_user_gesture(false);
-    settings.set_enable_webaudio(true);
-    settings.set_enable_media_stream(true);
-    settings.set_enable_html5_local_storage(true);
-    settings.set_enable_html5_database(true);
-    settings.set_enable_site_specific_quirks(true);
-    settings.set_javascript_can_access_clipboard(true);
-    settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
-    settings.set_auto_load_images(true);
-    settings.set_load_icons_ignoring_image_load_setting(true);
-    settings.set_enable_page_cache(true);
+    App::configure_web_settings(&settings);
 
     let ucm = webkit6::UserContentManager::new();
     ucm.register_script_message_handler("railContextMenu", None);
-    crate::web::inject_web_optimizations(&ucm);
+    let html_css = load_html_css();
+    if css_has_active_content(&html_css) {
+        ucm.add_style_sheet(&user_style_sheet(&html_css));
+    }
+    STYLE_MANAGERS.with(|l| l.borrow_mut().push(ucm.downgrade()));
+    ADBLOCK_FILTER.with(|f| {
+        if let Some(f) = f.borrow().as_ref() {
+            ucm.add_filter(f);
+        }
+    });
+    crate::web::inject_context_menu_bridge(&ucm);
 
     let website_policies = webkit6::WebsitePolicies::builder()
-        .autoplay(webkit6::AutoplayPolicy::Allow)
+        .autoplay(webkit6::AutoplayPolicy::AllowWithoutSound)
         .build();
 
     let view = WebView::builder()
@@ -511,6 +503,7 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
         .hexpand(true)
         .vexpand(true)
         .build();
+    App::configure_native_web_view(&view);
 
     let v_back = view.clone();
     btn_back.connect_clicked(move |_| v_back.go_back());

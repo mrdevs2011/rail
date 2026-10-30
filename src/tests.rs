@@ -643,6 +643,35 @@ fn test_page_zoom_steps_cover_20_to_500() {
 }
 
 #[test]
+fn test_external_uri_protocols_are_routed_outside_webkit() {
+    for scheme in [
+        "mailto", "tel", "sms", "sip", "sips", "webcal", "xmpp", "facetime", "tg", "telegram",
+        "magnet", "slack", "discord", "zoommtg", "zoomus", "skype", "callto", "signal", "viber",
+        "whatsapp", "msteams", "ms-teams", "steam", "spotify",
+    ] {
+        assert!(
+            is_external_uri_scheme(scheme),
+            "missing external scheme: {scheme}"
+        );
+    }
+    for scheme in ["http", "https", "file", "blob", "data", "javascript"] {
+        assert!(
+            !is_external_uri_scheme(scheme),
+            "web scheme intercepted: {scheme}"
+        );
+    }
+}
+
+#[test]
+fn test_roomy_tab_cap_scales_with_physical_memory() {
+    assert_eq!(roomy_max_live_tabs(Some(4 * 1024)), 6);
+    assert_eq!(roomy_max_live_tabs(Some(8 * 1024)), 8);
+    assert_eq!(roomy_max_live_tabs(Some(16 * 1024)), 16);
+    assert_eq!(roomy_max_live_tabs(Some(32 * 1024)), 20);
+    assert_eq!(roomy_max_live_tabs(None), 8);
+}
+
+#[test]
 fn test_zoom_keys_plus_works_without_shift() {
     // Ctrl+= (US layout, no Shift) must zoom in, same as Ctrl+Shift++
     assert_eq!(App::zoom_dir(gdk::Key::equal, 21, false), Some(1));
