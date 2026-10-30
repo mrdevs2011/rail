@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, mpsc};
@@ -161,8 +161,16 @@ pub struct HistorySuggestion {
     pub kind: SuggestionKind,
 }
 
+const SUGGEST_CACHE_CAP: usize = 64;
+const HISTORY_ENTRY_CAP: usize = 4096;
+const HISTORY_PRUNE_BATCH: usize = 512;
+
 pub struct HistoryManager {
     entries: HashMap<String, HistoryEntry>,
+    // Small FIFO memoization for repeated omnibox queries (e.g. focus/selection redraws).
+    // Invalidated on every history mutation; never persists derived or sensitive query data.
+    suggest_cache: std::cell::RefCell<HashMap<String, Vec<HistorySuggestion>>>,
+    suggest_cache_order: std::cell::RefCell<VecDeque<String>>,
     file_path: PathBuf,
     /// Visits are written to disk lazily (flush()), by the background writer, never on the UI thread.
     dirty: bool,
@@ -176,6 +184,8 @@ impl HistoryManager {
         let writer = DiskWriter::spawn(file_path.clone());
         let mut mgr = Self {
             entries: HashMap::new(),
+            suggest_cache: std::cell::RefCell::new(HashMap::new()),
+            suggest_cache_order: std::cell::RefCell::new(VecDeque::new()),
             file_path,
             dirty: false,
             writer,
@@ -214,6 +224,11 @@ impl HistoryManager {
         self.writer.send(rows);
     }
 
+    fn invalidate_suggest_cache(&self) {
+        self.suggest_cache.borrow_mut().clear();
+        self.suggest_cache_order.borrow_mut().clear();
+    }
+
     pub fn record_visit(&mut self, url: &str, title: &str) {
         let trimmed = url.trim();
         if trimmed.is_empty()
@@ -243,6 +258,21 @@ impl HistoryManager {
             );
         }
         self.dirty = true;
+        self.invalidate_suggest_cache();
+        // Bound live memory as well as the persisted file. Prune in batches so normal
+        // navigation remains O(1); keep the most recently visited entries.
+        if self.entries.len() > HISTORY_ENTRY_CAP {
+            let mut oldest: Vec<(i64, String)> = self
+                .entries
+                .values()
+                .map(|e| (e.last_visit, e.url.clone()))
+                .collect();
+            let prune_count = HISTORY_PRUNE_BATCH.min(oldest.len());
+            oldest.select_nth_unstable_by_key(prune_count - 1, |x| x.0);
+            for (_, url) in oldest.into_iter().take(prune_count) {
+                self.entries.remove(&url);
+            }
+        }
     }
 
     /// Writes history to disk if something changed since the last write.
@@ -255,6 +285,7 @@ impl HistoryManager {
 
     pub fn clear(&mut self) {
         self.entries.clear();
+        self.invalidate_suggest_cache();
         self.dirty = false;
         let path = self.file_path.clone();
         self.writer.invalidate_and(|| {
@@ -264,6 +295,7 @@ impl HistoryManager {
 
     pub fn remove_entry(&mut self, url: &str) {
         if self.entries.remove(url).is_some() {
+            self.invalidate_suggest_cache();
             self.dirty = true;
             self.flush();
         }
@@ -279,6 +311,9 @@ impl HistoryManager {
         let raw_q = query.trim();
         if raw_q.is_empty() {
             return Vec::new();
+        }
+        if let Some(cached) = self.suggest_cache.borrow().get(raw_q) {
+            return cached.clone();
         }
 
         let q_lower = raw_q.to_lowercase();
@@ -416,6 +451,18 @@ impl HistoryManager {
             results.push(search_sug);
         }
 
+        // Keep only a tiny bounded working set; FIFO avoids per-keystroke LRU bookkeeping.
+        {
+            let mut cache = self.suggest_cache.borrow_mut();
+            let mut order = self.suggest_cache_order.borrow_mut();
+            if cache.len() >= SUGGEST_CACHE_CAP {
+                if let Some(oldest) = order.pop_front() {
+                    cache.remove(&oldest);
+                }
+            }
+            cache.insert(raw_q.to_string(), results.clone());
+            order.push_back(raw_q.to_string());
+        }
         results
     }
 }
@@ -481,6 +528,8 @@ mod tests {
         assert_eq!(suggestions[0].autofill_text, "google.com");
         assert!(suggestions[0].target_url.contains("google.com"));
 
+        // A cached result must be invalidated immediately when history changes.
+        let _ = mgr.suggest("good");
         // Record a visit to a custom site
         mgr.record_visit("https://goodreads.com/book/123", "Goodreads Book");
         let suggestions2 = mgr.suggest("good");
