@@ -198,12 +198,6 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
         "Find previous match",
         ["Shift+F3", "Ctrl+Shift+G"]
     ),
-    sc!(
-        "extension_mode",
-        G_PANELS,
-        "Toggle extension shortcut mode",
-        ["Ctrl+Shift+E"]
-    ),
     sc!("fullscreen", G_PANELS, "Toggle Fullscreen", ["F11"]),
     sc!("quit", G_PANELS, "Quit Rail", ["Ctrl+Q"]),
 ];

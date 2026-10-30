@@ -184,15 +184,10 @@ fn test_to_uri_search_engines() {
 fn test_settings_tab_enum() {
     assert_ne!(SettingsTab::General, SettingsTab::Profiles);
     assert_ne!(SettingsTab::Data, SettingsTab::Customize);
-    assert_ne!(SettingsTab::General, SettingsTab::Extensions);
     assert_eq!(SettingsTab::General, SettingsTab::General);
     assert_eq!(
-        settings_uri_for_tab(SettingsTab::Extensions),
-        "rail://settings/extensions"
-    );
-    assert_eq!(
         settings_tab_from_uri("rail://settings/extensions"),
-        Some(SettingsTab::Extensions)
+        Some(SettingsTab::General)
     );
     assert_eq!(
         crate::nav::normalize_internal_uri("rail://history"),
@@ -206,43 +201,6 @@ fn test_settings_tab_enum() {
         crate::nav::to_uri("chrome://history", "google"),
         "rail://settings/data"
     );
-}
-
-#[test]
-fn test_extension_manifest_parsing() {
-    let tmp = std::env::temp_dir().join(format!(
-        "rail_test_ext_{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    let _ = std::fs::create_dir_all(&tmp);
-    let manifest = r#"{
-        "manifest_version": 3,
-        "name": "Dark Mode Helper",
-        "version": "2.1.0",
-        "description": "Applies dark mode to websites",
-        "content_scripts": [
-            {
-                "matches": ["*://*.example.com/*", "<all_urls>"],
-                "js": ["content.js"],
-                "css": ["style.css"],
-                "run_at": "document_start"
-            }
-        ]
-    }"#;
-    std::fs::write(tmp.join("manifest.json"), manifest).unwrap();
-    let ext = extensions::parse_manifest(&tmp).expect("parse manifest");
-    assert_eq!(ext.name, "Dark Mode Helper");
-    assert_eq!(ext.version, "2.1.0");
-    assert_eq!(ext.description, "Applies dark mode to websites");
-    assert_eq!(ext.content_scripts.len(), 1);
-    assert_eq!(ext.content_scripts[0].matches.len(), 2);
-    assert_eq!(ext.content_scripts[0].js, vec!["content.js"]);
-    assert_eq!(ext.content_scripts[0].css, vec!["style.css"]);
-    assert_eq!(ext.content_scripts[0].run_at, "document_start");
-    let _ = std::fs::remove_dir_all(&tmp);
 }
 
 #[test]
@@ -557,7 +515,6 @@ fn test_find_reload_zoom_defaults() {
         ("Ctrl+0", "zoom_reset"),
         ("Ctrl+Shift+T", "reopen_tab"),
         ("Ctrl+H", "history"),
-        ("Ctrl+Shift+E", "extension_mode"),
         ("Alt+F", "full_tab"),
         ("F11", "fullscreen"),
     ] {

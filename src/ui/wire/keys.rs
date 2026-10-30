@@ -9,7 +9,6 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     KEY_CTL.with(|k| *k.borrow_mut() = Some(keys.clone()));
     apply_shortcut_priority();
     sc_refresh_bound();
-    let held_shortcut: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
     // Overview zoom uses a frame-rate-independent hold loop rather than relying on the
     // desktop's keyboard-repeat delay (which may emit only one shortcut event).
     let zoom_repeat_key: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
@@ -63,15 +62,9 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     win.add_controller(nav_keys);
 
     let a = app.clone();
-    let held = held_shortcut.clone();
     let zoom_key = zoom_repeat_key.clone();
     let zoom_source = zoom_repeat_source.clone();
     keys.connect_key_pressed(move |_, key, keycode, state| {
-        use gdk::ModifierType as M;
-        let ctrl = state.contains(M::CONTROL_MASK);
-        let alt = state.contains(M::ALT_MASK);
-        let super_key = state.contains(M::SUPER_MASK);
-
         // Ignore OS key-repeat events while our smooth overview zoom loop owns this key.
         if zoom_key.get() == Some(keycode) {
             return glib::Propagation::Stop;
@@ -86,33 +79,8 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
         // Tugma qaysi amalga bog'langan (Settings > Customize > Shortcuts): standart ham, o'zgartirilgan ham
         let resolved = sc_resolve_any(&shortcut_combos(key, keycode, state));
 
-        // Extension shortcut mode toggle (see App::toggle_extension_mode). Extension rejimida ham ishlashi kerak.
-        if let ScResolve::Action("extension_mode") = resolved {
-            if held.get() == Some(keycode) {
-                return glib::Propagation::Stop;
-            }
-            a.toggle_extension_mode();
-            held.set(Some(keycode));
-            return glib::Propagation::Stop;
-        }
-
         // Let Ctrl+V reach WebKitGTK unchanged, matching the sibling Rail browser.
         // Synthetic clipboard events are not trusted by sites such as ChatGPT.
-
-        // Extension mode: Rail's own shortcuts are off, only extension commands are handled.
-        // Everything else goes straight to the page.
-        if crate::extensions::ext_keys_on() {
-            if (ctrl || alt || super_key) && held.get() == Some(keycode) {
-                return glib::Propagation::Stop;
-            }
-            if a.try_extension_command(key, state) {
-                if ctrl || alt || super_key {
-                    held.set(Some(keycode));
-                }
-                return glib::Propagation::Stop;
-            }
-            return glib::Propagation::Proceed;
-        }
 
         // Do not globally suppress a key just because its keycode matches the previous
         // press. GTK/WebKit can occasionally miss a release while focus moves between
@@ -138,10 +106,6 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
             ScResolve::Unknown => a.on_key(key, keycode, state),
         };
         // Zoom va qidiruvda tugmani bosib turish qadam-baqadam ishlashi kerak (o'z tezlik chegarasi bor)
-        let repeatable = matches!(
-            resolved,
-            ScResolve::Action("overview_zoom_in" | "overview_zoom_out" | "find_next" | "find_prev")
-        );
         if handled {
             if let Some(dir) = overview_repeat_dir {
                 zoom_key.set(Some(keycode));
@@ -171,13 +135,9 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     // release'ni alohida Capture controller kuzatadi.
     let release = gtk::EventControllerKey::new();
     release.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let held_rel = held_shortcut.clone();
     let zoom_key_rel = zoom_repeat_key.clone();
     let zoom_source_rel = zoom_repeat_source.clone();
     release.connect_key_released(move |_, _, keycode, _| {
-        if held_rel.get() == Some(keycode) {
-            held_rel.set(None);
-        }
         if zoom_key_rel.get() == Some(keycode) {
             zoom_key_rel.set(None);
             if let Some(source) = zoom_source_rel.borrow_mut().take() {
@@ -187,11 +147,9 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     });
     win.add_controller(release);
 
-    let held_focus = held_shortcut.clone();
     let zoom_key_focus = zoom_repeat_key.clone();
     let zoom_source_focus = zoom_repeat_source.clone();
     win.connect_has_focus_notify(move |_| {
-        held_focus.set(None);
         zoom_key_focus.set(None);
         if let Some(source) = zoom_source_focus.borrow_mut().take() {
             source.remove();

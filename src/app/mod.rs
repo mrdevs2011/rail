@@ -26,7 +26,6 @@ mod welcome;
 #[cfg(test)]
 pub(crate) use keys::STATIC_ACTIONS;
 mod ctxmenu;
-mod extensions_ui;
 mod find;
 mod screenshot;
 mod translate;
@@ -96,7 +95,7 @@ pub(crate) struct App {
     pub(crate) side_open: Cell<bool>,
     /// true = edge-hover auto mode; false = fixed (Claude-style always visible when open).
     pub(crate) sidebar_auto: Cell<bool>,
-    /// When true (e.g. extension popover or dialog is open), sidebar auto-close is locked/prevented.
+    /// When true (e.g. a modal dialog is open), sidebar auto-close is locked/prevented.
     pub(crate) sidebar_locked: Cell<bool>,
     pub(crate) side_gen: Cell<u32>,
     pub(crate) side_open_timer: RefCell<Option<glib::SourceId>>,

@@ -137,7 +137,6 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Muhitni eksport qilish (barcha ma'lumotlar)",
         "Экспорт окружения (все данные)",
     ),
-    ("Extensions", "Kengaytmalar", "Расширения"),
     (
         "Export or import all workspaces, profiles, logins & cookies  (Alt+I)",
         "Barcha ish maydonlari, profillar, loginlar va cookie'larni eksport yoki import qiling  (Alt+I)",
@@ -189,26 +188,11 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Izolyatsiyalangan ish maydonlari, sessiyalar va cookie saqlash  (Alt+P)",
         "Изолированные пространства, сессии и хранилище cookie  (Alt+P)",
     ),
-    (
-        "Load unpacked extension",
-        "Mahalliy kengaytma yuklash",
-        "Загрузить распакованное расширение",
-    ),
     ("Make Active", "Faol qilish", "Сделать активным"),
     (
         "Manage Profiles in Settings (Alt+P)",
         "Profillarni Sozlamalarda boshqarish (Alt+P)",
         "Управление профилями в настройках (Alt+P)",
-    ),
-    (
-        "Manage extensions",
-        "Kengaytmalarni boshqarish",
-        "Управление расширениями",
-    ),
-    (
-        "Manage local unpacked Chrome and WebExtension add-ons",
-        "Mahalliy (unpacked) Chrome va WebExtension kengaytmalarini boshqarish",
-        "Управление локальными распакованными расширениями Chrome и WebExtension",
     ),
     (
         "Network Leak Protections",
@@ -221,11 +205,6 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Новая вкладка  (Ctrl+T)",
     ),
     (
-        "No local extensions loaded yet",
-        "Hozircha mahalliy kengaytmalar yuklanmagan",
-        "Локальные расширения еще не загружены",
-    ),
-    (
         "Pack all your open tabs, workspaces, profiles, accounts & cookies into a single portable .tar.gz archive.",
         "Barcha ochiq tablar, ish maydonlari, profillar, akkauntlar va cookie'larni bitta ko'chma .tar.gz arxivga joylang.",
         "Упакуйте все открытые вкладки, пространства, профили, аккаунты и cookie в один переносимый архив .tar.gz.",
@@ -234,11 +213,6 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Privacy & Security Shield",
         "Maxfiylik va xavfsizlik qalqoni",
         "Щит конфиденциальности и безопасности",
-    ),
-    (
-        "Are you sure you want to remove this extension?",
-        "Haqiqatan ham ushbu kengaytmani o'chirib tashlamoqchimisiz?",
-        "Вы действительно хотите удалить это расширение?",
     ),
     ("Remove", "O'chirish", "Удалить"),
     (
@@ -318,6 +292,11 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Удалить эту клавишу",
     ),
     (
+        "Restore the built-in developer CSS template",
+        "Ichki dasturchi CSS shablonini tiklash",
+        "Восстановить встроенный шаблон CSS для разработчиков",
+    ),
+    (
         "Reset all to defaults",
         "Hammasini standartga qaytarish",
         "Сбросить всё по умолчанию",
@@ -351,11 +330,6 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Select or enter path to .tar.gz backup...",
         ".tar.gz zaxira yo'lini tanlang yoki kiriting...",
         "Выберите или введите путь к резервной копии .tar.gz...",
-    ),
-    (
-        "Select unpacked extension folder (with manifest.json)",
-        "Kengaytma papkasini tanlang (manifest.json bo'lgan)",
-        "Выберите папку распакованного расширения (с manifest.json)",
     ),
     ("Settings", "Sozlamalar", "Настройки"),
     (
@@ -392,11 +366,6 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ),
     ("rail.preferences", "rail.sozlamalar", "rail.настройки"),
     ("recenter", "markazlash", "по центру"),
-    (
-        "You can load any unpacked Chrome or Brave extension directory containing a manifest.json file directly.",
-        "Chrome yoki Brave kengaytmalarini (manifest.json bo'lgan papkani) to'g'ridan-to'g'ri yuklashingiz mumkin.",
-        "Вы можете напрямую загрузить любую папку расширения Chrome или Brave с файлом manifest.json.",
-    ),
     (
         "v0.4.5 Liquid Edition",
         "v0.4.5 Liquid nashri",
@@ -1705,19 +1674,9 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Режим расширений ВКЛ",
     ),
     (
-        "Rail shortcuts are off, only extension shortcuts work. Ctrl+Shift+E to exit.",
-        "Rail tugmalari o'chirildi, faqat kengaytma tugmalari ishlaydi. Chiqish: Ctrl+Shift+E.",
-        "Горячие клавиши Rail выключены, работают только клавиши расширений. Выход: Ctrl+Shift+E.",
-    ),
-    (
         "Extension mode OFF",
         "Kengaytma rejimi O'CHIRILDI",
         "Режим расширений ВЫКЛ",
-    ),
-    (
-        "Rail shortcuts are back, extension shortcuts are blocked.",
-        "Rail tugmalari qaytdi, kengaytma tugmalari bloklandi.",
-        "Клавиши Rail снова работают, клавиши расширений заблокированы.",
     ),
     ("Paste skipped", "Qo'yish bajarilmadi", "Вставка пропущена"),
     (
@@ -1781,10 +1740,5 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Find previous match",
         "Oldingi natija",
         "Предыдущее совпадение",
-    ),
-    (
-        "Toggle extension shortcut mode",
-        "Kengaytma tugmalari rejimini almashtirish",
-        "Переключить режим клавиш расширений",
     ),
 ];

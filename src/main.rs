@@ -46,7 +46,6 @@ use webkit6::{
 mod app;
 mod cli;
 mod config;
-mod extensions;
 mod model;
 mod nav;
 mod pages;
@@ -58,7 +57,6 @@ mod web;
 use app::*;
 use cli::*;
 use config::*;
-use extensions::*;
 use model::*;
 use nav::*;
 use pages::*;

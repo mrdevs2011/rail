@@ -119,13 +119,17 @@ body {
     </div>
     <div class="pmenu" id="pmenu" hidden></div>
   </div>
+  <section class="shortcuts" aria-label="Keyboard shortcuts">
+    <div class="shortcuts-head"><div class="shortcuts-title" id="shortcuts-title">Keyboard shortcuts</div><div class="shortcuts-caption" id="shortcuts-caption">Current settings</div></div>
+    <div class="shortcut-groups" id="shortcut-groups"></div>
+  </section>
 </div>
 <script>
 (function () {
   var q = document.getElementById('q'), pbtn = document.getElementById('pbtn');
   var pmenu = document.getElementById('pmenu'), panel = document.getElementById('panel');
   var sugsEl = document.getElementById('sugs'), hint = document.getElementById('hint'), hint2 = document.getElementById('hint2');
-  var S = { profiles: [], selected: '', badges: ['History', 'Top', 'Search'], hint: '', selTitle: '', manage: '' };
+  var S = { profiles: [], shortcuts: [], selected: '', badges: ['History', 'Top', 'Search'], hint: '', selTitle: '', manage: '' };
   var sugs = [], sel = -1, prevLen = 0, deleting = false, lastQ = '', fwd = false;
   var ICONS = [
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
@@ -207,6 +211,27 @@ body {
     renderSugs();
   }
 
+  function renderShortcuts() {
+    var root = document.getElementById('shortcut-groups'); root.textContent = '';
+    var groups = {}, order = [];
+    (S.shortcuts || []).forEach(function (item) {
+      if (!groups[item.group]) { groups[item.group] = []; order.push(item.group); }
+      groups[item.group].push(item);
+    });
+    order.forEach(function (name) {
+      var card = el('section', 'shortcut-group'); card.appendChild(el('h2', 'shortcut-group-title', name));
+      groups[name].forEach(function (item) {
+        var row = el('div', 'shortcut-row' + (item.important ? ' primary' : ''));
+        row.appendChild(el('div', 'shortcut-desc', item.desc));
+        var keys = el('div', 'shortcut-keys');
+        if (!item.enabled || !item.combo) keys.appendChild(el('span', 'shortcut-off', 'O‘chirilgan'));
+        else item.combo.split(' · ').forEach(function (combo) { keys.appendChild(el('kbd', 'shortcut-key', combo)); });
+        row.appendChild(keys); card.appendChild(row);
+      });
+      root.appendChild(card);
+    });
+  }
+
   window.railState = function (st) {
     var keep = S.selected;
     S = st;
@@ -214,7 +239,7 @@ body {
     q.placeholder = st.placeholder || '';
     q.setAttribute('aria-label', st.placeholder || '');
     document.getElementById('gicon').innerHTML = st.engineSvg || '';
-    fillHint(hint); fillHint(hint2); renderBtn(); renderMenu();
+    fillHint(hint); fillHint(hint2); renderBtn(); renderMenu(); renderShortcuts();
   };
   window.railSugg = function (text, arr) {
     if (text !== lastQ) return;               // stale answer

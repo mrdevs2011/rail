@@ -449,7 +449,6 @@ impl App {
                     let tab_name = match tab {
                         SettingsTab::General => "general",
                         SettingsTab::Profiles => "profiles",
-                        SettingsTab::Extensions => "extensions",
                         SettingsTab::Data => "data",
                         SettingsTab::Privacy => "privacy",
                         SettingsTab::Customize => "customize",

@@ -4,7 +4,6 @@ use crate::*;
 
 pub(crate) fn build(gapp: &gtk::Application) {
     setup_adblock();
-    init_extensions();
     if let Some(s) = gtk::Settings::default() {
         s.set_gtk_application_prefer_dark_theme(true);
     }
@@ -27,7 +26,6 @@ pub(crate) fn build(gapp: &gtk::Application) {
         head_back,
         head_forward,
         head_reload,
-        head_ext,
         brand_logo,
         list,
         pill,
@@ -126,11 +124,6 @@ pub(crate) fn build(gapp: &gtk::Application) {
             SettingsTab::Profiles,
             "system-users-symbolic",
             tr("Profiles"),
-        ),
-        (
-            SettingsTab::Extensions,
-            "application-x-addon-symbolic",
-            tr("Extensions"),
         ),
         (SettingsTab::Data, "drive-harddisk-symbolic", tr("Data")),
         (
@@ -276,7 +269,6 @@ pub(crate) fn build(gapp: &gtk::Application) {
     update::ensure_icon();
     gtk::Window::set_default_icon_name("rail");
     overlay.add_overlay(&update::build_card(&win));
-    build_extensions_page(&settings_stack, win.clone());
 
     let app = Rc::new(App {
         win: win.clone(),
@@ -436,14 +428,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         footer_downloads,
         footer_settings,
     );
-    wire_sidebar_header(
-        &app,
-        head_back,
-        head_forward,
-        head_reload,
-        head_ext,
-        head_close_side,
-    );
+    wire_sidebar_header(&app, head_back, head_forward, head_reload, head_close_side);
 
     let a_pwa = app.clone();
     app.pill_pwa_btn.connect_clicked(move |_| {

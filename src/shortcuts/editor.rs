@@ -154,6 +154,22 @@ pub(crate) fn sc_commit(ui: &ScUi) {
         SHORTCUTS.with(|c| *c.borrow_mut() = cfg);
         apply_shortcut_priority();
         sc_refresh_bound();
+        MAIN_APP.with(|slot| {
+            if let Some(app) = slot.borrow().as_ref() {
+                if let Ok(rows) = app.rows.try_borrow() {
+                    for row in rows.iter() {
+                        for tab in &row.tabs {
+                            let uri = tab.view.uri().map(|u| u.to_string()).unwrap_or_default();
+                            let saved = tab.saved_uri.borrow().clone();
+                            if uri.starts_with("rail://start") || saved.starts_with("rail://start")
+                            {
+                                app.push_start_state(&tab.view);
+                            }
+                        }
+                    }
+                }
+            }
+        });
     } else {
         ui.status
             .set_text(tr("Could not write shortcuts-customize.json"));

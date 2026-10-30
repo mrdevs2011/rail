@@ -45,6 +45,33 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
     editor_hbox.append(&gutter_view);
     editor_hbox.append(&css_view);
 
+    // Editor actions stay above the code so Reset is always immediately discoverable.
+    let css_toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    css_toolbar.set_homogeneous(false);
+    let css_reset_btn = gtk::Button::with_label(tr("Reset to default"));
+    css_reset_btn.add_css_class("settings-option-item");
+    css_reset_btn.set_tooltip_text(Some(tr("Restore the built-in developer CSS template")));
+    let css_save_btn = gtk::Button::with_label(tr("Save"));
+    css_save_btn.add_css_class("settings-option-item");
+    css_save_btn.add_css_class("active");
+    css_toolbar.append(&css_reset_btn);
+    css_toolbar.append(&css_save_btn);
+    page_css.append(&css_toolbar);
+
+    {
+        let buf = css_buffer.clone();
+        let save = css_save_btn.clone();
+        css_reset_btn.connect_clicked(move |reset| {
+            buf.set_text(DEFAULT_HTML_CSS);
+            save_css_editor(&buf, &save);
+            reset.set_label(tr("Reset"));
+            let b = reset.clone();
+            glib::timeout_add_local_once(Duration::from_millis(1500), move || {
+                b.set_label(tr("Reset to default"));
+            });
+        });
+    }
+
     let css_scroll = gtk::ScrolledWindow::new();
     css_scroll.add_css_class("css-editor-frame");
     css_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
@@ -86,12 +113,6 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
             }
         });
     }
-
-    let css_save_btn = gtk::Button::with_label(tr("Save"));
-    css_save_btn.add_css_class("settings-option-item");
-    css_save_btn.add_css_class("active");
-    css_save_btn.set_halign(gtk::Align::Start);
-    page_css.append(&css_save_btn);
 
     {
         let buf = css_buffer.clone();

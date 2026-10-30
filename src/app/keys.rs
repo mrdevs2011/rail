@@ -57,7 +57,6 @@ pub(crate) const STATIC_ACTIONS: &[&str] = &[
     "find",
     "find_next",
     "find_prev",
-    "extension_mode",
 ];
 
 impl App {
@@ -237,7 +236,6 @@ impl App {
                     self.page_zoom(0);
                 }
             }
-            "extension_mode" => self.toggle_extension_mode(),
             // ---- find in page ----
             "find" => return self.find_open(),
             "find_next" => return self.find_step(true),
@@ -274,11 +272,6 @@ impl App {
                 self.ov_key(k, M::empty());
                 return true;
             }
-        }
-
-        // Extension commands (e.g. Quick Open Ctrl+Comma, Crystal Text Alt+F)
-        if self.try_extension_command(key, state) {
-            return true;
         }
 
         // Find bar: Esc yopadi, Shift+Enter — oldingi natija

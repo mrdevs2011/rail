@@ -21,7 +21,6 @@ fn svg_data(name: &str) -> Option<&'static [u8]> {
         "naver" => include_bytes!("../../icons/svg/naver.svg").as_slice(),
         "ask" => include_bytes!("../../icons/svg/ask.svg").as_slice(),
         "gear" => include_bytes!("../../icons/svg/gear.svg").as_slice(),
-        "extension" => include_bytes!("../../icons/svg/extension.svg").as_slice(),
         "translate" => include_bytes!("../../icons/svg/translate.svg").as_slice(),
         "user" => include_bytes!("../../icons/svg/user.svg").as_slice(),
         "auto-lang" => include_bytes!("../../icons/svg/auto-lang.svg").as_slice(),
@@ -136,10 +135,6 @@ pub(crate) fn create_gear_icon(size: i32) -> gtk::Image {
 #[allow(dead_code)]
 pub(crate) fn create_user_icon(size: i32) -> gtk::Image {
     load_icon("user", size)
-}
-
-pub(crate) fn create_extension_icon(size: i32) -> gtk::Image {
-    load_icon("extension", size)
 }
 
 pub(crate) fn create_rail_icon(size: i32) -> gtk::Image {

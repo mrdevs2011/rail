@@ -12,7 +12,6 @@ pub(crate) enum DevToolsDockSide {
 pub(crate) enum SettingsTab {
     General,
     Profiles,
-    Extensions,
     Data,
     Privacy,
     Customize,

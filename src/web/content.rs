@@ -2,7 +2,159 @@
 
 use crate::*;
 
-pub(crate) const DEFAULT_HTML_CSS: &str = include_str!("../html_default.css");
+/// Developer-oriented HTML/CSS starter kit. All recipes are intentionally commented
+/// out: resetting the editor must never silently restyle every website.
+pub(crate) const DEFAULT_HTML_CSS: &str = r###"/* ============================================================================
+   RAIL · HTML.CSS — DEVELOPER STARTER KIT
+   Luxury / Modern / Classic · Standards-first · WebKit compatible
+
+   This file is injected as a USER stylesheet on every website when saved.
+   IMPORTANT: examples below are intentionally commented out. Enable only the
+   rules you explicitly need. A universal reset can change a site's layout,
+   controls, icons, SVGs, avatars, media sizing and accessibility behavior.
+
+   QUICK GUIDE
+   1. Keep this file as a reference, or uncomment a focused recipe.
+   2. Prefer :where() for low-specificity defaults.
+   3. Scope overrides to a site/component instead of styling every element.
+   4. Avoid !important unless overriding a known third-party rule is essential.
+   5. Save to apply to current and future tabs. Use Reset to restore this kit.
+   ============================================================================ */
+
+/* --------------------------------------------------------------------------
+   01 · SAFE FOUNDATION — optional, global document defaults
+   These intentionally alter page geometry; enable only if that is desired.
+   --------------------------------------------------------------------------
+:where(*, *::before, *::after) { box-sizing: border-box; }
+:where(html) { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+:where(body) { margin: 0; }
+*/
+
+/* --------------------------------------------------------------------------
+   02 · TYPOGRAPHY — restrained, readable, system-native
+   Do not force a font globally on sites with their own typographic identity.
+   --------------------------------------------------------------------------
+:where(body) {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+               sans-serif;
+  line-height: 1.5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+:where(code, kbd, samp, pre) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+*/
+
+/* --------------------------------------------------------------------------
+   03 · HEADINGS & PROSE — semantic rhythm without fixed font sizes
+   --------------------------------------------------------------------------
+:where(h1, h2, h3, h4, h5, h6) {
+  font-family: inherit;
+  font-weight: 650;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+:where(p, li, blockquote) { line-height: 1.65; }
+:where(p) { text-wrap: pretty; }
+*/
+
+/* --------------------------------------------------------------------------
+   04 · LINKS — accessible focus, subtle underline treatment
+   --------------------------------------------------------------------------
+:where(a) { text-underline-offset: 0.18em; text-decoration-thickness: 0.08em; }
+:where(a:focus-visible) { outline: 2px solid currentColor; outline-offset: 3px; }
+*/
+
+/* --------------------------------------------------------------------------
+   05 · FORMS — inherit typography; preserve native affordances
+   Avoid appearance:none globally: it can remove platform accessibility cues.
+   --------------------------------------------------------------------------
+:where(button, input, select, textarea) { font: inherit; }
+:where(button, [role="button"], input, select, textarea) { color: inherit; }
+:where(button, input, select, textarea):focus-visible {
+  outline: 2px solid Highlight;
+  outline-offset: 2px;
+}
+:where(textarea) { resize: vertical; }
+*/
+
+/* --------------------------------------------------------------------------
+   06 · MEDIA — no global width/height rules by design
+   Set dimensions only on the component you own; preserve SVG icon geometry.
+   Example, scoped to your own component (copy and uncomment manually):
+   .my-card__image { display: block; width: 100%; height: auto; object-fit: cover; }
+   .my-icon { width: 1.25rem; height: 1.25rem; flex: 0 0 auto; }
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   07 · TABLES & DATA — opt-in readable table recipe
+   --------------------------------------------------------------------------
+:where(table) { border-collapse: collapse; }
+:where(th, td) { text-align: start; }
+*/
+
+/* --------------------------------------------------------------------------
+   08 · SELECTION & MOTION — respect user accessibility preferences
+   --------------------------------------------------------------------------
+:where(::selection) { background: Highlight; color: HighlightText; }
+@media (prefers-reduced-motion: reduce) {
+  :where(*, *::before, *::after) {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+*/
+
+/* --------------------------------------------------------------------------
+   09 · SCROLLBARS — intentionally no global scrollbar override
+   Browser/site defaults are preserved. If needed, scope to a known container.
+   --------------------------------------------------------------------------
+.my-scroll-area { scrollbar-width: thin; scrollbar-color: #888 transparent; }
+*/
+
+/* --------------------------------------------------------------------------
+   10 · RESPONSIVE UTILITIES — examples for components you own
+   --------------------------------------------------------------------------
+.my-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+@media (min-width: 48rem) {
+  .my-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 75rem) {
+  .my-layout { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+*/
+
+/* --------------------------------------------------------------------------
+   11 · LUXURY / MODERN / CLASSIC DESIGN TOKENS — opt-in component scope
+   --------------------------------------------------------------------------
+:root {
+  --rail-surface: #111214;
+  --rail-surface-raised: #191b1f;
+  --rail-text: #f4f1eb;
+  --rail-muted: #a7a39b;
+  --rail-border: rgb(255 255 255 / 12%);
+  --rail-accent: #c8a96b;
+  --rail-radius: 0.75rem;
+  --rail-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+}
+*/
+
+/* --------------------------------------------------------------------------
+   12 · ACCESSIBILITY & QUALITY CHECKLIST
+   - Keep visible focus indicators; do not remove outlines globally.
+   - Preserve contrast and user zoom; avoid fixed text sizes.
+   - Do not globally hide scrollbars or disable selection.
+   - Do not globally resize img, svg, canvas, video, iframe or icon elements.
+   - Prefer component classes and site-specific selectors over tag selectors.
+   - Test keyboard navigation, reduced motion, narrow viewports and dark mode.
+   -------------------------------------------------------------------------- */
+
+/* YOUR CUSTOM CSS — add site-specific rules below this line. */
+"###;
 
 thread_local! {
     pub(crate) static STYLE_MANAGERS: RefCell<Vec<glib::WeakRef<webkit6::UserContentManager>>> =
@@ -67,10 +219,12 @@ pub(crate) fn load_html_css() -> String {
         Ok(text) => {
             // Migrate away from legacy Chrome UA reset dump which forced `color: black;`
             // on buttons/inputs and broke dark mode icons (e.g. YouTube mic and create buttons).
-            if text.contains("font: -webkit-small-control")
+            if text.contains("Rail leaves website styling untouched by default.")
+                || text.contains("Rail HTML5 Default Standards & Base Stylesheet")
+                || text.contains("/* ===== 1. Box Sizing")
+                || text.contains("font: -webkit-small-control")
                 || text.contains("/* ===== form controls ===== */")
                 || text.contains("Sites that set their own CSS still win; this layer only replaces the defaults.")
-                || (!text.contains("/* ===== 1. Box Sizing") && text.lines().count() <= 35)
             {
                 let _ = std::fs::write(&path, DEFAULT_HTML_CSS);
                 return DEFAULT_HTML_CSS.to_string();
@@ -85,10 +239,12 @@ pub(crate) fn load_html_css() -> String {
             let legacy = rail_data_dir().join("html.css");
             let initial =
                 std::fs::read_to_string(&legacy).unwrap_or_else(|_| DEFAULT_HTML_CSS.to_string());
-            let initial = if initial.contains("font: -webkit-small-control")
+            let initial = if initial.contains("Rail leaves website styling untouched by default.")
+                || initial.contains("Rail HTML5 Default Standards & Base Stylesheet")
+                || initial.contains("/* ===== 1. Box Sizing")
+                || initial.contains("font: -webkit-small-control")
                 || initial.contains("/* ===== form controls ===== */")
                 || initial.contains("Sites that set their own CSS still win; this layer only replaces the defaults.")
-                || (!initial.contains("/* ===== 1. Box Sizing") && initial.lines().count() <= 35)
             {
                 DEFAULT_HTML_CSS.to_string()
             } else {
@@ -125,7 +281,6 @@ pub(crate) fn apply_html_css(css: &str) -> usize {
                 if !css.trim().is_empty() {
                     ucm.add_style_sheet(&user_style_sheet(css));
                 }
-                apply_extensions_to_ucm(&ucm);
                 applied += 1;
             }
         }

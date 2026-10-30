@@ -220,8 +220,21 @@ impl App {
         let engine = self.search_engine.borrow().clone();
         let display_name = search_engine_display_name(&engine);
         let svg_str = std::str::from_utf8(search_engine_svg_bytes(&engine)).unwrap_or("");
+        let shortcuts = SHORTCUTS.with(|cfg| {
+            let cfg = cfg.borrow();
+            let mut defs = SHORTCUT_DEFS.iter().collect::<Vec<_>>();
+            defs.sort_by_key(|def| !matches!(def.id, "new_tab" | "focus_url" | "close_tab" | "next_tab" | "prev_tab" | "reopen_tab" | "find" | "downloads" | "history" | "settings" | "profiles" | "devtools" | "sidebar" | "fullscreen"));
+            defs.into_iter().map(|def| {
+                let combos = sc_effective(def, &cfg);
+                let enabled = sc_enabled(&cfg, def.id);
+                let combo = combos.iter().filter(|v| !v.is_empty()).cloned().collect::<Vec<_>>().join(" · ");
+                let important = matches!(def.id, "new_tab" | "focus_url" | "close_tab" | "next_tab" | "prev_tab" | "reopen_tab" | "find" | "downloads" | "history" | "settings" | "profiles" | "devtools" | "sidebar" | "fullscreen");
+                format!("{{\"id\":\"{}\",\"group\":\"{}\",\"desc\":\"{}\",\"combo\":\"{}\",\"enabled\":{},\"important\":{}}}",
+                    e(def.id), e(tr(def.group)), e(tr(def.desc)), e(&combo), enabled, important)
+            }).collect::<Vec<_>>().join(",")
+        });
         format!(
-            "{{\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}]}}",
+            "{{\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}],\"shortcuts\":[{}]}}",
             e(&tr("Search with {} or enter URL").replace("{}", &display_name)),
             e(svg_str),
             e(&sc_apply(
@@ -237,7 +250,8 @@ impl App {
             e(tr("Top")),
             e(tr("Search")),
             e(&tab_prof),
-            profs.join(",")
+            profs.join(","),
+            shortcuts
         )
     }
 
