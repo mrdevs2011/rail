@@ -27,19 +27,17 @@ impl App {
         None
     }
 
-    pub(crate) fn create_web_view(session: &webkit6::NetworkSession, _profile_id: &str) -> WebView {
-        attach_download_handlers_once(session);
-
+    fn build_web_view(
+        session: Option<&webkit6::NetworkSession>,
+        related_view: Option<&WebView>,
+    ) -> WebView {
         let settings = webkit6::Settings::new();
-        // Native WebKitGTK user agent ensures websites deliver JavaScriptCore-compatible
-        // scripts with zero V8 syntax errors.
+        // Keep one browser configuration for normal tabs and window.open() popups.
         settings.set_enable_webrtc(webrtc_allowed());
-        // High-speed background DNS prefetching eliminates lookup latency on all link clicks
         settings.set_enable_dns_prefetching(true);
         settings.set_property("enable-offline-web-application-cache", true);
-        // Smooth, kinetic scrolling across all pages and web views:
         settings.set_enable_smooth_scrolling(load_app_settings().smooth_scrolling);
-        settings.set_enable_webgl(true); // needed for smooth compositing on many sites
+        settings.set_enable_webgl(true);
         settings.set_property("enable-2d-canvas-acceleration", true);
         settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_mediasource(true);
@@ -47,25 +45,21 @@ impl App {
         settings.set_enable_media_capabilities(true);
         settings.set_media_playback_allows_inline(true);
         settings.set_media_playback_requires_user_gesture(false);
-        // Widevine CDM is absent on desktop Linux WebKitGTK; enabling EME causes YouTube to request DRM/ClearKey and fail
+        // Widevine CDM is not installed in this Linux WebKitGTK environment.
         settings.set_enable_encrypted_media(false);
         settings.set_enable_developer_extras(true);
         settings.set_enable_back_forward_navigation_gestures(true);
         settings.set_enable_webaudio(true);
-        settings.set_enable_media_stream(true); // getUserMedia (mic/camera) still needs the user prompt
+        settings.set_enable_media_stream(true);
         settings.set_enable_html5_local_storage(true);
         settings.set_enable_html5_database(true);
         settings.set_enable_site_specific_quirks(true);
         settings.set_javascript_can_access_clipboard(true);
-        // Allow local offline files (e.g. index.html) to load relative CSS, JS and images like Chrome / Firefox
         settings.set_allow_file_access_from_file_urls(true);
         settings.set_allow_universal_access_from_file_urls(true);
-        // Always: smooth page scroll/compositing; falls back when GPU unavailable
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
-        // Ensure images, web icons, fonts, and inline SVGs load unconditionally
         settings.set_auto_load_images(true);
         settings.set_load_icons_ignoring_image_load_setting(true);
-        // Back/forward uses the page cache: instant history navigation instead of a reload
         let dev_no_cache = rail_data_dir().join("dev-disable-cache").exists();
         settings.set_enable_page_cache(!dev_no_cache);
 
@@ -85,8 +79,7 @@ impl App {
 
         // Cross-tab/webpage image drags often arrive as text/uri-list + text/html,
         // not as files. Best-effort fetch the dragged image and route it through the
-        // page's normal file input. If CORS or the site blocks it, native drop remains
-        // available as a fallback instead of swallowing the drag.
+        // page's normal file input without swallowing the native drop fallback.
         let drop_image_script = r#"(function(){
           document.addEventListener('drop', function(ev) {
             try {
@@ -135,13 +128,43 @@ impl App {
             .autoplay(webkit6::AutoplayPolicy::Allow)
             .build();
 
-        let view = WebView::builder()
-            .network_session(session)
-            .settings(&settings)
-            .user_content_manager(&ucm)
-            .website_policies(&website_policies)
-            .build();
+        let view = if let Some(parent) = related_view {
+            WebView::builder()
+                .related_view(parent)
+                .settings(&settings)
+                .user_content_manager(&ucm)
+                .website_policies(&website_policies)
+                .build()
+        } else {
+            WebView::builder()
+                .network_session(session.expect("a new WebView needs a NetworkSession"))
+                .settings(&settings)
+                .user_content_manager(&ucm)
+                .website_policies(&website_policies)
+                .build()
+        };
 
+        Self::configure_native_web_view(&view);
+        view
+    }
+
+    pub(crate) fn create_web_view(session: &webkit6::NetworkSession, _profile_id: &str) -> WebView {
+        attach_download_handlers_once(session);
+        Self::build_web_view(Some(session), None)
+    }
+
+    /// Create a `window.open()` target with exactly the same settings, user scripts,
+    /// content filters, stylesheet and native chooser/navigation handlers as a normal tab.
+    /// WebKit's `related_view` shares only the opener's web process and network session;
+    /// those other per-view settings must be attached explicitly.
+    pub(crate) fn create_related_web_view(parent: &WebView) -> WebView {
+        if let Some(session) = parent.network_session() {
+            attach_download_handlers_once(&session);
+        }
+        Self::build_web_view(None, Some(parent))
+    }
+
+    fn configure_native_web_view(view: &WebView) {
         // Use a native GTK chooser for every web file input. This is more reliable
         // than WebKit's default chooser on Linux and supports multi-file uploads.
         view.connect_run_file_chooser(|view, request| {
@@ -150,8 +173,7 @@ impl App {
                     .title("Choose files to upload")
                     .transient_for(&view.root().and_downcast::<gtk::Window>().unwrap_or_else(
                         || {
-                            // WebView is always embedded in the application window; this is
-                            // only a defensive fallback for detached views.
+                            // Defensive fallback for detached views.
                             gtk::Window::new()
                         },
                     ))
@@ -240,8 +262,6 @@ impl App {
             }
             false
         });
-
-        view
     }
 
     pub(crate) fn new_tab(self: &Rc<Self>) {

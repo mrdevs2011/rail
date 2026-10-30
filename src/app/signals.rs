@@ -353,7 +353,7 @@ impl App {
             let parent_prof = app
                 .find_view_profile(v)
                 .unwrap_or_else(|| app.profiles.borrow().active_profile().id);
-            let nv = WebView::builder().related_view(v).build();
+            let nv = App::create_related_web_view(v);
             if let Some(req) = nav.request() {
                 if let Some(uri) = req.uri() {
                     let u = uri.to_string();
