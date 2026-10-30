@@ -222,7 +222,7 @@ impl App {
         let svg_str = std::str::from_utf8(search_engine_svg_bytes(&engine)).unwrap_or("");
         format!(
             "{{\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}]}}",
-            e(&format!("{} {}...", tr("Search with"), display_name)),
+            e(&tr("Search with {} or enter URL").replace("{}", &display_name)),
             e(svg_str),
             e(&sc_apply(
                 tr("Enter  go      Esc  cancel      Alt+P  profiles"),

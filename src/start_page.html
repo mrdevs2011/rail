@@ -10,10 +10,10 @@
 :root { --bg: #000000; --fg: #ededed; --dim: #525252; --line-hi: #3a3a3a; --acc: #38bdf8; --panel: #0c0c0c; --line: #1f1f1f; }
 html, body { height: 100%; }
 body {
-  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; min-height: 100svh; display: flex; align-items: center; justify-content: center;
   background: var(--bg);
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', ui-monospace, monospace;
-  user-select: none; padding: 0 20px;
+  user-select: none; padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }
 /* The block is vertically centered once; the suggestion list and the profile menu are
    absolutely positioned dropdowns, so nothing ever shifts or floats away from the brand. */
@@ -78,6 +78,26 @@ body {
 .pmenu .sep { height: 1px; background: var(--line); margin: 6px 2px; }
 .pmenu .manage { display: flex; align-items: center; gap: 8px; padding: 8px; font-size: 10px; font-weight: 700; color: var(--fg); border-radius: 4px; cursor: pointer; }
 .pmenu .manage:hover { background: #151515; }
+@media (max-width: 520px) {
+  body { align-items: flex-start; padding-top: max(22vh, 72px); }
+  .container { gap: 22px; max-width: 100%; }
+  .brand-title { font-size: clamp(34px, 11vw, 46px); }
+  .brand-subtitle { font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+  .bar { gap: 8px; }
+  #q { font-size: 13px; }
+  .hint { gap: 12px; white-space: normal; flex-wrap: wrap; line-height: 1.6; }
+  .pmenu { width: min(250px, calc(100vw - 40px)); }
+  .sugs { max-height: min(38vh, 220px); }
+}
+@media (max-width: 360px) {
+  body { padding-left: 14px; padding-right: 14px; }
+  .brand-title { font-size: 34px; }
+  .sug { gap: 6px; padding-left: 3px; padding-right: 3px; }
+  .sug .t { max-width: 42%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .container { animation: none; }
+}
 </style>
 </head>
 <body>
@@ -89,7 +109,7 @@ body {
   <div class="omni" id="omni">
     <div class="bar">
       <span class="gicon" id="gicon"></span>
-      <input id="q" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus placeholder="Search or enter web address...">
+      <input id="q" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus placeholder="" aria-label="">
       <button class="pbtn" id="pbtn" type="button" tabindex="-1" style="display:none"></button>
     </div>
     <div class="hint" id="hint"></div>
@@ -192,6 +212,7 @@ body {
     S = st;
     if (keep && S.profiles.some(function (p) { return p.id === keep; })) S.selected = keep;
     q.placeholder = st.placeholder || '';
+    q.setAttribute('aria-label', st.placeholder || '');
     document.getElementById('gicon').innerHTML = st.engineSvg || '';
     fillHint(hint); fillHint(hint2); renderBtn(); renderMenu();
   };

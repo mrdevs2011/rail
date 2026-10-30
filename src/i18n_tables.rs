@@ -1727,8 +1727,8 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ),
     (
         "Search with {} or enter URL",
-        "{} orqali qidiring yoki URL kiriting",
-        "Поиск в {} или введите URL",
+        "{} orqali qidiring yoki URL manzilini kiriting",
+        "Ищите через {} или введите адрес сайта",
     ),
     ("Earlier", "Oldinroq", "Ранее"),
     (

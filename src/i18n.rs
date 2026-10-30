@@ -141,6 +141,8 @@ mod tests {
         for (file, src) in [
             ("main.rs", include_str!("main.rs")),
             ("update.rs", include_str!("update.rs")),
+            ("welcome.rs", include_str!("app/welcome.rs")),
+            ("start.rs", include_str!("pages/start.rs")),
         ] {
             let b = src.as_bytes();
             let mut i = 0;
