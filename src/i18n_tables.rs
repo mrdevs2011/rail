@@ -13,6 +13,7 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Показать все сочетания",
     ),
     ("Show fewer", "Kamroq ko'rsatish", "Свернуть список"),
+    ("Disabled", "O'chirilgan", "Отключено"),
     (
         "+ New Workspace (Alt+Shift+V)",
         "+ Yangi ish maydoni (Alt+Shift+V)",

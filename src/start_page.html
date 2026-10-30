@@ -82,6 +82,8 @@ body {
 /* Keyboard shortcuts: compact, readable cards instead of a long unstyled list. */
 .container { max-width: 820px; gap: 23px; }
 .shortcuts { width: 100%; margin-top: 0; padding-top: 13px; border-top: 1px solid #202a33; }
+body.shortcuts-expanded { align-items: flex-start; overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
+body.shortcuts-expanded .container { margin-top: 0; margin-bottom: 0; }
 .shortcuts-head { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; min-height: 25px; }
 .shortcuts-title { color: #b9c9d5; font: 700 10px/1.2 'DejaVu Sans', sans-serif; letter-spacing: .12em; text-transform: uppercase; }
 .shortcuts-caption { color: #596b79; font: 9px/1.2 'DejaVu Sans', sans-serif; }
@@ -153,7 +155,7 @@ body {
     <div class="shortcuts-head">
       <div class="shortcuts-title" id="shortcuts-title">Keyboard shortcuts</div>
       <div class="shortcuts-caption" id="shortcuts-caption">Quick reference</div>
-      <button class="shortcuts-toggle" id="shortcuts-toggle" type="button" aria-expanded="false">Show all</button>
+      <button class="shortcuts-toggle" id="shortcuts-toggle" type="button" aria-expanded="false" aria-controls="shortcut-groups">Show all</button>
     </div>
     <div class="shortcut-groups" id="shortcut-groups"></div>
   </section>
@@ -163,7 +165,7 @@ body {
   var q = document.getElementById('q'), pbtn = document.getElementById('pbtn');
   var pmenu = document.getElementById('pmenu'), panel = document.getElementById('panel');
   var sugsEl = document.getElementById('sugs'), hint = document.getElementById('hint'), hint2 = document.getElementById('hint2');
-  var S = { profiles: [], shortcuts: [], selected: '', badges: ['History', 'Top', 'Search'], hint: '', selTitle: '', manage: '', shortcutTitle: 'Keyboard shortcuts', shortcutCaption: 'Quick reference', showAll: 'Show all shortcuts', showLess: 'Show fewer' };
+  var S = { profiles: [], shortcuts: [], selected: '', badges: ['History', 'Top', 'Search'], hint: '', selTitle: '', manage: '', shortcutTitle: 'Keyboard shortcuts', shortcutCaption: 'Quick reference', showAll: 'Show all shortcuts', showLess: 'Show fewer', shortcutDisabled: 'Disabled' };
   var shortcutsExpanded = false;
   var sugs = [], sel = -1, prevLen = 0, deleting = false, lastQ = '', fwd = false;
   var ICONS = [
@@ -249,7 +251,11 @@ body {
   function renderShortcuts() {
     var root = document.getElementById('shortcut-groups'); root.textContent = '';
     var all = S.shortcuts || [];
+    var importantCount = all.filter(function (item) { return item.important; }).length;
+    var canExpand = all.length > importantCount;
+    if (!canExpand) shortcutsExpanded = false;
     var visible = shortcutsExpanded ? all : all.filter(function (item) { return item.important; });
+    document.body.classList.toggle('shortcuts-expanded', shortcutsExpanded && canExpand);
     var groups = {}, order = [];
     visible.forEach(function (item) {
       if (!groups[item.group]) { groups[item.group] = []; order.push(item.group); }
@@ -262,15 +268,18 @@ body {
         var row = el('div', 'shortcut-row' + (item.important ? ' primary' : ''));
         row.appendChild(el('div', 'shortcut-desc', item.desc));
         var keys = el('div', 'shortcut-keys');
-        if (!item.enabled || !item.combo) keys.appendChild(el('span', 'shortcut-off', 'O‘chirilgan'));
+        if (!item.enabled || !item.combo) keys.appendChild(el('span', 'shortcut-off', S.shortcutDisabled || 'Disabled'));
         else item.combo.split(' · ').forEach(function (combo) { keys.appendChild(el('kbd', 'shortcut-key', combo)); });
         row.appendChild(keys); card.appendChild(row);
       });
       root.appendChild(card);
     });
     var toggle = document.getElementById('shortcuts-toggle');
-    toggle.hidden = all.length === visible.length;
-    toggle.textContent = shortcutsExpanded ? S.showLess : S.showAll + ' · ' + all.length;
+    // Keep the collapse control visible after expansion. Compare against the
+    // collapsed/important count, not the currently rendered count (which equals all
+    // items when expanded).
+    toggle.hidden = !canExpand;
+    toggle.textContent = shortcutsExpanded ? S.showLess : S.showAll + ' · +' + (all.length - importantCount);
     toggle.setAttribute('aria-expanded', shortcutsExpanded ? 'true' : 'false');
   }
   document.getElementById('shortcuts-toggle').addEventListener('click', function () {
@@ -285,6 +294,7 @@ body {
     document.getElementById('shortcuts-title').textContent = st.shortcutTitle || S.shortcutTitle;
     document.getElementById('shortcuts-caption').textContent = st.shortcutCaption || S.shortcutCaption;
     S.showAll = st.showAll || S.showAll; S.showLess = st.showLess || S.showLess;
+    S.shortcutDisabled = st.shortcutDisabled || S.shortcutDisabled;
     q.placeholder = st.placeholder || '';
     q.setAttribute('aria-label', st.placeholder || '');
     document.getElementById('gicon').innerHTML = st.engineSvg || '';
