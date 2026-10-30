@@ -115,6 +115,46 @@ fn test_to_uri_search_engines() {
         to_uri("rust lang", "kagi"),
         "https://kagi.com/search?q=rust%20lang"
     );
+    assert_eq!(
+        to_uri("gh rust gtk", "google"),
+        "https://github.com/search?q=rust%20gtk"
+    );
+    assert_eq!(
+        to_uri("gl webkit", "google"),
+        "https://gitlab.com/search?search=webkit"
+    );
+    assert_eq!(
+        to_uri("mdn AbortController", "google"),
+        "https://developer.mozilla.org/en-US/search?q=AbortController"
+    );
+    assert_eq!(
+        to_uri("so gtk4-rs", "google"),
+        "https://stackoverflow.com/search?q=gtk4-rs"
+    );
+    assert_eq!(
+        to_uri("crates serde json", "google"),
+        "https://crates.io/search?q=serde%20json"
+    );
+    assert_eq!(
+        to_uri("npm vite", "google"),
+        "https://www.npmjs.com/search?q=vite"
+    );
+    assert_eq!(
+        to_uri("py pydantic", "google"),
+        "https://pypi.org/search/?q=pydantic"
+    );
+    assert_eq!(
+        to_uri("docker postgres", "google"),
+        "https://hub.docker.com/search?q=postgres"
+    );
+    assert_eq!(
+        to_uri("k8s ingress", "google"),
+        "https://kubernetes.io/search/?q=ingress"
+    );
+    assert_eq!(
+        to_uri("ghcode async rust", "google"),
+        "https://github.com/search?type=code&q=async%20rust"
+    );
     assert_eq!(to_uri("https://github.com", "google"), "https://github.com");
     assert_eq!(to_uri("github.com", "duckduckgo"), "https://github.com");
     assert_eq!(

@@ -133,6 +133,36 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
         }
     }
 
+    // Developer-friendly search aliases. These are intentionally checked before
+    // generic search handling, while real URLs / local paths above keep priority.
+    if let Some((alias, query)) = s.split_once(char::is_whitespace) {
+        let query = query.trim();
+        if !query.is_empty() {
+            let template = match alias.to_ascii_lowercase().as_str() {
+                "gh" | "github" => Some("https://github.com/search?q={}"),
+                "gl" | "gitlab" => Some("https://gitlab.com/search?search={}"),
+                "yt" | "youtube" => Some("https://www.youtube.com/results?search_query={}"),
+                "mdn" => Some("https://developer.mozilla.org/en-US/search?q={}"),
+                "so" | "stackoverflow" => Some("https://stackoverflow.com/search?q={}"),
+                "crates" => Some("https://crates.io/search?q={}"),
+                "docs" | "docsrs" => Some("https://docs.rs/releases/search?query={}"),
+                "npm" => Some("https://www.npmjs.com/search?q={}"),
+                "pypi" | "py" => Some("https://pypi.org/search/?q={}"),
+                "docker" => Some("https://hub.docker.com/search?q={}"),
+                "k8s" | "kubernetes" => Some("https://kubernetes.io/search/?q={}"),
+                "ghcode" => Some("https://github.com/search?type=code&q={}"),
+                "reddit" | "r" => Some("https://www.reddit.com/search/?q={}"),
+                "wiki" | "w" => Some("https://en.wikipedia.org/w/index.php?search={}"),
+                "maps" => Some("https://www.openstreetmap.org/search?query={}"),
+                _ => None,
+            };
+            if let Some(url) = template {
+                let encoded = glib::Uri::escape_string(query, None, false);
+                return url.replace("{}", &encoded);
+            }
+        }
+    }
+
     // 2. Protocols (http, https, about, data, blob)
     if s.contains("://")
         || s.starts_with("about:")

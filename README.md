@@ -96,6 +96,10 @@ Yoki ilovalar ro‘yxatidan (Rofi / Wofi / GNOME / KDE) **Rail** deb qidirib och
 | `F12` / `Alt + Shift + D` | DevTools / DevTools joylashuvini almashtirish |
 | `F11` | To‘liq ekran |
 | `Alt + Left` / `Alt + Right` | Orqaga / Oldinga |
+
+### Dasturchilar uchun tezkor qidiruv
+
+Manzil satrida alias + so'rov yozing: `gh rust async`, `mdn fetch`, `crates serde`, `npm vite`, `docker postgres`, `k8s ingress`. Qo'llab-quvvatlanadigan aliaslar: `gh`/`github`, `ghcode`, `gl`, `mdn`, `so`, `crates`, `docs`, `npm`, `py`/`pypi`, `docker`, `k8s`, `yt`, `r`, `w`, `maps`. Bu odatiy qidiruv tizimini o'zgartirmaydi; to'liq URL va lokal fayl yo'llari avvalgidek ustun turadi.
 | `Ctrl + Q` | Rail'dan chiqish |
 
 Overview ichida: `h` `j` `k` `l` — harakat, `Enter` — ochish, `x` — yopish, `Esc` — bekor qilish.
