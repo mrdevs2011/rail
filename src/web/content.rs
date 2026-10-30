@@ -8,7 +8,7 @@ pub(crate) const DEFAULT_HTML_CSS: &str = r###"/* ==============================
    RAIL · HTML.CSS — DEVELOPER STARTER KIT
    Luxury / Modern / Classic · Standards-first · WebKit compatible
 
-   This file is injected as a USER stylesheet on every website when saved.
+   This file is injected at AUTHOR cascade level when saved; the site can keep its own design.
    IMPORTANT: examples below are intentionally commented out. Enable only the
    rules you explicitly need. A universal reset can change a site's layout,
    controls, icons, SVGs, avatars, media sizing and accessibility behavior.
@@ -212,22 +212,70 @@ pub(crate) fn customize_dir() -> PathBuf {
     rail_data_dir().join(".railassets").join("customize")
 }
 
-/// Reads html.css; creates it from the built-in default the first time.
+/// Identifies the previous Rail-wide reset that could override site-authored CSS.
+fn is_legacy_global_reset(css: &str) -> bool {
+    css.contains("Rail HTML5 Default Standards & Base Stylesheet")
+        || css.contains("/* ===== 1. Box Sizing")
+        || css.contains("Rail leaves website styling untouched by default.")
+        || css.contains("font: -webkit-small-control")
+        || css.contains("/* ===== form controls ===== */")
+        || css.contains(
+            "Sites that set their own CSS still win; this layer only replaces the defaults.",
+        )
+}
+
+/// Preserve the old file before replacing it. Write-and-rename prevents a partial template
+/// if the process exits during migration. Existing backup is never overwritten.
+fn migrated_css_from_legacy(old_css: &str) -> String {
+    // Keep intentional user rules written after the old template's explicit custom area.
+    // The old built-in reset itself is discarded; the original full file is backed up.
+    const CUSTOM_MARKER: &str = "/* ===== 7. User Custom Overrides ===== */";
+    let custom = old_css
+        .find(CUSTOM_MARKER)
+        .map(|at| &old_css[at + CUSTOM_MARKER.len()..])
+        .unwrap_or("");
+    if css_has_active_content(custom) {
+        format!(
+            "{}\n/* Preserved user rules from the previous Rail html.css. */\n{}",
+            DEFAULT_HTML_CSS, custom
+        )
+    } else {
+        DEFAULT_HTML_CSS.to_string()
+    }
+}
+
+fn migrate_legacy_css(path: &Path, old_css: &str) -> Option<String> {
+    let dir = path.parent()?;
+    std::fs::create_dir_all(dir).ok()?;
+    let backup = dir.join("html.css.legacy-backup");
+    if !backup.exists() {
+        std::fs::write(&backup, old_css).ok()?;
+    }
+    let migrated = migrated_css_from_legacy(old_css);
+    let temp = dir.join("html.css.migrating");
+    if std::fs::write(&temp, &migrated).is_err() {
+        return None;
+    }
+    if std::fs::rename(&temp, path).is_err() {
+        let _ = std::fs::remove_file(&temp);
+        return None;
+    }
+    // Remove the stale sheet from every already-open tab in this process immediately.
+    apply_html_css(&migrated);
+    Some(migrated)
+}
+
+/// Reads html.css; creates it from the built-in developer template the first time.
 pub(crate) fn load_html_css() -> String {
     let path = html_css_path();
     match std::fs::read_to_string(&path) {
         Ok(text) => {
-            // Migrate away from legacy Chrome UA reset dump which forced `color: black;`
-            // on buttons/inputs and broke dark mode icons (e.g. YouTube mic and create buttons).
-            if text.contains("Rail leaves website styling untouched by default.")
-                || text.contains("Rail HTML5 Default Standards & Base Stylesheet")
-                || text.contains("/* ===== 1. Box Sizing")
-                || text.contains("font: -webkit-small-control")
-                || text.contains("/* ===== form controls ===== */")
-                || text.contains("Sites that set their own CSS still win; this layer only replaces the defaults.")
-            {
-                let _ = std::fs::write(&path, DEFAULT_HTML_CSS);
-                return DEFAULT_HTML_CSS.to_string();
+            if is_legacy_global_reset(&text) {
+                if let Some(migrated) = migrate_legacy_css(&path, &text) {
+                    return migrated;
+                }
+                // Fail safe: do not apply the known-bad old global reset if migration fails.
+                return String::new();
             }
             text
         }
@@ -235,23 +283,25 @@ pub(crate) fn load_html_css() -> String {
             if let Some(dir) = path.parent() {
                 let _ = std::fs::create_dir_all(dir);
             }
-            // First run after the move: carry over the old html.css from the data root.
+            // First run after the move: carry over a user file from the previous data root.
             let legacy = rail_data_dir().join("html.css");
-            let initial =
-                std::fs::read_to_string(&legacy).unwrap_or_else(|_| DEFAULT_HTML_CSS.to_string());
-            let initial = if initial.contains("Rail leaves website styling untouched by default.")
-                || initial.contains("Rail HTML5 Default Standards & Base Stylesheet")
-                || initial.contains("/* ===== 1. Box Sizing")
-                || initial.contains("font: -webkit-small-control")
-                || initial.contains("/* ===== form controls ===== */")
-                || initial.contains("Sites that set their own CSS still win; this layer only replaces the defaults.")
-            {
-                DEFAULT_HTML_CSS.to_string()
-            } else {
-                initial
+            let old = std::fs::read_to_string(&legacy).ok();
+            let initial = match old.as_deref() {
+                Some(css) if is_legacy_global_reset(css) => {
+                    let Some(migrated) = migrate_legacy_css(&path, css) else {
+                        return String::new();
+                    };
+                    let _ = std::fs::remove_file(&legacy);
+                    return migrated;
+                }
+                Some(css) => css.to_string(),
+                None => DEFAULT_HTML_CSS.to_string(),
             };
-            let _ = std::fs::write(&path, &initial);
-            if legacy.exists() {
+            let temp = path.with_file_name("html.css.migrating");
+            if std::fs::write(&temp, &initial).is_ok() {
+                let _ = std::fs::rename(&temp, &path);
+            }
+            if legacy.exists() && old.is_some() {
                 let _ = std::fs::remove_file(&legacy);
             }
             initial
@@ -259,11 +309,37 @@ pub(crate) fn load_html_css() -> String {
     }
 }
 
+/// Returns true only when the stylesheet contains tokens outside CSS comments.
+/// The built-in developer kit is a reference-only comment document and must never
+/// be injected into a page as an active stylesheet.
+pub(crate) fn css_has_active_content(css: &str) -> bool {
+    let bytes = css.as_bytes();
+    let mut i = 0;
+    let mut in_comment = false;
+    while i < bytes.len() {
+        if !in_comment && bytes[i..].starts_with(b"/*") {
+            in_comment = true;
+            i += 2;
+        } else if in_comment && bytes[i..].starts_with(b"*/") {
+            in_comment = false;
+            i += 2;
+        } else {
+            if !in_comment && !bytes[i].is_ascii_whitespace() {
+                return true;
+            }
+            i += 1;
+        }
+    }
+    false
+}
+
 pub(crate) fn user_style_sheet(css: &str) -> webkit6::UserStyleSheet {
     webkit6::UserStyleSheet::new(
         css,
         webkit6::UserContentInjectedFrames::AllFrames,
-        webkit6::UserStyleLevel::User,
+        // Site-authored rules win normal cascade conflicts; custom CSS cannot silently
+        // resize/replace a site's icons, avatars, controls or layout.
+        webkit6::UserStyleLevel::Author,
         &[],
         &[],
     )
@@ -278,7 +354,7 @@ pub(crate) fn apply_html_css(css: &str) -> usize {
         for w in list.iter() {
             if let Some(ucm) = w.upgrade() {
                 ucm.remove_all_style_sheets();
-                if !css.trim().is_empty() {
+                if css_has_active_content(css) {
                     ucm.add_style_sheet(&user_style_sheet(css));
                 }
                 applied += 1;
@@ -354,20 +430,10 @@ pub(crate) fn inject_web_optimizations(ucm: &webkit6::UserContentManager) {
     if (a && a.href) preconnectUrl(a.href);
   }, { passive: true, capture: true });
 
-  // 2. Zero-stale Realtime Guarantee with BFCache:
-  // When a page is restored from Back/Forward cache (event.persisted === true),
-  // immediately dispatch visibilitychange and online events. Modern web frameworks
-  // (React Query, SWR, Apollo, WebSockets, Next.js, SSE) silently revalidate dynamic feeds
-  // while keeping the instant 0ms cached page UI.
-  window.addEventListener('pageshow', function(e) {
-    if (e.persisted) {
-      try {
-        document.dispatchEvent(new Event('visibilitychange'));
-        window.dispatchEvent(new Event('online'));
-        window.dispatchEvent(new Event('focus'));
-      } catch(_) {}
-    }
-  }, false);
+  // Never synthesize visibilitychange/online/focus events on behalf of a site.
+  // Those events carry real browser state; faking them can trigger duplicate network
+  // requests, race Firestore/Firebase listeners and temporarily empty dynamic lists.
+  // WebKit dispatches the genuine lifecycle events when their state actually changes.
 
   // Do not monkey-patch addEventListener to force passive touch listeners.
   // Sites and web apps need to be able to call preventDefault() for nested scrolling,
@@ -497,4 +563,76 @@ pub(crate) fn inject_web_optimizations(ucm: &webkit6::UserContentManager) {
         &[],
     );
     ucm.add_script(&script);
+}
+
+#[cfg(test)]
+mod stylesheet_safety_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_global_reset_is_detected_but_developer_template_is_not() {
+        let legacy = "/* Rail HTML5 Default Standards & Base Stylesheet */\n:where(svg) { max-width: 100%; height: auto; }";
+        assert!(is_legacy_global_reset(legacy));
+        assert!(!is_legacy_global_reset(DEFAULT_HTML_CSS));
+        assert!(!is_legacy_global_reset(
+            ".my-site-card { border-radius: 12px; }"
+        ));
+    }
+
+    #[test]
+    fn built_in_developer_template_has_no_active_css_rules() {
+        assert!(!css_has_active_content(DEFAULT_HTML_CSS));
+        assert!(css_has_active_content(
+            ".custom-card { border-radius: 12px; }"
+        ));
+        // Tiny CSS-comment lexer: every default recipe must remain inside a valid comment.
+        // This prevents accidental global rules from leaking out of a nested/malformed comment.
+        let bytes = DEFAULT_HTML_CSS.as_bytes();
+        let mut index = 0;
+        let mut in_comment = false;
+        while index < bytes.len() {
+            if !in_comment && bytes[index..].starts_with(b"/*") {
+                in_comment = true;
+                index += 2;
+            } else if in_comment && bytes[index..].starts_with(b"*/") {
+                in_comment = false;
+                index += 2;
+            } else {
+                if !in_comment {
+                    assert!(
+                        bytes[index].is_ascii_whitespace(),
+                        "active CSS outside comments at byte {index}"
+                    );
+                }
+                index += 1;
+            }
+        }
+        assert!(!in_comment, "unclosed comment in developer CSS template");
+    }
+
+    #[test]
+    fn legacy_css_migration_preserves_backup_and_replaces_the_active_file() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "rail-css-migration-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("html.css");
+        let old_css = "/* Rail HTML5 Default Standards & Base Stylesheet */\nsvg { height: auto; }\n/* ===== 7. User Custom Overrides ===== */\n.my-panel { border-radius: 12px; }";
+        std::fs::write(&path, old_css).unwrap();
+
+        let migrated = migrate_legacy_css(&path, old_css).unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), migrated);
+        assert!(migrated.contains(".my-panel { border-radius: 12px; }"));
+        assert_eq!(
+            std::fs::read_to_string(dir.join("html.css.legacy-backup")).unwrap(),
+            old_css
+        );
+
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

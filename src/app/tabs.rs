@@ -120,7 +120,7 @@ impl App {
         ucm.add_script(&drop_image_user_script);
 
         let html_css = load_html_css();
-        if !html_css.trim().is_empty() {
+        if css_has_active_content(&html_css) {
             ucm.add_style_sheet(&user_style_sheet(&html_css));
         }
         crate::web::inject_web_optimizations(&ucm);

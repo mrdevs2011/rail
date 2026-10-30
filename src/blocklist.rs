@@ -1,7 +1,9 @@
 //! Ad and tracker blocking through WebKit's content filters.
 //!
-//! Third-party requests to the hosts below are blocked, plus a few obvious ad
-//! containers are hidden. Put extra hosts (one per line) in `blocklist.txt`.
+//! Third-party requests to known ad/tracker hosts below are blocked. Only
+//! high-confidence ad markers are hidden; generic class names are deliberately
+//! avoided because sites often reuse names such as `.advertisement` for real UI.
+//! Put extra hosts (one per line) in `blocklist.txt`.
 
 const HOSTS: &[&str] = &[
     // ad networks & exchanges
@@ -111,7 +113,6 @@ const HOSTS: &[&str] = &[
     "snap.licdn.com",
     "analytics.tiktok.com",
     "ads.tiktok.com",
-    "connect.facebook.net",
     "pixel.facebook.com",
     "an.facebook.com",
     "analytics.yahoo.com",
@@ -140,7 +141,6 @@ const HOSTS: &[&str] = &[
 /// Obvious ad containers; kept short on purpose so pages are not broken.
 const HIDE: &str = "ins.adsbygoogle, .adsbygoogle, [id^='google_ads_iframe'], [id^='div-gpt-ad'], \
 [id^='google_ads_'], iframe[src*='doubleclick.net'], iframe[src*='googlesyndication.com'], \
-.ad-slot, .ad-banner, .ad-container, .advert, .advertisement, .sponsored-ad, #ad-banner, \
 [data-ad-slot], [data-google-query-id]";
 
 fn json_str(s: &str) -> String {
@@ -166,11 +166,38 @@ fn host_rule(host: &str) -> String {
     )
 }
 
+/// Identity and core site hosts must never be added to the block list. Several of these
+/// domains also serve OAuth, profile photos, site assets and federated sign-in scripts.
+const PROTECTED_HOSTS: &[&str] = &[
+    "github.com",
+    "githubassets.com",
+    "githubusercontent.com",
+    "google.com",
+    "googleusercontent.com",
+    "gstatic.com",
+    "apple.com",
+    "icloud.com",
+    "microsoft.com",
+    "microsoftonline.com",
+    "live.com",
+    "outlook.com",
+    "office.com",
+    "facebook.com",
+    "connect.facebook.net",
+];
+
+fn is_protected_host(host: &str) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    PROTECTED_HOSTS
+        .iter()
+        .any(|protected| host == *protected || host.ends_with(&format!(".{protected}")))
+}
+
 /// The rule list in WebKit's content-blocker JSON format.
 pub fn rules_json(extra: &str) -> String {
     let mut rules: Vec<String> = HOSTS
         .iter()
-        .filter(|h| !h.contains('/'))
+        .filter(|h| !h.contains('/') && !is_protected_host(h))
         .map(|h| host_rule(h))
         .collect();
     for line in extra.lines() {
@@ -183,19 +210,58 @@ pub fn rules_json(extra: &str) -> String {
         if !h.is_empty()
             && h.chars()
                 .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+            && !is_protected_host(h)
         {
             rules.push(host_rule(h));
         }
-    }
-    for path in ["/pagead/ads", "/pagead/js"] {
-        rules.push(format!(
-            "{{\"trigger\":{{\"url-filter\":{}}},\"action\":{{\"type\":\"block\"}}}}",
-            json_str(path)
-        ));
     }
     rules.push(format!(
         "{{\"trigger\":{{\"url-filter\":\".*\"}},\"action\":{{\"type\":\"css-display-none\",\"selector\":{}}}}}",
         json_str(HIDE)
     ));
     format!("[{}]", rules.join(","))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hides_only_high_confidence_ad_markers() {
+        let rules = rules_json("");
+        assert!(rules.contains("ins.adsbygoogle"));
+        assert!(rules.contains("[data-ad-slot]"));
+        assert!(!rules.contains(".ad-container"));
+        assert!(!rules.contains(".advertisement"));
+        assert!(!rules.contains(".advert,"));
+        assert!(!rules.contains("\"url-filter\":\"/pagead/ads\""));
+        assert!(!rules.contains("\"url-filter\":\"/pagead/js\""));
+        for protected_host in [
+            "github\\.com",
+            "githubassets\\.com",
+            "githubusercontent\\.com",
+            "accounts\\.google\\.com",
+            "gstatic\\.com",
+            "appleid\\.apple\\.com",
+            "apple\\.com",
+            "icloud\\.com",
+        ] {
+            assert!(
+                !rules.contains(protected_host),
+                "identity host was blocked: {protected_host}"
+            );
+        }
+        let protected_custom = rules_json(
+            "github.com\naccounts.google.com\nappleid.apple.com\nconnect.facebook.net\ntracker.example",
+        );
+        assert!(!protected_custom.contains("github\\.com"));
+        assert!(!protected_custom.contains("accounts\\.google"));
+        assert!(!protected_custom.contains("appleid\\.apple"));
+        assert!(!protected_custom.contains("connect\\.facebook"));
+        assert!(protected_custom.contains("tracker"));
+        assert!(
+            crate::minijson::parse(&rules).is_some(),
+            "content-blocker JSON must remain valid"
+        );
+    }
 }
