@@ -76,9 +76,6 @@ pub(crate) fn sc_open_picker(
     pop.set_parent(&ui.picker_host);
     pop.set_position(gtk::PositionType::Bottom);
     // Point at the button the user clicked
-    if let Some(p) = anchor.compute_bounds(&ui.picker_host) {
-        // popover relative to host is fine; MenuButton-style is simpler:
-    }
     let _ = anchor; // anchor via set_parent of a transient
     let grid = gtk::Grid::new();
     grid.set_row_spacing(3);
@@ -397,7 +394,7 @@ pub(crate) fn sc_build(ui: &ScUi) {
                 if ui3.is_syncing.get() {
                     return;
                 }
-                let n = ((sel.get() + 1) % SC_MODS.len() as u32);
+                let n = (sel.get() + 1) % SC_MODS.len() as u32;
                 sel.set(n);
                 mod_btn2.set_label(SC_MODS[n as usize]);
                 let is_f = key.len() >= 2

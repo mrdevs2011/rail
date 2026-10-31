@@ -405,7 +405,7 @@ impl App {
 
     pub(crate) fn set_tab_width(&self, r: usize, c: usize, width: f64) {
         let vw = self.strip.width() as f64;
-        let clamped = width.clamp(280.0, vw);
+        let clamped = clamp_column_width(width, vw);
         let rows = self.rows.borrow();
         if let Some(row) = rows.get(r) {
             if let Some(tab) = row.tabs.get(c) {
@@ -479,11 +479,27 @@ impl App {
             custom_heights.push(row_heights);
             col_ids.push(row_ids);
         }
+        let tabbed_columns: Vec<Vec<bool>> = rows
+            .iter()
+            .map(|row| {
+                row.tabs
+                    .iter()
+                    .enumerate()
+                    .map(|(index, _)| {
+                        let (head, _) = row.col_span(index);
+                        row.tabs[head].tabbed.get()
+                    })
+                    .collect()
+            })
+            .collect();
         drop(rows);
         self.layout.set_grid(grid);
         self.layout.set_custom_widths(custom_widths);
         self.layout.set_custom_heights(custom_heights);
         self.layout.set_col_ids(col_ids);
+        self.layout.set_tabbed_columns(tabbed_columns);
+        self.layout
+            .set_focus(self.focus_row.get(), self.focus_col.get());
         self.strip.queue_allocate();
     }
 

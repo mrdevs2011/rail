@@ -32,8 +32,30 @@ pub(crate) const STATIC_ACTIONS: &[&str] = &[
     "move_right",
     "move_down",
     "move_up",
+    "focus_workspace_up",
+    "focus_workspace_down",
+    "focus_column_first",
+    "focus_column_last",
+    "move_column_first",
+    "move_column_last",
+    "move_column_workspace_up",
+    "move_column_workspace_down",
+    "move_workspace_up",
+    "move_workspace_down",
+    "column_width_preset",
+    "column_width_down",
+    "column_width_up",
+    "column_expand",
+    "window_height_preset",
+    "window_height_reset",
+    "window_height_down",
+    "window_height_up",
+    "column_tabbed",
+    "center_column",
+    "center_visible_columns",
     "next_tab",
     "prev_tab",
+    "consume_into_left",
     "stack_left",
     "stack_right",
     "settings",
@@ -77,20 +99,6 @@ impl App {
             return Some(0);
         }
         None
-    }
-
-    /// Zoom the focused tab: `dir` > 0 in, < 0 out, 0 reset to 100%.
-    /// Always base the next step on WebKit's live zoom level so pinch gestures and keyboard
-    /// zoom stay in sync. Opposite directions are never dropped by a shared debounce timer.
-    pub(crate) fn page_zoom(self: &Rc<Self>, dir: i32) {
-        let Some(v) = self.focused_view() else { return };
-        let cur = v.zoom_level();
-        let z = if dir == 0 {
-            1.0
-        } else {
-            next_page_zoom(cur, dir)
-        };
-        v.set_zoom_level(z);
     }
 
     // ---- actions ---------------------------------------------------------
@@ -165,8 +173,30 @@ impl App {
             "move_right" => self.move_column(1),
             "move_up" => self.move_window_vertical(-1),
             "move_down" => self.move_window_vertical(1),
+            "focus_workspace_up" => self.focus_workspace_relative(-1),
+            "focus_workspace_down" => self.focus_workspace_relative(1),
+            "consume_into_left" => self.consume_window_into_column(-1),
             "stack_left" => self.consume_or_expel(-1),
             "stack_right" => self.consume_or_expel(1),
+            "focus_column_first" => self.focus_column_edge(false),
+            "focus_column_last" => self.focus_column_edge(true),
+            "move_column_first" => self.move_column_edge(false),
+            "move_column_last" => self.move_column_edge(true),
+            "move_column_workspace_up" => self.move_to_workspace_relative(-1, true),
+            "move_column_workspace_down" => self.move_to_workspace_relative(1, true),
+            "move_workspace_up" => self.move_workspace(-1),
+            "move_workspace_down" => self.move_workspace(1),
+            "column_width_preset" => self.cycle_column_width_preset(),
+            "column_width_down" => self.adjust_column_width(-1),
+            "column_width_up" => self.adjust_column_width(1),
+            "column_expand" => self.expand_column_to_available_width(),
+            "window_height_preset" => self.cycle_window_height_preset(),
+            "window_height_reset" => self.reset_window_height(),
+            "window_height_down" => self.adjust_window_height(-1),
+            "window_height_up" => self.adjust_window_height(1),
+            "column_tabbed" => self.toggle_column_tabbed(),
+            "center_column" => self.center_focused_column(),
+            "center_visible_columns" => self.center_visible_columns(),
             // ---- panels ----
             "settings" => self.toggle_settings_modal(),
             "profiles" => {
@@ -215,27 +245,9 @@ impl App {
             "fullscreen" => self.win.set_fullscreened(!self.win.is_fullscreen()),
             "quit" => self.win.close(),
             // ---- zoom: overview ichida grid, aks holda sahifa ----
-            "overview_zoom_in" => {
-                if self.overview_open() {
-                    self.overview_zoom_by(1.06);
-                } else {
-                    self.page_zoom(1);
-                }
-            }
-            "overview_zoom_out" => {
-                if self.overview_open() {
-                    self.overview_zoom_by(1.0 / 1.06);
-                } else {
-                    self.page_zoom(-1);
-                }
-            }
-            "zoom_reset" => {
-                if self.overview_open() {
-                    self.overview_zoom_by(OV_ZOOM / self.target_zoom.get());
-                } else {
-                    self.page_zoom(0);
-                }
-            }
+            "overview_zoom_in" => self.zoom_step(1),
+            "overview_zoom_out" => self.zoom_step(-1),
+            "zoom_reset" => self.zoom_step(0),
             // ---- find in page ----
             "find" => return self.find_open(),
             "find_next" => return self.find_step(true),

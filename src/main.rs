@@ -30,13 +30,13 @@ use gtk::{gdk, gio};
 use gtk4 as gtk;
 use history::{HistoryManager, HistorySuggestion, SuggestionKind};
 use profile::ProfileManager;
-use spring::{SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS, Spring, coast_distance};
+use spring::{SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS, Spring};
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::OnceLock;
 use std::time::Duration;
-use strip::{SIDE_W, ShellLayout, StripLayout, col_width, gap, group_ranges, stack_height};
+use strip::{SIDE_W, ShellLayout, StripLayout, col_width, gap, group_ranges};
 use webkit6::prelude::*;
 use webkit6::{
     ContextMenu, ContextMenuAction, ContextMenuItem, HitTestResult, ScriptDialog, ScriptDialogType,

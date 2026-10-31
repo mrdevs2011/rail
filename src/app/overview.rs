@@ -44,7 +44,7 @@ impl App {
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
         if vw <= 1.0 || vh <= 1.0 {
-            let z = self.ov_user_zoom.get().clamp(OV_ZOOM_MIN, OV_ZOOM_MAX);
+            let z = overview_scale(self.ov_user_zoom.get());
             self.target_zoom.set(z);
             self.ensure_overview_previews();
             self.animate();
@@ -60,7 +60,7 @@ impl App {
         // Niri's center-focused-column="never": keep the old viewport center while zooming.
         // The focused tile is moved only if it would otherwise be outside the overview viewport;
         // half-width columns never snap to the center.
-        let z = self.ov_user_zoom.get().clamp(OV_ZOOM_MIN, OV_ZOOM_MAX);
+        let z = overview_scale(self.ov_user_zoom.get());
         let (fx, fy) = self.overview_offsets_at_zoom(z);
         self.target_x.set(fx);
         self.target_y.set(fy);
@@ -178,22 +178,35 @@ impl App {
         }
     }
 
-    /// Ctrl+/- or pinch: change overview scale (clamped), keep framing on the focused tab.
+    /// Ctrl+/- or pinch: change the user-facing overview scale (20%-500%).
+    /// `ov_user_zoom` is normalized around 1.0, while `OV_ZOOM` is only the physical 100% base.
     pub(crate) fn overview_zoom_by(self: &Rc<Self>, factor: f64) {
+        if !self.ov.get() || self.ov_exiting.get() || !factor.is_finite() || factor <= 0.0 {
+            return;
+        }
+        let current = self.ov_user_zoom.get();
+        let next = scale_zoom(current, factor, OV_ZOOM_MIN, OV_ZOOM_MAX);
+        if (next - current).abs() < 1e-7 {
+            return;
+        }
+        self.ov_user_zoom.set(next);
+        let physical_scale = overview_scale(next);
+        self.target_zoom.set(physical_scale);
+        let (fx, fy) = self.overview_offsets_at_zoom(physical_scale);
+        self.target_x.set(fx);
+        self.target_y.set(fy);
+        self.show_zoom_indicator(next * 100.0);
+        self.animate();
+    }
+
+    /// Reset overview to its native 100% scale, independent of the physical overview base.
+    pub(crate) fn reset_overview_zoom(self: &Rc<Self>) {
         if !self.ov.get() || self.ov_exiting.get() {
             return;
         }
-        let z0 = self.target_zoom.get();
-        let z1 = (z0 * factor).clamp(OV_ZOOM_MIN, OV_ZOOM_MAX);
-        if (z1 - z0).abs() < 0.001 {
-            return;
-        }
-        self.ov_user_zoom.set(z1);
-        self.target_zoom.set(z1);
-        let (fx, fy) = self.overview_offsets_at_zoom(z1);
-        self.target_x.set(fx);
-        self.target_y.set(fy);
-        self.animate();
+        let current = self.ov_user_zoom.get();
+        self.overview_zoom_by(1.0 / current.max(OV_ZOOM_MIN));
+        self.show_zoom_indicator(100.0);
     }
 
     pub(crate) fn cancel_overview(self: &Rc<Self>) {
@@ -222,10 +235,40 @@ impl App {
             if unscaled_y >= row_y && unscaled_y <= row_y + vh {
                 for (start, len, x, w) in row_cols(row, vw, g) {
                     if unscaled_x >= x && unscaled_x <= x + w {
-                        let h = stack_height(vh, len, g);
-                        let j = (((unscaled_y - row_y) / (h + g)).floor().max(0.0) as usize)
-                            .min(len - 1);
-                        hit = Some((r_idx, start + j));
+                        let head = &row.tabs[start];
+                        if head.tabbed.get() {
+                            let active = if self.focus_row.get() == r_idx
+                                && self.focus_col.get() >= start
+                                && self.focus_col.get() < start + len
+                            {
+                                self.focus_col.get()
+                            } else {
+                                start
+                            };
+                            hit = Some((r_idx, active));
+                        } else if len == 1 {
+                            hit = Some((r_idx, start));
+                        } else {
+                            let weights: Vec<f64> = (start..start + len)
+                                .map(|index| {
+                                    row.tabs[index]
+                                        .custom_height
+                                        .get()
+                                        .unwrap_or(1.0 / len as f64)
+                                })
+                                .collect();
+                            let available = (vh - (len as f64 - 1.0) * g).max(1.0);
+                            let heights =
+                                distribute_height_weights(&weights, available, MIN_WINDOW_HEIGHT);
+                            let mut top = row_y;
+                            for (index, window_height) in heights.into_iter().enumerate() {
+                                if unscaled_y <= top + window_height {
+                                    hit = Some((r_idx, start + index));
+                                    break;
+                                }
+                                top += window_height + g;
+                            }
+                        }
                         break;
                     }
                 }

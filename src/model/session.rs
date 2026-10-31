@@ -8,6 +8,9 @@ pub(crate) struct SessionTabItem {
     pub(crate) profile_id: String,
     pub(crate) url: String,
     pub(crate) custom_width: Option<f64>,
+    /// Column-relative vertical share (0.0..=1.0), stable across viewport resizes.
+    pub(crate) custom_height: Option<f64>,
+    pub(crate) tabbed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -59,6 +62,10 @@ pub(crate) fn parse_session_content(content: &str) -> SessionState {
                 let pid = parts[4].to_string();
                 let url = parts[5].to_string();
                 let custom_width = parts.get(6).and_then(|s| s.parse::<f64>().ok());
+                let custom_height = parts
+                    .get(7)
+                    .and_then(|s| s.parse::<f64>().ok())
+                    .filter(|height| height.is_finite() && *height > 0.0 && *height <= 1.0);
                 tabs.push(SessionTabItem {
                     row: r,
                     col: c,
@@ -66,6 +73,8 @@ pub(crate) fn parse_session_content(content: &str) -> SessionState {
                     profile_id: pid,
                     url,
                     custom_width,
+                    custom_height,
+                    tabbed: parts.get(8).is_some_and(|value| *value == "1"),
                 });
             }
             "tab" if parts.len() == 4 => {
@@ -79,6 +88,8 @@ pub(crate) fn parse_session_content(content: &str) -> SessionState {
                     profile_id: pid,
                     url,
                     custom_width: None,
+                    custom_height: None,
+                    tabbed: false,
                 });
             }
             "stack" if parts.len() >= 3 => {

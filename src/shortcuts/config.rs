@@ -93,6 +93,127 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
         "Move window Up",
         ["Alt+Shift+K", "Alt+Shift+Up"]
     ),
+    sc!(
+        "focus_workspace_up",
+        G_TABS,
+        "Focus workspace above",
+        ["Alt+Page_Up"]
+    ),
+    sc!(
+        "focus_workspace_down",
+        G_TABS,
+        "Focus workspace below",
+        ["Alt+Page_Down"]
+    ),
+    sc!(
+        "focus_column_first",
+        G_TABS,
+        "Focus first column",
+        ["Alt+Home"]
+    ),
+    sc!(
+        "focus_column_last",
+        G_TABS,
+        "Focus last column",
+        ["Alt+End"]
+    ),
+    sc!(
+        "move_column_first",
+        G_TABS,
+        "Move column to first position",
+        ["Alt+Ctrl+Home"]
+    ),
+    sc!(
+        "move_column_last",
+        G_TABS,
+        "Move column to last position",
+        ["Alt+Ctrl+End"]
+    ),
+    sc!(
+        "move_column_workspace_up",
+        G_TABS,
+        "Move column to workspace above",
+        ["Alt+Shift+I"]
+    ),
+    sc!(
+        "move_column_workspace_down",
+        G_TABS,
+        "Move column to workspace below",
+        ["Alt+Shift+U"]
+    ),
+    sc!(
+        "move_workspace_up",
+        G_TABS,
+        "Move workspace up",
+        ["Alt+Ctrl+I"]
+    ),
+    sc!(
+        "move_workspace_down",
+        G_TABS,
+        "Move workspace down",
+        ["Alt+Ctrl+U"]
+    ),
+    sc!(
+        "column_width_preset",
+        G_TABS,
+        "Cycle column width preset (50% / 100%)",
+        ["Alt+Shift+F"]
+    ),
+    sc!(
+        "column_width_down",
+        G_TABS,
+        "Decrease column width by 10%",
+        ["Alt+minus"]
+    ),
+    sc!(
+        "column_width_up",
+        G_TABS,
+        "Increase column width by 10%",
+        ["Alt+equal"]
+    ),
+    sc!(
+        "column_expand",
+        G_TABS,
+        "Expand column to available width",
+        ["Alt+Ctrl+F"]
+    ),
+    sc!(
+        "window_height_preset",
+        G_TABS,
+        "Cycle window height preset",
+        ["Alt+Shift+R"]
+    ),
+    sc!(
+        "window_height_reset",
+        G_TABS,
+        "Reset stacked window heights",
+        ["Alt+Ctrl+R"]
+    ),
+    sc!(
+        "window_height_down",
+        G_TABS,
+        "Decrease window height by 10%",
+        ["Alt+Shift+minus"]
+    ),
+    sc!(
+        "window_height_up",
+        G_TABS,
+        "Increase window height by 10%",
+        ["Alt+Shift+equal"]
+    ),
+    sc!(
+        "column_tabbed",
+        G_TABS,
+        "Toggle tabbed column display",
+        ["Alt+W"]
+    ),
+    sc!("center_column", G_TABS, "Center focused column", ["Alt+C"]),
+    sc!(
+        "center_visible_columns",
+        G_TABS,
+        "Center visible columns",
+        ["Alt+Ctrl+C"]
+    ),
     sc!("next_tab", G_TABS, "Cycle to next tab", ["Ctrl+Tab"]),
     sc!(
         "prev_tab",
@@ -105,6 +226,12 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
         G_TABS,
         "Reopen last closed tab",
         ["Ctrl+Shift+T"]
+    ),
+    sc!(
+        "consume_into_left",
+        G_TABS,
+        "Consume window into left column",
+        ["Alt+,"]
     ),
     sc!(
         "stack_left",

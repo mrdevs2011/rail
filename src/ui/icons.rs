@@ -124,10 +124,6 @@ pub(crate) fn load_search_engine_icon(engine: &str, size: i32) -> gtk::Image {
     load_icon(canonical_search_engine(engine), size)
 }
 
-pub(crate) fn create_google_icon(size: i32) -> gtk::Image {
-    load_icon("google", size)
-}
-
 pub(crate) fn create_gear_icon(size: i32) -> gtk::Image {
     load_icon("gear", size)
 }

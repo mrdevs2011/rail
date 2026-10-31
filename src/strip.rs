@@ -1,6 +1,7 @@
 //! The niri-style 2D tiled layout: a custom GTK layout manager that places
 //! columns horizontally and rows (workspaces) vertically, sliding by (offset_x, offset_y).
 
+use crate::{MIN_WINDOW_HEIGHT, clamp_column_width, distribute_height_weights};
 use gtk::glib;
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
@@ -52,14 +53,6 @@ pub fn col_width_animated(progress: f64, viewport: f64) -> f64 {
     normal_w + (full_w - normal_w) * p
 }
 
-/// Height of one window inside a column that stacks `k` windows (niri-style column).
-pub fn stack_height(vh: f64, k: usize, g: f64) -> f64 {
-    if k <= 1 {
-        return vh;
-    }
-    ((vh - (k as f64 - 1.0) * g) / k as f64).max(80.0)
-}
-
 /// Consecutive equal ids form one column: returns (start, len) of every column.
 pub fn group_ranges(ids: &[u64]) -> Vec<(usize, usize)> {
     let mut out = Vec::new();
@@ -102,8 +95,12 @@ mod imp {
         pub current_grid: RefCell<Vec<Vec<f64>>>,
         /// Custom widths per column in each row
         pub custom_widths: RefCell<Vec<Vec<Option<f64>>>>,
-        /// Custom heights per tab (stack splits); None = equal share
+        /// Relative window-height weights per tab; None = the column's equal-share default.
         pub custom_heights: RefCell<Vec<Vec<Option<f64>>>>,
+        /// True for every member of a column displayed as a tabbed stack.
+        pub tabbed_columns: RefCell<Vec<Vec<bool>>>,
+        /// Current focus is needed to select the visible member of tabbed columns.
+        pub focused: Cell<(usize, usize)>,
         /// Per row: column id of every tab. Consecutive equal ids are stacked in one column.
         pub col_ids: RefCell<Vec<Vec<u64>>>,
         /// Sahifa elementi (video va h.k.) to'liq ekran: shu tab butun oynani egallaydi,
@@ -194,6 +191,9 @@ mod imp {
             let cur_prog = self.current_grid.borrow();
             let c_widths = self.custom_widths.borrow();
             let c_heights = self.custom_heights.borrow();
+            let tabbed_columns = self.tabbed_columns.borrow();
+            let focused = self.focused.get();
+            let visibility_cb = self.on_visibility.borrow().clone();
             let mut child = widget.first_child();
             let focus = widget.root().and_then(|r| r.focus());
 
@@ -260,7 +260,7 @@ mod imp {
                     let cw = if let Some(Some(cw_val)) =
                         c_widths.get(r_idx).and_then(|r| r.get(start))
                     {
-                        cw_val.clamp(280.0, vw)
+                        clamp_column_width(*cw_val, vw)
                     } else {
                         let prog = cur_prog
                             .get(r_idx)
@@ -269,42 +269,63 @@ mod imp {
                             .unwrap_or(if is_full { 1.0 } else { 0.0 });
                         col_width_animated(prog, vw)
                     };
-                    // Per-tab heights inside a stacked column (drag-resizable)
-                    let equal_h = stack_height(vh, len, g);
-                    let mut hs: Vec<f64> = (0..len)
+                    let tabbed = tabbed_columns
+                        .get(r_idx)
+                        .and_then(|row| row.get(start))
+                        .copied()
+                        .unwrap_or(false);
+                    let active_tab =
+                        if focused.0 == r_idx && focused.1 >= start && focused.1 < start + len {
+                            focused.1 - start
+                        } else {
+                            0
+                        };
+
+                    // Window heights are stored as ratios, not pixels. The same weights
+                    // therefore survive output/window resizes without accumulating drift.
+                    let weights: Vec<f64> = (0..len)
                         .map(|j| {
                             c_heights
                                 .get(r_idx)
                                 .and_then(|r| r.get(start + j))
                                 .copied()
                                 .flatten()
-                                .unwrap_or(equal_h)
+                                .unwrap_or(1.0 / len.max(1) as f64)
                         })
                         .collect();
-                    if len > 1 {
-                        let target = (vh - (len as f64 - 1.0) * g).max(80.0 * len as f64);
-                        let sum: f64 = hs.iter().sum();
-                        if sum > 1.0 && (sum - target).abs() > 0.5 {
-                            let scale = target / sum;
-                            for h in &mut hs {
-                                *h = (*h * scale).max(80.0);
-                            }
-                        }
-                    }
+                    let hs = if tabbed || len == 1 {
+                        vec![vh; len]
+                    } else {
+                        let available = (vh - (len as f64 - 1.0) * g).max(1.0);
+                        distribute_height_weights(&weights, available, MIN_WINDOW_HEIGHT)
+                    };
                     let mut y_off = 0.0f64;
                     for j in 0..len {
                         let Some(c) = child else { break };
-                        let ch_f = if len == 1 { vh } else { hs[j] };
+                        let is_active = !tabbed || j == active_tab;
+                        if !is_active {
+                            if c.is_child_visible() {
+                                if let Some(callback) = &visibility_cb {
+                                    callback(&c, false);
+                                }
+                                c.set_child_visible(false);
+                            }
+                            child = c.next_sibling();
+                            continue;
+                        }
+                        if !c.is_child_visible() {
+                            c.set_child_visible(true);
+                            if let Some(callback) = &visibility_cb {
+                                callback(&c, true);
+                            }
+                        }
+                        let ch_f = if tabbed { vh } else { hs[j] };
                         let tx = ((col_x - off_x) * z) as f32;
                         let ty = ((row_y + y_off - off_y) * z) as f32;
                         let t = gsk::Transform::new()
                             .translate(&graphene::Point::new(tx, ty))
                             .scale(z as f32, z as f32);
-                        let ch = if len == 1 {
-                            height
-                        } else {
-                            ch_f.round() as i32
-                        };
+                        let ch = ch_f.round() as i32;
                         self.apply_visibility(
                             &c,
                             tx as f64,
@@ -316,7 +337,9 @@ mod imp {
                             focus.as_ref(),
                         );
                         c.allocate(cw.round() as i32, ch, -1, Some(t));
-                        y_off += ch_f + g;
+                        if !tabbed {
+                            y_off += ch_f + g;
+                        }
                         child = c.next_sibling();
                     }
                     col_x += cw + g;
@@ -393,6 +416,14 @@ impl StripLayout {
     }
     pub fn set_custom_heights(&self, heights: Vec<Vec<Option<f64>>>) {
         *self.imp().custom_heights.borrow_mut() = heights;
+    }
+    pub fn set_tabbed_columns(&self, columns: Vec<Vec<bool>>) {
+        *self.imp().tabbed_columns.borrow_mut() = columns;
+        self.layout_changed();
+    }
+    pub fn set_focus(&self, row: usize, column: usize) {
+        self.imp().focused.set((row, column));
+        self.layout_changed();
     }
     pub fn set_tab_height(&self, r_idx: usize, c_idx: usize, height: Option<f64>) {
         let imp = self.imp();
@@ -559,7 +590,7 @@ impl ShellLayout {
 
 #[cfg(test)]
 mod tests {
-    use super::{group_ranges, stack_height};
+    use super::group_ranges;
 
     #[test]
     fn consecutive_equal_ids_make_one_column() {
@@ -571,14 +602,6 @@ mod tests {
         assert!(group_ranges(&[]).is_empty());
         // equal ids that are not adjacent stay separate columns
         assert_eq!(group_ranges(&[1, 2, 1]), vec![(0, 1), (1, 1), (2, 1)]);
-    }
-
-    #[test]
-    fn stacked_windows_share_the_column_height() {
-        assert_eq!(stack_height(900.0, 1, 6.0), 900.0);
-        assert_eq!(stack_height(900.0, 2, 6.0), 447.0);
-        let h3 = stack_height(900.0, 3, 6.0);
-        assert!((3.0 * h3 + 2.0 * 6.0 - 900.0).abs() < 1e-9);
     }
 }
 

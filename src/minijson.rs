@@ -51,12 +51,6 @@ impl Json {
             _ => None,
         }
     }
-    pub fn as_obj(&self) -> Option<&[(String, Json)]> {
-        match self {
-            Json::Obj(items) => Some(items.as_slice()),
-            _ => None,
-        }
-    }
 }
 
 pub fn escape(s: &str) -> String {

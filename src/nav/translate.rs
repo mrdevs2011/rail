@@ -250,15 +250,6 @@ fn rebuild_url(host: &str, u: &glib::Uri, extra: &[(&str, &str)]) -> String {
     out
 }
 
-/// Page already served through Google Translate.
-pub(crate) fn is_translated_uri(uri: &str) -> bool {
-    glib::Uri::parse(uri, glib::UriFlags::NONE)
-        .ok()
-        .and_then(|u| u.host())
-        .map(|h| h.ends_with(".translate.goog"))
-        .unwrap_or(false)
-}
-
 /// Settings code -> code Google Translate expects ("zh" alone is ambiguous there).
 fn google_lang_code(code: &str) -> String {
     match code {

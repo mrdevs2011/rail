@@ -8,7 +8,6 @@ mod minimap;
 mod palette;
 mod settings;
 mod sidebar_header;
-mod toast;
 
 pub(crate) use close::*;
 pub(crate) use devtools::*;
@@ -18,4 +17,3 @@ pub(crate) use minimap::*;
 pub(crate) use palette::*;
 pub(crate) use settings::*;
 pub(crate) use sidebar_header::*;
-pub(crate) use toast::*;

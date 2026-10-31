@@ -122,6 +122,8 @@ impl App {
         self.focus_row.set(r_clamped);
         self.focus_col.set(c_clamped);
         self.row_last_col.borrow_mut().insert(r_clamped, c_clamped);
+        self.layout.set_focus(r_clamped, c_clamped);
+        self.strip.queue_allocate();
 
         for (ri, row) in rows.iter().enumerate() {
             for (ci, tab) in row.tabs.iter().enumerate() {
@@ -370,6 +372,35 @@ impl App {
         };
         if let Some(t) = target {
             self.focus_coords(r, t);
+        }
+    }
+
+    /// Focus a workspace without first traversing the windows stacked inside the current column.
+    pub(crate) fn focus_workspace_relative(self: &Rc<Self>, direction: i32) {
+        if direction == 0 {
+            return;
+        }
+        let target = self.focus_row.get() as isize + direction.signum() as isize;
+        if target < 0 {
+            return;
+        }
+        self.focus_row(target as usize);
+    }
+
+    /// Move the current focused tab/column to a workspace relative to its current row.
+    pub(crate) fn move_to_workspace_relative(self: &Rc<Self>, direction: i32, whole_column: bool) {
+        if direction == 0 {
+            return;
+        }
+        let target = self.focus_row.get() as isize + direction.signum() as isize;
+        if target < 0 {
+            return;
+        }
+        let target = target as usize;
+        if whole_column {
+            self.move_column_to_workspace(target);
+        } else {
+            self.move_tab_to_row(target);
         }
     }
 

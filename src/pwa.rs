@@ -17,7 +17,6 @@ use std::rc::Rc;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct PwaAppInfo {
-    pub id: String,
     pub name: String,
     pub url: String,
     pub icon_url: Option<String>,
@@ -201,71 +200,6 @@ Keywords=pwa;web;app;{id};\n",
         .spawn();
 
     Ok(final_icon)
-}
-
-/// List all installed PWAs
-pub(crate) fn list_installed_pwas() -> Vec<PwaAppInfo> {
-    let dir = pwa_apps_dir();
-    let mut list = Vec::new();
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return list;
-    };
-    for entry in entries.flatten() {
-        let meta_file = entry.path().join("app.json");
-        if let Ok(content) = std::fs::read_to_string(meta_file) {
-            if let Some(json) = crate::minijson::parse(&content) {
-                let id = json
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let name = json
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let url = json
-                    .get("url")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let icon_url = json
-                    .get("icon")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let theme_color = json
-                    .get("theme_color")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                if !name.is_empty() && !url.is_empty() {
-                    list.push(PwaAppInfo {
-                        id,
-                        name,
-                        url,
-                        icon_url,
-                        theme_color,
-                    });
-                }
-            }
-        }
-    }
-    list
-}
-
-/// Uninstall PWA
-pub(crate) fn uninstall_pwa_app(id: &str) -> Result<(), String> {
-    let desktop_file = desktop_applications_dir().join(format!("rail-pwa-{}.desktop", id));
-    if desktop_file.exists() {
-        let _ = std::fs::remove_file(&desktop_file);
-    }
-    let app_dir = pwa_apps_dir().join(id);
-    if app_dir.exists() {
-        let _ = std::fs::remove_dir_all(&app_dir);
-    }
-    let _ = std::process::Command::new("update-desktop-database")
-        .arg(desktop_applications_dir())
-        .spawn();
-    Ok(())
 }
 
 /// Open native PWA install confirmation dialog

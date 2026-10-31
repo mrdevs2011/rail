@@ -13,6 +13,8 @@ pub(crate) struct Tab {
     pub(crate) custom_width: Cell<Option<f64>>,
     /// Height inside a stacked column (None = equal share)
     pub(crate) custom_height: Cell<Option<f64>>,
+    /// Only meaningful on the first tab of a column: show one focused window with tabbed switching.
+    pub(crate) tabbed: Cell<bool>,
     /// Consecutive tabs of a row with the same id share one column, stacked vertically (like niri)
     pub(crate) col_id: Cell<u64>,
     /// Oxirgi ma'lum http(s) manzil. WebKit web process to'xtatilganda uri() ni tozalab yuboradi,
@@ -79,6 +81,7 @@ impl Tab {
     /// Width of a brand-new tab: full width, no manual size.
     pub(crate) fn reset_col_props(&self) {
         self.custom_width.set(None);
+        self.tabbed.set(false);
         set_full_class(&self.container, true);
     }
 }
@@ -105,6 +108,8 @@ impl Row {
     /// A column's width lives on its first tab; hands it over from one tab to another.
     pub(crate) fn move_col_props(&self, from: usize, to: usize) {
         let full = self.tabs[from].container.has_css_class("full");
+        let tabbed = self.tabs[from].tabbed.get();
+        self.tabs[to].tabbed.set(tabbed);
         self.tabs[to]
             .custom_width
             .set(self.tabs[from].custom_width.get());
@@ -118,6 +123,7 @@ impl Row {
             self.tabs[i].custom_width.get(),
             self.tabs[j].custom_width.get(),
         );
+        let (ti, tj) = (self.tabs[i].tabbed.get(), self.tabs[j].tabbed.get());
         let (fi, fj) = (
             self.tabs[i].container.has_css_class("full"),
             self.tabs[j].container.has_css_class("full"),
@@ -125,6 +131,8 @@ impl Row {
         self.tabs.swap(i, j);
         self.tabs[i].custom_width.set(wi);
         self.tabs[j].custom_width.set(wj);
+        self.tabs[i].tabbed.set(ti);
+        self.tabs[j].tabbed.set(tj);
         set_full_class(&self.tabs[i].container, fi);
         set_full_class(&self.tabs[j].container, fj);
     }
@@ -141,6 +149,8 @@ impl Row {
             }
         }
         let tab = self.tabs.remove(c);
+        tab.custom_height.set(None);
+        tab.tabbed.set(false);
         tab.col_id.set(new_col_id());
         tab
     }
@@ -161,19 +171,13 @@ pub(crate) fn step_cam_axis(
     slot: &Cell<Option<CamSpring>>,
     cur: f64,
     target: f64,
-    v0_hint: &Cell<f64>,
     now_us: i64,
 ) -> (f64, bool) {
-    let hint = v0_hint.replace(0.0);
     let mut cs = slot.get();
     match cs {
         Some(c) if (c.spring.to - target).abs() > 0.01 => {
             let t = (now_us - c.start_us) as f64 / 1e6;
-            let v = if hint != 0.0 {
-                hint
-            } else {
-                c.spring.velocity_at(t)
-            };
+            let v = c.spring.velocity_at(t);
             cs = Some(CamSpring {
                 spring: Spring::new(cur, target, v, SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS),
                 start_us: now_us,
@@ -181,7 +185,7 @@ pub(crate) fn step_cam_axis(
         }
         None if (cur - target).abs() > 0.01 => {
             cs = Some(CamSpring {
-                spring: Spring::new(cur, target, hint, SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS),
+                spring: Spring::new(cur, target, 0.0, SLIDE_DAMPING_RATIO, SLIDE_STIFFNESS),
                 start_us: now_us,
             });
         }
@@ -205,10 +209,12 @@ pub(crate) fn row_cols(row: &Row, vw: f64, g: f64) -> Vec<(usize, usize, f64, f6
     let mut x = 0.0;
     for (start, len) in row.columns() {
         let head = &row.tabs[start];
-        let w = head
-            .custom_width
-            .get()
-            .unwrap_or_else(|| col_width(head.container.has_css_class("full"), vw));
+        let w = clamp_column_width(
+            head.custom_width
+                .get()
+                .unwrap_or_else(|| col_width(head.container.has_css_class("full"), vw)),
+            vw,
+        );
         out.push((start, len, x, w));
         x += w + g;
     }

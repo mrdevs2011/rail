@@ -8,7 +8,6 @@ pub(crate) struct DevtoolsWidgets {
     pub(crate) devtools_detach_btn: gtk::Button,
     pub(crate) devtools_panel: gtk::Box,
     pub(crate) devtools_resize_handle: gtk::Box,
-    pub(crate) devtools_url_lbl: gtk::Label,
 }
 
 pub(crate) fn build_devtools() -> DevtoolsWidgets {
@@ -26,11 +25,6 @@ pub(crate) fn build_devtools() -> DevtoolsWidgets {
     let devtools_badge = gtk::Label::new(None);
     sc_bind_chip(&devtools_badge, "devtools");
     devtools_badge.add_css_class("devtools-badge");
-
-    let devtools_url_lbl = gtk::Label::new(None);
-    devtools_url_lbl.add_css_class("devtools-url-lbl");
-    devtools_url_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    devtools_url_lbl.set_max_width_chars(60);
 
     let dt_spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     dt_spacer.set_hexpand(true);
@@ -50,7 +44,6 @@ pub(crate) fn build_devtools() -> DevtoolsWidgets {
     devtools_header.append(&devtools_icon);
     devtools_header.append(&devtools_title);
     devtools_header.append(&devtools_badge);
-    devtools_header.append(&devtools_url_lbl);
     devtools_header.append(&dt_spacer);
     devtools_header.append(&devtools_detach_btn);
     devtools_header.append(&devtools_close_btn);
@@ -80,6 +73,5 @@ pub(crate) fn build_devtools() -> DevtoolsWidgets {
         devtools_detach_btn,
         devtools_panel,
         devtools_resize_handle,
-        devtools_url_lbl,
     }
 }

@@ -214,6 +214,21 @@ pub(crate) fn build(gapp: &gtk::Application) {
 
     let HintWidgets { load_bar, ov_hint } = build_hints();
 
+    // A compact, transient zoom readout shared by website zoom and spatial overview.
+    let zoom_indicator_label = gtk::Label::new(Some("100%"));
+    zoom_indicator_label.add_css_class("zoom-indicator-label");
+    let zoom_indicator = gtk::Revealer::new();
+    zoom_indicator.set_transition_type(gtk::RevealerTransitionType::Crossfade);
+    zoom_indicator.set_transition_duration(140);
+    zoom_indicator.add_css_class("zoom-indicator");
+    zoom_indicator.set_child(Some(&zoom_indicator_label));
+    zoom_indicator.set_halign(gtk::Align::End);
+    zoom_indicator.set_valign(gtk::Align::Start);
+    zoom_indicator.set_margin_top(12);
+    zoom_indicator.set_margin_end(12);
+    zoom_indicator.set_can_target(false);
+    zoom_indicator.set_reveal_child(false);
+
     let MinimapWidgets {
         map_close_btn,
         map_container,
@@ -228,12 +243,25 @@ pub(crate) fn build(gapp: &gtk::Application) {
         devtools_detach_btn,
         devtools_panel,
         devtools_resize_handle,
-        devtools_url_lbl,
     } = build_devtools();
 
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&shell));
     overlay.add_overlay(&load_bar);
+
+    // On narrow Niri columns the dock becomes an overlay, not a 260px reservation.
+    // This launcher keeps the actual page reachable when the sidebar is collapsed.
+    let responsive_sidebar_toggle = gtk::Button::from_icon_name("sidebar-show-symbolic");
+    responsive_sidebar_toggle.add_css_class("flat-icon");
+    responsive_sidebar_toggle.add_css_class("responsive-sidebar-toggle");
+    responsive_sidebar_toggle.set_tooltip_text(Some(tr("Show sidebar")));
+    responsive_sidebar_toggle.set_halign(gtk::Align::Start);
+    responsive_sidebar_toggle.set_valign(gtk::Align::Start);
+    responsive_sidebar_toggle.set_margin_start(8);
+    responsive_sidebar_toggle.set_margin_top(8);
+    responsive_sidebar_toggle.set_size_request(34, 34);
+    responsive_sidebar_toggle.set_visible(false);
+    overlay.add_overlay(&responsive_sidebar_toggle);
 
     // Browser-style link preview, anchored at the bottom-left of the content window.
     let hovered_link_label = gtk::Label::new(None);
@@ -266,12 +294,16 @@ pub(crate) fn build(gapp: &gtk::Application) {
     update::ensure_icon();
     gtk::Window::set_default_icon_name("rail");
     overlay.add_overlay(&update::build_card(&win));
+    // Added last so zoom feedback remains above page, DevTools and update surfaces.
+    overlay.add_overlay(&zoom_indicator);
 
     let app = Rc::new(App {
         win: win.clone(),
         shell: shell.clone(),
         shell_layout,
         side,
+        responsive_sidebar_toggle: responsive_sidebar_toggle.clone(),
+        responsive_layout: Cell::new(false),
         strip,
         layout: layout.clone(),
         brand_logo: brand_logo.clone(),
@@ -294,10 +326,13 @@ pub(crate) fn build(gapp: &gtk::Application) {
         last_entry_len: Cell::new(0),
         delete_key: Cell::new(false),
         ov_hint,
+        zoom_indicator: zoom_indicator.clone(),
+        zoom_indicator_label: zoom_indicator_label.clone(),
+        zoom_indicator_timer: RefCell::new(None),
         find_ui: RefCell::new(None),
         ov: Cell::new(false),
         ov_exiting: Cell::new(false),
-        ov_user_zoom: Cell::new(OV_ZOOM),
+        ov_user_zoom: Cell::new(1.0),
         ov_return: Cell::new((0, 0)),
         ov_saved_x: Cell::new(0.0),
         ov_saved_y: Cell::new(0.0),
@@ -309,10 +344,8 @@ pub(crate) fn build(gapp: &gtk::Application) {
         target_x: Cell::new(0.0),
         target_y: Cell::new(0.0),
         animating: Cell::new(false),
-        pan_alloc_pending: Cell::new(false),
         cam_spring_x: Cell::new(None),
         cam_spring_y: Cell::new(None),
-        cam_v0_x: Cell::new(0.0),
         anim_frozen: RefCell::new(Vec::new()),
         side_open: Cell::new(true),
         sidebar_auto: Cell::new(load_app_settings().sidebar_mode == "auto"),
@@ -333,7 +366,6 @@ pub(crate) fn build(gapp: &gtk::Application) {
         add_prof_btn: add_prof_btn.clone(),
         new_profile_color_idx,
         color_buttons: RefCell::new(color_btns),
-        ss_overlay: RefCell::new(None),
         last_saved_session: RefCell::new(String::new()),
         save_session_gen: Cell::new(0),
         data_modal_info_lbl: data_info_lbl.clone(),
@@ -351,9 +383,6 @@ pub(crate) fn build(gapp: &gtk::Application) {
         default_devtools_width: Cell::new(420),
         devtools_dock_side: Cell::new(devtools_dock_from_str(&initial_settings.devtools_dock)),
         devtools_panel: devtools_panel.clone(),
-        devtools_content_box: devtools_content_box.clone(),
-        devtools_resize_handle: devtools_resize_handle.clone(),
-        devtools_url_lbl: devtools_url_lbl.clone(),
         devtools_window: RefCell::new(None),
         qr_modal: RefCell::new(None),
         settings_modal: settings_modal.clone(),
@@ -408,6 +437,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
 
     let a = app.clone();
     layout.connect_resized(move || {
+        a.sync_responsive_sidebar();
         a.reveal_focus();
         if a.palette_open() {
             a.update_palette_size();
@@ -427,6 +457,13 @@ pub(crate) fn build(gapp: &gtk::Application) {
         footer_settings,
     );
     wire_sidebar_header(&app, head_back, head_forward, head_reload, head_close_side);
+
+    let a_responsive_toggle = app.clone();
+    responsive_sidebar_toggle.connect_clicked(move |_| {
+        a_responsive_toggle.set_sidebar(true);
+    });
+    let a_responsive_map = app.clone();
+    win.connect_map(move |_| a_responsive_map.sync_responsive_sidebar());
 
     let a_pwa = app.clone();
     app.pill_pwa_btn.connect_clicked(move |_| {
@@ -451,6 +488,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     wire_close(&app, win.clone());
 
     let restored = app.restore_session();
+    app.sync_responsive_sidebar();
     if let Some(url) = TARGET_URL.get() {
         let uri = to_uri(url, &app.search_engine.borrow());
         let can_reuse = {

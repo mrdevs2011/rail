@@ -3,13 +3,27 @@
 use crate::*;
 
 impl App {
+    /// Store a window's desired height as a column-relative ratio, not a pixel value.
+    /// This keeps Niri-style height presets stable when the output or Rail tile is resized.
     pub(crate) fn set_tab_stack_height(&self, r: usize, c: usize, height: f64) {
+        let viewport = self.strip.height() as f64;
+        let available = {
+            let rows = self.rows.borrow();
+            rows.get(r)
+                .filter(|row| c < row.tabs.len())
+                .map(|row| {
+                    let (start, end) = row.col_span(c);
+                    (viewport - (end - start - 1) as f64 * gap(1.0)).max(1.0)
+                })
+                .unwrap_or(viewport.max(1.0))
+        };
+        let ratio = (height / available).clamp(0.0, 1.0);
         let rows = self.rows.borrow();
         if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) {
-            tab.custom_height.set(Some(height.max(80.0)));
+            tab.custom_height.set(Some(ratio));
         }
         drop(rows);
-        self.layout.set_tab_height(r, c, Some(height.max(80.0)));
+        self.layout.set_tab_height(r, c, Some(ratio));
         self.strip.queue_allocate();
     }
 
@@ -36,6 +50,7 @@ impl App {
                     profile_id,
                     custom_width: Cell::new(None),
                     custom_height: Cell::new(None),
+                    tabbed: Cell::new(false),
                     col_id: Cell::new(new_col_id()),
                     saved_uri: RefCell::new(String::new()),
                     suspended: Cell::new(false),
@@ -73,6 +88,7 @@ impl App {
                         profile_id,
                         custom_width: Cell::new(None),
                         custom_height: Cell::new(None),
+                        tabbed: Cell::new(false),
                         col_id: Cell::new(new_col_id()),
                         saved_uri: RefCell::new(String::new()),
                         suspended: Cell::new(false),

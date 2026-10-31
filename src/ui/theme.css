@@ -31,6 +31,11 @@ button, modelbutton {
     text-shadow: none;
     transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
+/* Button foreground is inherited by its label; a global label color must not erase CTA contrast. */
+button label, modelbutton label {
+    color: inherit;
+}
+
 button:hover, modelbutton:hover {
     background: @rail_hover;
     background-image: none;
@@ -177,7 +182,7 @@ progressbar.load-bar progress {
 /* Sidebar: restrained navigation, clear active state, no ornamental chrome. */
 .side-bar {
     background: @rail_sidebar;
-    border-right: 1px solid @rail_line;
+    border-right: 1px solid @rail_line_strong;
     padding: 12px 9px 9px 10px;
     box-shadow: none;
 }
@@ -304,14 +309,35 @@ button.pill:hover {
     background: @rail_selected;
     color: @rail_text;
 }
-.btn-new-workspace, button.btn-make-active, button.btn-create-profile {
+/* New workspace is a quiet outlined action, not a solid white block. */
+.btn-new-workspace {
+    color: @rail_accent;
+    background: @rail_surface;
+    border: 1px dashed @rail_line_strong;
+    border-radius: 7px;
+    box-shadow: none;
+    cursor: pointer;
+}
+.btn-new-workspace label {
+    color: @rail_accent;
+}
+.btn-new-workspace:hover {
+    color: @rail_text;
+    background: @rail_hover;
+    border-color: @rail_accent;
+    border-style: solid;
+}
+.btn-new-workspace:hover label {
+    color: @rail_text;
+}
+button.btn-make-active, button.btn-create-profile {
     color: @rail_accent_contrast;
     background: @rail_accent;
     border: 1px solid @rail_accent;
     border-radius: 7px;
     box-shadow: none;
 }
-.btn-new-workspace:hover, button.btn-make-active:hover, button.btn-create-profile:hover {
+button.btn-make-active:hover, button.btn-create-profile:hover {
     background: @rail_line_strong;
     border-color: @rail_line_strong;
     color: @rail_text;
@@ -956,4 +982,37 @@ button.pill-pwa-btn:hover {
 .css-editor, .css-editor-gutter, .css-editor text {
     color: @rail_text;
     background: @rail_surface;
+}
+
+
+/* Narrow Niri columns: a small launcher floats above the full-width page. */
+button.responsive-sidebar-toggle {
+    color: @rail_text;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line_strong;
+    border-radius: 8px;
+    box-shadow: 0 5px 18px @rail_shadow;
+}
+button.responsive-sidebar-toggle:hover {
+    color: @rail_accent;
+    background: @rail_hover;
+    border-color: @rail_accent;
+}
+
+
+/* Shared browser/overview zoom feedback: quiet, legible, and never steals input. */
+.zoom-indicator {
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line_strong;
+    border-radius: 8px;
+    padding: 6px 10px;
+    box-shadow: 0 8px 24px @rail_shadow;
+}
+.zoom-indicator-label {
+    color: @rail_text;
+    font-family: 'Inter', 'Cantarell', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .02em;
 }

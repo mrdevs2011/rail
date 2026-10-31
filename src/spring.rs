@@ -2,22 +2,13 @@
 //!
 //! * `Spring` – closed-form damped spring evaluated at an absolute time `t` since it started,
 //!   so the result does not depend on the frame rate (no per-frame lerp).
-//! * `SwipeTracker` – keeps the last 150 ms of touchpad deltas to get a release velocity and
-//!   the point where the swipe would coast to.
 //!
 //! Values mirror niri's `horizontal-view-movement` (damping-ratio 1.0, stiffness 2200).
-
-use std::collections::VecDeque;
 
 /// Critically damped: no wobble, no sudden start.
 pub const SLIDE_DAMPING_RATIO: f64 = 1.0;
 /// Same stiffness as the user's niri `horizontal-view-movement`.
 pub const SLIDE_STIFFNESS: f64 = 2200.0;
-
-/// Touchpad deceleration used to project where a flick would stop (niri: 0.997 per ms).
-const DECELERATION_TOUCHPAD: f64 = 0.997;
-/// Only this much recent history is used to measure the release velocity.
-const HISTORY_SECS: f64 = 0.150;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Spring {
@@ -87,67 +78,6 @@ impl Spring {
     }
 }
 
-/// Distance a swipe released at `velocity` (px/s) keeps travelling before it would stop.
-pub fn coast_distance(velocity: f64) -> f64 {
-    -velocity / (1000.0 * DECELERATION_TOUCHPAD.ln())
-}
-
-#[derive(Debug, Default)]
-pub struct SwipeTracker {
-    history: VecDeque<(f64, f64)>, // (delta, time in seconds)
-}
-
-impl SwipeTracker {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn reset(&mut self) {
-        self.history.clear();
-    }
-
-    /// Adds a reading. Timestamps that go backwards are ignored.
-    pub fn push(&mut self, delta: f64, t: f64) {
-        if let Some(&(_, last)) = self.history.back() {
-            if t < last {
-                return;
-            }
-        }
-        self.history.push_back((delta, t));
-        while let Some(&(_, first)) = self.history.front() {
-            if t <= first + HISTORY_SECS {
-                break;
-            }
-            self.history.pop_front();
-        }
-    }
-
-    pub fn last_time(&self) -> Option<f64> {
-        self.history.back().map(|&(_, t)| t)
-    }
-
-    /// Units per second over the recent window.
-    pub fn velocity(&self) -> f64 {
-        let (Some(&(_, t0)), Some(&(_, t1))) = (self.history.front(), self.history.back()) else {
-            return 0.0;
-        };
-        let dt = t1 - t0;
-        if dt <= 0.0 {
-            return 0.0;
-        }
-        self.history.iter().map(|&(d, _)| d).sum::<f64>() / dt
-    }
-
-    /// Release velocity: counts the pause between the last event and the finger lifting,
-    /// so a swipe that stopped before release does not fling.
-    pub fn release_velocity(&mut self, idle_secs: f64) -> f64 {
-        if let Some(t) = self.last_time() {
-            self.push(0.0, t + idle_secs.max(0.0));
-        }
-        self.velocity()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,25 +103,5 @@ mod tests {
         let s = Spring::new(100.0, 0.0, 0.0, 1.0, 2200.0);
         assert_eq!(s.value_at(0.0), 100.0);
         assert!(s.velocity_at(0.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn tracker_velocity_and_idle() {
-        let mut t = SwipeTracker::new();
-        for i in 0..10 {
-            t.push(10.0, i as f64 * 0.01); // 1000 px/s
-        }
-        assert!((t.velocity() - 1000.0 * 10.0 / 9.0).abs() < 1.0);
-        let v = t.release_velocity(0.3);
-        assert!(
-            v.abs() < 1.0,
-            "long pause before release means no fling, got {v}"
-        );
-    }
-
-    #[test]
-    fn coast_matches_niri() {
-        // niri: v / -(1000 ln 0.997) ≈ 0.3328 s of travel
-        assert!((coast_distance(1000.0) - 332.8).abs() < 0.5);
     }
 }

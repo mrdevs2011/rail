@@ -35,7 +35,11 @@ pub(crate) fn wire_sidebar_header(
     // Cycle: fixed open ↔ auto (edge hover). Persisted to settings.json.
     let a = app.clone();
     head_mode.connect_clicked(move |_| {
-        a.cycle_sidebar_mode();
+        if a.responsive_layout.get() {
+            a.set_sidebar(false);
+        } else {
+            a.cycle_sidebar_mode();
+        }
     });
 
     // Edge-hover for auto mode: motion on the window captured before WebKit consumes it.

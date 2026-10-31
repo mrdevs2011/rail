@@ -1,4 +1,4 @@
-//! Window keyboard shortcuts.
+//! Window keyboard shortcuts and smooth, press-and-hold zoom.
 
 use crate::*;
 
@@ -9,14 +9,13 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     KEY_CTL.with(|k| *k.borrow_mut() = Some(keys.clone()));
     apply_shortcut_priority();
     sc_refresh_bound();
-    // Overview zoom uses a frame-rate-independent hold loop rather than relying on the
-    // desktop's keyboard-repeat delay (which may emit only one shortcut event).
-    let zoom_repeat_key: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
-    let zoom_repeat_source: Rc<RefCell<Option<glib::SourceId>>> = Rc::new(RefCell::new(None));
 
-    // WebKit consumes Ctrl+V before bubble-phase browser shortcuts run. Handle
-    // image paste in a dedicated capture-phase controller; plain text paste still
-    // proceeds to WebKit untouched.
+    // A held key is represented by its hardware keycode. A frame-clock callback checks
+    // that state instead of depending on OS key repeat or a cancellable timeout source.
+    let zoom_repeat_key: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
+
+    // WebKit consumes Ctrl+V before browser shortcuts run. Handle image paste in capture
+    // phase; plain text paste still proceeds to the focused WebView unchanged.
     let paste_keys = gtk::EventControllerKey::new();
     paste_keys.set_propagation_phase(gtk::PropagationPhase::Capture);
     let paste_app = app.clone();
@@ -25,17 +24,15 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
         if state.contains(M::CONTROL_MASK)
             && !state.intersects(M::ALT_MASK | M::SUPER_MASK | M::SHIFT_MASK)
             && (key == gdk::Key::v || key == gdk::Key::V || keycode == 55)
+            && (paste_app.try_paste_image() || paste_app.try_paste_files())
         {
-            if paste_app.try_paste_image() {
-                return glib::Propagation::Stop;
-            }
+            return glib::Propagation::Stop;
         }
         glib::Propagation::Proceed
     });
     win.add_controller(paste_keys);
 
-    // Web pages may consume Alt+Arrow before Rail's bubble-phase shortcuts run.
-    // Keep spatial focus navigation reliable with a narrow capture-phase handler.
+    // Web pages may consume Alt+Arrow. Keep Rail's spatial focus navigation reliable.
     let nav_keys = gtk::EventControllerKey::new();
     nav_keys.set_propagation_phase(gtk::PropagationPhase::Capture);
     let nav_app = app.clone();
@@ -61,99 +58,93 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     });
     win.add_controller(nav_keys);
 
-    let a = app.clone();
-    let zoom_key = zoom_repeat_key.clone();
-    let zoom_source = zoom_repeat_source.clone();
+    let app_key = app.clone();
+    let held_key = zoom_repeat_key.clone();
     keys.connect_key_pressed(move |_, key, keycode, state| {
-        // Ignore OS key-repeat events while our smooth overview zoom loop owns this key.
-        if zoom_key.get() == Some(keycode) {
+        // Repeated key-down events are ignored while the frame clock owns this key.
+        if held_key.get() == Some(keycode) {
             return glib::Propagation::Stop;
         }
 
-        // Omnibar / new-tab input: Esc must close it even if a shortcut map interferes
-        if key == gdk::Key::Escape && a.palette_open() {
-            a.cancel_palette();
+        // Omnibar / new-tab input: Esc must close it even if a shortcut map interferes.
+        if key == gdk::Key::Escape && app_key.palette_open() {
+            app_key.cancel_palette();
             return glib::Propagation::Stop;
         }
 
-        // Tugma qaysi amalga bog'langan (Settings > Customize > Shortcuts): standart ham, o'zgartirilgan ham
+        // Resolve the same customizable shortcut IDs used by Settings > Customize.
         let resolved = sc_resolve_any(&shortcut_combos(key, keycode, state));
-
-        // Let Ctrl+V reach WebKitGTK unchanged, matching the sibling Rail browser.
-        // Synthetic clipboard events are not trusted by sites such as ChatGPT.
-
-        // Do not globally suppress a key just because its keycode matches the previous
-        // press. GTK/WebKit can occasionally miss a release while focus moves between
-        // embedded views; that left `held` stuck and swallowed every later tap of the
-        // same shortcut. Let GTK's normal key-repeat policy handle held keys instead.
-
-        // Overview zoom hold direction must be captured before dispatch consumes the action.
-        let overview_repeat_dir = if a.overview_open() {
-            match &resolved {
-                ScResolve::Action("overview_zoom_in") => Some(1.0f64),
-                ScResolve::Action("overview_zoom_out") => Some(-1.0f64),
-                _ => None,
-            }
-        } else {
-            None
+        let zoom_direction = match &resolved {
+            ScResolve::Action("overview_zoom_in") => Some(1),
+            ScResolve::Action("overview_zoom_out") => Some(-1),
+            _ => None,
         };
 
-        // Hamma amal ID bo'yicha bajariladi: tugma o'zgartirilgan bo'lsa ham xuddi shu yo'l.
-        // `Unknown` — ro'yxatda yo'q tugma (Esc, overview ichidagi oddiy tugmalar, Shift+Enter ...).
+        if let Some(direction) = zoom_direction {
+            let was_overview = app_key.overview_open();
+            held_key.set(Some(keycode));
+
+            // A tap always means exactly one step. Continuous movement begins only after
+            // the explicit hold delay, so a short press can never run to either zoom limit.
+            app_key.zoom_step(direction);
+
+            let weak_app = Rc::downgrade(&app_key);
+            let held = held_key.clone();
+            let started_at = glib::monotonic_time();
+            let last_frame = Cell::new(None::<i64>);
+            app_key.strip.add_tick_callback(move |_, clock| {
+                if held.get() != Some(keycode) {
+                    return glib::ControlFlow::Break;
+                }
+                let Some(app) = weak_app.upgrade() else {
+                    return glib::ControlFlow::Break;
+                };
+                // A mode change while the key is held ends this gesture; it never leaks
+                // from overview into a page (or vice versa).
+                if app.overview_open() != was_overview || (was_overview && app.ov_exiting.get()) {
+                    held.set(None);
+                    return glib::ControlFlow::Break;
+                }
+
+                let now = clock.frame_time();
+                if now - started_at < ZOOM_HOLD_DELAY.as_micros() as i64 {
+                    return glib::ControlFlow::Continue;
+                }
+                let dt = last_frame.replace(Some(now)).map_or(0.0, |last| {
+                    ((now - last) as f64 / 1_000_000.0).clamp(0.0, 0.05)
+                });
+                if dt > 0.0 {
+                    app.zoom_by_factor(zoom_hold_factor(direction, dt));
+                }
+                glib::ControlFlow::Continue
+            });
+            return glib::Propagation::Stop;
+        }
+
+        // All remaining actions use the central shortcut dispatcher. Unknown keys are
+        // allowed to reach WebKit, including ordinary editing and site-specific shortcuts.
         let handled = match resolved {
-            ScResolve::Action(id) => a.run_action(id),
+            ScResolve::Action(id) => app_key.run_action(id),
             ScResolve::Disabled => false,
-            ScResolve::Unknown => a.on_key(key, keycode, state),
+            ScResolve::Unknown => app_key.on_key(key, keycode, state),
         };
-        // Zoom va qidiruvda tugmani bosib turish qadam-baqadam ishlashi kerak (o'z tezlik chegarasi bor)
         if handled {
-            if let Some(dir) = overview_repeat_dir {
-                zoom_key.set(Some(keycode));
-                let a_zoom = a.clone();
-                let key_zoom = zoom_key.clone();
-                let source =
-                    glib::timeout_add_local(std::time::Duration::from_millis(16), move || {
-                        if key_zoom.get() != Some(keycode) {
-                            return glib::ControlFlow::Break;
-                        }
-                        if a_zoom.overview_open() && !a_zoom.ov_exiting.get() {
-                            let factor = if dir > 0.0 { 1.012 } else { 1.0 / 1.012 };
-                            a_zoom.overview_zoom_by(factor);
-                        }
-                        glib::ControlFlow::Continue
-                    });
-                *zoom_source.borrow_mut() = Some(source);
-            }
             glib::Propagation::Stop
         } else {
             glib::Propagation::Proceed
         }
     });
 
-    // Tugma qo'yib yuborilishi har doim ko'rinishi kerak: asosiy controller Bubble fazada, WebKit
-    // release'ni "yutib" yuborsa `held` qotib qolib, keyingi bosish yo'qolib qolardi. Shuning uchun
-    // release'ni alohida Capture controller kuzatadi.
-    let release = gtk::EventControllerKey::new();
-    release.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let zoom_key_rel = zoom_repeat_key.clone();
-    let zoom_source_rel = zoom_repeat_source.clone();
-    release.connect_key_released(move |_, _, keycode, _| {
-        if zoom_key_rel.get() == Some(keycode) {
-            zoom_key_rel.set(None);
-            if let Some(source) = zoom_source_rel.borrow_mut().take() {
-                source.remove();
-            }
+    // Capture release in the same phase/controller as key-down. No timer handle is kept:
+    // the frame callback sees None on its next frame and exits without a source-ID race.
+    let held_release = zoom_repeat_key.clone();
+    keys.connect_key_released(move |_, _, keycode, _| {
+        if held_release.get() == Some(keycode) {
+            held_release.set(None);
         }
     });
-    win.add_controller(release);
 
-    let zoom_key_focus = zoom_repeat_key.clone();
-    let zoom_source_focus = zoom_repeat_source.clone();
-    win.connect_has_focus_notify(move |_| {
-        zoom_key_focus.set(None);
-        if let Some(source) = zoom_source_focus.borrow_mut().take() {
-            source.remove();
-        }
-    });
+    let held_focus = zoom_repeat_key.clone();
+    win.connect_has_focus_notify(move |_| held_focus.set(None));
     win.add_controller(keys);
 }

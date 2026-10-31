@@ -1,9 +1,17 @@
 //! Animation timing and tab suspension policy (memory pressure aware).
 
-/// How far the strip zooms out in overview (niri uses a similar factor).
+/// Physical overview scale at the user's 100% zoom setting.
 pub(crate) const OV_ZOOM: f64 = 0.4;
-pub(crate) const OV_ZOOM_MIN: f64 = 0.18;
-pub(crate) const OV_ZOOM_MAX: f64 = 0.85;
+/// User-facing page and overview zoom range, independent of the overview's physical base scale.
+pub(crate) const PAGE_ZOOM_MIN: f64 = 0.2;
+pub(crate) const PAGE_ZOOM_MAX: f64 = 5.0;
+pub(crate) const OV_ZOOM_MIN: f64 = 0.2;
+pub(crate) const OV_ZOOM_MAX: f64 = 5.0;
+/// A single press changes zoom by one clear 10% step; holding switches to continuous motion.
+pub(crate) const ZOOM_TAP_FACTOR: f64 = 1.10;
+pub(crate) const ZOOM_HOLD_DELAY: std::time::Duration = std::time::Duration::from_millis(180);
+/// Logarithmic scale change per second while a zoom key is held (frame-rate independent).
+pub(crate) const ZOOM_HOLD_RATE: f64 = 0.90;
 /// Page zoom (Ctrl +/-/0): Chrome-style steps, 20%..500%.
 pub(crate) const PAGE_ZOOM_STEPS: [f64; 18] = [
     0.20, 0.25, 0.33, 0.50, 0.67, 0.75, 0.80, 0.90, 1.0, 1.10, 1.25, 1.50, 1.75, 2.0, 2.5, 3.0,
@@ -13,8 +21,13 @@ pub(crate) const PAGE_ZOOM_STEPS: [f64; 18] = [
 /// Next page zoom step above (`dir > 0`) or below (`dir < 0`) `cur`; clamped to 20%..500%.
 pub(crate) fn next_page_zoom(cur: f64, dir: i32) -> f64 {
     const EPS: f64 = 0.005;
-    let min = PAGE_ZOOM_STEPS[0];
-    let max = PAGE_ZOOM_STEPS[PAGE_ZOOM_STEPS.len() - 1];
+    let min = PAGE_ZOOM_MIN;
+    let max = PAGE_ZOOM_MAX;
+    let cur = if cur.is_finite() {
+        cur.clamp(min, max)
+    } else {
+        1.0
+    };
     if dir > 0 {
         PAGE_ZOOM_STEPS
             .iter()
@@ -29,6 +42,37 @@ pub(crate) fn next_page_zoom(cur: f64, dir: i32) -> f64 {
             .find(|z| *z < cur - EPS)
             .unwrap_or(min)
     }
+}
+
+/// Apply a continuous zoom ratio without depending on frame rate or key-repeat cadence.
+pub(crate) fn scale_zoom(current: f64, factor: f64, min: f64, max: f64) -> f64 {
+    if !min.is_finite() || !max.is_finite() || min <= 0.0 || max < min {
+        return 1.0;
+    }
+    let current = if current.is_finite() { current } else { 1.0 }.clamp(min, max);
+    if !factor.is_finite() || factor <= 0.0 {
+        return current;
+    }
+    (current * factor).clamp(min, max)
+}
+
+/// Convert elapsed frame time into a multiplicative zoom ratio. Clamping a long frame
+/// prevents one delayed callback from visibly jumping across the zoom range.
+pub(crate) fn zoom_hold_factor(direction: i32, elapsed_seconds: f64) -> f64 {
+    if direction == 0 || !elapsed_seconds.is_finite() || elapsed_seconds <= 0.0 {
+        return 1.0;
+    }
+    (ZOOM_HOLD_RATE * elapsed_seconds.clamp(0.0, 0.05) * direction.signum() as f64).exp()
+}
+
+/// Overview's user-facing percentage (1.0 = 100%) converted to the physical strip scale.
+pub(crate) fn overview_scale(user_zoom: f64) -> f64 {
+    let normalized = if user_zoom.is_finite() {
+        user_zoom
+    } else {
+        1.0
+    };
+    OV_ZOOM * normalized.clamp(OV_ZOOM_MIN, OV_ZOOM_MAX)
 }
 
 /// Overview zoom in/out duration (fixed, ease-out): zoom, pan and grid land together.

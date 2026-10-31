@@ -64,21 +64,21 @@ impl App {
 
                     focused_x = Some((x, x + w));
 
-                    // Match StripLayout's real stack allocation, including user-resized heights.
-                    let equal_h = stack_height(vh, len, g);
-                    let mut heights: Vec<f64> = (0..len)
-                        .map(|j| row.tabs[start + j].custom_height.get().unwrap_or(equal_h))
+                    // Keep overview hit framing identical to StripLayout's ratio-based height allocation.
+                    let weights: Vec<f64> = (0..len)
+                        .map(|j| {
+                            row.tabs[start + j]
+                                .custom_height
+                                .get()
+                                .unwrap_or(1.0 / len.max(1) as f64)
+                        })
                         .collect();
-                    if len > 1 {
-                        let total_h = (vh - (len as f64 - 1.0) * g).max(80.0 * len as f64);
-                        let sum: f64 = heights.iter().sum();
-                        if sum > 1.0 && (sum - total_h).abs() > 0.5 {
-                            let scale = total_h / sum;
-                            for h in &mut heights {
-                                *h = (*h * scale).max(80.0);
-                            }
-                        }
-                    }
+                    let heights = if len == 1 {
+                        vec![vh]
+                    } else {
+                        let available = (vh - (len as f64 - 1.0) * g).max(1.0);
+                        distribute_height_weights(&weights, available, MIN_WINDOW_HEIGHT)
+                    };
                     let index = cur_c - start;
                     let y_in_stack: f64 = heights[..index].iter().map(|h| h + g).sum();
                     let tile_h = heights[index];
@@ -256,7 +256,6 @@ impl App {
                 }
                 app.cam_spring_x.set(None);
                 app.cam_spring_y.set(None);
-                app.cam_v0_x.set(0.0);
             } else {
                 zanim.set(None);
                 let mut z = zc + (zt - zc) * k;
@@ -265,8 +264,8 @@ impl App {
                 }
                 nz = z;
                 // Niri-style critically damped spring on the real frame time (no per-frame lerp)
-                let (sx, _) = step_cam_axis(&app.cam_spring_x, oxc, oxt, &app.cam_v0_x, now);
-                let (sy, _) = step_cam_axis(&app.cam_spring_y, oyc, oyt, &Cell::new(0.0), now);
+                let (sx, _) = step_cam_axis(&app.cam_spring_x, oxc, oxt, now);
+                let (sy, _) = step_cam_axis(&app.cam_spring_y, oyc, oyt, now);
                 nx = sx;
                 ny = sy;
             }
@@ -298,158 +297,5 @@ impl App {
                 glib::ControlFlow::Continue
             }
         });
-    }
-
-    /// Live 1:1 horizontal pan (finger tracks content). Used by touchpad slide mode.
-    /// Offsets update every event; strip allocate is coalesced to one per frame.
-    pub(crate) fn pan_canvas_x(self: &Rc<Self>, dx: f64) {
-        let vw = self.strip.width() as f64;
-        if vw <= 0.0 || dx == 0.0 {
-            return;
-        }
-        let g = gap(self.target_zoom.get());
-        let cur_r = self.focus_row.get();
-        let rows = self.rows.borrow();
-        if cur_r >= rows.len() {
-            return;
-        }
-        let row_w = row_cols(&rows[cur_r], vw, g)
-            .last()
-            .map_or(0.0, |&(_, _, x, w)| x + w);
-        drop(rows);
-        let max_x = (row_w - vw).max(0.0);
-        let nx = (self.layout.offset_x() + dx).clamp(0.0, max_x);
-        // A new swipe grabs the view: stop any running spring right where it is (like niri)
-        self.cam_spring_x.set(None);
-        self.cam_spring_y.set(None);
-        self.cam_v0_x.set(0.0);
-        self.layout.set_offset_x(nx);
-        self.target_x.set(nx);
-        // One allocate per display frame — per-event allocate freezes WebKit tabs
-        if !self.pan_alloc_pending.get() {
-            self.pan_alloc_pending.set(true);
-            let app = self.clone();
-            self.strip.add_tick_callback(move |strip, _clock| {
-                app.pan_alloc_pending.set(false);
-                strip.queue_allocate();
-                glib::ControlFlow::Break
-            });
-        }
-    }
-
-    /// Finger lifted after a touchpad slide (niri `view_offset_gesture_end`): project where the
-    /// swipe would coast to, snap to the nearest column edge there, focus the furthest column
-    /// that is fully visible in the swipe direction, and let the spring continue from the
-    /// release velocity so the motion never stops and restarts.
-    pub(crate) fn finish_slide(self: &Rc<Self>, vel: f64) {
-        let vw = self.strip.width() as f64;
-        if vw <= 0.0 {
-            return;
-        }
-        let g = gap(self.target_zoom.get());
-        let cur_r = self.focus_row.get();
-        let cur_off = self.layout.offset_x();
-        let cols = {
-            let rows = self.rows.borrow();
-            if cur_r >= rows.len() || rows[cur_r].tabs.is_empty() {
-                return;
-            }
-            row_cols(&rows[cur_r], vw, g)
-        };
-        if cols.is_empty() {
-            return;
-        }
-        let row_w = cols.last().map_or(0.0, |&(_, _, x, w)| x + w);
-        let max_x = (row_w - vw).max(0.0);
-
-        // Where the swipe would stop after decelerating
-        let proj = (cur_off + coast_distance(vel)).clamp(0.0, max_x);
-
-        // Snap points: a column's left edge or right edge aligned with the view edge
-        let mut snaps = vec![0.0, max_x];
-        for &(_, _, x, w) in &cols {
-            snaps.push(x.clamp(0.0, max_x));
-            snaps.push((x + w - vw).clamp(0.0, max_x));
-        }
-        let snap = snaps
-            .into_iter()
-            .min_by(|a, b| (a - proj).abs().total_cmp(&(b - proj).abs()))
-            .unwrap_or(cur_off);
-
-        // Focus the furthest fully visible column in the direction of travel
-        let visible: Vec<usize> = cols
-            .iter()
-            .enumerate()
-            .filter(|&(_, &(_, _, x, w))| x >= snap - 0.5 && x + w <= snap + vw + 0.5)
-            .map(|(i, _)| i)
-            .collect();
-        let pick = if visible.is_empty() {
-            let center = snap + vw / 2.0;
-            cols.iter()
-                .enumerate()
-                .min_by(|(_, a), (_, b)| {
-                    ((a.2 + a.3 / 2.0) - center)
-                        .abs()
-                        .total_cmp(&((b.2 + b.3 / 2.0) - center).abs())
-                })
-                .map_or(0, |(i, _)| i)
-        } else if snap >= cur_off {
-            *visible.last().unwrap()
-        } else {
-            visible[0]
-        };
-        let (start, len, _, _) = cols[pick];
-        let cur_c = self.focus_col.get();
-        let new_c = if cur_c >= start && cur_c < start + len {
-            cur_c
-        } else {
-            start
-        };
-
-        self.target_x.set(snap);
-        self.cam_v0_x.set(vel);
-        if new_c != cur_c {
-            self.focus_coords(cur_r, new_c);
-        } else {
-            self.reveal_focus();
-        }
-    }
-}
-
-#[cfg(test)]
-mod overview_camera_tests {
-    use super::overview_axis_offset;
-
-    #[test]
-    fn overview_zoom_preserves_view_center_without_recentering_half_column() {
-        let offset = overview_axis_offset(0.0, 1.0, 0.4, 1000.0, Some((0.0, 500.0)));
-        let focused_center_on_screen = (250.0 - offset) * 0.4;
-
-        assert!((offset - (-750.0)).abs() < 0.001);
-        assert!((focused_center_on_screen - 400.0).abs() < 0.001);
-        assert!((focused_center_on_screen - 500.0).abs() > 50.0);
-    }
-
-    #[test]
-    fn overview_zoom_keeps_full_width_column_at_its_existing_screen_center() {
-        let offset = overview_axis_offset(0.0, 1.0, 0.4, 1000.0, Some((0.0, 1000.0)));
-        let focused_center_on_screen = (500.0 - offset) * 0.4;
-
-        assert!((focused_center_on_screen - 500.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn overview_focus_navigation_scrolls_only_to_the_nearest_edge() {
-        let offset = overview_axis_offset(-750.0, 0.4, 0.4, 1000.0, Some((2600.0, 3100.0)));
-
-        // The column's right edge lands on the viewport's right edge; it is not centered.
-        assert!((offset - 600.0).abs() < 0.001);
-        assert!(((2600.0 - offset) * 0.4 - 800.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn overview_zoom_preserves_camera_center_when_no_focus_rect_exists() {
-        let offset = overview_axis_offset(120.0, 1.0, 0.25, 800.0, None);
-        assert!((offset - (-1080.0)).abs() < 0.001);
     }
 }

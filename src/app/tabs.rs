@@ -160,6 +160,7 @@ impl App {
         Self::build_web_view(None, Some(parent))
     }
 
+    #[allow(deprecated)] // WebKit's run_file_chooser callback still needs this native chooser.
     pub(crate) fn configure_native_web_view(view: &WebView) {
         // Use a native GTK chooser for every web file input. This is more reliable
         // than WebKit's default chooser on Linux and supports multi-file uploads.

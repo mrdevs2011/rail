@@ -19,6 +19,8 @@ fn test_parse_session_content() {
             profile_id: "default".to_string(),
             url: "https://google.com".to_string(),
             custom_width: None,
+            custom_height: None,
+            tabbed: false,
         }
     );
     assert_eq!(
@@ -30,6 +32,8 @@ fn test_parse_session_content() {
             profile_id: "work".to_string(),
             url: "https://github.com".to_string(),
             custom_width: None,
+            custom_height: None,
+            tabbed: false,
         }
     );
 }
@@ -57,6 +61,8 @@ fn test_parse_legacy_session() {
             profile_id: "work".to_string(),
             url: "https://news.ycombinator.com".to_string(),
             custom_width: None,
+            custom_height: None,
+            tabbed: false,
         }
     );
 }
@@ -67,6 +73,32 @@ fn test_parse_session_with_custom_width() {
     let state = parse_session_content(sample);
     assert_eq!(state.tabs.len(), 1);
     assert_eq!(state.tabs[0].custom_width, Some(850.5));
+}
+
+#[test]
+fn test_parse_session_with_custom_height_ratio() {
+    let sample = "tab\t0\t0\t0\tdefault\thttps://example.test\t\t0.666667\n";
+    let state = parse_session_content(sample);
+    assert_eq!(state.tabs.len(), 1);
+    assert_eq!(state.tabs[0].custom_width, None);
+    assert_eq!(state.tabs[0].custom_height, Some(0.666667));
+}
+
+#[test]
+fn test_parse_session_with_tabbed_column_flag() {
+    let sample = "tab\t0\t0\t1\tdefault\thttps://one.test\t\t0.5\t1\ntab\t0\t1\t1\tdefault\thttps://two.test\t\t0.5\t0\nstack\t0\t1\n";
+    let state = parse_session_content(sample);
+    assert_eq!(state.tabs.len(), 2);
+    assert!(state.tabs[0].tabbed);
+    assert!(!state.tabs[1].tabbed);
+    assert_eq!(state.stacked, vec![(0, 1)]);
+}
+
+#[test]
+fn test_parse_session_rejects_invalid_custom_height_ratio() {
+    let sample = "tab\t0\t0\t0\tdefault\thttps://example.test\t\t9.0\n";
+    let state = parse_session_content(sample);
+    assert_eq!(state.tabs[0].custom_height, None);
 }
 
 #[test]
@@ -463,6 +495,28 @@ fn test_default_combos_resolve_to_own_action() {
 
 /// Foydalanuvchi tugmani o'zgartirsa: yangi tugma ishlaydi, eskisi sahifaga qaytadi, o'chirilgani ham.
 #[test]
+fn test_niri_layout_shortcuts_resolve_from_gdk_key_names() {
+    use gdk::ModifierType as M;
+    SHORTCUTS.with(|config| *config.borrow_mut() = ShortcutConfig::default());
+    let resolve = |key, modifiers| {
+        let combos = shortcut_combos(key, 0, modifiers);
+        sc_resolve_any(&combos)
+    };
+    assert!(matches!(
+        resolve(gdk::Key::Page_Up, M::ALT_MASK),
+        ScResolve::Action("focus_workspace_up")
+    ));
+    assert!(matches!(
+        resolve(gdk::Key::Page_Down, M::ALT_MASK),
+        ScResolve::Action("focus_workspace_down")
+    ));
+    assert!(matches!(
+        resolve(gdk::Key::comma, M::ALT_MASK),
+        ScResolve::Action("consume_into_left")
+    ));
+}
+
+#[test]
 fn test_customized_shortcut_follows_action_not_key() {
     let mut cfg = ShortcutConfig::default();
     cfg.overrides
@@ -672,6 +726,23 @@ fn test_roomy_tab_cap_scales_with_physical_memory() {
 }
 
 #[test]
+fn test_zoom_math_bounds_and_hold_rate_are_stable() {
+    assert_eq!(scale_zoom(1.0, 10.0, 0.2, 5.0), 5.0);
+    assert_eq!(scale_zoom(1.0, 0.01, 0.2, 5.0), 0.2);
+    assert_eq!(scale_zoom(f64::NAN, 1.1, 0.2, 5.0), 1.1);
+    assert_eq!(scale_zoom(2.0, f64::NAN, 0.2, 5.0), 2.0);
+    assert_eq!(next_page_zoom(f64::NAN, 1), 1.1);
+    assert_eq!(overview_scale(f64::NAN), OV_ZOOM);
+
+    let one_frame = zoom_hold_factor(1, 1.0 / 60.0);
+    let capped_frame = zoom_hold_factor(1, 1.0);
+    assert!((one_frame - (ZOOM_HOLD_RATE / 60.0).exp()).abs() < 1e-12);
+    assert!((capped_frame - (ZOOM_HOLD_RATE * 0.05).exp()).abs() < 1e-12);
+    assert_eq!(zoom_hold_factor(-1, 0.0), 1.0);
+    assert_eq!(zoom_hold_factor(0, 0.05), 1.0);
+}
+
+#[test]
 fn test_zoom_keys_plus_works_without_shift() {
     // Ctrl+= (US layout, no Shift) must zoom in, same as Ctrl+Shift++
     assert_eq!(App::zoom_dir(gdk::Key::equal, 21, false), Some(1));
@@ -744,12 +815,11 @@ fn test_untranslate_round_trip() {
         "https://example.com/",
     ] {
         let t = translate_url(u, "auto", "uz").unwrap();
-        assert!(is_translated_uri(&t));
+        assert!(t.contains(".translate.goog/"));
         let back = untranslate_url(&t).unwrap();
         assert_eq!(back, u.replace("?x=1#top", "?x=1#top"));
     }
     assert!(untranslate_url("https://example.com/").is_none());
-    assert!(!is_translated_uri("https://example.com/"));
 }
 
 #[test]

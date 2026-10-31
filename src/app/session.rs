@@ -42,17 +42,26 @@ impl App {
                     0
                 };
                 let uri = tab.real_uri();
-                if let Some(cw) = tab.custom_width.get() {
-                    out.push_str(&format!(
-                        "tab\t{}\t{}\t{}\t{}\t{}\t{:.1}\n",
-                        ri, ci, is_full, tab.profile_id, uri, cw
-                    ));
+                let width = tab
+                    .custom_width
+                    .get()
+                    .map(|value| format!("{value:.1}"))
+                    .unwrap_or_default();
+                let height = tab
+                    .custom_height
+                    .get()
+                    .map(|value| format!("{value:.6}"))
+                    .unwrap_or_default();
+                let is_column_head = ci == 0 || row.tabs[ci - 1].col_id.get() != tab.col_id.get();
+                let tabbed = if is_column_head && tab.tabbed.get() {
+                    "1"
                 } else {
-                    out.push_str(&format!(
-                        "tab\t{}\t{}\t{}\t{}\t{}\n",
-                        ri, ci, is_full, tab.profile_id, uri
-                    ));
-                }
+                    "0"
+                };
+                out.push_str(&format!(
+                    "tab\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                    ri, ci, is_full, tab.profile_id, uri, width, height, tabbed
+                ));
                 if ci > 0 && row.tabs[ci - 1].col_id.get() == tab.col_id.get() {
                     out.push_str(&format!("stack\t{}\t{}\n", ri, ci));
                 }
@@ -196,7 +205,8 @@ impl App {
                     height_handle: tw.height_handle,
                     profile_id: item.profile_id,
                     custom_width: Cell::new(item.custom_width),
-                    custom_height: Cell::new(None),
+                    custom_height: Cell::new(item.custom_height),
+                    tabbed: Cell::new(item.tabbed),
                     col_id: Cell::new(new_col_id()),
                     saved_uri: RefCell::new(
                         if item.url.starts_with("http") || item.url.starts_with("rail://") {

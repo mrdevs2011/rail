@@ -25,18 +25,23 @@ mod settings_modal;
 mod sidebar;
 mod signals;
 mod welcome;
+mod window_layout;
 #[cfg(test)]
 pub(crate) use keys::STATIC_ACTIONS;
 mod ctxmenu;
 mod find;
 mod screenshot;
 mod translate;
+mod zoom;
 
 pub(crate) struct App {
     pub(crate) win: gtk::ApplicationWindow,
     pub(crate) shell: gtk::Box,
     pub(crate) shell_layout: ShellLayout,
     pub(crate) side: gtk::Box,
+    /// Compact sidebar launcher shown when the Niri column is narrower than the dock.
+    pub(crate) responsive_sidebar_toggle: gtk::Button,
+    pub(crate) responsive_layout: Cell<bool>,
     /// Square Rail logo in sidebar header (fixed mode only).
     pub(crate) brand_logo: gtk::Revealer,
     pub(crate) strip: gtk::Box,
@@ -63,6 +68,10 @@ pub(crate) struct App {
     /// Oxirgi bosilgan tugma o'chirish (Backspace/Delete/Ctrl+X...) bo'lganmi: shunda inline to'ldirish ishlamaydi
     pub(crate) delete_key: Cell<bool>,
     pub(crate) ov_hint: gtk::Label,
+    /// Small, non-interactive zoom percentage indicator anchored at the window's top-right.
+    pub(crate) zoom_indicator: gtk::Revealer,
+    pub(crate) zoom_indicator_label: gtk::Label,
+    pub(crate) zoom_indicator_timer: RefCell<Option<glib::SourceId>>,
     /// Sahifa ichida qidirish paneli (Ctrl+F); birinchi ochilganda yaratiladi.
     pub(crate) find_ui: RefCell<Option<Rc<find::FindUi>>>,
     /// Overview is active: the strip is zoomed out and tabs ignore the pointer.
@@ -85,13 +94,10 @@ pub(crate) struct App {
     pub(crate) target_x: Cell<f64>,
     pub(crate) target_y: Cell<f64>,
     pub(crate) animating: Cell<bool>,
-    /// Touchpad slide: at most one strip allocate per frame (avoids jank)
-    pub(crate) pan_alloc_pending: Cell<bool>,
     /// Niri-style springs for the camera; `None` while at rest.
     pub(crate) cam_spring_x: Cell<Option<CamSpring>>,
     pub(crate) cam_spring_y: Cell<Option<CamSpring>>,
     /// Release velocity (px/s) of a touchpad flick, consumed when the next x spring starts.
-    pub(crate) cam_v0_x: Cell<f64>,
     /// Animatsiya paytida freeze-kadrga almashtirilgan tablar; animatsiya tugagach jonliga qaytariladi.
     pub(crate) anim_frozen: RefCell<Vec<(gtk::Picture, WebView)>>,
     pub(crate) side_open: Cell<bool>,
@@ -117,8 +123,6 @@ pub(crate) struct App {
     pub(crate) add_prof_btn: gtk::Button,
     pub(crate) new_profile_color_idx: Cell<usize>,
     pub(crate) color_buttons: RefCell<Vec<gtk::Button>>,
-    /// Active screenshot overlay (Zen-style); removed on capture/cancel.
-    pub(crate) ss_overlay: RefCell<Option<gtk::Overlay>>,
     pub(crate) last_saved_session: RefCell<String>,
     pub(crate) save_session_gen: Cell<u64>,
     pub(crate) data_modal_info_lbl: gtk::Label,
@@ -138,9 +142,6 @@ pub(crate) struct App {
     pub(crate) default_devtools_width: Cell<i32>,
     pub(crate) devtools_dock_side: Cell<DevToolsDockSide>,
     pub(crate) devtools_panel: gtk::Box,
-    pub(crate) devtools_content_box: gtk::Box,
-    pub(crate) devtools_resize_handle: gtk::Box,
-    pub(crate) devtools_url_lbl: gtk::Label,
     pub(crate) devtools_window: RefCell<Option<gtk::Window>>,
     // Floating Settings Panel (Alt+Shift+S / Alt+P / Alt+I)
     pub(crate) qr_modal: RefCell<Option<gtk::Box>>,

@@ -636,8 +636,8 @@ impl App {
                 if let Some((r, c)) = app.find_view_coords(&v) {
                     let (c, next_c) = app.col_head_and_next(r, c);
                     let vw = app.strip.width() as f64;
-                    let min_w = 280.0;
-                    let max_w = vw; // Fullscreen max: left edge to right edge
+                    let min_w = MIN_COLUMN_WIDTH.min(vw.max(1.0));
+                    let max_w = vw.max(min_w); // Fullscreen max: left edge to right edge
                     let initial0 = start_w0.get();
                     let new_w0 = (initial0 + dx).clamp(min_w, max_w);
 
@@ -735,9 +735,10 @@ impl App {
                         .filter(|t| t.col_id.get() == id)
                         .count()
                         .max(1);
-                    let equal = stack_height(vh, k, gap(1.0));
-                    let h0 = row.tabs[c].custom_height.get().unwrap_or(equal);
-                    let h1 = next.custom_height.get().unwrap_or(equal);
+                    let available = (vh - (k as f64 - 1.0) * gap(1.0)).max(1.0);
+                    let equal_ratio = 1.0 / k as f64;
+                    let h0 = row.tabs[c].custom_height.get().unwrap_or(equal_ratio) * available;
+                    let h1 = next.custom_height.get().unwrap_or(equal_ratio) * available;
                     start_h0.set(h0);
                     start_h1.set(h1);
                 }
@@ -762,10 +763,22 @@ impl App {
                     offset_y
                 };
                 if let Some((r, c)) = app.find_view_coords(&v) {
-                    let min_h = 80.0;
+                    let (available, stack_count) = {
+                        let rows = app.rows.borrow();
+                        let Some(row) = rows.get(r) else { return };
+                        if c >= row.tabs.len() {
+                            return;
+                        }
+                        let (start, end) = row.col_span(c);
+                        let count = end - start;
+                        let vh = app.strip.height() as f64;
+                        ((vh - (count as f64 - 1.0) * gap(1.0)).max(1.0), count)
+                    };
+                    let min_h = MIN_WINDOW_HEIGHT.min(available / stack_count.max(1) as f64);
                     let pair = start_h0.get() + start_h1.get();
-                    let new0 = (start_h0.get() + dy).clamp(min_h, (pair - min_h).max(min_h));
-                    let new1 = (pair - new0).max(min_h);
+                    let lower = min_h.min(pair / 2.0);
+                    let new0 = (start_h0.get() + dy).clamp(lower, (pair - lower).max(lower));
+                    let new1 = (pair - new0).max(lower);
                     app.set_tab_stack_height(r, c, new0);
                     app.set_tab_stack_height(r, c + 1, new1);
                 }

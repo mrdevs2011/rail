@@ -29,10 +29,6 @@ impl App {
             .unwrap_or(false)
     }
 
-    pub(crate) fn dt_view(&self) -> Option<WebView> {
-        self.focused_view()
-    }
-
     pub(crate) fn dt_close_window(&self) {
         let win = self.devtools_window.borrow_mut().take();
         if let Some(win) = win {
@@ -372,27 +368,6 @@ impl App {
         if let Some(view) = self.focused_view() {
             if prev != side || !self.devtools_open() {
                 self.show_view_devtools(&view);
-            }
-        }
-    }
-
-    pub(crate) fn hide_devtools_impl(&self, close_inspector: bool) {
-        if let Some(view) = self.focused_view() {
-            if close_inspector {
-                self.hide_view_devtools(&view);
-            } else {
-                let Some((r, c)) = self.find_view_coords(&view) else {
-                    return;
-                };
-                let rows = self.rows.borrow();
-                let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) else {
-                    return;
-                };
-                self.dt_close_window();
-                tab.dt_open.set(false);
-                tab.dt_box.set_visible(false);
-                tab.dt_handle.set_visible(false);
-                view.grab_focus();
             }
         }
     }

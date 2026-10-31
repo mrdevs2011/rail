@@ -471,7 +471,6 @@ impl App {
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| u.clone());
                     let pwa_info = crate::pwa::PwaAppInfo {
-                        id: crate::pwa::slugify(&t),
                         name: t,
                         url: u,
                         icon_url: None,
@@ -650,8 +649,6 @@ impl App {
         vbox.append(&msg_lbl);
 
         let done = Rc::new(Cell::new(false));
-        let req_close = req.clone();
-        let done_close = done.clone();
         let closer_slot: Rc<RefCell<Option<Box<dyn Fn()>>>> = Rc::new(RefCell::new(None));
         let finish = {
             let done = done.clone();

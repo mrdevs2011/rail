@@ -61,11 +61,53 @@ impl App {
             self.sync_strip();
             self.focus_coords(r, t);
             self.schedule_save_session();
-        } else if dir > 0 {
-            self.move_tab_to_row(r + 1);
-        } else if r > 0 {
-            self.move_tab_to_row(r - 1);
         }
+    }
+
+    /// Niri consume-window-into-column: move the focused window into the adjacent column
+    /// without toggling or expelling other members of either stack.
+    pub(crate) fn consume_window_into_column(self: &Rc<Self>, direction: isize) {
+        let row_index = self.focus_row.get();
+        let column_index = self.focus_col.get();
+        let mut rows = self.rows.borrow_mut();
+        let Some(row) = rows.get_mut(row_index) else {
+            return;
+        };
+        if column_index >= row.tabs.len() {
+            return;
+        }
+        let (start, end) = row.col_span(column_index);
+        let target_id = if direction < 0 {
+            if start == 0 {
+                return;
+            }
+            row.tabs[start - 1].col_id.get()
+        } else {
+            if end >= row.tabs.len() {
+                return;
+            }
+            row.tabs[end].col_id.get()
+        };
+
+        if end - start > 1 && column_index == start {
+            row.move_col_props(start, start + 1);
+        }
+        let tab = row.tabs.remove(column_index);
+        tab.reset_col_props();
+        tab.custom_height.set(None);
+        tab.tabbed.set(false);
+        tab.col_id.set(target_id);
+        let insert_at = row
+            .tabs
+            .iter()
+            .rposition(|candidate| candidate.col_id.get() == target_id)
+            .map_or(0, |last| last + 1);
+        row.tabs.insert(insert_at, tab);
+        drop(rows);
+
+        self.sync_strip();
+        self.focus_coords(row_index, insert_at);
+        self.schedule_save_session();
     }
 
     /// niri's consume-or-expel-window: a window that is alone in its column joins the
@@ -108,6 +150,7 @@ impl App {
                 } else {
                     let tab = row.tabs.remove(c);
                     tab.reset_col_props();
+                    tab.custom_height.set(None);
                     tab.col_id.set(new_col_id());
                     row.tabs.insert(s, tab);
                     new_c = s;
@@ -198,6 +241,7 @@ impl App {
                 profile_id: prof_id,
                 custom_width: Cell::new(None),
                 custom_height: Cell::new(None),
+                tabbed: Cell::new(false),
                 col_id: Cell::new(new_col_id()),
                 saved_uri: RefCell::new("rail://start/".to_string()),
                 suspended: Cell::new(false),
@@ -279,6 +323,7 @@ impl App {
                 profile_id: prof_id,
                 custom_width: Cell::new(None),
                 custom_height: Cell::new(None),
+                tabbed: Cell::new(false),
                 col_id: Cell::new(new_col_id()),
                 saved_uri: RefCell::new("rail://start/".to_string()),
                 suspended: Cell::new(false),

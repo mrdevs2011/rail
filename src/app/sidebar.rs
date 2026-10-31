@@ -478,7 +478,6 @@ impl App {
                 .unwrap_or_else(|| u.clone());
             if !u.is_empty() && (u.starts_with("http://") || u.starts_with("https://")) {
                 let info = crate::pwa::PwaAppInfo {
-                    id: crate::pwa::slugify(&t),
                     name: t,
                     url: u,
                     icon_url: None,
@@ -643,6 +642,31 @@ impl App {
         self.schedule_save_session();
     }
 
+    /// Adapt the dock to Niri's narrow default half-width columns without hiding the page.
+    /// Below 600 logical pixels the sidebar floats over the page; when closed, a small
+    /// launcher remains available instead of leaving the WebView with zero width.
+    pub(crate) fn sync_responsive_sidebar(&self) {
+        let narrow = self.win.width() > 0 && self.win.width() < 600;
+        self.responsive_layout.set(narrow);
+
+        if narrow {
+            self.shell_layout.set_overlay(true);
+            // A resize can happen while the dock's close animation is in flight.
+            // Force one deterministic closed state so the launcher is never stranded.
+            self.side.set_visible(false);
+            self.shell_layout.set_side(0.0);
+            self.responsive_sidebar_toggle.set_visible(true);
+        } else {
+            self.shell_layout.set_overlay(self.sidebar_auto.get());
+            let open = self.side_open.get();
+            self.side.set_visible(open);
+            self.shell_layout
+                .set_side(if open { SIDE_W as f64 } else { 0.0 });
+            self.responsive_sidebar_toggle.set_visible(false);
+        }
+        self.shell.queue_allocate();
+    }
+
     pub(crate) fn set_sidebar(self: &Rc<Self>, open: bool) {
         if open {
             if let Some(source) = self.side_close_timer.borrow_mut().take() {
@@ -654,6 +678,9 @@ impl App {
             }
         }
         self.side_open.set(open);
+        if self.responsive_layout.get() {
+            self.responsive_sidebar_toggle.set_visible(!open);
+        }
         self.schedule_save_session();
         if self.win.is_fullscreen() {
             // fullscreen'da faqat kontent: tanlov saqlanadi, fullscreen'dan chiqqanda qo'llanadi
