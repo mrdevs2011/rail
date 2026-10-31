@@ -193,3 +193,9 @@
 - Build & Test: `cargo build --release` OK, `cargo test --release` 66/66 OK (6 yangi test). GUI da ko'zdan kechirilmagan.
 - Keyingi qadam: real oynada Ctrl+F, Alt+F (full/half kenglik), F11, Ctrl+=/-/0 ni standart va o'zgartirilgan tugma bilan sinash. Customize faqat 1-tugmani tahrirlaydi, qo'shimcha standartlar (F5, Ctrl+G ...) qoladi.
 - Git holati: uncommitted (src/app/keys.rs, find.rs, mod.rs, focus.rs, shortcuts/config.rs, ui/wire/keys.rs, ui/build.rs, style.css, i18n_tables.rs, tests.rs, docs/shortcuts).
+
+---
+### 2026-10-31 06:42
+- Qilindi: Rail UI to'liq modern monochrome qora-oq dizaynga yangilandi: GTK theme tokenlari, sidebar/tablar, omnibar, Settings, minimap, DevTools, modallar va New Tab. 72/72 test, cargo check va release build o'tdi. cafb1e2 main'ga push qilindi, yangi binary atomik o'rnatildi; eski ochiq process tegilmagan.
+- Keyingi qadam: Foydalanuvchi Rail oynasini normal yopib qayta ochgach, real GUI ko'rinishini tekshiradi; kerak bo'lsa mayda polish.
+- Git holati: cafb1e2 feat(ui): modern monochrome Rail design
