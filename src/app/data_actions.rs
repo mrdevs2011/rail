@@ -83,7 +83,7 @@ impl App {
             // Spec: 1-inputda kamida 1 belgi bo'lsa shifrlash ishlasin; 2-input bo'sh bo'lishi mumkin
             if p1.is_empty() {
                 el.set_markup(&format!(
-                    "<span foreground='#f87171'>{}</span>",
+                    "<span foreground='#a1a1a1'>{}</span>",
                     tr("Password cannot be empty.")
                 ));
                 el.set_visible(true);
@@ -93,7 +93,7 @@ impl App {
                 let p2 = c.text().to_string();
                 if !p2.is_empty() && p1 != p2 {
                     el.set_markup(&format!(
-                        "<span foreground='#f87171'>{}</span>",
+                        "<span foreground='#a1a1a1'>{}</span>",
                         tr("Passwords do not match.")
                     ));
                     el.set_visible(true);
@@ -132,7 +132,7 @@ impl App {
             true,
             move |password| {
                 app.data_modal_status_lbl.set_markup(&format!(
-                    "<span foreground='#38bdf8'><b>{}</b></span>",
+                    "<span foreground='#d4d4d4'><b>{}</b></span>",
                     tr("Syncing: Encrypting and uploading data to cloud...")
                 ));
 
@@ -161,7 +161,7 @@ impl App {
                                 app_check.sync_url_result_entry.set_text(&r.url);
                                 app_check.win.clipboard().set_text(&r.url);
                                 app_check.data_modal_status_lbl.set_markup(&format!(
-                                    "<span foreground='#4ade80'><b>{}</b> {} ({})</span>",
+                                    "<span foreground='#f5f5f5'><b>{}</b> {} ({})</span>",
                                     tr("Sync Successful:"),
                                     tr("URL copied to clipboard! Remember your password to restore."),
                                     glib::markup_escape_text(&r.url)
@@ -169,7 +169,7 @@ impl App {
                             }
                             Err(e) => {
                                 app_check.data_modal_status_lbl.set_markup(&format!(
-                                    "<span foreground='#f87171'><b>{}</b> {}</span>",
+                                    "<span foreground='#a1a1a1'><b>{}</b> {}</span>",
                                     tr("Sync Failed:"),
                                     glib::markup_escape_text(&e)
                                 ));
@@ -188,7 +188,7 @@ impl App {
         let raw = self.sync_restore_entry.text().to_string();
         if raw.trim().is_empty() {
             self.data_modal_status_lbl.set_markup(&format!(
-                "<span foreground='#f87171'><b>{}</b> {}</span>",
+                "<span foreground='#a1a1a1'><b>{}</b> {}</span>",
                 tr("Error:"),
                 tr("Please enter a valid Sync URL or ID.")
             ));
@@ -203,7 +203,7 @@ impl App {
             false,
             move |password| {
                 app.data_modal_status_lbl.set_markup(&format!(
-                    "<span foreground='#38bdf8'><b>{}</b></span>",
+                    "<span foreground='#d4d4d4'><b>{}</b></span>",
                     tr("Restoring: Downloading and decrypting cloud data...")
                 ));
 
@@ -239,14 +239,14 @@ impl App {
                                         app_check.refresh_sidebar();
                                         app_check.refresh_data_modal_info();
                                         app_check.data_modal_status_lbl.set_markup(&format!(
-                                            "<span foreground='#4ade80'><b>{}</b> {}</span>",
+                                            "<span foreground='#f5f5f5'><b>{}</b> {}</span>",
                                             tr("Restore Successful:"),
                                             tr("All workspaces, tabs, accounts & cookies restored!")
                                         ));
                                     }
                                     Err(e) => {
                                         app_check.data_modal_status_lbl.set_markup(&format!(
-                                            "<span foreground='#f87171'><b>{}</b> {}</span>",
+                                            "<span foreground='#a1a1a1'><b>{}</b> {}</span>",
                                             tr("Restore Failed:"),
                                             glib::markup_escape_text(&e)
                                         ));
@@ -257,13 +257,13 @@ impl App {
                                 let _ = std::fs::remove_file(&temp_tar);
                                 if e == "INCORRECT_PASSWORD" {
                                     app_check.data_modal_status_lbl.set_markup(&format!(
-                                        "<span foreground='#f87171'><b>{}</b> {}</span>",
+                                        "<span foreground='#a1a1a1'><b>{}</b> {}</span>",
                                         tr("Error:"),
                                         tr("Incorrect password! Data cannot be restored without the correct password.")
                                     ));
                                 } else {
                                     app_check.data_modal_status_lbl.set_markup(&format!(
-                                        "<span foreground='#f87171'><b>{}</b> {}</span>",
+                                        "<span foreground='#a1a1a1'><b>{}</b> {}</span>",
                                         tr("Restore Failed:"),
                                         glib::markup_escape_text(&e)
                                     ));
@@ -288,7 +288,7 @@ impl App {
         let path = PathBuf::from(path_str.trim());
         if path.as_os_str().is_empty() {
             self.data_modal_status_lbl.set_markup(&format!(
-                "<span foreground='#f87171'><b>{}</b> {}</span>",
+                "<span foreground='#a1a1a1'><b>{}</b> {}</span>",
                 tr("Error:"),
                 tr("Please specify an export destination file.")
             ));
@@ -301,7 +301,7 @@ impl App {
                     .map(|m| format!("{:.1} KB", m.len() as f64 / 1024.0))
                     .unwrap_or_else(|_| tr("saved").to_string());
                 self.data_modal_status_lbl.set_markup(&format!(
-                    "<span foreground='#4ade80'><b>{}</b> {} ({})</span>",
+                    "<span foreground='#f5f5f5'><b>{}</b> {} ({})</span>",
                     tr("Export Successful:"),
                     glib::markup_escape_text(&path.to_string_lossy()),
                     size_str
@@ -309,7 +309,7 @@ impl App {
             }
             Err(e) => {
                 self.data_modal_status_lbl.set_markup(&format!(
-                    "<span foreground='#f87171'><b>{}</b> {}</span>",
+                    "<span foreground='#a1a1a1'><b>{}</b> {}</span>",
                     tr("Export Failed:"),
                     glib::markup_escape_text(&e)
                 ));
@@ -322,7 +322,7 @@ impl App {
         let path = PathBuf::from(path_str.trim());
         if path.as_os_str().is_empty() || !path.exists() {
             self.data_modal_status_lbl.set_markup(&format!(
-                "<span foreground='#f87171'><b>{}</b> {}</span>",
+                "<span foreground='#a1a1a1'><b>{}</b> {}</span>",
                 tr("Error:"),
                 tr("Please select a valid .tar.gz backup file.")
             ));
@@ -348,14 +348,14 @@ impl App {
                 self.refresh_data_modal_info();
 
                 self.data_modal_status_lbl.set_markup(&format!(
-                    "<span foreground='#4ade80'><b>{}</b> {}</span>",
+                    "<span foreground='#f5f5f5'><b>{}</b> {}</span>",
                     tr("Import Successful:"),
                     tr("All workspaces, tabs, accounts & cookies restored!")
                 ));
             }
             Err(e) => {
                 self.data_modal_status_lbl.set_markup(&format!(
-                    "<span foreground='#f87171'><b>{}</b> {}</span>",
+                    "<span foreground='#a1a1a1'><b>{}</b> {}</span>",
                     tr("Import Failed:"),
                     glib::markup_escape_text(&e)
                 ));

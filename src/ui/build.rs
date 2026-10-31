@@ -4,11 +4,8 @@ use crate::*;
 
 pub(crate) fn build(gapp: &gtk::Application) {
     setup_adblock();
-    if let Some(s) = gtk::Settings::default() {
-        s.set_gtk_application_prefer_dark_theme(true);
-    }
     let provider = gtk::CssProvider::new();
-    provider.load_from_string(CSS);
+    install_styles(&provider);
     gtk::style_context_add_provider_for_display(
         &gdk::Display::default().expect("no display"),
         &provider,

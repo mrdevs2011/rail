@@ -26,8 +26,8 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
     .rail-ss-mask { position: absolute; background: rgba(0, 0, 0, 0.45); pointer-events: none; display: none; z-index: 2147483645; }
     #__rail_ss_hover {
       position: absolute;
-      border: 2px solid #60a5fa;
-      background: rgba(96, 165, 250, 0.22);
+      border: 2px solid #ffffff;
+      background: rgba(255, 255, 255, 0.14);
       border-radius: 4px;
       pointer-events: none;
       display: none;
@@ -134,14 +134,14 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
     }
     .rail-ss-btn-copy:hover { background: #383a40; }
     .rail-ss-btn-dl {
-      background: #93c5fd;
-      color: #0f172a;
-      border: 1.5px solid #60a5fa;
+      background: #ffffff;
+      color: #080808;
+      border: 1.5px solid #ffffff;
       padding: 6px 16px;
       height: 32px;
       font-weight: 700;
     }
-    .rail-ss-btn-dl:hover { background: #bfdbfe; }
+    .rail-ss-btn-dl:hover { background: #e5e5e5; }
     .rail-ss-top-btn {
       background: #2b2d30;
       color: #fff;

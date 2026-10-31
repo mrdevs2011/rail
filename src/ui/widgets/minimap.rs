@@ -20,7 +20,7 @@ pub(crate) fn build_minimap() -> MinimapWidgets {
     map_icon.add_css_class("minimap-header-icon");
 
     let map_title = gtk::Label::new(None);
-    map_title.set_markup("<span>roadmap</span><span foreground='#38bdf8'>.</span>");
+    map_title.set_markup("<span>roadmap</span><span foreground='#ffffff'>.</span>");
     map_title.add_css_class("minimap-header-title");
     map_title.set_hexpand(true);
     map_title.set_xalign(0.0);

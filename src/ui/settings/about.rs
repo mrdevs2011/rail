@@ -24,7 +24,7 @@ pub(crate) fn build_about_page(settings_stack: &gtk::Stack) {
 
     let brand_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     let brand_logo = gtk::Label::new(None);
-    brand_logo.set_markup("<span weight='bold' font_family='monospace' size='xx-large' foreground='#f8fafc'>rail</span><span weight='bold' size='xx-large' foreground='#38bdf8'>.</span>");
+    brand_logo.set_markup("<span weight='bold' font_family='monospace' size='xx-large' foreground='#f5f5f5'>rail</span><span weight='bold' size='xx-large' foreground='#ffffff'>.</span>");
     let version_badge = gtk::Label::new(Some(&format!("v{}", update::current_version())));
     version_badge.add_css_class("settings-badge");
     version_badge.set_valign(gtk::Align::Center);

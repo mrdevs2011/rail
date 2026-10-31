@@ -7,100 +7,101 @@
 <title>Rail Browser</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-:root { --bg: #000000; --fg: #ededed; --dim: #525252; --line-hi: #3a3a3a; --acc: #38bdf8; --panel: #0c0c0c; --line: #1f1f1f; }
+:root { color-scheme: dark; --bg: #000000; --fg: #f5f5f5; --dim: #8a8a8a; --line-hi: #3a3a3a; --acc: #ffffff; --panel: #0a0a0a; --line: #242424; --hover: #181818; --surface: #101010; --raised: #0a0a0a; }
 html, body { height: 100%; }
 body {
   min-height: 100vh; min-height: 100svh; display: flex; align-items: center; justify-content: center;
   background: var(--bg);
-  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', ui-monospace, monospace;
+  font-family: 'Inter', 'Cantarell', 'Noto Sans', system-ui, sans-serif;
   user-select: none; padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }
 /* The block is vertically centered once; the suggestion list and the profile menu are
    absolutely positioned dropdowns, so nothing ever shifts or floats away from the brand. */
 .container { width: 100%; max-width: 580px; display: flex; flex-direction: column; align-items: flex-start; gap: 28px; animation: fadeIn 160ms ease-out; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.brand-title { font-size: 46px; font-weight: 700; letter-spacing: -0.05em; color: var(--fg); line-height: 1; }
+.brand-title { font-size: 48px; font-weight: 760; letter-spacing: -0.065em; color: var(--fg); line-height: 1; }
 .brand-title .dot { color: var(--acc); }
-.brand-subtitle { margin-top: 10px; font-size: 12px; color: var(--dim); }
+.brand-subtitle { margin-top: 9px; font-size: 12px; color: var(--dim); letter-spacing: .01em; }
 
 .omni { position: relative; width: 100%; }
-.bar { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; }
-.gicon { width: 20px; height: 20px; flex: none; display: inline-flex; }
+.bar { display: flex; align-items: center; gap: 12px; width: 100%; height: 48px; padding: 0 14px; border: 1px solid #292929; border-radius: 11px; background: var(--raised); transition: border-color 140ms ease, background-color 140ms ease; }
+.bar:focus-within { border-color: #696969; background: #0d0d0d; }
+.gicon { width: 20px; height: 20px; flex: none; display: inline-flex; color: #888888; }
 .gicon svg { width: 20px; height: 20px; }
 #q {
-  flex: 1; min-width: 0; height: 40px;
+  flex: 1; min-width: 0; height: 44px;
   background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
   padding: 0 !important; outline: none !important;
-  font: inherit; font-size: 14px; color: var(--fg); caret-color: var(--acc); cursor: text;
+  font: inherit; font-size: 14px; letter-spacing: .005em; color: var(--fg); caret-color: var(--acc); cursor: text;
 }
 #q::placeholder { color: var(--dim); }
-#q::selection { background: #2b4a63; color: #fff; }
+#q::selection { background: #454545; color: #fff; }
 .pbtn {
   flex: none; width: 24px; height: 24px; border-radius: 50%; border: 0; cursor: pointer;
   font: inherit; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center;
 }
 .pbtn:hover { filter: brightness(1.12); }
 
-.hint { margin-top: 6px; display: flex; gap: 26px; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; }
+.hint { margin-top: 8px; display: flex; gap: 26px; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; }
 .hint .k { color: #6a6a6a; margin-right: 6px; }
 .hint .v { color: var(--dim); }
 
 .panel {
   position: absolute; left: 0; right: 0; top: 100%; z-index: 10;
-  background: var(--bg); border-top: 1px solid var(--line); padding-top: 4px;
+  background: var(--raised); border: 1px solid #303030; border-top: 0; border-radius: 0 0 10px 10px; padding: 5px 7px 7px; box-shadow: 0 16px 36px rgba(0,0,0,.45);
 }
 .panel[hidden], .pmenu[hidden] { display: none; }
-.sugs { max-height: 220px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #2a2a2a transparent; }
-.sug { display: flex; align-items: center; gap: 8px; padding: 7px 6px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-.sug:hover, .sug.sel { background: #121212; }
+.sugs { max-height: 260px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #2a2a2a transparent; }
+.sug { display: flex; align-items: center; gap: 9px; padding: 9px 8px; border: 1px solid transparent; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.sug:hover, .sug.sel { background: var(--hover); border-color: #242424; }
 .sug.sel { box-shadow: inset 2px 0 0 var(--acc); }
 .sug .ic { width: 14px; height: 14px; flex: none; color: var(--dim); display: inline-flex; }
 .sug .ic svg { width: 14px; height: 14px; }
 .sug .t { color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; flex: none; }
 .sug .u { color: var(--dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 .sug .t.only { flex: 1; max-width: none; }
-.sug .b { flex: none; margin-left: auto; font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; color: #8a8a8a; border: 1px solid #2a2a2a; border-radius: 3px; padding: 2px 6px; }
+.sug .b { flex: none; margin-left: auto; font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; color: #8a8a8a; border: 1px solid #303030; border-radius: 4px; padding: 2px 6px; }
 
 .pmenu {
   position: absolute; right: 0; top: 46px; z-index: 20; width: 250px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+  background: var(--panel); border: 1px solid #303030; border-radius: 10px; padding: 7px;
+  box-shadow: 0 18px 42px rgba(0,0,0,0.72);
 }
 .pmenu .ttl { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); padding: 6px 8px 8px; }
-.pitem { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 4px; cursor: pointer; }
-.pitem:hover { background: #151515; }
-.pitem.sel { background: #151515; box-shadow: inset 2px 0 0 var(--fg); }
+.pitem { display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 6px; cursor: pointer; }
+.pitem:hover { background: var(--hover); }
+.pitem.sel { background: var(--hover); box-shadow: inset 2px 0 0 var(--fg); }
 .pitem .dot { width: 24px; height: 24px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; }
 .pitem .nm { font-size: 12px; font-weight: 700; color: var(--fg); }
 .pitem .ps { font-size: 9px; color: var(--dim); margin-top: 1px; }
 .pitem .col { flex: 1; min-width: 0; }
 .pitem .ck { color: var(--fg); font-size: 12px; }
 .pmenu .sep { height: 1px; background: var(--line); margin: 6px 2px; }
-.pmenu .manage { display: flex; align-items: center; gap: 8px; padding: 8px; font-size: 10px; font-weight: 700; color: var(--fg); border-radius: 4px; cursor: pointer; }
-.pmenu .manage:hover { background: #151515; }
+.pmenu .manage { display: flex; align-items: center; gap: 8px; padding: 8px; font-size: 10px; font-weight: 700; color: var(--fg); border-radius: 6px; cursor: pointer; }
+.pmenu .manage:hover { background: var(--hover); }
 
 /* Keyboard shortcuts: compact, readable cards instead of a long unstyled list. */
-.container { max-width: 820px; gap: 23px; }
-.shortcuts { width: 100%; margin-top: 0; padding-top: 13px; border-top: 1px solid #202a33; }
+.container { max-width: 820px; gap: 25px; }
+.shortcuts { width: 100%; margin-top: 0; padding-top: 15px; border-top: 1px solid var(--line); }
 body.shortcuts-expanded { align-items: flex-start; overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
 body.shortcuts-expanded .container { margin-top: 0; margin-bottom: 0; }
-.shortcuts-head { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; min-height: 25px; }
-.shortcuts-title { color: #b9c9d5; font: 700 10px/1.2 'DejaVu Sans', sans-serif; letter-spacing: .12em; text-transform: uppercase; }
-.shortcuts-caption { color: #596b79; font: 9px/1.2 'DejaVu Sans', sans-serif; }
-.shortcuts-toggle { margin-left: auto; flex: none; border: 1px solid #293640; border-radius: 5px; background: #0b1116; color: #8aaebe; padding: 5px 8px; font: 600 9px/1 'DejaVu Sans', sans-serif; cursor: pointer; transition: background .15s, border-color .15s; }
-.shortcuts-toggle:hover { background: #152633; border-color: #3b6b83; }
+.shortcuts-head { display: flex; align-items: center; gap: 9px; margin-bottom: 11px; min-height: 27px; }
+.shortcuts-title { color: #e5e5e5; font: 700 10px/1.2 'Inter', 'Cantarell', sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+.shortcuts-caption { color: #777777; font: 9px/1.2 'DejaVu Sans', sans-serif; }
+.shortcuts-toggle { margin-left: auto; flex: none; border: 1px solid #303030; border-radius: 5px; background: #090909; color: #f5f5f5; padding: 6px 10px; font: 600 10px/1 'Inter', 'Cantarell', sans-serif; cursor: pointer; transition: background .15s, border-color .15s; }
+.shortcuts-toggle:hover { background: #202020; border-color: #555555; }
 .shortcuts-toggle:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 .shortcut-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 8px; }
-.shortcut-group { min-width: 0; padding: 8px 9px 5px; border: 1px solid #1c2831; border-radius: 7px; background: #080d11; }
-.shortcut-group-title { margin: 0 0 4px; color: #7893a5; font: 700 8px/1.4 'DejaVu Sans', sans-serif; letter-spacing: .12em; text-transform: uppercase; }
-.shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 27px; padding: 4px 2px; border-top: 1px solid rgba(125,155,178,.08); }
+.shortcut-group { min-width: 0; padding: 10px 11px 6px; border: 1px solid #242424; border-radius: 9px; background: #080808; }
+.shortcut-group-title { margin: 0 0 4px; color: #a0a0a0; font: 700 9px/1.4 'Inter', 'Cantarell', sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+.shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 29px; padding: 5px 2px; border-top: 1px solid rgba(255,255,255,.07); }
 .shortcut-row:first-of-type { border-top: 0; }
-.shortcut-row:hover { background: rgba(116,180,211,.055); }
-.shortcut-row.primary .shortcut-desc { color: #e6f2fa; }
-.shortcut-desc { min-width: 0; color: #9aaab5; font: 9px/1.3 'DejaVu Sans', sans-serif; overflow-wrap: anywhere; }
+.shortcut-row:hover { background: rgba(255,255,255,.045); }
+.shortcut-row.primary .shortcut-desc { color: #ffffff; }
+.shortcut-desc { min-width: 0; color: #a1a1a1; font: 10px/1.35 'Inter', 'Cantarell', sans-serif; overflow-wrap: anywhere; }
 .shortcut-keys { display: flex; flex: none; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 3px; max-width: 58%; }
-.shortcut-key { display: inline-flex; align-items: center; min-height: 19px; padding: 2px 5px; border: 1px solid #2b3a45; border-radius: 4px; background: #111a21; color: #c1d2dd; font: 600 8px/1.2 'DejaVu Sans Mono', monospace; white-space: nowrap; }
-.shortcut-off { color: #687887; font: 9px/1.2 'DejaVu Sans', sans-serif; }
+.shortcut-key { display: inline-flex; align-items: center; min-height: 19px; padding: 2px 5px; border: 1px solid #3a3a3a; border-radius: 5px; background: #171717; color: #f0f0f0; font: 600 9px/1.2 'DejaVu Sans Mono', monospace; white-space: nowrap; }
+.shortcut-off { color: #777777; font: 10px/1.2 'Inter', 'Cantarell', sans-serif; }
 @media (min-width: 521px) and (max-width: 760px) {
   .shortcut-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -112,7 +113,7 @@ body.shortcuts-expanded .container { margin-top: 0; margin-bottom: 0; }
   .shortcut-group { padding: 8px 8px 5px; }
   .brand-title { font-size: clamp(34px, 11vw, 46px); }
   .brand-subtitle { font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
-  .bar { gap: 8px; }
+  .bar { gap: 8px; height: 46px; padding: 0 11px; }
   #q { font-size: 13px; }
   .hint { gap: 12px; white-space: normal; flex-wrap: wrap; line-height: 1.6; }
   .pmenu { width: min(250px, calc(100vw - 40px)); }
@@ -136,7 +137,7 @@ body.shortcuts-expanded .container { margin-top: 0; margin-bottom: 0; }
 <div class="container">
   <div class="brand-area">
     <div class="brand-title">rail<span class="dot">.</span></div>
-    <div class="brand-subtitle">fast pages many workspaces with RAIL</div>
+    <div class="brand-subtitle">A calm space for many workspaces</div>
   </div>
   <div class="omni" id="omni">
     <div class="bar">

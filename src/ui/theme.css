@@ -1,0 +1,959 @@
+/* Rail design system — a quiet, durable graphite / paper palette. */
+* {
+    -gtk-icon-shadow: none;
+}
+
+window {
+    background: @rail_canvas;
+    color: @rail_text;
+    font-family: 'Inter', 'Cantarell', 'Noto Sans', sans-serif;
+    font-size: 13px;
+}
+label, text, textview text {
+    color: @rail_text;
+}
+image {
+    color: @rail_muted;
+}
+selection, entry selection, textview text selection {
+    background: @rail_selection;
+    color: @rail_text;
+}
+
+/* Native controls: consistent dimensions, quiet borders, deliberate focus. */
+button, modelbutton {
+    color: @rail_text;
+    background: @rail_surface;
+    background-image: none;
+    border: 1px solid @rail_line;
+    border-radius: 7px;
+    box-shadow: none;
+    text-shadow: none;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+button:hover, modelbutton:hover {
+    background: @rail_hover;
+    background-image: none;
+    border-color: @rail_line_strong;
+    color: @rail_text;
+}
+button:active, button:checked, modelbutton:checked {
+    background: @rail_selected;
+    background-image: none;
+    border-color: @rail_line_strong;
+}
+button:disabled, modelbutton:disabled {
+    opacity: 0.48;
+}
+button:focus-visible, entry:focus-visible, dropdown:focus-visible, textview:focus-visible {
+    outline: 2px solid @rail_focus;
+    outline-offset: 2px;
+}
+entry, spinbutton, dropdown, combobox, textview, treeview {
+    color: @rail_text;
+    background: @rail_surface_raised;
+    background-image: none;
+    border: 1px solid @rail_line;
+    border-radius: 7px;
+    box-shadow: none;
+    caret-color: @rail_accent;
+}
+entry:focus, spinbutton:focus, dropdown:focus, textview:focus {
+    border-color: @rail_line_strong;
+    box-shadow: 0 0 0 2px @rail_focus;
+}
+entry placeholder, textview placeholder {
+    color: @rail_subtle;
+}
+separator {
+    background: @rail_line;
+    color: @rail_line;
+    min-height: 1px;
+    min-width: 1px;
+}
+
+scrollbar, scrollbar trough, scrollbar.horizontal trough, scrollbar.vertical trough {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+scrollbar slider {
+    background: @rail_line_strong;
+    border: none;
+    border-radius: 99px;
+    min-width: 5px;
+    min-height: 24px;
+}
+scrollbar slider:hover {
+    background: @rail_muted;
+}
+tooltip.background {
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line_strong;
+    border-radius: 7px;
+    box-shadow: 0 8px 24px @rail_shadow;
+}
+tooltip.background label {
+    color: @rail_text;
+    padding: 3px 5px;
+    font-size: 11px;
+}
+popover > contents, popover.menu > contents {
+    color: @rail_text;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line_strong;
+    border-radius: 9px;
+    padding: 5px;
+    box-shadow: 0 14px 34px @rail_shadow;
+}
+popover > arrow {
+    background: @rail_surface_raised;
+    border-color: @rail_line_strong;
+}
+popover.menu modelbutton {
+    min-height: 30px;
+    padding: 0 9px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+}
+popover.menu modelbutton:hover {
+    background: @rail_hover;
+}
+popover.menu separator {
+    margin: 4px 3px;
+}
+
+/* Browser canvas, spatial tabs and split handles. */
+.rail-col, .zoomed {
+    background: @rail_canvas;
+}
+.tab {
+    background: @rail_canvas;
+    border: 1px solid @rail_line;
+    border-radius: 7px;
+    box-shadow: none;
+}
+.tab.focused {
+    border-color: @rail_accent;
+    box-shadow: inset 0 0 0 1px @rail_accent_soft;
+}
+.zoomed .tab {
+    border: 1px solid @rail_line_strong;
+    border-radius: 7px;
+}
+.zoomed .tab.focused {
+    border-color: @rail_accent;
+    outline: 1px solid @rail_accent;
+    outline-offset: 1px;
+}
+.fs-content .tab, .fs-content .tab.focused {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    outline: none;
+}
+.tab-height-handle, .tab-resize-handle {
+    background: transparent;
+    transition: background-color 120ms ease;
+}
+.tab-height-handle:hover, .tab-height-handle.active,
+.tab-resize-handle:hover, .tab-resize-handle.active {
+    background: @rail_accent;
+    box-shadow: none;
+}
+.ov-hint {
+    color: @rail_muted;
+}
+progressbar.load-bar trough {
+    background: transparent;
+}
+progressbar.load-bar progress {
+    background: @rail_accent;
+    border-radius: 99px;
+    box-shadow: none;
+}
+
+/* Sidebar: restrained navigation, clear active state, no ornamental chrome. */
+.side-bar {
+    background: @rail_sidebar;
+    border-right: 1px solid @rail_line;
+    padding: 12px 9px 9px 10px;
+    box-shadow: none;
+}
+.side-footer {
+    border-top: 1px solid @rail_line;
+    padding: 8px 2px 2px;
+    margin-top: 6px;
+}
+.brand {
+    color: @rail_text;
+    font-family: 'Inter', 'Cantarell', 'Noto Sans', sans-serif;
+    font-weight: 750;
+    font-size: 15px;
+    letter-spacing: -0.045em;
+}
+.brand-dot {
+    color: @rail_accent;
+}
+.side-head-btn, button.side-footer-btn, button.flat-icon {
+    color: @rail_muted;
+    background: transparent;
+    border: 1px solid transparent;
+    box-shadow: none;
+}
+.side-head-btn:hover, button.side-footer-btn:hover, button.flat-icon:hover {
+    color: @rail_text;
+    background: @rail_hover;
+    border-color: @rail_line;
+}
+button.side-footer-btn {
+    border-radius: 6px;
+    padding: 7px 9px;
+    font-size: 12px;
+}
+button.btn-add-tab, button.btn-ws-add {
+    color: @rail_muted;
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    box-shadow: none;
+}
+button.btn-add-tab:hover, button.btn-ws-add:hover {
+    color: @rail_text;
+    background: @rail_hover;
+    border-color: @rail_line_strong;
+}
+button.pill {
+    color: @rail_text;
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    border-radius: 7px;
+    box-shadow: none;
+}
+button.pill:hover {
+    background: @rail_hover;
+    border-color: @rail_line_strong;
+}
+.pill-chip, .workspace-badge, .tab-index {
+    color: @rail_muted;
+    background: @rail_surface_raised;
+    border-color: @rail_line;
+}
+.tablist row {
+    background: transparent;
+    border-radius: 6px;
+}
+.tablist row:hover, .tablist row:selected {
+    background: @rail_hover;
+}
+.workspace-header {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 7px;
+}
+.workspace-header:hover {
+    background: @rail_hover;
+    border-color: @rail_line;
+}
+.workspace-header.active-workspace {
+    background: @rail_surface;
+    border-color: @rail_line_strong;
+    border-left: 2px solid @rail_accent;
+}
+.workspace-title, .tab-title {
+    color: @rail_text;
+    font-family: 'Inter', 'Cantarell', 'Noto Sans', sans-serif;
+    letter-spacing: -0.01em;
+}
+.workspace-title {
+    font-size: 11.5px;
+    font-weight: 650;
+}
+.tab-title {
+    font-size: 12.5px;
+    font-weight: 500;
+}
+.workspace-tab-count, .tab-index {
+    color: @rail_subtle;
+}
+.tabrow {
+    background: transparent;
+    border: 1px solid transparent;
+    border-left: 2px solid transparent;
+    border-radius: 6px;
+    margin: 1px 3px;
+    padding: 6px 8px 6px 9px;
+}
+.tabrow:hover {
+    background: @rail_hover;
+    border-color: @rail_line;
+}
+.tabrow.active-tab {
+    background: @rail_surface;
+    border-color: @rail_line;
+    border-left: 2px solid @rail_accent;
+}
+.tabrow.active-tab .tab-title {
+    color: @rail_text;
+    font-weight: 650;
+}
+.tab-close {
+    color: @rail_muted;
+}
+.tab-close:hover {
+    background: @rail_selected;
+    color: @rail_text;
+}
+.btn-new-workspace, button.btn-make-active, button.btn-create-profile {
+    color: @rail_accent_contrast;
+    background: @rail_accent;
+    border: 1px solid @rail_accent;
+    border-radius: 7px;
+    box-shadow: none;
+}
+.btn-new-workspace:hover, button.btn-make-active:hover, button.btn-create-profile:hover {
+    background: @rail_line_strong;
+    border-color: @rail_line_strong;
+    color: @rail_text;
+}
+.side-hint, .shortcut-desc {
+    color: @rail_muted;
+}
+
+/* Omnibar, suggestions and profile picker. */
+.palette, .find-bar {
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line_strong;
+    border-radius: 10px;
+    box-shadow: 0 18px 48px @rail_shadow;
+}
+.palette-entry, entry.palette-entry, entry.palette-entry:focus-within {
+    color: @rail_text;
+    caret-color: @rail_accent;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+}
+.palette-hint, .palette-sug-url, .find-count {
+    color: @rail_subtle;
+}
+.palette-suggestions-box {
+    border-top: 1px solid @rail_line;
+}
+.palette-sug-item {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+}
+.palette-sug-item:hover, .palette-sug-item.selected {
+    background: @rail_hover;
+    border-color: @rail_line;
+}
+.palette-sug-item.selected {
+    box-shadow: inset 2px 0 0 @rail_accent;
+}
+.palette-sug-title {
+    color: @rail_text;
+    font-family: 'Inter', 'Cantarell', 'Noto Sans', sans-serif;
+}
+.palette-sug-icon, .palette image {
+    color: @rail_muted;
+}
+.palette-sug-item.selected .palette-sug-icon,
+.palette-sug-item:hover .palette-sug-icon {
+    color: @rail_accent;
+}
+.palette-sug-badge, .profile-badge-mini, .settings-badge, .devtools-badge {
+    color: @rail_muted;
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    border-radius: 5px;
+}
+.profile-popover > contents, popover.profile-popover > contents {
+    color: @rail_text;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line_strong;
+    border-radius: 9px;
+    box-shadow: 0 14px 34px @rail_shadow;
+}
+.profile-popover-title, .profile-item-name {
+    color: @rail_text;
+}
+.profile-item-persona, .profile-popover-title {
+    color: @rail_muted;
+}
+button.profile-item-btn {
+    color: @rail_text;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+}
+button.profile-item-btn:hover, button.profile-item-btn.selected {
+    color: @rail_text;
+    background: @rail_hover;
+    border-color: @rail_line;
+}
+.profile-card {
+    color: @rail_text;
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    border-radius: 9px;
+    box-shadow: none;
+}
+.profile-card:hover, .profile-card.active-profile {
+    background: @rail_surface_raised;
+    border-color: @rail_line_strong;
+}
+.profile-card-name, .profile-section-label {
+    color: @rail_text;
+}
+.profile-card-sub, .profile-error-label {
+    color: @rail_muted;
+}
+.profile-entry-box {
+    color: @rail_text;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line;
+    border-radius: 7px;
+}
+.profile-entry-box:focus {
+    border-color: @rail_line_strong;
+}
+.profile-drag-handle, .btn-del-profile {
+    color: @rail_muted;
+}
+
+/* Settings: readable hierarchy and calm, consistent surfaces. */
+.settings-modal, .settings-modal-window {
+    color: @rail_text;
+    background: @rail_canvas;
+}
+.settings-header {
+    background: @rail_sidebar;
+    border-bottom: 1px solid @rail_line;
+    padding: 12px 16px;
+}
+.settings-header-icon, .settings-title {
+    color: @rail_text;
+}
+.settings-title {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+.settings-badge {
+    color: @rail_muted;
+    padding: 3px 7px;
+    font-size: 9px;
+}
+.settings-body {
+    background: @rail_canvas;
+}
+.settings-sidebar {
+    background: @rail_sidebar;
+    border-right: 1px solid @rail_line;
+    padding: 10px 8px;
+}
+.settings-tab-btn {
+    color: @rail_muted;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    padding: 8px 10px;
+    font-size: 12px;
+}
+.settings-tab-btn:hover {
+    color: @rail_text;
+    background: @rail_hover;
+}
+.settings-tab-btn.active {
+    color: @rail_text;
+    background: @rail_surface;
+    border-color: @rail_line;
+}
+.settings-content-page {
+    background: @rail_canvas;
+    padding: 22px 24px;
+}
+.settings-page-title {
+    color: @rail_text;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+}
+.settings-page-subtitle, .settings-card-desc {
+    color: @rail_muted;
+    font-size: 12px;
+}
+.settings-card {
+    color: @rail_text;
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    border-radius: 9px;
+    padding: 14px 16px;
+}
+.settings-card-title {
+    color: @rail_text;
+    font-size: 13px;
+    font-weight: 650;
+}
+.settings-option-item, .settings-engine-btn, .appearance-mode-btn {
+    color: @rail_muted;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line;
+    border-radius: 7px;
+}
+.settings-option-item:hover, .settings-engine-btn:hover, .appearance-mode-btn:hover {
+    color: @rail_text;
+    background: @rail_hover;
+    border-color: @rail_line_strong;
+}
+.settings-option-item.active, .settings-engine-btn.active, .appearance-mode-btn.active {
+    color: @rail_text;
+    background: @rail_selected;
+    border-color: @rail_accent;
+    box-shadow: inset 0 0 0 1px @rail_accent_soft;
+}
+.appearance-mode-btn {
+    min-width: 104px;
+    min-height: 36px;
+    padding: 0 16px;
+    font-weight: 600;
+}
+.settings-engine-label {
+    color: inherit;
+}
+.hist-row {
+    color: @rail_text;
+    background: transparent;
+    border-bottom: 1px solid @rail_line;
+}
+.hist-row:hover {
+    background: @rail_hover;
+}
+.shortcut-kbd {
+    color: @rail_muted;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line_strong;
+    border-radius: 5px;
+}
+.shortcut-stack-card {
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    border-radius: 8px;
+}
+.shortcut-stack-card:hover {
+    background: @rail_hover;
+    border-color: @rail_line_strong;
+}
+
+/* Data, profile, and scripted dialog surfaces. */
+.data-modal, .profiles-modal, .top-dialog-card, .js-dialog-window {
+    color: @rail_text;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line_strong;
+    border-radius: 10px;
+    box-shadow: 0 18px 48px @rail_shadow;
+}
+.data-modal-title, .profiles-modal-title, .js-dialog-title {
+    color: @rail_text;
+    font-size: 16px;
+    font-weight: 700;
+}
+.data-modal-subtitle, .js-dialog-message, .profiles-modal-subtitle {
+    color: @rail_muted;
+}
+.data-section-box, .data-info-card {
+    color: @rail_text;
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    border-radius: 8px;
+}
+.data-section-title {
+    color: @rail_text;
+}
+.data-section-desc, .data-status-lbl {
+    color: @rail_muted;
+}
+.btn-data-action {
+    color: @rail_text;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line;
+    border-radius: 7px;
+}
+.btn-data-primary, .js-dialog-btn-ok {
+    color: @rail_accent_contrast;
+    background: @rail_accent;
+    border: 1px solid @rail_accent;
+    border-radius: 7px;
+}
+.btn-data-action:hover, .btn-data-primary:hover, .js-dialog-btn-ok:hover {
+    background: @rail_hover;
+    color: @rail_text;
+    border-color: @rail_line_strong;
+}
+.js-dialog-entry {
+    color: @rail_text;
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    border-radius: 7px;
+}
+.js-dialog-btn-cancel {
+    color: @rail_text;
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    border-radius: 7px;
+}
+
+/* Utility panes and developer surfaces. */
+.minimap-window, .devtools-panel, .devtools-window-box {
+    color: @rail_text;
+    background: @rail_canvas;
+    border: 1px solid @rail_line;
+}
+.minimap-header, .devtools-header, .devtools-input-bar {
+    color: @rail_text;
+    background: @rail_sidebar;
+    border-bottom: 1px solid @rail_line;
+}
+.minimap-header-title, .devtools-brand-label, .devtools-card-title {
+    color: @rail_text;
+}
+.minimap-header-hint, .minimap-badge, .devtools-card-row {
+    color: @rail_muted;
+}
+.minimap-canvas, .devtools-log-area, .devtools-text-view {
+    color: @rail_text;
+    background: @rail_canvas;
+}
+.minimap-location-btn, .devtools-tab-btn {
+    color: @rail_muted;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+}
+.minimap-location-btn:hover, .devtools-tab-btn:hover {
+    color: @rail_text;
+    background: @rail_hover;
+}
+.devtools-tab-btn.active {
+    color: @rail_text;
+    background: @rail_selected;
+    border-color: @rail_line_strong;
+}
+.devtools-entry {
+    color: @rail_text;
+    background: transparent;
+    border: 0;
+}
+.devtools-card {
+    color: @rail_text;
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    border-radius: 8px;
+}
+.devtools-log-row.level-in, .devtools-log-row.level-info {
+    color: @rail_text;
+    background: @rail_surface;
+    border-left-color: @rail_line_strong;
+}
+.hovered-link-status {
+    color: @rail_text;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line_strong;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px @rail_shadow;
+}
+
+/* Update, PWA, QR, screenshot and transient feedback. */
+.update-card, .qr-card, .copied-toast, .ss-toolbar, .ss-topbar {
+    color: @rail_text;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line_strong;
+    border-radius: 10px;
+    box-shadow: 0 14px 36px @rail_shadow;
+}
+.update-kicker, .update-sub, .qr-hint, .copied-toast-body {
+    color: @rail_muted;
+}
+.update-ver, .qr-title, .copied-toast-title {
+    color: @rail_text;
+}
+button.update-get, .qr-copy-btn, .ss-toolbar button.ss-primary, .ss-toolbar button.ss-btn-dl {
+    color: @rail_accent_contrast;
+    background: @rail_accent;
+    border: 1px solid @rail_accent;
+    border-radius: 7px;
+    box-shadow: none;
+}
+button.update-get label, .qr-copy-btn label,
+.ss-toolbar button.ss-primary label, .ss-toolbar button.ss-btn-dl label {
+    color: @rail_accent_contrast;
+}
+button.update-close, .qr-close {
+    color: @rail_muted;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+}
+button.update-close:hover, .qr-close:hover {
+    color: @rail_text;
+    background: @rail_hover;
+}
+.qr-topbar, .qr-url-row, .pwa-headerbar {
+    color: @rail_text;
+    background: @rail_sidebar;
+    border-bottom: 1px solid @rail_line;
+}
+.qr-frame {
+    border: 1px solid @rail_line_strong;
+    border-radius: 5px;
+}
+.qr-url {
+    color: @rail_text;
+}
+.pwa-window {
+    color: @rail_text;
+    background: @rail_canvas;
+}
+.pwa-title-pill {
+    color: @rail_text;
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    border-radius: 7px;
+}
+.ss-toolbar button, .ss-topbar button {
+    color: @rail_text;
+    background: @rail_surface;
+    border: 1px solid @rail_line;
+    border-radius: 6px;
+}
+.ss-toolbar button:hover, .ss-topbar button:hover {
+    background: @rail_hover;
+}
+.ss-hint, .ss-size {
+    color: @rail_text;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line;
+    border-radius: 7px;
+}
+
+/* Context menus share the same compact, precise surface language. */
+popover.ctxm > contents {
+    color: @rail_text;
+    background: @rail_surface_raised;
+    border: 1px solid @rail_line_strong;
+    border-radius: 9px;
+    padding: 5px 0;
+    box-shadow: 0 14px 34px @rail_shadow;
+}
+popover.ctxm button.ctxm-row {
+    color: @rail_text;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+}
+popover.ctxm button.ctxm-row label {
+    color: inherit;
+}
+popover.ctxm button.ctxm-row:hover, popover.ctxm button.ctxm-hdr-btn:hover {
+    color: @rail_text;
+    background: @rail_hover;
+}
+popover.ctxm separator {
+    background: @rail_line;
+}
+popover.ctxm .ctxm-sc {
+    color: @rail_subtle;
+}
+
+/* Final fit-and-finish: interaction details and secondary browser surfaces. */
+.side-bar, .settings-sidebar {
+    border-right-color: @rail_line;
+}
+button.flat-icon, button.side-head-btn, button.side-footer-btn,
+.tab-close, .btn-ws-add {
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+button.flat-icon, button.side-head-btn, .tab-close, .btn-ws-add {
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+}
+.workspace-header, .tabrow, .settings-tab-btn,
+.profile-card, .settings-card, .data-section-box, .data-info-card {
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+.tabrow.active-tab, .workspace-header.active-workspace {
+    box-shadow: none;
+}
+.settings-content-page > label:first-child {
+    margin-bottom: 2px;
+}
+.settings-card {
+    margin-bottom: 2px;
+}
+.settings-option-item, .settings-engine-btn {
+    min-height: 34px;
+    padding: 0 11px;
+}
+.settings-engine-btn.active, .settings-option-item.active {
+    box-shadow: inset 0 0 0 1px @rail_accent_soft;
+}
+.settings-update-chip {
+    color: @rail_accent_contrast;
+    background: @rail_accent;
+    border: 1px solid @rail_accent;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 650;
+}
+.settings-update-chip:hover {
+    color: @rail_text;
+    background: @rail_hover;
+    border-color: @rail_line_strong;
+}
+.settings-header button.flat-icon {
+    border-radius: 6px;
+}
+.settings-sidebar-scroll, .settings-content-page {
+    border: 0;
+}
+.settings-content-page dropdown,
+.settings-content-page combobox,
+.settings-content-page entry {
+    min-height: 34px;
+}
+.profile-circle-btn {
+    box-shadow: 0 0 0 2px @rail_canvas;
+}
+button.profile-circle-btn:hover {
+    border-color: @rail_text;
+}
+.profile-card.active-profile {
+    box-shadow: inset 2px 0 0 @rail_accent;
+}
+button.btn-del-profile:hover {
+    color: @rail_text;
+    background: @rail_hover;
+}
+button.color-choice.selected {
+    border-color: @rail_text;
+    box-shadow: 0 0 0 2px @rail_canvas, 0 0 0 3px @rail_text;
+}
+.find-bar {
+    padding: 7px 9px;
+}
+entry.find-entry, entry.find-entry:focus-within {
+    color: @rail_text;
+    caret-color: @rail_accent;
+}
+.find-bar.find-none .find-count {
+    color: @rail_text;
+}
+.devtools-panel {
+    border-color: @rail_line_strong;
+}
+.devtools-resize-handle:hover, .devtools-resize-handle.dragging,
+.devtools-panel.dock-bottom .devtools-resize-handle:hover,
+.devtools-panel.dock-bottom .devtools-resize-handle.dragging,
+.devtools-panel.dock-left .devtools-resize-handle:hover,
+.devtools-panel.dock-right .devtools-resize-handle:hover,
+.devtools-panel.dock-left .devtools-resize-handle.dragging,
+.devtools-panel.dock-right .devtools-resize-handle.dragging {
+    background: @rail_accent;
+    border-color: @rail_accent;
+}
+.devtools-panel.dock-bottom .devtools-resize-handle {
+    border-top-color: @rail_line;
+}
+.devtools-panel.dock-left .devtools-resize-handle,
+.devtools-panel.dock-right .devtools-resize-handle {
+    border-left-color: @rail_line;
+    border-right-color: @rail_line;
+}
+.devtools-brand-icon, .devtools-prompt-char {
+    color: @rail_text;
+}
+.devtools-entry {
+    caret-color: @rail_accent;
+}
+.devtools-log-row.level-out {
+    color: @rail_text;
+    background: @rail_surface;
+    border-left-color: @rail_muted;
+}
+.minimap-window {
+    border-color: @rail_line_strong;
+    border-radius: 9px;
+}
+.minimap-header {
+    border-radius: 9px 9px 0 0;
+}
+.minimap-location-btn:hover image, .minimap-location-btn:hover label {
+    color: @rail_text;
+}
+.update-card {
+    min-width: 280px;
+}
+button.update-get:hover, .qr-copy-btn:hover,
+.ss-toolbar button.ss-primary:hover, .ss-toolbar button.ss-btn-dl:hover {
+    color: @rail_text;
+    background: @rail_hover;
+    border-color: @rail_line_strong;
+}
+button.update-get:hover label, .qr-copy-btn:hover label,
+.ss-toolbar button.ss-primary:hover label, .ss-toolbar button.ss-btn-dl:hover label {
+    color: @rail_text;
+}
+.pwa-headerbar {
+    min-height: 44px;
+}
+.pwa-dialog-icon, button.pill-pwa-btn {
+    color: @rail_text;
+}
+button.pill-pwa-btn:hover {
+    color: @rail_text;
+    background: @rail_hover;
+}
+.qr-backdrop, .ss-overlay {
+    background: rgba(0, 0, 0, 0.76);
+}
+.copied-toast {
+    border-radius: 8px;
+}
+.hovered-link-status {
+    padding: 5px 9px;
+}
+
+/* Monochrome navigation markers; profile swatches remain user-configurable. */
+.fav-0 { background: #f2f2f2; }
+.fav-1 { background: #d8d8d8; }
+.fav-2 { background: #bdbdbd; }
+.fav-3 { background: #a5a5a5; }
+.fav-4 { background: #8d8d8d; }
+.fav-5 { background: #777777; }
+.fav-6 { background: #626262; }
+.fav-7 { background: #4d4d4d; }
+.fav-5, .fav-6, .fav-7 { color: #ffffff; }
+
+/* Status is communicated by wording and iconography, not a second accent palette. */
+.profile-entry-box.error {
+    border-color: @rail_line_strong;
+    box-shadow: 0 0 0 1px @rail_line_strong;
+}
+.profile-error-label, .update-err {
+    color: @rail_muted;
+}
+.devtools-log-row.level-err {
+    color: @rail_text;
+    background: @rail_surface;
+    border-left-color: @rail_line_strong;
+}
+.devtools-log-row.level-out {
+    background: @rail_surface;
+    color: @rail_text;
+    border-left-color: @rail_line_strong;
+}
+.css-editor, .css-editor-gutter, .css-editor text {
+    color: @rail_text;
+    background: @rail_surface;
+}

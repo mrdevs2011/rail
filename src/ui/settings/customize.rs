@@ -294,28 +294,28 @@ fn setup_css_tags(buf: &gtk::TextBuffer) {
         .build();
     let selector = gtk::TextTag::builder()
         .name("css_selector")
-        .foreground("#60a5fa")
+        .foreground("#f0f0f0")
         .weight(700)
         .build();
     let prop = gtk::TextTag::builder()
         .name("css_prop")
-        .foreground("#38bdf8")
+        .foreground("#c8c8c8")
         .build();
     let val = gtk::TextTag::builder()
         .name("css_val")
-        .foreground("#34d399")
+        .foreground("#a8a8a8")
         .build();
     let str_tag = gtk::TextTag::builder()
         .name("css_str")
-        .foreground("#f472b6")
+        .foreground("#e2e2e2")
         .build();
     let num_tag = gtk::TextTag::builder()
         .name("css_num")
-        .foreground("#fb923c")
+        .foreground("#909090")
         .build();
     let punct = gtk::TextTag::builder()
         .name("css_punct")
-        .foreground("#e4e4e7")
+        .foreground("#bdbdbd")
         .build();
 
     let _ = table.add(&comment);

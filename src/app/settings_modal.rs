@@ -209,7 +209,7 @@ impl App {
     pub(crate) fn clear_history_action(self: &Rc<Self>) {
         self.history.borrow_mut().clear();
         self.data_modal_status_lbl.set_markup(&format!(
-            "<span foreground='#4ade80'><b>{}</b> {}</span>",
+            "<span foreground='#f5f5f5'><b>{}</b> {}</span>",
             tr("History Cleared:"),
             tr("All Omnibar history and suggestions have been purged.")
         ));
@@ -233,7 +233,7 @@ impl App {
             }
         }
         self.data_modal_status_lbl.set_markup(&format!(
-            "<span foreground='#4ade80'><b>{}</b> {}</span>",
+            "<span foreground='#f5f5f5'><b>{}</b> {}</span>",
             tr("Cache Cleared:"),
             tr("Profile network disk caches purged successfully.")
         ));

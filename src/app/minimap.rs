@@ -296,7 +296,7 @@ impl App {
     }
 
     pub(crate) fn draw_minimap(&self, cr: &gtk::cairo::Context, width: f64, height: f64) {
-        // Rail deep obsidian canvas background (#060913)
+        // Rail monochrome canvas background (#080808)
         cr.set_source_rgb(0.03, 0.03, 0.03);
         let _ = cr.paint();
 
@@ -343,10 +343,10 @@ impl App {
 
                 Self::draw_rounded_rect(cr, sx, sy, sw, sh, corner_r);
 
-                // Sleek dark slate tile (#0f172a)
+                // Subtle graphite tile (#141414)
                 cr.set_source_rgb(0.08, 0.08, 0.08);
                 let _ = cr.fill_preserve();
-                // Subtle border (#1e293b)
+                // Subtle graphite border (#262626)
                 cr.set_source_rgb(0.15, 0.15, 0.15);
                 cr.set_line_width((1.2 * zoom).clamp(0.8, 1.8));
                 let _ = cr.stroke();

@@ -20,7 +20,7 @@ pub(crate) fn build_devtools() -> DevtoolsWidgets {
     devtools_icon.add_css_class("devtools-brand-icon");
 
     let devtools_title = gtk::Label::new(None);
-    devtools_title.set_markup("<span font_family='ui-monospace' font_weight='800'>rail</span><span foreground='#38bdf8'>.</span><span font_family='ui-monospace' foreground='#a1a1a1'>devtools</span>");
+    devtools_title.set_markup("<span font_family='ui-monospace' font_weight='800'>rail</span><span foreground='#ffffff'>.</span><span font_family='ui-monospace' foreground='#a1a1a1'>devtools</span>");
     devtools_title.add_css_class("devtools-brand-label");
 
     let devtools_badge = gtk::Label::new(None);
