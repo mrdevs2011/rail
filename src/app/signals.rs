@@ -518,6 +518,14 @@ impl App {
                 app_ss.on_screenshot_message(&v, val.to_str().as_str());
             });
 
+            let app_downloads = self.clone();
+            let wv_downloads = view.downgrade();
+            ucm.connect_script_message_received(Some("railDownloads"), move |_, val| {
+                if let Some(v) = wv_downloads.upgrade() {
+                    app_downloads.handle_downloads_message(&v, val.to_str().as_str());
+                }
+            });
+
             let wv_ctx = view.downgrade();
             ucm.connect_script_message_received(Some("railContextMenu"), move |_, _val| {
                 if let Some(v) = wv_ctx.upgrade() {

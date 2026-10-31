@@ -368,6 +368,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         recently_closed: RefCell::new(Vec::new()),
     });
 
+    install_download_notifications(&app);
     app.select_palette_profile(&initial_prof_id);
 
     wire_minimap(
