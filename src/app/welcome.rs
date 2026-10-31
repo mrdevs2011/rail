@@ -149,22 +149,21 @@ impl App {
         let mut target_w = 580.min(win_w.saturating_sub(32));
         // Welcome page: pin the omnibar directly under the "rail." brand, aligned with it.
         // (Start page = centered column, max 580px, 20px side padding; brand block ~72px tall.)
-        if self.focused_is_welcome() {
-            if let (Some(v), Some(parent)) = (self.focused_view(), self.palette.parent()) {
-                if let Some(b) = v.compute_bounds(&parent) {
-                    if b.width() > 120.0 && b.height() > 120.0 {
-                        let cw = ((b.width() as i32) - 40).clamp(200, 580);
-                        let cx = b.x() + b.width() / 2.0;
-                        self.palette.set_size_request(cw, -1);
-                        self.palette.set_halign(gtk::Align::Start);
-                        self.palette
-                            .set_margin_start(((cx - cw as f32 / 2.0).round() as i32).max(0));
-                        let top = b.y() + b.height() / 2.0 + 36.0 + 28.0;
-                        self.palette.set_margin_top(top.round() as i32);
-                        return;
-                    }
-                }
-            }
+        if self.focused_is_welcome()
+            && let (Some(v), Some(parent)) = (self.focused_view(), self.palette.parent())
+            && let Some(b) = v.compute_bounds(&parent)
+            && b.width() > 120.0
+            && b.height() > 120.0
+        {
+            let cw = ((b.width() as i32) - 40).clamp(200, 580);
+            let cx = b.x() + b.width() / 2.0;
+            self.palette.set_size_request(cw, -1);
+            self.palette.set_halign(gtk::Align::Start);
+            self.palette
+                .set_margin_start(((cx - cw as f32 / 2.0).round() as i32).max(0));
+            let top = b.y() + b.height() / 2.0 + 36.0 + 28.0;
+            self.palette.set_margin_top(top.round() as i32);
+            return;
         }
         // Ctrl+L on a normal page: classic centered palette near the top
         target_w = target_w.max(200);
@@ -235,7 +234,7 @@ impl App {
         });
         format!(
             "{{\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}],\"shortcuts\":[{}],\"shortcutTitle\":\"{}\",\"shortcutCaption\":\"{}\",\"showAll\":\"{}\",\"showLess\":\"{}\",\"shortcutDisabled\":\"{}\"}}",
-            e(&tr("Search with {} or enter URL").replace("{}", &display_name)),
+            e(&tr("Search with {} or enter URL").replace("{}", display_name)),
             e(svg_str),
             e(&sc_apply(
                 tr("Enter  go      Esc  cancel      Alt+P  profiles"),
@@ -263,7 +262,7 @@ impl App {
     pub(crate) fn sync_search_engine_ui(self: &Rc<Self>) {
         let engine = self.search_engine.borrow().clone();
         let display_name = search_engine_display_name(&engine);
-        let placeholder = tr("Search with {} or enter URL").replace("{}", &display_name);
+        let placeholder = tr("Search with {} or enter URL").replace("{}", display_name);
 
         self.entry.set_placeholder_text(Some(&placeholder));
 

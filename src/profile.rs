@@ -49,12 +49,13 @@ impl Profile {
         // 2. If multi-word name:
         let words: Vec<&str> = trimmed.split_whitespace().collect();
         if words.len() > 1 {
-            if let Some(last) = words.last() {
-                if last.chars().all(|c| c.is_ascii_digit()) && last.len() <= 3 {
-                    // e.g. "Profile 10" -> "10"
-                    if words.len() == 2 && words[0].eq_ignore_ascii_case("profile") {
-                        return (*last).to_string();
-                    }
+            if let Some(last) = words.last()
+                && last.chars().all(|c| c.is_ascii_digit())
+                && last.len() <= 3
+            {
+                // e.g. "Profile 10" -> "10"
+                if words.len() == 2 && words[0].eq_ignore_ascii_case("profile") {
+                    return (*last).to_string();
                 }
             }
             // Multi-word initials up to 3: "John Doe" -> "JD", "My Work Space" -> "MWS"

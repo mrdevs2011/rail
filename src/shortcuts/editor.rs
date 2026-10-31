@@ -152,16 +152,15 @@ pub(crate) fn sc_commit(ui: &ScUi) {
         apply_shortcut_priority();
         sc_refresh_bound();
         MAIN_APP.with(|slot| {
-            if let Some(app) = slot.borrow().as_ref() {
-                if let Ok(rows) = app.rows.try_borrow() {
-                    for row in rows.iter() {
-                        for tab in &row.tabs {
-                            let uri = tab.view.uri().map(|u| u.to_string()).unwrap_or_default();
-                            let saved = tab.saved_uri.borrow().clone();
-                            if uri.starts_with("rail://start") || saved.starts_with("rail://start")
-                            {
-                                app.push_start_state(&tab.view);
-                            }
+            if let Some(app) = slot.borrow().as_ref()
+                && let Ok(rows) = app.rows.try_borrow()
+            {
+                for row in rows.iter() {
+                    for tab in &row.tabs {
+                        let uri = tab.view.uri().map(|u| u.to_string()).unwrap_or_default();
+                        let saved = tab.saved_uri.borrow().clone();
+                        if uri.starts_with("rail://start") || saved.starts_with("rail://start") {
+                            app.push_start_state(&tab.view);
                         }
                     }
                 }
@@ -358,15 +357,13 @@ pub(crate) fn sc_build(ui: &ScUi) {
                 ui2.is_syncing.set(false);
                 sc_commit(&ui2);
                 // Update opacity without full rebuild
-                if let Some(parent) = s.parent() {
-                    if let Some(boxp) = parent.downcast_ref::<gtk::Box>() {
-                        if let Some(lab) = boxp
-                            .first_child()
-                            .and_then(|w| w.downcast::<gtk::Label>().ok())
-                        {
-                            lab.set_opacity(if is_on { 1.0 } else { 0.45 });
-                        }
-                    }
+                if let Some(parent) = s.parent()
+                    && let Some(boxp) = parent.downcast_ref::<gtk::Box>()
+                    && let Some(lab) = boxp
+                        .first_child()
+                        .and_then(|w| w.downcast::<gtk::Label>().ok())
+                {
+                    lab.set_opacity(if is_on { 1.0 } else { 0.45 });
                 }
             });
         }

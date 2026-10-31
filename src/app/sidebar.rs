@@ -125,7 +125,7 @@ impl App {
     }
 
     pub(crate) fn refresh_sidebar_soon(self: &Rc<Self>) {
-        thread_local! { static SIDEBAR_PENDING: Cell<bool> = Cell::new(false); }
+        thread_local! { static SIDEBAR_PENDING: Cell<bool> = const { Cell::new(false) }; }
         if SIDEBAR_PENDING.with(|p| p.replace(true)) {
             return;
         }
@@ -214,24 +214,24 @@ impl App {
                 content_box.append(&Self::tab_icon(t, 16));
 
                 let mgr = self.profiles.borrow();
-                if mgr.profiles().len() > 1 {
-                    if let Some(p) = mgr.get_profile(&t.profile_id) {
-                        let p_dot = gtk::Label::new(None);
-                        let fg = p.text_color();
-                        p_dot.set_markup(&format!(
-                            "<span foreground='{}' font_weight='800'>{}</span>",
-                            fg,
-                            glib::markup_escape_text(&p.initial_letter())
-                        ));
-                        p_dot.add_css_class("profile-badge-mini");
-                        p_dot.add_css_class(&format!("prof-bg-{}", p.color_idx));
-                        p_dot.set_valign(gtk::Align::Center);
-                        p_dot.set_halign(gtk::Align::Center);
-                        p_dot.set_width_request(18);
-                        p_dot.set_height_request(16);
-                        p_dot.set_tooltip_text(Some(&trf("Profile: {}", &[&p.display_name()])));
-                        content_box.append(&p_dot);
-                    }
+                if mgr.profiles().len() > 1
+                    && let Some(p) = mgr.get_profile(&t.profile_id)
+                {
+                    let p_dot = gtk::Label::new(None);
+                    let fg = p.text_color();
+                    p_dot.set_markup(&format!(
+                        "<span foreground='{}' font_weight='800'>{}</span>",
+                        fg,
+                        glib::markup_escape_text(&p.initial_letter())
+                    ));
+                    p_dot.add_css_class("profile-badge-mini");
+                    p_dot.add_css_class(&format!("prof-bg-{}", p.color_idx));
+                    p_dot.set_valign(gtk::Align::Center);
+                    p_dot.set_halign(gtk::Align::Center);
+                    p_dot.set_width_request(18);
+                    p_dot.set_height_request(16);
+                    p_dot.set_tooltip_text(Some(&trf("Profile: {}", &[&p.display_name()])));
+                    content_box.append(&p_dot);
                 }
                 drop(mgr);
 
@@ -310,7 +310,7 @@ impl App {
 
                         if dist < 4.0 {
                             let items = tab_reg_update.borrow();
-                            for &(_, _, ref b) in items.iter() {
+                            for (_, _, b) in items.iter() {
                                 b.remove_css_class("drop-target-above");
                                 b.remove_css_class("drop-target-below");
                             }
@@ -381,7 +381,7 @@ impl App {
                     item_end.set_cursor_from_name(Some("grab"));
 
                     let items = tab_reg_end.borrow();
-                    for &(_, _, ref b) in items.iter() {
+                    for (_, _, b) in items.iter() {
                         b.remove_css_class("drop-target-above");
                         b.remove_css_class("drop-target-below");
                     }
@@ -493,8 +493,6 @@ impl App {
         self.cycle_sidebar_mode();
     }
 
-    /// Alt+B / header button: cycle fixed ↔ auto. Auto starts closed; fixed starts open.
-
     /// Rail logo is always visible: fixed mode and the hover-opened (auto) sidebar.
     pub(crate) fn sync_brand_logo(&self) {
         self.brand_logo.set_reveal_child(true);
@@ -533,10 +531,10 @@ impl App {
         }
 
         // Cancel pending close if pointer is back inside or near sidebar
-        if x <= (SIDE_W as f64) + 16.0 {
-            if let Some(source) = self.side_close_timer.borrow_mut().take() {
-                source.remove();
-            }
+        if x <= (SIDE_W as f64) + 16.0
+            && let Some(source) = self.side_close_timer.borrow_mut().take()
+        {
+            source.remove();
         }
 
         if !self.side_open.get() {
@@ -564,18 +562,15 @@ impl App {
         } else {
             // Sidebar is open.
             // If pointer moves past sidebar width plus grace margin, start debounce close timer.
-            if x > (SIDE_W as f64) + 24.0 {
-                if self.side_close_timer.borrow().is_none() {
-                    let app = self.clone();
-                    let source =
-                        glib::timeout_add_local_once(Duration::from_millis(200), move || {
-                            app.side_close_timer.borrow_mut().take();
-                            if app.sidebar_auto.get() && app.side_open.get() {
-                                app.set_sidebar(false);
-                            }
-                        });
-                    *self.side_close_timer.borrow_mut() = Some(source);
-                }
+            if x > (SIDE_W as f64) + 24.0 && self.side_close_timer.borrow().is_none() {
+                let app = self.clone();
+                let source = glib::timeout_add_local_once(Duration::from_millis(200), move || {
+                    app.side_close_timer.borrow_mut().take();
+                    if app.sidebar_auto.get() && app.side_open.get() {
+                        app.set_sidebar(false);
+                    }
+                });
+                *self.side_close_timer.borrow_mut() = Some(source);
             }
         }
     }
@@ -601,17 +596,15 @@ impl App {
 
         // Pointer left the window: give a short grace period (160ms) before closing
         // so quick flicks to window borders don't abruptly snap the sidebar away.
-        if last_x > 4.0 {
-            if self.side_close_timer.borrow().is_none() {
-                let app = self.clone();
-                let source = glib::timeout_add_local_once(Duration::from_millis(160), move || {
-                    app.side_close_timer.borrow_mut().take();
-                    if app.sidebar_auto.get() && app.side_open.get() {
-                        app.set_sidebar(false);
-                    }
-                });
-                *self.side_close_timer.borrow_mut() = Some(source);
-            }
+        if last_x > 4.0 && self.side_close_timer.borrow().is_none() {
+            let app = self.clone();
+            let source = glib::timeout_add_local_once(Duration::from_millis(160), move || {
+                app.side_close_timer.borrow_mut().take();
+                if app.sidebar_auto.get() && app.side_open.get() {
+                    app.set_sidebar(false);
+                }
+            });
+            *self.side_close_timer.borrow_mut() = Some(source);
         }
     }
 

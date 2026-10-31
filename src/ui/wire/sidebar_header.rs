@@ -9,19 +9,19 @@ pub(crate) fn wire_sidebar_header(
 ) {
     let a = app.clone();
     head_back.connect_clicked(move |_| {
-        if let Some(v) = a.focused_view() {
-            if v.can_go_back() {
-                v.go_back();
-            }
+        if let Some(v) = a.focused_view()
+            && v.can_go_back()
+        {
+            v.go_back();
         }
     });
 
     let a = app.clone();
     head_forward.connect_clicked(move |_| {
-        if let Some(v) = a.focused_view() {
-            if v.can_go_forward() {
-                v.go_forward();
-            }
+        if let Some(v) = a.focused_view()
+            && v.can_go_forward()
+        {
+            v.go_forward();
         }
     });
 

@@ -407,14 +407,14 @@ impl App {
         let vw = self.strip.width() as f64;
         let clamped = clamp_column_width(width, vw);
         let rows = self.rows.borrow();
-        if let Some(row) = rows.get(r) {
-            if let Some(tab) = row.tabs.get(c) {
-                tab.custom_width.set(Some(clamped));
-                if (clamped - vw).abs() < 10.0 {
-                    tab.container.add_css_class("full");
-                } else {
-                    tab.container.remove_css_class("full");
-                }
+        if let Some(row) = rows.get(r)
+            && let Some(tab) = row.tabs.get(c)
+        {
+            tab.custom_width.set(Some(clamped));
+            if (clamped - vw).abs() < 10.0 {
+                tab.container.add_css_class("full");
+            } else {
+                tab.container.remove_css_class("full");
             }
         }
         drop(rows);

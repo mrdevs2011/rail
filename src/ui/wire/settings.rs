@@ -2,30 +2,54 @@
 
 use crate::*;
 
-pub(crate) fn wire_settings(
-    app: &Rc<App>,
-    add_prof_btn: gtk::Button,
-    btn_clear_cache: gtk::Button,
-    btn_clear_hist: gtk::Button,
-    btn_clear_hist_tab: gtk::Button,
-    btn_copy_sync_url: gtk::Button,
-    btn_export_local: gtk::Button,
-    btn_import_local: gtk::Button,
-    btn_sync_now: gtk::Button,
-    btn_sync_restore: gtk::Button,
-    engine_buttons: Vec<(String, gtk::Button)>,
-    hist_list_box: gtk::Box,
-    hist_search_entry: gtk::Entry,
-    layout: StripLayout,
-    new_profile_entry: gtk::Entry,
-    settings_close_btn: gtk::Button,
-    settings_update_chip: gtk::Button,
-    sub_history_btn: gtk::Button,
-    sync_restore_entry: gtk::Entry,
-    sync_url_result_entry: gtk::Entry,
-    tab_buttons_vec: Vec<(SettingsTab, gtk::Button)>,
-    win: gtk::ApplicationWindow,
-) {
+pub(crate) struct SettingsWidgets {
+    pub(crate) add_prof_btn: gtk::Button,
+    pub(crate) btn_clear_cache: gtk::Button,
+    pub(crate) btn_clear_hist: gtk::Button,
+    pub(crate) btn_clear_hist_tab: gtk::Button,
+    pub(crate) btn_copy_sync_url: gtk::Button,
+    pub(crate) btn_export_local: gtk::Button,
+    pub(crate) btn_import_local: gtk::Button,
+    pub(crate) btn_sync_now: gtk::Button,
+    pub(crate) btn_sync_restore: gtk::Button,
+    pub(crate) engine_buttons: Vec<(String, gtk::Button)>,
+    pub(crate) hist_list_box: gtk::Box,
+    pub(crate) hist_search_entry: gtk::Entry,
+    pub(crate) layout: StripLayout,
+    pub(crate) new_profile_entry: gtk::Entry,
+    pub(crate) settings_close_btn: gtk::Button,
+    pub(crate) settings_update_chip: gtk::Button,
+    pub(crate) sub_history_btn: gtk::Button,
+    pub(crate) sync_restore_entry: gtk::Entry,
+    pub(crate) sync_url_result_entry: gtk::Entry,
+    pub(crate) tab_buttons_vec: Vec<(SettingsTab, gtk::Button)>,
+    pub(crate) win: gtk::ApplicationWindow,
+}
+
+pub(crate) fn wire_settings(app: &Rc<App>, widgets: SettingsWidgets) {
+    let SettingsWidgets {
+        add_prof_btn,
+        btn_clear_cache,
+        btn_clear_hist,
+        btn_clear_hist_tab,
+        btn_copy_sync_url,
+        btn_export_local,
+        btn_import_local,
+        btn_sync_now,
+        btn_sync_restore,
+        engine_buttons,
+        hist_list_box,
+        hist_search_entry,
+        layout,
+        new_profile_entry,
+        settings_close_btn,
+        settings_update_chip,
+        sub_history_btn,
+        sync_restore_entry,
+        sync_url_result_entry,
+        tab_buttons_vec,
+        win,
+    } = widgets;
     let a = app.clone();
     settings_close_btn.connect_clicked(move |_| {
         // X = close the settings tab (same as Ctrl+W), not just hide chrome
@@ -170,11 +194,11 @@ pub(crate) fn wire_settings(
             .build();
         let a = a.clone();
         dialog.save(Some(&win), gio::Cancellable::NONE, move |res| {
-            if let Ok(file) = res {
-                if let Some(path) = file.path() {
-                    a.data_export_entry.set_text(&path.to_string_lossy());
-                    a.execute_export_action();
-                }
+            if let Ok(file) = res
+                && let Some(path) = file.path()
+            {
+                a.data_export_entry.set_text(&path.to_string_lossy());
+                a.execute_export_action();
             }
         });
     });
@@ -190,11 +214,11 @@ pub(crate) fn wire_settings(
             .build();
         let a = a.clone();
         dialog.open(Some(&win), gio::Cancellable::NONE, move |res| {
-            if let Ok(file) = res {
-                if let Some(path) = file.path() {
-                    a.data_import_entry.set_text(&path.to_string_lossy());
-                    a.execute_import_action();
-                }
+            if let Ok(file) = res
+                && let Some(path) = file.path()
+            {
+                a.data_import_entry.set_text(&path.to_string_lossy());
+                a.execute_import_action();
             }
         });
     });
@@ -217,7 +241,7 @@ pub(crate) fn wire_settings(
     {
         // Off-screen columns are unmapped by the strip layout (WebKit then throttles them). Grab the last
         // frame just before a live tab is hidden (so suspend can still freeze it) and drop it when shown.
-        let weak = Rc::downgrade(&app);
+        let weak = Rc::downgrade(app);
         layout.connect_visibility(move |child, visible| {
             let Some(a) = weak.upgrade() else { return };
             let Ok(rows) = a.rows.try_borrow() else {
@@ -263,7 +287,7 @@ pub(crate) fn wire_settings(
     }
 
     {
-        let weak = Rc::downgrade(&app);
+        let weak = Rc::downgrade(app);
         app.win.connect_fullscreened_notify(move |_| {
             if let Some(a) = weak.upgrade() {
                 a.apply_fullscreen_mode();

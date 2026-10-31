@@ -86,7 +86,7 @@ fn write_rows(path: &PathBuf, mut rows: Vec<Row>) {
     });
     let mut out = String::new();
     for (url, title, count, last) in rows.into_iter().take(2000) {
-        let clean_title = title.replace('\t', " ").replace('\n', " ");
+        let clean_title = title.replace(['\t', '\n'], " ");
         out.push_str(&format!("{}\t{}\t{}\t{}\n", url, clean_title, count, last));
     }
     let tmp = path.with_extension("txt.tmp");
@@ -303,7 +303,7 @@ impl HistoryManager {
 
     pub fn get_all_sorted(&self) -> Vec<HistoryEntry> {
         let mut list: Vec<HistoryEntry> = self.entries.values().cloned().collect();
-        list.sort_by(|a, b| b.last_visit.cmp(&a.last_visit));
+        list.sort_by_key(|entry| std::cmp::Reverse(entry.last_visit));
         list
     }
 
@@ -421,7 +421,7 @@ impl HistoryManager {
         }
 
         // Sort by score descending
-        candidates.sort_by(|a, b| b.score.cmp(&a.score));
+        candidates.sort_by_key(|candidate| std::cmp::Reverse(candidate.score));
 
         let mut results: Vec<HistorySuggestion> = candidates
             .into_iter()
@@ -455,10 +455,10 @@ impl HistoryManager {
         {
             let mut cache = self.suggest_cache.borrow_mut();
             let mut order = self.suggest_cache_order.borrow_mut();
-            if cache.len() >= SUGGEST_CACHE_CAP {
-                if let Some(oldest) = order.pop_front() {
-                    cache.remove(&oldest);
-                }
+            if cache.len() >= SUGGEST_CACHE_CAP
+                && let Some(oldest) = order.pop_front()
+            {
+                cache.remove(&oldest);
             }
             cache.insert(raw_q.to_string(), results.clone());
             order.push_back(raw_q.to_string());
@@ -497,6 +497,14 @@ fn url_encode(s: &str) -> String {
         }
     }
     out
+}
+
+impl Drop for HistoryManager {
+    fn drop(&mut self) {
+        self.flush();
+        // Wait for the queued snapshot to reach the disk before the process exits.
+        self.writer.finish();
+    }
 }
 
 #[cfg(test)]
@@ -582,13 +590,5 @@ mod tests {
         let mgr2 = HistoryManager::new(temp_dir.clone());
         assert_eq!(mgr2.entries.len(), 0);
         let _ = fs::remove_dir_all(&temp_dir);
-    }
-}
-
-impl Drop for HistoryManager {
-    fn drop(&mut self) {
-        self.flush();
-        // Wait for the queued snapshot to reach the disk before the process exits.
-        self.writer.finish();
     }
 }

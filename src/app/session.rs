@@ -242,11 +242,12 @@ impl App {
         let mut stacked = state.stacked.clone();
         stacked.sort();
         for (sr, sc) in stacked {
-            if let Some(row) = rows.get(sr) {
-                if sc > 0 && sc < row.tabs.len() {
-                    let id = row.tabs[sc - 1].col_id.get();
-                    row.tabs[sc].col_id.set(id);
-                }
+            if let Some(row) = rows.get(sr)
+                && sc > 0
+                && sc < row.tabs.len()
+            {
+                let id = row.tabs[sc - 1].col_id.get();
+                row.tabs[sc].col_id.set(id);
             }
         }
         drop(rows);

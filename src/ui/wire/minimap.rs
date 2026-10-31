@@ -198,11 +198,11 @@ pub(crate) fn wire_minimap(
         header_drag.connect_drag_begin(move |gesture, _start_x, _start_y| {
             start_e.set(map_container.margin_end());
             start_b.set(map_container.margin_bottom());
-            if let Some(ev) = gesture.current_event() {
-                if let Some((rx, ry)) = ev.position() {
-                    start_rx.set(rx);
-                    start_ry.set(ry);
-                }
+            if let Some(ev) = gesture.current_event()
+                && let Some((rx, ry)) = ev.position()
+            {
+                start_rx.set(rx);
+                start_ry.set(ry);
             }
             map_header_row.set_cursor_from_name(Some("grabbing"));
         });

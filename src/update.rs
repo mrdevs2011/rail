@@ -252,10 +252,10 @@ fn fast_parallel_download(url: &str, dest_tmp: &std::path::Path) -> Result<(), (
     let mut total_size: u64 = 0;
     for line in h_text.lines() {
         let l = line.to_ascii_lowercase();
-        if l.starts_with("content-length:") {
-            if let Some(val) = l.split(':').nth(1) {
-                total_size = val.trim().parse::<u64>().unwrap_or(0);
-            }
+        if l.starts_with("content-length:")
+            && let Some(val) = l.split(':').nth(1)
+        {
+            total_size = val.trim().parse::<u64>().unwrap_or(0);
         }
     }
     if total_size < 200_000 {
@@ -264,7 +264,7 @@ fn fast_parallel_download(url: &str, dest_tmp: &std::path::Path) -> Result<(), (
 
     // 3. Download in parallel chunks (8 concurrent threads)
     let n_parts = 8usize;
-    let chunk_size = (total_size + n_parts as u64 - 1) / n_parts as u64;
+    let chunk_size = total_size.div_ceil(n_parts as u64);
     let parent_dir = dest_tmp.parent().unwrap_or(dest_tmp);
 
     let mut handles = Vec::new();
@@ -374,7 +374,7 @@ pub fn download_and_install(url: &str) -> Result<(), String> {
             let _ = std::fs::remove_file(&tmp);
             return Err(tr("This release has no Linux binary (asset missing).").to_string());
         }
-        if code < 200 || code >= 300 {
+        if !(200..300).contains(&code) {
             let _ = std::fs::remove_file(&tmp);
             return Err(trf("Download failed (HTTP {}).", &[&code.to_string()]));
         }

@@ -266,18 +266,18 @@ impl App {
 
         if let Some(w) = insp.web_view() {
             let widget: gtk::Widget = w.upcast();
-            if let Some(v_box) = win.child().and_then(|c| c.downcast::<gtk::Box>().ok()) {
-                if widget.parent().as_ref() != Some(v_box.upcast_ref()) {
-                    if widget.parent().is_some() {
-                        widget.unparent();
-                    }
-                    while let Some(ch) = v_box.first_child() {
-                        v_box.remove(&ch);
-                    }
-                    widget.set_hexpand(true);
-                    widget.set_vexpand(true);
-                    v_box.append(&widget);
+            if let Some(v_box) = win.child().and_then(|c| c.downcast::<gtk::Box>().ok())
+                && widget.parent().as_ref() != Some(v_box.upcast_ref())
+            {
+                if widget.parent().is_some() {
+                    widget.unparent();
                 }
+                while let Some(ch) = v_box.first_child() {
+                    v_box.remove(&ch);
+                }
+                widget.set_hexpand(true);
+                widget.set_vexpand(true);
+                v_box.append(&widget);
             }
         }
 
@@ -365,10 +365,10 @@ impl App {
             save_app_settings(&st);
         }
 
-        if let Some(view) = self.focused_view() {
-            if prev != side || !self.devtools_open() {
-                self.show_view_devtools(&view);
-            }
+        if let Some(view) = self.focused_view()
+            && (prev != side || !self.devtools_open())
+        {
+            self.show_view_devtools(&view);
         }
     }
 

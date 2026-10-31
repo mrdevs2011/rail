@@ -184,10 +184,10 @@ impl App {
         };
         let same = ui.view.borrow().as_ref() == Some(&v);
         if !same {
-            if let Some(old) = ui.view.borrow().clone() {
-                if let Some(fc) = old.find_controller() {
-                    fc.search_finish();
-                }
+            if let Some(old) = ui.view.borrow().clone()
+                && let Some(fc) = old.find_controller()
+            {
+                fc.search_finish();
             }
             self.find_bind(&ui, &v);
         }

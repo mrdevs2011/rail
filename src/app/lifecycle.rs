@@ -544,10 +544,10 @@ impl App {
         *tab.saved_uri.borrow_mut() = uri;
         // Prefer a fresh durable snapshot while still mapped; otherwise keep the frame
         // grabbed on visibility-hide. Never clear an existing good frame here.
-        if tab.view.is_mapped() {
-            if let Some(tex) = Self::capture_durable_frame(&tab.view) {
-                tab.freeze.set_paintable(Some(&tex));
-            }
+        if tab.view.is_mapped()
+            && let Some(tex) = Self::capture_durable_frame(&tab.view)
+        {
+            tab.freeze.set_paintable(Some(&tex));
         }
         // ONLY suspend and terminate web process if a durable snapshot actually exists.
         // Terminating without a snapshot turns the tab into a pitch black crashed rectangle!
@@ -582,9 +582,7 @@ impl App {
         for (ri, row) in rows.iter().enumerate() {
             for (ci, tab) in row.tabs.iter().enumerate() {
                 let is_focused = ri == fr && ci == fc;
-                if is_focused {
-                    tab.last_active.set(std::time::Instant::now());
-                } else if !in_overview && self.tab_is_visible(tab) {
+                if is_focused || (!in_overview && self.tab_is_visible(tab)) {
                     tab.last_active.set(std::time::Instant::now());
                 }
             }

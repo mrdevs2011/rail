@@ -122,19 +122,18 @@ impl App {
                         .clamp(0, (total_profiles - 1) as isize)
                         as usize;
 
-                    if target_idx != from_idx {
-                        if app_end
+                    if target_idx != from_idx
+                        && app_end
                             .profiles
                             .borrow_mut()
                             .reorder_profile(from_idx, target_idx)
-                        {
-                            let a = app_end.clone();
-                            glib::idle_add_local_once(move || {
-                                a.rebuild_profiles_modal_list();
-                                a.rebuild_profile_popover();
-                                a.refresh_sidebar();
-                            });
-                        }
+                    {
+                        let a = app_end.clone();
+                        glib::idle_add_local_once(move || {
+                            a.rebuild_profiles_modal_list();
+                            a.rebuild_profile_popover();
+                            a.refresh_sidebar();
+                        });
                     }
                 });
 

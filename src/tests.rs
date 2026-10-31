@@ -817,7 +817,7 @@ fn test_untranslate_round_trip() {
         let t = translate_url(u, "auto", "uz").unwrap();
         assert!(t.contains(".translate.goog/"));
         let back = untranslate_url(&t).unwrap();
-        assert_eq!(back, u.replace("?x=1#top", "?x=1#top"));
+        assert_eq!(back, u);
     }
     assert!(untranslate_url("https://example.com/").is_none());
 }

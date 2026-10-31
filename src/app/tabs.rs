@@ -197,10 +197,10 @@ impl App {
                     let model = dialog.files();
                     let mut uris = Vec::new();
                     for i in 0..model.n_items() {
-                        if let Some(obj) = model.item(i) {
-                            if let Ok(file) = obj.downcast::<gio::File>() {
-                                uris.push(file.uri().to_string());
-                            }
+                        if let Some(obj) = model.item(i)
+                            && let Ok(file) = obj.downcast::<gio::File>()
+                        {
+                            uris.push(file.uri().to_string());
                         }
                     }
                     let refs: Vec<&str> = uris.iter().map(String::as_str).collect();
@@ -222,22 +222,20 @@ impl App {
             if decision_type == webkit6::PolicyDecisionType::NavigationAction {
                 if let Some(nav_decision) =
                     decision.downcast_ref::<webkit6::NavigationPolicyDecision>()
+                    && let Some(req) = nav_decision.navigation_action().and_then(|a| a.request())
+                    && let Some(uri) = req.uri()
                 {
-                    if let Some(req) = nav_decision.navigation_action().and_then(|a| a.request()) {
-                        if let Some(uri) = req.uri() {
-                            let uri_s = uri.to_string();
-                            let scheme = uri_s.split(':').next().unwrap_or("").to_lowercase();
-                            if is_external_uri_scheme(&scheme)
-                                && gio::AppInfo::launch_default_for_uri(
-                                    &uri_s,
-                                    None::<&gio::AppLaunchContext>,
-                                )
-                                .is_ok()
-                            {
-                                decision.ignore();
-                                return true;
-                            }
-                        }
+                    let uri_s = uri.to_string();
+                    let scheme = uri_s.split(':').next().unwrap_or("").to_lowercase();
+                    if is_external_uri_scheme(&scheme)
+                        && gio::AppInfo::launch_default_for_uri(
+                            &uri_s,
+                            None::<&gio::AppLaunchContext>,
+                        )
+                        .is_ok()
+                    {
+                        decision.ignore();
+                        return true;
                     }
                 }
                 let policies = webkit6::WebsitePolicies::builder()
@@ -302,11 +300,11 @@ impl App {
         for ms in [30u64, 120, 350] {
             let app = self.clone();
             glib::timeout_add_local_once(std::time::Duration::from_millis(ms), move || {
-                if app.focused_is_welcome() {
-                    if let Some(v) = app.focused_view() {
-                        app.push_start_state(&v);
-                        app.focus_welcome_input(false);
-                    }
+                if app.focused_is_welcome()
+                    && let Some(v) = app.focused_view()
+                {
+                    app.push_start_state(&v);
+                    app.focus_welcome_input(false);
                 }
             });
         }

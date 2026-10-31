@@ -21,7 +21,7 @@ pub(crate) fn build_palette(profile_mgr: &ProfileManager) -> PaletteWidgets {
     entry.add_css_class("palette-entry");
     entry.set_hexpand(true);
     entry.set_placeholder_text(Some(
-        &tr("Search with {} or enter URL").replace("{}", &engine_name),
+        &tr("Search with {} or enter URL").replace("{}", engine_name),
     ));
 
     let palette_engine_icon = load_search_engine_icon(&initial_settings.search_engine, 20);

@@ -4,11 +4,15 @@ use crate::*;
 
 pub(crate) const START_PAGE: &str = include_str!("../start_page.html");
 
+type SidebarHeaderItems = Vec<(usize, gtk::Box)>;
+type SidebarTabItems = Vec<(usize, usize, gtk::Box)>;
+type SidebarItems = (SidebarHeaderItems, SidebarTabItems);
+
 thread_local! {
     /// Sidebar widgets from the last `refresh_sidebar()`: workspace headers and tab rows.
     /// Lets overview navigation flip the active highlight without rebuilding the whole list.
-    pub(crate) static SIDEBAR_ITEMS: RefCell<(Vec<(usize, gtk::Box)>, Vec<(usize, usize, gtk::Box)>)> =
-        RefCell::new((Vec::new(), Vec::new()));
+    pub(crate) static SIDEBAR_ITEMS: RefCell<SidebarItems> =
+        const { RefCell::new((Vec::new(), Vec::new())) };
 }
 
 /// Boshlang'ich sahifa: til, sarlavha, tavsif va qidiruv placeholder joriy tilga o'giriladi.

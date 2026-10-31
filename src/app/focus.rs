@@ -158,10 +158,10 @@ impl App {
             }
         }
 
-        if let Some(tab) = rows[r_clamped].tabs.get(c_clamped) {
-            if !tab.view.is_loading() {
-                self.load_bar.set_visible(false);
-            }
+        if let Some(tab) = rows[r_clamped].tabs.get(c_clamped)
+            && !tab.view.is_loading()
+        {
+            self.load_bar.set_visible(false);
         }
         drop(rows);
 
@@ -203,10 +203,9 @@ impl App {
             && !self.ov.get()
             && !self.settings_modal_open()
             && !self.find_is_open()
+            && let Some(v) = self.focused_view()
         {
-            if let Some(v) = self.focused_view() {
-                v.grab_focus();
-            }
+            v.grab_focus();
         }
     }
 
@@ -274,25 +273,25 @@ impl App {
 
         // Stay parented on the settings tab overlay even when another tab is focused,
         // so overview shows settings content the same way it shows downloads HTML.
-        if let Some(parent) = v.parent() {
-            if let Ok(ov) = parent.downcast::<gtk::Overlay>() {
-                let already = self
-                    .settings_modal
-                    .parent()
-                    .map(|p| p == *ov.upcast_ref::<gtk::Widget>())
-                    .unwrap_or(false);
-                if !already {
-                    if let Some(old) = self.settings_modal.parent() {
-                        if let Ok(old_ov) = old.downcast::<gtk::Overlay>() {
-                            old_ov.remove_overlay(&self.settings_modal);
-                        }
-                    }
-                    self.settings_modal.set_halign(gtk::Align::Fill);
-                    self.settings_modal.set_valign(gtk::Align::Fill);
-                    self.settings_modal.set_hexpand(true);
-                    self.settings_modal.set_vexpand(true);
-                    ov.add_overlay(&self.settings_modal);
+        if let Some(parent) = v.parent()
+            && let Ok(ov) = parent.downcast::<gtk::Overlay>()
+        {
+            let already = self
+                .settings_modal
+                .parent()
+                .map(|p| p == *ov.upcast_ref::<gtk::Widget>())
+                .unwrap_or(false);
+            if !already {
+                if let Some(old) = self.settings_modal.parent()
+                    && let Ok(old_ov) = old.downcast::<gtk::Overlay>()
+                {
+                    old_ov.remove_overlay(&self.settings_modal);
                 }
+                self.settings_modal.set_halign(gtk::Align::Fill);
+                self.settings_modal.set_valign(gtk::Align::Fill);
+                self.settings_modal.set_hexpand(true);
+                self.settings_modal.set_vexpand(true);
+                ov.add_overlay(&self.settings_modal);
             }
         }
 
@@ -412,10 +411,10 @@ impl App {
         }
         let n = rows[target_r].tabs.len();
         // 1) Last focused tab in that workspace (if still valid)
-        if let Some(&c) = self.row_last_col.borrow().get(&target_r) {
-            if c < n {
-                return c;
-            }
+        if let Some(&c) = self.row_last_col.borrow().get(&target_r)
+            && c < n
+        {
+            return c;
         }
         // 2) Same column ordinal + stack depth as the source tab
         if from_r < rows.len() && from_c < rows[from_r].tabs.len() {

@@ -3,7 +3,7 @@
 //! Layout of the crate:
 //! - `app/`        the `App` state and its behaviour, one concern per file
 //! - `ui/`         window construction: `widgets/` (widget trees), `settings/`
-//!                 (Settings pages), `wire/` (signal wiring), `build.rs` (glue)
+//!   (Settings pages), `wire/` (signal wiring), `build.rs` (glue)
 //! - `model/`      tabs, rows, session format, minimap state, tuning constants
 //! - `shortcuts/`  shortcut definitions, live labels and the shortcut editor
 //! - `pages/`      rail://start and rail://downloads
@@ -154,8 +154,7 @@ fn main() -> glib::ExitCode {
                 let _ = CUSTOM_DATA_DIR.set(PathBuf::from(next));
                 break;
             }
-        } else if arg.starts_with("--data-dir=") {
-            let val = &arg["--data-dir=".len()..];
+        } else if let Some(val) = arg.strip_prefix("--data-dir=") {
             let _ = CUSTOM_DATA_DIR.set(PathBuf::from(val));
             break;
         }
@@ -268,8 +267,8 @@ fn main() -> glib::ExitCode {
                 i += 2;
                 continue;
             }
-        } else if arg.starts_with("--app=") {
-            let _ = PWA_APP_URL.set(arg["--app=".len()..].to_string());
+        } else if let Some(app_url) = arg.strip_prefix("--app=") {
+            let _ = PWA_APP_URL.set(app_url.to_string());
             i += 1;
             continue;
         } else if !arg.starts_with('-') && target_url.is_none() {
@@ -425,8 +424,8 @@ fn parse_cli_app(args: &[String]) -> Option<String> {
             if i + 1 < args.len() {
                 return Some(args[i + 1].clone());
             }
-        } else if a.starts_with("--app=") {
-            return Some(a["--app=".len()..].to_string());
+        } else if let Some(app_url) = a.strip_prefix("--app=") {
+            return Some(app_url.to_string());
         }
         i += 1;
     }

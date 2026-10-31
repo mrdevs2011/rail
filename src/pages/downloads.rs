@@ -17,10 +17,12 @@ pub(crate) struct DownloadEntry {
     pub(crate) completed_at: i64,
 }
 
+type DownloadNotice = Rc<dyn Fn(&str, &str)>;
+
 thread_local! {
     pub(crate) static DOWNLOADS: RefCell<Vec<DownloadEntry>> = const { RefCell::new(Vec::new()) };
     pub(crate) static DOWNLOAD_SEQ: Cell<u64> = const { Cell::new(1) };
-    static DOWNLOAD_NOTICE: RefCell<Option<Rc<dyn Fn(&str, &str)>>> = const { RefCell::new(None) };
+    static DOWNLOAD_NOTICE: RefCell<Option<DownloadNotice>> = const { RefCell::new(None) };
 }
 
 pub(crate) fn install_download_notifications(app: &Rc<App>) {
@@ -57,11 +59,11 @@ fn encode_field(value: &str) -> String {
 }
 
 fn decode_field(value: &str) -> Option<String> {
-    if value.len() % 2 != 0 {
+    if !value.len().is_multiple_of(2) {
         return None;
     }
     let mut bytes = Vec::with_capacity(value.len() / 2);
-    for pair in value.as_bytes().chunks_exact(2) {
+    for pair in value.as_bytes().as_chunks::<2>().0 {
         let hex = std::str::from_utf8(pair).ok()?;
         bytes.push(u8::from_str_radix(hex, 16).ok()?);
     }
@@ -569,7 +571,7 @@ pub(crate) fn downloads_page() -> String {
 </body>
 </html>"##;
     template
-        .replace("__LANG__", &i18n::current().code())
+        .replace("__LANG__", i18n::current().code())
         .replace("__TITLE__", &glib::markup_escape_text(tr("Downloads")))
         .replace(
             "__HINT__",

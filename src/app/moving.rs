@@ -46,14 +46,14 @@ impl App {
         let mut swapped = None;
         {
             let mut rows = self.rows.borrow_mut();
-            if let Some(row) = rows.get_mut(r) {
-                if c < row.tabs.len() {
-                    let (s, e) = row.col_span(c);
-                    let t = c as isize + dir;
-                    if t >= s as isize && (t as usize) < e {
-                        row.swap_keep_props(c, t as usize);
-                        swapped = Some(t as usize);
-                    }
+            if let Some(row) = rows.get_mut(r)
+                && c < row.tabs.len()
+            {
+                let (s, e) = row.col_span(c);
+                let t = c as isize + dir;
+                if t >= s as isize && (t as usize) < e {
+                    row.swap_keep_props(c, t as usize);
+                    swapped = Some(t as usize);
                 }
             }
         }
@@ -259,7 +259,7 @@ impl App {
             drop(rows);
         } else if cur_row_empty && cur_r > 0 {
             let mut rows = self.rows.borrow_mut();
-            while rows.len() > 1 && rows.last().map_or(false, |r| r.tabs.is_empty()) {
+            while rows.len() > 1 && rows.last().is_some_and(|r| r.tabs.is_empty()) {
                 rows.pop();
             }
             drop(rows);
@@ -341,7 +341,7 @@ impl App {
             drop(rows);
         } else if cur_row_empty && from_r > 0 {
             let mut rows = self.rows.borrow_mut();
-            while rows.len() > 1 && rows.last().map_or(false, |r| r.tabs.is_empty()) {
+            while rows.len() > 1 && rows.last().is_some_and(|r| r.tabs.is_empty()) {
                 rows.pop();
             }
             drop(rows);

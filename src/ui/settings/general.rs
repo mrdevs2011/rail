@@ -203,7 +203,7 @@ pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
         let name: &'static str = if *code == "auto" {
             tr("Auto-detect")
         } else {
-            *name
+            name
         };
         src_codes.push(*code);
         src_names.push(name);
@@ -338,7 +338,7 @@ fn language_row_factory(rows: Rc<Vec<(&'static str, &'static str)>>) -> gtk::Sig
         let Some(lbl) = pic.next_sibling().and_downcast::<gtk::Label>() else {
             return;
         };
-        pic.set_paintable(lang_flag_texture(*code).as_ref());
+        pic.set_paintable(lang_flag_texture(code).as_ref());
         lbl.set_text(name);
     });
     factory

@@ -112,10 +112,10 @@ impl App {
         let (fr, fc) = (self.focus_row.get(), self.focus_col.get());
         self.focus_coords(fr, fc);
         self.sync_settings_chrome();
-        if let Some(v) = self.focused_view() {
-            if !self.settings_modal_open() {
-                v.grab_focus();
-            }
+        if let Some(v) = self.focused_view()
+            && !self.settings_modal_open()
+        {
+            v.grab_focus();
         }
     }
 
