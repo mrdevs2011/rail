@@ -57,9 +57,9 @@ impl App {
         self.layout.set_zoom(1.0);
         self.strip.queue_allocate();
 
-        // The zoom-out itself is anchored on the old camera center (see animate()); once the
-        // zoom settles the camera glides to the framed position: whole grid centered when it
-        // fits, otherwise the active tab centered (clamped at the grid edges).
+        // Niri's center-focused-column="never": keep the old viewport center while zooming.
+        // The focused tile is moved only if it would otherwise be outside the overview viewport;
+        // half-width columns never snap to the center.
         let z = self.ov_user_zoom.get().clamp(OV_ZOOM_MIN, OV_ZOOM_MAX);
         let (fx, fy) = self.overview_offsets_at_zoom(z);
         self.target_x.set(fx);

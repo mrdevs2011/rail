@@ -2,49 +2,101 @@
 
 use crate::*;
 
+/// Preserve the existing viewport center across an overview zoom, then reveal the
+/// focused tile only as much as necessary. This mirrors Niri's
+/// `center-focused-column "never"` behavior: focus changes never snap a column
+/// to the center, including columns that are exactly half the viewport wide.
+fn overview_axis_offset(
+    current_offset: f64,
+    from_zoom: f64,
+    to_zoom: f64,
+    viewport: f64,
+    focused_span: Option<(f64, f64)>,
+) -> f64 {
+    if viewport <= 0.0 || from_zoom <= 0.0 || to_zoom <= 0.0 {
+        return current_offset;
+    }
+
+    let world_center = current_offset + viewport / (2.0 * from_zoom);
+    let visible = viewport / to_zoom;
+    let mut offset = world_center - visible / 2.0;
+
+    if let Some((start, end)) = focused_span {
+        let size = (end - start).max(0.0);
+        if size >= visible {
+            // An oversized tile cannot fit; keep its leading edge visible.
+            offset = start;
+        } else if start < offset {
+            offset = start;
+        } else if end > offset + visible {
+            offset = end - visible;
+        }
+    }
+
+    offset
+}
+
 impl App {
     // ---- strip scrolling -------------------------------------------------
 
-    /// Camera offsets that keep the overview grid framed with equal margins
-    /// (or focused on the active tab when the grid is larger than the view).
-    /// Computed for an arbitrary zoom so animation frames stay centered — not skewed.
+    /// Camera offsets that preserve the current viewport center across zoom changes,
+    /// revealing the focused tile only when it would otherwise leave the visible area.
     pub(crate) fn overview_offsets_at_zoom(&self, z: f64) -> (f64, f64) {
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
         if vw <= 0.0 || vh <= 0.0 || z <= 0.01 {
             return (self.target_x.get(), self.target_y.get());
         }
-        let visible_w = vw / z;
-        let visible_h = vh / z;
-        let g = gap(z);
+
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
+        let g = gap(z);
+        let mut focused_x = None;
+        let mut focused_y = None;
 
-        let rows = self.rows.borrow();
-        if rows.is_empty() {
-            return (0.0, 0.0);
+        {
+            let rows = self.rows.borrow();
+            if let Some(row) = rows.get(cur_r) {
+                for (start, len, x, w) in row_cols(row, vw, g) {
+                    if cur_c < start || cur_c >= start + len {
+                        continue;
+                    }
+
+                    focused_x = Some((x, x + w));
+
+                    // Match StripLayout's real stack allocation, including user-resized heights.
+                    let equal_h = stack_height(vh, len, g);
+                    let mut heights: Vec<f64> = (0..len)
+                        .map(|j| row.tabs[start + j].custom_height.get().unwrap_or(equal_h))
+                        .collect();
+                    if len > 1 {
+                        let total_h = (vh - (len as f64 - 1.0) * g).max(80.0 * len as f64);
+                        let sum: f64 = heights.iter().sum();
+                        if sum > 1.0 && (sum - total_h).abs() > 0.5 {
+                            let scale = total_h / sum;
+                            for h in &mut heights {
+                                *h = (*h * scale).max(80.0);
+                            }
+                        }
+                    }
+                    let index = cur_c - start;
+                    let y_in_stack: f64 = heights[..index].iter().map(|h| h + g).sum();
+                    let tile_h = heights[index];
+                    let y = cur_r as f64 * (vh + g) + y_in_stack;
+                    focused_y = Some((y, y + tile_h));
+                    break;
+                }
+            }
         }
 
-        let mut active_span: Option<(f64, f64)> = None;
-        if let Some(row) = rows.get(cur_r) {
-            let cols = row_cols(row, vw, g);
-            active_span = cols
-                .iter()
-                .find(|&&(st, len, _, _)| cur_c >= st && cur_c < st + len)
-                .map(|&(_, _, x, w)| (x, x + w));
-        }
-        drop(rows);
-
-        // Niri-style: focused tab is always framed in the exact center of the screen
-        let row_center_y = cur_r as f64 * (vh + g) + vh / 2.0;
-        let col_center_x = active_span.map_or(vw / 2.0, |(l, r)| (l + r) / 2.0);
-        let tx = col_center_x - visible_w / 2.0;
-        let ty = row_center_y - visible_h / 2.0;
+        let from_zoom = self.target_zoom.get().max(0.01);
+        let tx = overview_axis_offset(self.target_x.get(), from_zoom, z, vw, focused_x);
+        let ty = overview_axis_offset(self.target_y.get(), from_zoom, z, vh, focused_y);
         (tx, ty)
     }
 
-    /// Normal mode: scroll 2D minimum needed to show focused row and column.
-    /// Overview: center the 2D grid in the zoomed-out plane (equal margins).
+    /// Normal mode: minimally reveal the focused row and column.
+    /// Overview: preserve the camera and minimally reveal the focused tile, Niri-style.
     pub(crate) fn reveal_focus(self: &Rc<Self>) {
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
@@ -361,5 +413,43 @@ impl App {
         } else {
             self.reveal_focus();
         }
+    }
+}
+
+#[cfg(test)]
+mod overview_camera_tests {
+    use super::overview_axis_offset;
+
+    #[test]
+    fn overview_zoom_preserves_view_center_without_recentering_half_column() {
+        let offset = overview_axis_offset(0.0, 1.0, 0.4, 1000.0, Some((0.0, 500.0)));
+        let focused_center_on_screen = (250.0 - offset) * 0.4;
+
+        assert!((offset - (-750.0)).abs() < 0.001);
+        assert!((focused_center_on_screen - 400.0).abs() < 0.001);
+        assert!((focused_center_on_screen - 500.0).abs() > 50.0);
+    }
+
+    #[test]
+    fn overview_zoom_keeps_full_width_column_at_its_existing_screen_center() {
+        let offset = overview_axis_offset(0.0, 1.0, 0.4, 1000.0, Some((0.0, 1000.0)));
+        let focused_center_on_screen = (500.0 - offset) * 0.4;
+
+        assert!((focused_center_on_screen - 500.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn overview_focus_navigation_scrolls_only_to_the_nearest_edge() {
+        let offset = overview_axis_offset(-750.0, 0.4, 0.4, 1000.0, Some((2600.0, 3100.0)));
+
+        // The column's right edge lands on the viewport's right edge; it is not centered.
+        assert!((offset - 600.0).abs() < 0.001);
+        assert!(((2600.0 - offset) * 0.4 - 800.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn overview_zoom_preserves_camera_center_when_no_focus_rect_exists() {
+        let offset = overview_axis_offset(120.0, 1.0, 0.25, 800.0, None);
+        assert!((offset - (-1080.0)).abs() < 0.001);
     }
 }

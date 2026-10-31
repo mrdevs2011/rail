@@ -7,7 +7,8 @@ use gtk::subclass::prelude::*;
 use gtk::{graphene, gsk};
 use gtk4 as gtk;
 
-pub const GAP: f64 = 6.0;
+// Mirrors ~/.config/niri/config.kdl: layout { gaps 0 }.
+pub const GAP: f64 = 0.0;
 
 /// Space between columns and rows, in strip coordinates.
 /// Must be **constant** (not a function of zoom): otherwise every animation frame
@@ -32,28 +33,23 @@ pub fn gap_px() -> f64 {
     }
 }
 
-/// Minimum width for a column to be usable.
-pub const MIN_COL_W: f64 = 480.0;
-
-/// Column width calculation
+/// Column width calculation. Normal columns stay at Niri's 50% default even
+/// on narrow viewports; full columns occupy the entire viewport.
 pub fn col_width(full: bool, viewport: f64) -> f64 {
-    if full || viewport < (MIN_COL_W * 2.0 + gap_px()) {
-        viewport.max(280.0)
+    let viewport = viewport.max(1.0);
+    if full {
+        viewport
     } else {
-        ((viewport - gap_px()) / 2.0).floor()
+        ((viewport - gap_px()).max(0.0) / 2.0).floor().max(1.0)
     }
 }
 
 /// Smooth animated column width calculation (progress 0.0: normal, 1.0: full)
 pub fn col_width_animated(progress: f64, viewport: f64) -> f64 {
     let p = progress.clamp(0.0, 1.0);
-    if viewport < (MIN_COL_W * 2.0 + gap_px()) {
-        viewport.max(280.0)
-    } else {
-        let normal_w = ((viewport - gap_px()) / 2.0).floor();
-        let full_w = viewport.max(280.0);
-        normal_w + (full_w - normal_w) * p
-    }
+    let normal_w = col_width(false, viewport);
+    let full_w = col_width(true, viewport);
+    normal_w + (full_w - normal_w) * p
 }
 
 /// Height of one window inside a column that stacks `k` windows (niri-style column).
@@ -583,5 +579,30 @@ mod tests {
         assert_eq!(stack_height(900.0, 2, 6.0), 447.0);
         let h3 = stack_height(900.0, 3, 6.0);
         assert!((3.0 * h3 + 2.0 * 6.0 - 900.0).abs() < 1e-9);
+    }
+}
+
+#[cfg(test)]
+mod niri_layout_tests {
+    use super::{GAP, col_width, col_width_animated};
+
+    #[test]
+    fn default_column_remains_half_width_on_small_and_large_viewports() {
+        assert_eq!(col_width(false, 1440.0), 720.0);
+        assert_eq!(col_width(false, 900.0), 450.0);
+        assert_eq!(col_width(false, 400.0), 200.0);
+    }
+
+    #[test]
+    fn full_column_is_one_hundred_percent_and_gaps_match_niri_config() {
+        assert_eq!(col_width(true, 900.0), 900.0);
+        assert_eq!(GAP, 0.0);
+    }
+
+    #[test]
+    fn width_transition_interpolates_from_half_to_full() {
+        assert_eq!(col_width_animated(0.0, 900.0), 450.0);
+        assert_eq!(col_width_animated(1.0, 900.0), 900.0);
+        assert_eq!(col_width_animated(0.5, 900.0), 675.0);
     }
 }
