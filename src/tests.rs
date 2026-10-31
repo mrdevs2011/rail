@@ -429,7 +429,7 @@ fn test_stack_shortcuts() {
 /// One action = one shortcut, and one shortcut = one action (or multiple non-conflicting default shortcuts).
 #[test]
 fn test_no_duplicate_default_shortcuts() {
-    let mut seen: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+    let mut seen: std::collections::HashMap<String, &str> = std::collections::HashMap::new();
     for def in SHORTCUT_DEFS {
         assert!(
             !def.defaults.is_empty(),
@@ -437,8 +437,12 @@ fn test_no_duplicate_default_shortcuts() {
             def.id
         );
         for d in def.defaults {
-            if let Some(prev) = seen.insert(*d, def.id) {
-                panic!("{} is bound to both \"{}\" and \"{}\"", d, prev, def.id);
+            let canonical = sc_canon(d);
+            if let Some(prev) = seen.insert(canonical.clone(), def.id) {
+                panic!(
+                    "{} (canonical: {}) is bound to both \"{}\" and \"{}\"",
+                    d, canonical, prev, def.id
+                );
             }
         }
     }
@@ -684,8 +688,8 @@ fn test_ui_shortcut_labels_follow_config() {
 
 #[test]
 fn test_page_zoom_steps_cover_20_to_500() {
-    assert_eq!(next_page_zoom(1.0, 1), 1.10);
-    assert_eq!(next_page_zoom(1.0, -1), 0.90);
+    assert_eq!(next_page_zoom(1.0, 1), 1.25);
+    assert_eq!(next_page_zoom(1.0, -1), 0.80);
     assert_eq!(next_page_zoom(0.20, -1), 0.20);
     assert_eq!(next_page_zoom(5.0, 1), 5.0);
     let mut z = 1.0;
@@ -698,7 +702,7 @@ fn test_page_zoom_steps_cover_20_to_500() {
     }
     assert_eq!(z, 0.20);
     // off-step value snaps to the neighbouring step
-    assert_eq!(next_page_zoom(1.05, 1), 1.10);
+    assert_eq!(next_page_zoom(1.05, 1), 1.25);
     assert_eq!(next_page_zoom(1.05, -1), 1.0);
     // Immediately reversing direction must return to the previous zoom step.
     assert_eq!(next_page_zoom(next_page_zoom(1.0, -1), 1), 1.0);
@@ -740,7 +744,7 @@ fn test_zoom_math_bounds_are_stable() {
     assert_eq!(scale_zoom(1.0, 0.01, 0.2, 5.0), 0.2);
     assert_eq!(scale_zoom(f64::NAN, 1.1, 0.2, 5.0), 1.1);
     assert_eq!(scale_zoom(2.0, f64::NAN, 0.2, 5.0), 2.0);
-    assert_eq!(next_page_zoom(f64::NAN, 1), 1.1);
+    assert_eq!(next_page_zoom(f64::NAN, 1), 1.25);
     assert_eq!(overview_scale(f64::NAN), OV_ZOOM);
 }
 

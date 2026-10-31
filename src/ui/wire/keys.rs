@@ -10,9 +10,6 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     apply_shortcut_priority();
     sc_refresh_bound();
 
-    // Suppress OS key-repeat: one physical press always produces exactly one zoom step.
-    let zoom_repeat_key: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
-
     // WebKit consumes Ctrl+V before browser shortcuts run. Handle image paste in capture
     // phase; plain text paste still proceeds to the focused WebView unchanged.
     let paste_keys = gtk::EventControllerKey::new();
@@ -58,13 +55,7 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     win.add_controller(nav_keys);
 
     let app_key = app.clone();
-    let held_key = zoom_repeat_key.clone();
     keys.connect_key_pressed(move |_, key, keycode, state| {
-        // Ignore OS key-repeat until the physical key is released.
-        if held_key.get() == Some(keycode) {
-            return glib::Propagation::Stop;
-        }
-
         // Omnibar / new-tab input: Esc must close it even if a shortcut map interferes.
         if key == gdk::Key::Escape && app_key.palette_open() {
             app_key.cancel_palette();
@@ -94,9 +85,8 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
         };
 
         if let Some(direction) = zoom_direction {
-            held_key.set(Some(keycode));
-            // No acceleration or auto-repeat: holding the key as long as you like
-            // changes the page by one browser-standard step only.
+            // Apply every key-down, including the desktop's key-repeat events. This makes
+            // holding Ctrl +/- zoom the page continuously instead of feeling unresponsive.
             app_key.zoom_step(direction);
             return glib::Propagation::Stop;
         }
@@ -115,15 +105,5 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
         }
     });
 
-    // Release the one-step guard on physical key-up, allowing the next deliberate press.
-    let held_release = zoom_repeat_key.clone();
-    keys.connect_key_released(move |_, _, keycode, _| {
-        if held_release.get() == Some(keycode) {
-            held_release.set(None);
-        }
-    });
-
-    let held_focus = zoom_repeat_key.clone();
-    win.connect_has_focus_notify(move |_| held_focus.set(None));
     win.add_controller(keys);
 }
