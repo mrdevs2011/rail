@@ -735,20 +735,13 @@ fn test_roomy_tab_cap_scales_with_physical_memory() {
 }
 
 #[test]
-fn test_zoom_math_bounds_and_hold_rate_are_stable() {
+fn test_zoom_math_bounds_are_stable() {
     assert_eq!(scale_zoom(1.0, 10.0, 0.2, 5.0), 5.0);
     assert_eq!(scale_zoom(1.0, 0.01, 0.2, 5.0), 0.2);
     assert_eq!(scale_zoom(f64::NAN, 1.1, 0.2, 5.0), 1.1);
     assert_eq!(scale_zoom(2.0, f64::NAN, 0.2, 5.0), 2.0);
     assert_eq!(next_page_zoom(f64::NAN, 1), 1.1);
     assert_eq!(overview_scale(f64::NAN), OV_ZOOM);
-
-    let one_frame = zoom_hold_factor(1, 1.0 / 60.0);
-    let capped_frame = zoom_hold_factor(1, 1.0);
-    assert!((one_frame - (ZOOM_HOLD_RATE / 60.0).exp()).abs() < 1e-12);
-    assert!((capped_frame - (ZOOM_HOLD_RATE * 0.05).exp()).abs() < 1e-12);
-    assert_eq!(zoom_hold_factor(-1, 0.0), 1.0);
-    assert_eq!(zoom_hold_factor(0, 0.05), 1.0);
 }
 
 #[test]

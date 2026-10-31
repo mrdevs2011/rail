@@ -1,4 +1,4 @@
-//! Window keyboard shortcuts and smooth, press-and-hold zoom.
+//! Window keyboard shortcuts and discrete, one-step-per-press zoom.
 
 use crate::*;
 
@@ -10,8 +10,7 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     apply_shortcut_priority();
     sc_refresh_bound();
 
-    // A held key is represented by its hardware keycode. A frame-clock callback checks
-    // that state instead of depending on OS key repeat or a cancellable timeout source.
+    // Suppress OS key-repeat: one physical press always produces exactly one zoom step.
     let zoom_repeat_key: Rc<Cell<Option<u32>>> = Rc::new(Cell::new(None));
 
     // WebKit consumes Ctrl+V before browser shortcuts run. Handle image paste in capture
@@ -61,7 +60,7 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     let app_key = app.clone();
     let held_key = zoom_repeat_key.clone();
     keys.connect_key_pressed(move |_, key, keycode, state| {
-        // Repeated key-down events are ignored while the frame clock owns this key.
+        // Ignore OS key-repeat until the physical key is released.
         if held_key.get() == Some(keycode) {
             return glib::Propagation::Stop;
         }
@@ -95,43 +94,10 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
         };
 
         if let Some(direction) = zoom_direction {
-            let was_overview = app_key.overview_open();
             held_key.set(Some(keycode));
-
-            // A tap always means exactly one step. Continuous movement begins only after
-            // the explicit hold delay, so a short press can never run to either zoom limit.
+            // No acceleration or auto-repeat: holding the key as long as you like
+            // changes the page by one browser-standard step only.
             app_key.zoom_step(direction);
-
-            let weak_app = Rc::downgrade(&app_key);
-            let held = held_key.clone();
-            let started_at = glib::monotonic_time();
-            let last_frame = Cell::new(None::<i64>);
-            app_key.strip.add_tick_callback(move |_, clock| {
-                if held.get() != Some(keycode) {
-                    return glib::ControlFlow::Break;
-                }
-                let Some(app) = weak_app.upgrade() else {
-                    return glib::ControlFlow::Break;
-                };
-                // A mode change while the key is held ends this gesture; it never leaks
-                // from overview into a page (or vice versa).
-                if app.overview_open() != was_overview || (was_overview && app.ov_exiting.get()) {
-                    held.set(None);
-                    return glib::ControlFlow::Break;
-                }
-
-                let now = clock.frame_time();
-                if now - started_at < ZOOM_HOLD_DELAY.as_micros() as i64 {
-                    return glib::ControlFlow::Continue;
-                }
-                let dt = last_frame.replace(Some(now)).map_or(0.0, |last| {
-                    ((now - last) as f64 / 1_000_000.0).clamp(0.0, 0.05)
-                });
-                if dt > 0.0 {
-                    app.zoom_by_factor(zoom_hold_factor(direction, dt));
-                }
-                glib::ControlFlow::Continue
-            });
             return glib::Propagation::Stop;
         }
 
@@ -149,8 +115,7 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
         }
     });
 
-    // Capture release in the same phase/controller as key-down. No timer handle is kept:
-    // the frame callback sees None on its next frame and exits without a source-ID race.
+    // Release the one-step guard on physical key-up, allowing the next deliberate press.
     let held_release = zoom_repeat_key.clone();
     keys.connect_key_released(move |_, _, keycode, _| {
         if held_release.get() == Some(keycode) {

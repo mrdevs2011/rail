@@ -7,10 +7,6 @@ pub(crate) const PAGE_ZOOM_MIN: f64 = 0.2;
 pub(crate) const PAGE_ZOOM_MAX: f64 = 5.0;
 pub(crate) const OV_ZOOM_MIN: f64 = 0.2;
 pub(crate) const OV_ZOOM_MAX: f64 = 5.0;
-/// A single press changes zoom by one clear 10% step; holding switches to continuous motion.
-pub(crate) const ZOOM_HOLD_DELAY: std::time::Duration = std::time::Duration::from_millis(180);
-/// Logarithmic scale change per second while a zoom key is held (frame-rate independent).
-pub(crate) const ZOOM_HOLD_RATE: f64 = 0.90;
 /// Page zoom (Ctrl +/-/0): Chrome-style steps, 20%..500%.
 pub(crate) const PAGE_ZOOM_STEPS: [f64; 18] = [
     0.20, 0.25, 0.33, 0.50, 0.67, 0.75, 0.80, 0.90, 1.0, 1.10, 1.25, 1.50, 1.75, 2.0, 2.5, 3.0,
@@ -53,15 +49,6 @@ pub(crate) fn scale_zoom(current: f64, factor: f64, min: f64, max: f64) -> f64 {
         return current;
     }
     (current * factor).clamp(min, max)
-}
-
-/// Convert elapsed frame time into a multiplicative zoom ratio. Clamping a long frame
-/// prevents one delayed callback from visibly jumping across the zoom range.
-pub(crate) fn zoom_hold_factor(direction: i32, elapsed_seconds: f64) -> f64 {
-    if direction == 0 || !elapsed_seconds.is_finite() || elapsed_seconds <= 0.0 {
-        return 1.0;
-    }
-    (ZOOM_HOLD_RATE * elapsed_seconds.clamp(0.0, 0.05) * direction.signum() as f64).exp()
 }
 
 /// Overview's user-facing percentage (1.0 = 100%) converted to the physical strip scale.

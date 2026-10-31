@@ -214,7 +214,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
 
     let HintWidgets { load_bar, ov_hint } = build_hints();
 
-    // A compact, transient zoom readout shared by website zoom and spatial overview.
+    // A compact, transient readout for browser page zoom only.
     let zoom_indicator_label = gtk::Label::new(Some("100%"));
     zoom_indicator_label.add_css_class("zoom-indicator-label");
     let zoom_indicator = gtk::Revealer::new();
@@ -228,6 +228,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
     zoom_indicator.set_margin_end(12);
     zoom_indicator.set_can_target(false);
     zoom_indicator.set_reveal_child(false);
+    zoom_indicator.set_visible(false);
 
     let MinimapWidgets {
         map_close_btn,

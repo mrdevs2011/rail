@@ -19,16 +19,25 @@ impl App {
             100
         };
         self.zoom_indicator_label.set_text(&format!("{value}%"));
+        self.zoom_indicator.set_visible(true);
         self.zoom_indicator.set_reveal_child(true);
 
         if let Some(timer) = self.zoom_indicator_timer.borrow_mut().take() {
             timer.remove();
         }
         let weak = Rc::downgrade(self);
-        let timer = glib::timeout_add_local_once(Duration::from_millis(920), move || {
+        let timer = glib::timeout_add_local_once(Duration::from_millis(700), move || {
             if let Some(app) = weak.upgrade() {
                 app.zoom_indicator.set_reveal_child(false);
                 app.zoom_indicator_timer.borrow_mut().take();
+                // GtkRevealer hides its child, not the overlay widget itself. Hide the
+                // overlay after the fade so its own CSS background cannot remain visible.
+                let indicator = app.zoom_indicator.clone();
+                glib::timeout_add_local_once(Duration::from_millis(160), move || {
+                    if !indicator.is_child_revealed() {
+                        indicator.set_visible(false);
+                    }
+                });
             }
         });
         *self.zoom_indicator_timer.borrow_mut() = Some(timer);
@@ -39,6 +48,7 @@ impl App {
             timer.remove();
         }
         self.zoom_indicator.set_reveal_child(false);
+        self.zoom_indicator.set_visible(false);
     }
 
     /// One discrete browser-style page zoom step (or reset when `dir == 0`).
@@ -55,30 +65,10 @@ impl App {
         self.show_zoom_indicator(next * 100.0);
     }
 
-    /// Continuous page zoom used only after a zoom key has been held past its tap delay.
-    pub(crate) fn page_zoom_by(self: &Rc<Self>, factor: f64) {
-        let Some(view) = self.focused_view() else {
-            return;
-        };
-        let next = scale_zoom(view.zoom_level(), factor, PAGE_ZOOM_MIN, PAGE_ZOOM_MAX);
-        if (next - view.zoom_level()).abs() < 1e-7 {
-            return;
-        }
-        view.set_zoom_level(next);
-        self.show_zoom_indicator(next * 100.0);
-    }
-
     /// Shared discrete browser-style page zoom entry point.
     pub(crate) fn zoom_step(self: &Rc<Self>, dir: i32) {
         if !self.overview_open() {
             self.page_zoom(dir);
-        }
-    }
-
-    /// Continuous browser page zoom used by press-and-hold shortcuts.
-    pub(crate) fn zoom_by_factor(self: &Rc<Self>, factor: f64) {
-        if !self.overview_open() {
-            self.page_zoom_by(factor);
         }
     }
 }
