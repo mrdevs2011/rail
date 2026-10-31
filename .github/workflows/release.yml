@@ -40,6 +40,18 @@ jobs:
 
           sed -i "s/^version = \"${OLD}\"/version = \"${NEW}\"/" Cargo.toml
 
+          # Keep Cargo.lock's root package version in sync with Cargo.toml before building.
+          python3 - <<PY
+          from pathlib import Path
+          p = Path("Cargo.lock")
+          text = p.read_text()
+          old = 'name = "rail"\nversion = "${OLD}"'
+          new = 'name = "rail"\nversion = "${NEW}"'
+          if old not in text:
+              raise SystemExit("Cargo.lock root rail package version did not match Cargo.toml")
+          p.write_text(text.replace(old, new, 1))
+          PY
+
           if [ -f package.json ]; then
             sed -i "s/\"version\": \"${OLD}\"/\"version\": \"${NEW}\"/" package.json || true
             # ba'zi package.json da version boshqa formatda bo'lishi mumkin
@@ -71,12 +83,16 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml package.json index.html ROADMAP.md docs || true
+          git add Cargo.toml Cargo.lock package.json index.html ROADMAP.md docs || true
           if git diff --cached --quiet; then
             echo "No version files changed"
             echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           else
             git commit -m "chore: bump version to ${{ steps.ver.outputs.version }} [skip release]"
+            # Another push may land after checkout (for example, a lockfile sync).
+            # Rebase the version bump on the latest main before publishing it.
+            git fetch origin main
+            git rebase origin/main
             git push origin HEAD:main
             echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           fi
