@@ -8,7 +8,6 @@ pub(crate) const PAGE_ZOOM_MAX: f64 = 5.0;
 pub(crate) const OV_ZOOM_MIN: f64 = 0.2;
 pub(crate) const OV_ZOOM_MAX: f64 = 5.0;
 /// A single press changes zoom by one clear 10% step; holding switches to continuous motion.
-pub(crate) const ZOOM_TAP_FACTOR: f64 = 1.10;
 pub(crate) const ZOOM_HOLD_DELAY: std::time::Duration = std::time::Duration::from_millis(180);
 /// Logarithmic scale change per second while a zoom key is held (frame-rate independent).
 pub(crate) const ZOOM_HOLD_RATE: f64 = 0.90;

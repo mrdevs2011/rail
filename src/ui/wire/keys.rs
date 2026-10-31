@@ -74,6 +74,20 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
 
         // Resolve the same customizable shortcut IDs used by Settings > Customize.
         let resolved = sc_resolve_any(&shortcut_combos(key, keycode, state));
+
+        // Overview is navigation-only: browser zoom shortcuts must not scale its grid.
+        // Swallow the bindings here so they cannot fall through to a page behind it.
+        if app_key.overview_open()
+            && matches!(
+                &resolved,
+                ScResolve::Action("overview_zoom_in")
+                    | ScResolve::Action("overview_zoom_out")
+                    | ScResolve::Action("zoom_reset")
+            )
+        {
+            return glib::Propagation::Stop;
+        }
+
         let zoom_direction = match &resolved {
             ScResolve::Action("overview_zoom_in") => Some(1),
             ScResolve::Action("overview_zoom_out") => Some(-1),

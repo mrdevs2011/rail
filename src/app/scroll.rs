@@ -234,7 +234,7 @@ impl App {
                     }
                 };
                 let zoom_ratio = (zt / z0.max(0.01)).ln().abs();
-                // Full overview open/close uses OV_ANIM_SECS; small incremental steps (Ctrl+/-) use 0.06s so holding is smooth
+                // Full overview open/close uses OV_ANIM_SECS; small incremental pinch steps use 0.06s so gestures stay smooth
                 let anim_secs = (zoom_ratio * 0.20).clamp(0.06, OV_ANIM_SECS);
                 let u = (((now - t0) as f64 / 1e6) / anim_secs).clamp(0.0, 1.0);
                 // Ease-out quad: responsive, fast, and flat/even (tekkiz) without sluggish tail

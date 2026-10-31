@@ -19,6 +19,7 @@ impl App {
         }
         // Cancel an in-flight exit so we don't fight the zoom-in.
         self.ov_exiting.set(false);
+        self.hide_zoom_indicator();
         self.palette.set_visible(false);
         // Settings rides on its tab overlay (like downloads HTML) — keep it visible
         // so the overview card shows real content, not a blank shell.
@@ -178,7 +179,7 @@ impl App {
         }
     }
 
-    /// Ctrl+/- or pinch: change the user-facing overview scale (20%-500%).
+    /// Pinch: change the user-facing overview scale (20%-500%).
     /// `ov_user_zoom` is normalized around 1.0, while `OV_ZOOM` is only the physical 100% base.
     pub(crate) fn overview_zoom_by(self: &Rc<Self>, factor: f64) {
         if !self.ov.get() || self.ov_exiting.get() || !factor.is_finite() || factor <= 0.0 {
@@ -195,18 +196,7 @@ impl App {
         let (fx, fy) = self.overview_offsets_at_zoom(physical_scale);
         self.target_x.set(fx);
         self.target_y.set(fy);
-        self.show_zoom_indicator(next * 100.0);
         self.animate();
-    }
-
-    /// Reset overview to its native 100% scale, independent of the physical overview base.
-    pub(crate) fn reset_overview_zoom(self: &Rc<Self>) {
-        if !self.ov.get() || self.ov_exiting.get() {
-            return;
-        }
-        let current = self.ov_user_zoom.get();
-        self.overview_zoom_by(1.0 / current.max(OV_ZOOM_MIN));
-        self.show_zoom_indicator(100.0);
     }
 
     pub(crate) fn cancel_overview(self: &Rc<Self>) {

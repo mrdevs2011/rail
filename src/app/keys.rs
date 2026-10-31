@@ -249,7 +249,7 @@ impl App {
             "sidebar" => self.toggle_sidebar(),
             "fullscreen" => self.win.set_fullscreened(!self.win.is_fullscreen()),
             "quit" => self.win.close(),
-            // ---- zoom: overview ichida grid, aks holda sahifa ----
+            // ---- browser page zoom (disabled while overview is active) ----
             "overview_zoom_in" => self.zoom_step(1),
             "overview_zoom_out" => self.zoom_step(-1),
             "zoom_reset" => self.zoom_step(0),

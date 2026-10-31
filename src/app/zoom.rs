@@ -8,6 +8,11 @@ use crate::*;
 impl App {
     /// Show the current zoom percentage and restart its short fade-out timer.
     pub(crate) fn show_zoom_indicator(self: &Rc<Self>, percentage: f64) {
+        // The readout belongs to browser page zoom only, never the spatial overview.
+        if self.overview_open() {
+            self.hide_zoom_indicator();
+            return;
+        }
         let value = if percentage.is_finite() {
             percentage.clamp(20.0, 500.0).round() as u32
         } else {
@@ -27,6 +32,13 @@ impl App {
             }
         });
         *self.zoom_indicator_timer.borrow_mut() = Some(timer);
+    }
+
+    pub(crate) fn hide_zoom_indicator(&self) {
+        if let Some(timer) = self.zoom_indicator_timer.borrow_mut().take() {
+            timer.remove();
+        }
+        self.zoom_indicator.set_reveal_child(false);
     }
 
     /// One discrete browser-style page zoom step (or reset when `dir == 0`).
@@ -56,29 +68,16 @@ impl App {
         self.show_zoom_indicator(next * 100.0);
     }
 
-    /// Shared discrete zoom entry point for Ctrl+Plus/Minus in pages and overview.
+    /// Shared discrete browser-style page zoom entry point.
     pub(crate) fn zoom_step(self: &Rc<Self>, dir: i32) {
-        if self.overview_open() {
-            if dir == 0 {
-                self.reset_overview_zoom();
-            } else {
-                let factor = if dir > 0 {
-                    ZOOM_TAP_FACTOR
-                } else {
-                    1.0 / ZOOM_TAP_FACTOR
-                };
-                self.overview_zoom_by(factor);
-            }
-        } else {
+        if !self.overview_open() {
             self.page_zoom(dir);
         }
     }
 
-    /// Continuous zoom factor used by hold-to-zoom, pinch and precision wheel input.
+    /// Continuous browser page zoom used by press-and-hold shortcuts.
     pub(crate) fn zoom_by_factor(self: &Rc<Self>, factor: f64) {
-        if self.overview_open() {
-            self.overview_zoom_by(factor);
-        } else {
+        if !self.overview_open() {
             self.page_zoom_by(factor);
         }
     }

@@ -51,7 +51,7 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
         shell.add_controller(zoom);
     }
     {
-        // Ctrl+scroll over overview adjusts scale (smooth, same path as Ctrl+/-).
+        // Ctrl+scroll over overview adjusts scale smoothly; keyboard zoom shortcuts remain page-only.
         let scroll_z = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
         scroll_z.set_propagation_phase(gtk::PropagationPhase::Capture);
         let a = app.clone();
