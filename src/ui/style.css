@@ -1299,6 +1299,13 @@ button.color-choice.selected {
     min-height: 0;
 }
 .hist-row:hover { background: #161616; }
+.hist-row .history-url-link {
+    color: #78a9e8;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.hist-row .history-url-link:hover { color: #a5c8f5; }
+
 .hist-row .shortcut-kbd { padding: 0 6px; font-size: 10.5px; }
 .hist-row .settings-card-title, .hist-row .settings-card-desc { margin: 0; }
 .hist-row button.flat-icon { min-width: 22px; min-height: 20px; }

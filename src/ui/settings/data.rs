@@ -416,8 +416,20 @@ pub(crate) fn render_history_list(
 
         let url_lbl = gtk::Label::new(Some(&entry.url));
         url_lbl.add_css_class("settings-card-desc");
+        url_lbl.add_css_class("history-url-link");
         url_lbl.set_xalign(0.0);
         url_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        url_lbl.set_cursor_from_name(Some("pointer"));
+        url_lbl.set_tooltip_text(Some(tr("Open in a new tab")));
+
+        let open_link = gtk::GestureClick::new();
+        let a_open = app.clone();
+        let u_open = entry.url.clone();
+        open_link.connect_released(move |_, _, _, _| {
+            a_open.new_tab_with_url(&u_open);
+            a_open.hide_settings_modal();
+        });
+        url_lbl.add_controller(open_link);
 
         for l in [&title_lbl, &url_lbl] {
             l.set_hexpand(true);
@@ -427,18 +439,6 @@ pub(crate) fn render_history_list(
         info_box.append(&title_lbl);
         info_box.append(&url_lbl);
         row.append(&info_box);
-
-        // Open in new tab button
-        let open_btn = gtk::Button::from_icon_name("tab-new-symbolic");
-        open_btn.add_css_class("flat-icon");
-        open_btn.set_tooltip_text(Some(tr("Open in new tab")));
-        let a_open = app.clone();
-        let u_open = entry.url.clone();
-        open_btn.connect_clicked(move |_| {
-            a_open.new_tab_with_url(&u_open);
-            a_open.hide_settings_modal();
-        });
-        row.append(&open_btn);
 
         // Delete button
         let del_btn = gtk::Button::from_icon_name("user-trash-symbolic");

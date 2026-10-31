@@ -555,6 +555,15 @@ button.profile-item-btn:hover, button.profile-item-btn.selected {
 .hist-row:hover {
     background: @rail_hover;
 }
+.hist-row .history-url-link {
+    color: @rail_accent;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.hist-row .history-url-link:hover {
+    color: #a5c8f5;
+}
+
 .shortcut-kbd {
     color: @rail_muted;
     background: @rail_surface_raised;
