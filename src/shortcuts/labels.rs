@@ -128,10 +128,12 @@ pub(crate) fn sc_bind_tooltip<W: gtk::prelude::IsA<gtk::Widget>>(
     });
 }
 
-/// Website shortcuts always have precedence: Rail handles a registered shortcut only
-/// when the focused page did not consume the key event.
+/// Registered browser/application shortcuts must be handled before WebKit's page
+/// receives the event. Otherwise WebKit can consume standard combinations (Ctrl+T,
+/// Ctrl+W, Ctrl+R, Ctrl+F, etc.) and the Rail action dispatcher never sees them.
+/// Unregistered keys still continue through GTK to the focused page.
 pub(crate) fn shortcut_propagation_phase() -> gtk::PropagationPhase {
-    gtk::PropagationPhase::Bubble
+    gtk::PropagationPhase::Capture
 }
 
 pub(crate) fn apply_shortcut_priority() {

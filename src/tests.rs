@@ -338,8 +338,8 @@ fn test_individual_shortcut_enable_disable() {
 }
 
 #[test]
-fn test_website_shortcuts_always_have_precedence() {
-    assert_eq!(shortcut_propagation_phase(), gtk::PropagationPhase::Bubble);
+fn test_registered_shortcuts_are_captured_before_webkit() {
+    assert_eq!(shortcut_propagation_phase(), gtk::PropagationPhase::Capture);
 }
 
 #[test]
