@@ -3,6 +3,17 @@
 use crate::*;
 
 impl App {
+    /// Keep the previous-workspace pointer valid when an empty workspace row is removed.
+    pub(crate) fn remap_previous_workspace_after_remove(&self, removed_row: usize) {
+        if let Some(previous) = self.previous_workspace.get() {
+            if previous == removed_row {
+                self.previous_workspace.set(None);
+            } else if previous > removed_row {
+                self.previous_workspace.set(Some(previous - 1));
+            }
+        }
+    }
+
     pub(crate) fn close_view(self: &Rc<Self>, view: &WebView) {
         let Some((r_idx, c_idx)) = self.find_view_coords(view) else {
             return;
@@ -55,6 +66,9 @@ impl App {
         let total_tabs: usize = rows.iter().map(|r| r.tabs.len()).sum();
         let total_rows = rows.len();
         drop(rows);
+        if row_removed {
+            self.remap_previous_workspace_after_remove(r_idx);
+        }
 
         // Free the web process right away instead of waiting for the WebView to be finalized.
         tab.view.terminate_web_process();
@@ -69,6 +83,9 @@ impl App {
 
         if is_closing_focused {
             let next_r = r_idx.min(total_rows.saturating_sub(1));
+            if row_removed {
+                self.focus_row.set(next_r);
+            }
             let rows = self.rows.borrow();
             if rows.is_empty() || rows[next_r].tabs.is_empty() {
                 if let Some((first_r, _)) =
@@ -119,6 +136,10 @@ impl App {
             return;
         }
         let c_clamped = c_idx.min(rows[r_clamped].tabs.len() - 1);
+        let previous_row = self.focus_row.get();
+        if previous_row != r_clamped {
+            self.previous_workspace.set(Some(previous_row));
+        }
         self.focus_row.set(r_clamped);
         self.focus_col.set(c_clamped);
         self.row_last_col.borrow_mut().insert(r_clamped, c_clamped);
@@ -386,6 +407,18 @@ impl App {
         self.focus_row(target as usize);
     }
 
+    /// Toggle focus between the current and the previously focused workspace, like Niri.
+    pub(crate) fn focus_workspace_previous(self: &Rc<Self>) {
+        let current = self.focus_row.get();
+        let Some(previous) = self.previous_workspace.get() else {
+            return;
+        };
+        if previous == current || previous >= self.rows.borrow().len() {
+            return;
+        }
+        self.focus_row(previous);
+    }
+
     /// Move the current focused tab/column to a workspace relative to its current row.
     pub(crate) fn move_to_workspace_relative(self: &Rc<Self>, direction: i32, whole_column: bool) {
         if direction == 0 {
@@ -434,8 +467,7 @@ impl App {
         from_c.min(n.saturating_sub(1))
     }
 
-    /// Window above inside a stacked column; at the top of the column: one workspace up,
-    /// restoring the last focused tab in that workspace.
+    /// Niri focus-window-up: move only within the focused stacked column.
     pub(crate) fn focus_row_up(self: &Rc<Self>) {
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
@@ -447,16 +479,10 @@ impl App {
         };
         if let Some(c) = above {
             self.focus_coords(cur_r, c);
-            return;
-        }
-        if cur_r > 0 {
-            let dest_c = self.col_for_workspace(cur_r, cur_c, cur_r - 1);
-            self.focus_coords(cur_r - 1, dest_c);
         }
     }
 
-    /// Window below inside a stacked column; at the bottom: one workspace down,
-    /// restoring the last focused tab in that workspace.
+    /// Niri focus-window-down: move only within the focused stacked column.
     pub(crate) fn focus_row_down(self: &Rc<Self>) {
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
@@ -468,12 +494,6 @@ impl App {
         };
         if let Some(c) = below {
             self.focus_coords(cur_r, c);
-            return;
-        }
-        let n_rows = self.rows.borrow().len();
-        if cur_r + 1 < n_rows {
-            let dest_c = self.col_for_workspace(cur_r, cur_c, cur_r + 1);
-            self.focus_coords(cur_r + 1, dest_c);
         }
     }
 

@@ -28,7 +28,7 @@ impl Profile {
         PROFILE_COLORS
             .get(self.color_idx)
             .map(|(c, _)| *c)
-            .unwrap_or("#7aa2f7")
+            .unwrap_or("#ededed")
     }
 
     pub fn initial_letter(&self) -> String {
@@ -99,15 +99,15 @@ pub fn profile_text_color_for_bg(hex: &str) -> &'static str {
         ) {
             let lum = 0.299 * (r as f64) + 0.587 * (g as f64) + 0.114 * (b as f64);
             if lum > 140.0 {
-                "#050811" // Light background -> solid pure deep black
+                "#000000" // Light background -> solid pure deep black
             } else {
                 "#ffffff" // Dark background -> solid crisp white
             }
         } else {
-            "#050811"
+            "#000000"
         }
     } else {
-        "#050811"
+        "#000000"
     }
 }
 
@@ -530,11 +530,11 @@ mod tests {
 
     #[test]
     fn test_profile_contrast_color() {
-        // Bright colors (cyan, yellow, green, teal, etc.) must yield high contrast dark text (#050811)
-        assert_eq!(profile_text_color_for_bg("#38bdf8"), "#050811");
-        assert_eq!(profile_text_color_for_bg("#facc15"), "#050811");
-        assert_eq!(profile_text_color_for_bg("#4ade80"), "#050811");
-        assert_eq!(profile_text_color_for_bg("#ffffff"), "#050811");
+        // Bright colors (cyan, yellow, green, teal, etc.) must yield high contrast dark text (#000000)
+        assert_eq!(profile_text_color_for_bg("#38bdf8"), "#000000");
+        assert_eq!(profile_text_color_for_bg("#facc15"), "#000000");
+        assert_eq!(profile_text_color_for_bg("#4ade80"), "#000000");
+        assert_eq!(profile_text_color_for_bg("#ffffff"), "#000000");
 
         // Dark backgrounds (black, deep navy, etc.) must yield crisp white text (#ffffff)
         assert_eq!(profile_text_color_for_bg("#000000"), "#ffffff");
@@ -544,9 +544,9 @@ mod tests {
         let prof = Profile {
             id: "work".into(),
             name: "Work".into(),
-            color_idx: 0, // #38bdf8
+            color_idx: 0, // #ededed (White)
         };
-        assert_eq!(prof.text_color(), "#050811");
+        assert_eq!(prof.text_color(), "#000000");
     }
 
     #[test]

@@ -77,6 +77,60 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
         shell.add_controller(scroll_z);
     }
 
+    // Niri-style modified wheel bindings. Only modified gestures are intercepted, so
+    // ordinary wheel/touchpad scrolling remains native to the webpage.
+    {
+        let layout_scroll =
+            gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
+        layout_scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let last_action = Rc::new(Cell::new(0i64));
+        let last_action_cb = last_action.clone();
+        let a = app.clone();
+        layout_scroll.connect_scroll(move |_, _dx, dy| {
+            if a.ov.get()
+                || a.ov_exiting.get()
+                || a.settings_modal_open()
+                || a.palette_open()
+                || a.map_open()
+                || dy.abs() < f64::EPSILON
+            {
+                return glib::Propagation::Proceed;
+            }
+            let modifiers = gtk::prelude::WidgetExt::display(&a.win)
+                .default_seat()
+                .and_then(|seat| seat.keyboard())
+                .map(|keyboard| keyboard.modifier_state())
+                .unwrap_or_else(gdk::ModifierType::empty);
+            if !modifiers.contains(gdk::ModifierType::ALT_MASK) {
+                return glib::Propagation::Proceed;
+            }
+            let control = modifiers.contains(gdk::ModifierType::CONTROL_MASK);
+            let shift = modifiers.contains(gdk::ModifierType::SHIFT_MASK);
+            if control && shift {
+                return glib::Propagation::Proceed;
+            }
+            let now = glib::monotonic_time();
+            if now - last_action_cb.get() < 150_000 {
+                return glib::Propagation::Stop;
+            }
+            last_action_cb.set(now);
+            let direction = if dy > 0.0 { 1 } else { -1 };
+            if control {
+                if direction > 0 {
+                    a.focus_column_right();
+                } else {
+                    a.focus_column_left();
+                }
+            } else if shift {
+                a.move_to_workspace_relative(direction, true);
+            } else {
+                a.focus_workspace_relative(direction);
+            }
+            glib::Propagation::Stop
+        });
+        win.add_controller(layout_scroll);
+    }
+
     // Overview-only 2D pan (two-finger swipe between tabs/rows). Normal browsing leaves
     // scroll to WebKit entirely — Bubble phase ensures normal page scroll is never intercepted.
     let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);

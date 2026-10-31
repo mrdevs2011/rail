@@ -503,16 +503,24 @@ fn test_niri_layout_shortcuts_resolve_from_gdk_key_names() {
         sc_resolve_any(&combos)
     };
     assert!(matches!(
-        resolve(gdk::Key::Page_Up, M::ALT_MASK),
+        resolve(gdk::Key::i, M::ALT_MASK),
         ScResolve::Action("focus_workspace_up")
     ));
     assert!(matches!(
-        resolve(gdk::Key::Page_Down, M::ALT_MASK),
+        resolve(gdk::Key::u, M::ALT_MASK),
         ScResolve::Action("focus_workspace_down")
     ));
     assert!(matches!(
         resolve(gdk::Key::comma, M::ALT_MASK),
         ScResolve::Action("consume_into_left")
+    ));
+    assert!(matches!(
+        resolve(gdk::Key::Tab, M::ALT_MASK | M::CONTROL_MASK),
+        ScResolve::Action("prev_workspace")
+    ));
+    assert!(matches!(
+        resolve(gdk::Key::period, M::ALT_MASK | M::CONTROL_MASK),
+        ScResolve::Action("expel_window")
     ));
 }
 
@@ -531,7 +539,7 @@ fn test_customized_shortcut_follows_action_not_key() {
         sc_resolve("Ctrl+Shift+F"),
         ScResolve::Action("full_tab")
     ));
-    assert!(matches!(sc_resolve("Alt+F"), ScResolve::Disabled));
+    assert!(matches!(sc_resolve("Alt+Shift+F"), ScResolve::Disabled));
     assert!(matches!(sc_resolve("F11"), ScResolve::Disabled));
     // ro'yxatda umuman yo'q tugma qat'iy tugmalarga (Esc, overview) qoladi
     assert!(matches!(sc_resolve("Escape"), ScResolve::Unknown));
@@ -569,7 +577,8 @@ fn test_find_reload_zoom_defaults() {
         ("Ctrl+0", "zoom_reset"),
         ("Ctrl+Shift+T", "reopen_tab"),
         ("Ctrl+H", "history"),
-        ("Alt+F", "full_tab"),
+        ("Alt+F", "column_width_preset"),
+        ("Alt+Shift+F", "full_tab"),
         ("F11", "fullscreen"),
     ] {
         match sc_resolve(combo) {

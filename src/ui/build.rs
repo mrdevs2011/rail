@@ -340,6 +340,7 @@ pub(crate) fn build(gapp: &gtk::Application) {
         rows: RefCell::new(Vec::new()),
         focus_row: Cell::new(0),
         focus_col: Cell::new(0),
+        previous_workspace: Cell::new(None),
         row_last_col: RefCell::new(std::collections::HashMap::new()),
         target_x: Cell::new(0.0),
         target_y: Cell::new(0.0),

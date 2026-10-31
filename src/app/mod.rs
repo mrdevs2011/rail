@@ -89,6 +89,8 @@ pub(crate) struct App {
     pub(crate) rows: RefCell<Vec<Row>>,
     pub(crate) focus_row: Cell<usize>,
     pub(crate) focus_col: Cell<usize>,
+    /// Workspace visited immediately before the current one (Niri focus-workspace-previous).
+    pub(crate) previous_workspace: Cell<Option<usize>>,
     /// Last focused tab index per workspace row (restored when moving up/down between rows).
     pub(crate) row_last_col: RefCell<std::collections::HashMap<usize, usize>>,
     pub(crate) target_x: Cell<f64>,

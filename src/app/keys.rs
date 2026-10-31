@@ -55,7 +55,9 @@ pub(crate) const STATIC_ACTIONS: &[&str] = &[
     "center_visible_columns",
     "next_tab",
     "prev_tab",
+    "prev_workspace",
     "consume_into_left",
+    "expel_window",
     "stack_left",
     "stack_right",
     "settings",
@@ -135,7 +137,8 @@ impl App {
             return true;
         }
         if let Some(n) = Self::action_num(id, "mv_") {
-            self.move_tab_to_row(n - 1);
+            // Niri's move-window-to-workspace numbered binds use focus=false.
+            self.move_tab_to_row_keep_focus(n - 1);
             return true;
         }
         match id {
@@ -160,10 +163,11 @@ impl App {
                 }
             }
             "reopen_tab" => self.reopen_closed_tab(),
+            "prev_workspace" => self.focus_workspace_previous(),
             "next_tab" => self.cycle_tab(1),
             "prev_tab" => self.cycle_tab(-1),
             // ---- layout (niri-style) ----
-            "full_tab" => self.toggle_full(),
+            "full_tab" => self.toggle_window_fullscreen(),
             "new_workspace" => self.split_vertical(),
             "focus_left" | "win_left" => self.focus_column_left(),
             "focus_right" | "win_right" => self.focus_column_right(),
@@ -175,7 +179,8 @@ impl App {
             "move_down" => self.move_window_vertical(1),
             "focus_workspace_up" => self.focus_workspace_relative(-1),
             "focus_workspace_down" => self.focus_workspace_relative(1),
-            "consume_into_left" => self.consume_window_into_column(-1),
+            "consume_into_left" => self.consume_window_into_column(),
+            "expel_window" => self.expel_window_from_column(),
             "stack_left" => self.consume_or_expel(-1),
             "stack_right" => self.consume_or_expel(1),
             "focus_column_first" => self.focus_column_edge(false),

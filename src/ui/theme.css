@@ -199,7 +199,7 @@ progressbar.load-bar progress {
     letter-spacing: -0.045em;
 }
 .brand-dot {
-    color: @rail_accent;
+    color: #83aeea;
 }
 .side-head-btn, button.side-footer-btn, button.flat-icon {
     color: @rail_muted;
@@ -556,12 +556,12 @@ button.profile-item-btn:hover, button.profile-item-btn.selected {
     background: @rail_hover;
 }
 .hist-row .history-url-link {
-    color: @rail_accent;
+    color: @rail_text;
     text-decoration: underline;
     text-underline-offset: 2px;
 }
 .hist-row .history-url-link:hover {
-    color: #a5c8f5;
+    color: #d8d8d8;
 }
 
 .shortcut-kbd {

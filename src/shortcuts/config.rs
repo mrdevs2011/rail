@@ -39,7 +39,12 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
         "Hard reload (bypass cache)",
         ["Ctrl+Shift+R", "Ctrl+F5", "Shift+F5"]
     ),
-    sc!("full_tab", G_TABS, "Toggle Full Tab View", ["Alt+F"]),
+    sc!(
+        "full_tab",
+        G_TABS,
+        "Toggle focused tab fullscreen",
+        ["Alt+Shift+F"]
+    ),
     sc!("new_workspace", G_TABS, "New Workspace", ["Alt+Shift+V"]),
     sc!("focus_left", G_TABS, "Focus column Left", ["Alt+H"]),
     sc!("focus_right", G_TABS, "Focus column Right", ["Alt+L"]),
@@ -60,13 +65,13 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!(
         "win_up",
         G_TABS,
-        "Focus workspace Up (Alt+Arrow)",
+        "Focus window Up in column (Alt+Arrow)",
         ["Alt+Up"]
     ),
     sc!(
         "win_down",
         G_TABS,
-        "Focus workspace Down (Alt+Arrow)",
+        "Focus window Down in column (Alt+Arrow)",
         ["Alt+Down"]
     ),
     sc!(
@@ -97,13 +102,13 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
         "focus_workspace_up",
         G_TABS,
         "Focus workspace above",
-        ["Alt+Page_Up"]
+        ["Alt+I"]
     ),
     sc!(
         "focus_workspace_down",
         G_TABS,
         "Focus workspace below",
-        ["Alt+Page_Down"]
+        ["Alt+U"]
     ),
     sc!(
         "focus_column_first",
@@ -157,7 +162,7 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
         "column_width_preset",
         G_TABS,
         "Cycle column width preset (50% / 100%)",
-        ["Alt+Shift+F"]
+        ["Alt+F"]
     ),
     sc!(
         "column_width_down",
@@ -214,6 +219,12 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
         "Center visible columns",
         ["Alt+Ctrl+C"]
     ),
+    sc!(
+        "prev_workspace",
+        G_TABS,
+        "Focus previous workspace",
+        ["Alt+Ctrl+Tab"]
+    ),
     sc!("next_tab", G_TABS, "Cycle to next tab", ["Ctrl+Tab"]),
     sc!(
         "prev_tab",
@@ -230,8 +241,14 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!(
         "consume_into_left",
         G_TABS,
-        "Consume window into left column",
+        "Consume window from the right into the focused column",
         ["Alt+,"]
+    ),
+    sc!(
+        "expel_window",
+        G_TABS,
+        "Expel bottom window to a new right column",
+        ["Alt+Ctrl+period"]
     ),
     sc!(
         "stack_left",
@@ -279,7 +296,7 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
         "Profiles / profile switcher",
         ["Alt+P"]
     ),
-    sc!("data", G_PANELS, "Data & Backup", ["Alt+I"]),
+    sc!("data", G_PANELS, "Data & Backup", ["Alt+Shift+E"]),
     sc!(
         "devtools",
         G_PANELS,

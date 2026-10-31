@@ -231,7 +231,7 @@ button.side-footer-btn label {
     color: #fafafa;
 }
 .brand-dot {
-    color: #ededed;
+    color: #83aeea;
 }
 button.btn-add-tab {
     background: #111111;
@@ -601,14 +601,14 @@ entry.palette-entry, entry.palette-entry:focus-within {
 }
 
 /* ---- profile colors (True Dark Multi-Profile) ---- */
-.prof-bg-0 { background-color: #ededed; color: #050811; }
-.prof-bg-1 { background-color: #c084fc; color: #050811; }
-.prof-bg-2 { background-color: #4ade80; color: #050811; }
-.prof-bg-3 { background-color: #facc15; color: #050811; }
-.prof-bg-4 { background-color: #f87171; color: #050811; }
-.prof-bg-5 { background-color: #22d3ee; color: #050811; }
-.prof-bg-6 { background-color: #fb923c; color: #050811; }
-.prof-bg-7 { background-color: #2dd4bf; color: #050811; }
+.prof-bg-0 { background-color: #ededed; color: #000000; }
+.prof-bg-1 { background-color: #c084fc; color: #000000; }
+.prof-bg-2 { background-color: #4ade80; color: #000000; }
+.prof-bg-3 { background-color: #facc15; color: #000000; }
+.prof-bg-4 { background-color: #f87171; color: #000000; }
+.prof-bg-5 { background-color: #22d3ee; color: #000000; }
+.prof-bg-6 { background-color: #fb923c; color: #000000; }
+.prof-bg-7 { background-color: #2dd4bf; color: #000000; }
 
 /* ---- profile circle button in URL palette ---- */
 button.profile-circle-btn {
@@ -1205,15 +1205,15 @@ button.color-choice.selected {
     letter-spacing: 0.02em;
     padding: 4px 10px;
     border-radius: 999px;
-    border: 1px solid #2f6bff;
-    background: rgba(47, 107, 255, 0.18);
-    color: #93b4ff;
+    border: 1px solid #3a3a3a;
+    background: rgba(255, 255, 255, 0.07);
+    color: #f5f5f5;
     margin-left: 6px;
 }
 .settings-update-chip:hover {
-    background: #2f6bff;
-    color: #fff;
-    border-color: #2f6bff;
+    background: #f5f5f5;
+    color: #000000;
+    border-color: #f5f5f5;
 }
 .settings-badge {
     background: rgba(255, 255, 255, 0.07);
@@ -1300,11 +1300,11 @@ button.color-choice.selected {
 }
 .hist-row:hover { background: #161616; }
 .hist-row .history-url-link {
-    color: #78a9e8;
+    color: #f5f5f5;
     text-decoration: underline;
     text-underline-offset: 2px;
 }
-.hist-row .history-url-link:hover { color: #a5c8f5; }
+.hist-row .history-url-link:hover { color: #d8d8d8; }
 
 .hist-row .shortcut-kbd { padding: 0 6px; font-size: 10.5px; }
 .hist-row .settings-card-title, .hist-row .settings-card-desc { margin: 0; }
@@ -1356,15 +1356,15 @@ button.settings-engine-btn {
 }
 button.settings-engine-btn:hover {
     background: #141414;
-    border-color: #3b82f6;
+    border-color: #ededed;
     color: #ffffff;
 }
 button.settings-engine-btn.active {
-    background: rgba(59, 130, 246, 0.14);
-    border-color: #3b82f6;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: #ededed;
     color: #ffffff;
     font-weight: 600;
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+    box-shadow: none;
 }
 .settings-engine-icon {
     min-width: 18px;
@@ -1538,8 +1538,8 @@ button.settings-engine-btn.active {
 }
 .devtools-resize-handle:hover,
 .devtools-resize-handle.dragging {
-    background: #3b82f6;
-    border-color: #60a5fa;
+    background: #ededed;
+    border-color: #ededed;
 }
 .devtools-tab-dock {
     background: #000000;
@@ -1565,8 +1565,8 @@ button.settings-engine-btn.active {
 }
 .devtools-panel.dock-bottom .devtools-resize-handle:hover,
 .devtools-panel.dock-bottom .devtools-resize-handle.dragging {
-    background: #3b82f6;
-    border-color: #60a5fa;
+    background: #ededed;
+    border-color: #ededed;
 }
 .devtools-panel.dock-left .devtools-resize-handle,
 .devtools-panel.dock-right .devtools-resize-handle {
@@ -1578,8 +1578,8 @@ button.settings-engine-btn.active {
 .devtools-panel.dock-right .devtools-resize-handle:hover,
 .devtools-panel.dock-left .devtools-resize-handle.dragging,
 .devtools-panel.dock-right .devtools-resize-handle.dragging {
-    background: #3b82f6;
-    border-color: #60a5fa;
+    background: #ededed;
+    border-color: #ededed;
 }
 .devtools-window-box {
     background: #000000;
@@ -1809,20 +1809,20 @@ button.update-close:hover {
     color: #ffffff;
 }
 /* ===== Rail visual polish layer (last on purpose; delete this block to revert) =====
-   One signature accent (sky, same as the start page dot) marks where you are: active row rail,
-   caret, load bar, selected suggestion. Everything else stays monochrome.
-   Surfaces: #000 canvas / #0a0a0a raised / #0e0e0e hover / #141414 active. Lines: #1a1a1a / #2a2a2a.
-   Radii: 4 chips, 6 controls, 8-10 panels. Transitions animate colors only; no blurred shadows on panes. */
+   Chrome stays black and white. The only blue brand accent is the small Rail dot.
+   Active states, focus, loading and selection use neutral white/gray contrast.
+   Surfaces: #000 canvas / #0a0a0a raised / #0e0e0e hover / #141414 active.
+   Radii: 4 chips, 6 controls, 8-10 panels. Transitions animate colors only. */
 
 selection, entry selection, label selection, textview text selection {
-    background: rgba(56, 189, 248, 0.28);
+    background: rgba(255, 255, 255, 0.22);
     color: #ffffff;
 }
 entry, text, textview text {
-    caret-color: #38bdf8;
+    caret-color: #ededed;
 }
 button:focus-visible, modelbutton:focus-visible {
-    outline: 1px solid rgba(56, 189, 248, 0.7);
+    outline: 1px solid rgba(255, 255, 255, 0.7);
     outline-offset: 1px;
 }
 
@@ -2099,21 +2099,21 @@ window.qr-win {
 }
 .ss-toolbar button.ss-primary,
 .ss-toolbar button.ss-btn-dl {
-    background: #93c5fd;
-    color: #0f172a;
-    border: 2px solid #3b82f6;
+    background: #ededed;
+    color: #000000;
+    border: 2px solid #ededed;
     font-weight: 600;
     padding: 0 14px;
 }
 .ss-toolbar button.ss-primary:hover,
 .ss-toolbar button.ss-btn-dl:hover {
-    background: #bfdbfe;
-    color: #0f172a;
-    border-color: #60a5fa;
+    background: #d4d4d4;
+    color: #000000;
+    border-color: #d4d4d4;
 }
 .ss-toolbar button.ss-btn-dl image,
 .ss-toolbar button.ss-btn-dl label {
-    color: #0f172a;
+    color: #000000;
 }
 .ss-topbar {
     background: #1c1c1e;
@@ -2195,7 +2195,7 @@ button.flat-icon, button.side-footer-btn {
 .tabrow.active-tab {
     background: #121212;
     border-color: #202020;
-    border-left: 2px solid #38bdf8;
+    border-left: 2px solid #ededed;
 }
 .workspace-header {
     margin: 10px 4px 3px 4px;
@@ -2211,7 +2211,7 @@ button.flat-icon, button.side-footer-btn {
 .workspace-header.active-workspace {
     background: #101010;
     border-color: #262626;
-    border-left: 2px solid #38bdf8;
+    border-left: 2px solid #ededed;
 }
 
 .tab-title, .workspace-title, .palette-sug-title, button.pill label, button.side-footer-btn label {
@@ -2230,7 +2230,7 @@ button.flat-icon, button.side-footer-btn {
 }
 
 progressbar.load-bar progress {
-    background: #38bdf8;
+    background: #ededed;
     box-shadow: none;
 }
 
@@ -2247,10 +2247,10 @@ progressbar.load-bar progress {
     background: rgba(255, 255, 255, 0.07);
 }
 .palette-sug-item.selected {
-    box-shadow: inset 2px 0 0 #38bdf8;
+    box-shadow: inset 2px 0 0 #ededed;
 }
 .palette-sug-item:hover .palette-sug-icon, .palette-sug-item.selected .palette-sug-icon {
-    color: #38bdf8;
+    color: #ededed;
 }
 
 
@@ -2320,18 +2320,18 @@ button.color-choice {
     font-weight: 500;
 }
 .pwa-dialog-icon {
-    color: #3584e4;
+    color: #ededed;
 }
 button.pill-pwa-btn {
     min-width: 22px;
     min-height: 22px;
     padding: 2px;
     margin-right: 4px;
-    color: #3584e4;
+    color: #ededed;
 }
 button.pill-pwa-btn:hover {
-    color: #62a0ea;
-    background: rgba(53, 132, 228, 0.15);
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
 }
 
 /* Extension load unpacked button - pure white text */

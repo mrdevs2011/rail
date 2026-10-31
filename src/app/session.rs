@@ -258,28 +258,4 @@ impl App {
         self.sync_settings_chrome();
         true
     }
-
-    pub(crate) fn toggle_full(self: &Rc<Self>) {
-        let cur_r = self.focus_row.get();
-        let cur_c = self.focus_col.get();
-        let rows = self.rows.borrow();
-        let Some(row) = rows.get(cur_r) else { return };
-        if cur_c >= row.tabs.len() {
-            return;
-        }
-        // the width belongs to the whole column: it lives on its first tab
-        let head = row.col_span(cur_c).0;
-        let tab = &row.tabs[head];
-        tab.custom_width.set(None);
-        if tab.container.has_css_class("full") {
-            tab.container.remove_css_class("full");
-        } else {
-            tab.container.add_css_class("full");
-        }
-        drop(rows);
-        self.layout.set_column_width(cur_r, head, None);
-        self.sync_strip();
-        self.reveal_focus();
-        self.schedule_save_session();
-    }
 }

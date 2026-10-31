@@ -38,8 +38,7 @@ impl App {
         self.schedule_save_session();
     }
 
-    /// Alt+Shift+J/K: swap the window with its neighbour inside a stacked column; when it is
-    /// not stacked in that direction, move it to the neighbouring workspace instead.
+    /// Niri move-window-up/down: swap only with a neighbour inside the focused stack.
     pub(crate) fn move_window_vertical(self: &Rc<Self>, dir: isize) {
         let r = self.focus_row.get();
         let c = self.focus_col.get();
@@ -64,49 +63,71 @@ impl App {
         }
     }
 
-    /// Niri consume-window-into-column: move the focused window into the adjacent column
-    /// without toggling or expelling other members of either stack.
-    pub(crate) fn consume_window_into_column(self: &Rc<Self>, direction: isize) {
+    /// Niri consume-window-into-column: take the top window from the column to the right
+    /// and append it to the focused column. The focused window remains focused.
+    pub(crate) fn consume_window_into_column(self: &Rc<Self>) {
         let row_index = self.focus_row.get();
-        let column_index = self.focus_col.get();
+        let focused_index = self.focus_col.get();
         let mut rows = self.rows.borrow_mut();
         let Some(row) = rows.get_mut(row_index) else {
             return;
         };
-        if column_index >= row.tabs.len() {
+        if focused_index >= row.tabs.len() {
             return;
         }
-        let (start, end) = row.col_span(column_index);
-        let target_id = if direction < 0 {
-            if start == 0 {
-                return;
-            }
-            row.tabs[start - 1].col_id.get()
-        } else {
-            if end >= row.tabs.len() {
-                return;
-            }
-            row.tabs[end].col_id.get()
-        };
-
-        if end - start > 1 && column_index == start {
-            row.move_col_props(start, start + 1);
+        let (target_start, target_end) = row.col_span(focused_index);
+        if target_end >= row.tabs.len() {
+            return;
         }
-        let tab = row.tabs.remove(column_index);
-        tab.reset_col_props();
-        tab.custom_height.set(None);
-        tab.tabbed.set(false);
-        tab.col_id.set(target_id);
-        let insert_at = row
-            .tabs
-            .iter()
-            .rposition(|candidate| candidate.col_id.get() == target_id)
-            .map_or(0, |last| last + 1);
-        row.tabs.insert(insert_at, tab);
+        let target_id = row.tabs[target_start].col_id.get();
+        // Row::detach transfers the right column's width/tabbed properties to its next
+        // window when it is a stack, then makes the moved window independent.
+        let moved = row.detach(target_end);
+        moved.reset_col_props();
+        moved.custom_height.set(None);
+        moved.tabbed.set(false);
+        moved.col_id.set(target_id);
+        row.tabs.insert(target_end, moved);
         drop(rows);
 
         self.sync_strip();
-        self.focus_coords(row_index, insert_at);
+        self.focus_coords(row_index, focused_index);
+        self.schedule_save_session();
+    }
+
+    /// Niri expel-window-from-column: move the bottom window into its own column to the right.
+    pub(crate) fn expel_window_from_column(self: &Rc<Self>) {
+        let row_index = self.focus_row.get();
+        let focused_index = self.focus_col.get();
+        let new_focus;
+        {
+            let mut rows = self.rows.borrow_mut();
+            let Some(row) = rows.get_mut(row_index) else {
+                return;
+            };
+            if focused_index >= row.tabs.len() {
+                return;
+            }
+            let (start, end) = row.col_span(focused_index);
+            if end - start < 2 {
+                return;
+            }
+            let bottom = end - 1;
+            let focused_moves = focused_index == bottom;
+            let moved = row.detach(bottom);
+            moved.reset_col_props();
+            moved.custom_height.set(None);
+            moved.tabbed.set(false);
+            let insert_at = bottom;
+            row.tabs.insert(insert_at, moved);
+            new_focus = if focused_moves {
+                insert_at
+            } else {
+                focused_index
+            };
+        }
+        self.sync_strip();
+        self.focus_coords(row_index, new_focus);
         self.schedule_save_session();
     }
 
@@ -193,80 +214,95 @@ impl App {
     }
 
     pub(crate) fn move_tab_to_row(self: &Rc<Self>, target_r: usize) {
-        let cur_r = self.focus_row.get();
-        let cur_c = self.focus_col.get();
-        if cur_r == target_r {
+        self.move_tab_to_row_with_focus(target_r, true);
+    }
+
+    /// Niri move-window-to-workspace --focus=false: move the focused tab but keep focus
+    /// on the source workspace (or its replacement if that workspace becomes empty).
+    pub(crate) fn move_tab_to_row_keep_focus(self: &Rc<Self>, target_r: usize) {
+        self.move_tab_to_row_with_focus(target_r, false);
+    }
+
+    fn move_tab_to_row_with_focus(self: &Rc<Self>, target_r: usize, follow: bool) {
+        let source_r = self.focus_row.get();
+        let source_c = self.focus_col.get();
+        if source_r == target_r {
             return;
         }
 
-        let mut rows = self.rows.borrow_mut();
-        if cur_r >= rows.len() || cur_c >= rows[cur_r].tabs.len() {
-            return;
-        }
-
-        let tab = rows[cur_r].detach(cur_c);
-        let cur_row_empty = rows[cur_r].tabs.is_empty();
-
-        while rows.len() <= target_r {
-            rows.push(Row { tabs: Vec::new() });
-        }
-        rows[target_r].tabs.push(tab);
-        let dest_c = rows[target_r].tabs.len() - 1;
-
-        let need_fresh_in_row_0 = cur_row_empty && cur_r == 0;
-        drop(rows);
-
-        if need_fresh_in_row_0 {
-            let prof_id = self.profiles.borrow().active_profile().id;
-            let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-            let view = Self::create_web_view(&session, &prof_id);
-            view.load_html(&start_page(), Some("rail://start/"));
-            view.set_can_target(!self.ov.get());
-            let tw = Self::create_tab_widget(&view);
-            self.setup_tab_signals(
-                &tw.container,
-                &view,
-                &tw.resize_handle,
-                &tw.height_handle,
-                &tw.dt_handle,
-                &tw.dt_box,
-            );
-
+        let (dest_r, dest_c, source_empty) = {
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab {
-                container: tw.container,
-                view,
-                freeze: tw.freeze,
-                height_handle: tw.height_handle,
-                profile_id: prof_id,
-                custom_width: Cell::new(None),
-                custom_height: Cell::new(None),
-                tabbed: Cell::new(false),
-                col_id: Cell::new(new_col_id()),
-                saved_uri: RefCell::new("rail://start/".to_string()),
-                suspended: Cell::new(false),
-                keep_alive: Cell::new(false),
-                last_active: Cell::new(std::time::Instant::now()),
-                dt_box: tw.dt_box,
-                dt_handle: tw.dt_handle,
-                tab_inner: tw.tab_inner,
-                overlay: tw.overlay,
-                dt_open: Cell::new(false),
-                dt_height: Cell::new(self.default_devtools_height.get()),
-                dt_width: Cell::new(self.default_devtools_width.get()),
-                dt_dock: Cell::new(self.devtools_dock_side.get()),
-            });
-            drop(rows);
-        } else if cur_row_empty && cur_r > 0 {
-            let mut rows = self.rows.borrow_mut();
-            while rows.len() > 1 && rows.last().is_some_and(|r| r.tabs.is_empty()) {
-                rows.pop();
+            if source_r >= rows.len() || source_c >= rows[source_r].tabs.len() {
+                return;
             }
-            drop(rows);
+            let tab = rows[source_r].detach(source_c);
+            let source_empty = rows[source_r].tabs.is_empty();
+            while rows.len() <= target_r {
+                rows.push(Row { tabs: Vec::new() });
+            }
+            rows[target_r].tabs.push(tab);
+            let dest_c = rows[target_r].tabs.len() - 1;
+            let mut dest_r = target_r;
+
+            // Non-home empty workspaces disappear; keep all workspace indices coherent.
+            if source_empty && source_r > 0 {
+                rows.remove(source_r);
+                if dest_r > source_r {
+                    dest_r -= 1;
+                }
+            }
+            (dest_r, dest_c, source_empty)
+        };
+
+        if source_empty && source_r > 0 {
+            self.remap_previous_workspace_after_remove(source_r);
+            let old = self.row_last_col.borrow().clone();
+            let mut remapped = std::collections::HashMap::new();
+            for (row, col) in old {
+                if row == source_r {
+                    continue;
+                }
+                remapped.insert(if row > source_r { row - 1 } else { row }, col);
+            }
+            *self.row_last_col.borrow_mut() = remapped;
         }
 
         self.sync_strip();
-        self.focus_coords(target_r, dest_c);
+        if source_empty && source_r == 0 {
+            // Rail always keeps its home workspace alive; create a replacement tab first.
+            self.new_tab();
+            if follow {
+                self.focus_coords(dest_r, dest_c);
+            }
+        } else if follow {
+            if source_empty {
+                self.focus_row.set(dest_r);
+            }
+            self.focus_coords(dest_r, dest_c);
+        } else if source_empty {
+            let rows = self.rows.borrow();
+            if rows.is_empty() {
+                return;
+            }
+            let keep_r = source_r.min(rows.len() - 1);
+            let keep_c = self
+                .row_last_col
+                .borrow()
+                .get(&keep_r)
+                .copied()
+                .unwrap_or(0)
+                .min(rows[keep_r].tabs.len().saturating_sub(1));
+            drop(rows);
+            self.focus_row.set(keep_r);
+            self.focus_coords(keep_r, keep_c);
+        } else {
+            let rows = self.rows.borrow();
+            let keep_c = source_c.min(rows[source_r].tabs.len().saturating_sub(1));
+            drop(rows);
+            self.focus_coords(source_r, keep_c);
+        }
+        self.refresh_sidebar();
+        self.schedule_save_session();
     }
 
     pub(crate) fn move_tab_to_row_pos(
@@ -281,74 +317,50 @@ impl App {
             return;
         }
 
-        let mut rows = self.rows.borrow_mut();
-        if from_r >= rows.len() || from_c >= rows[from_r].tabs.len() {
-            return;
-        }
-
-        let tab = rows[from_r].detach(from_c);
-        let cur_row_empty = rows[from_r].tabs.is_empty();
-
-        while rows.len() <= to_r {
-            rows.push(Row { tabs: Vec::new() });
-        }
-        let insert_c = to_c.min(rows[to_r].tabs.len());
-        rows[to_r].tabs.insert(insert_c, tab);
-
-        let need_fresh_in_row_0 = cur_row_empty && from_r == 0;
-        drop(rows);
-
-        if need_fresh_in_row_0 {
-            let prof_id = self.profiles.borrow().active_profile().id;
-            let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-            let view = Self::create_web_view(&session, &prof_id);
-            view.load_html(&start_page(), Some("rail://start/"));
-            view.set_can_target(!self.ov.get());
-            let tw = Self::create_tab_widget(&view);
-            self.setup_tab_signals(
-                &tw.container,
-                &view,
-                &tw.resize_handle,
-                &tw.height_handle,
-                &tw.dt_handle,
-                &tw.dt_box,
-            );
-
+        let (dest_r, insert_c, source_empty) = {
             let mut rows = self.rows.borrow_mut();
-            rows[0].tabs.push(Tab {
-                container: tw.container,
-                view,
-                freeze: tw.freeze,
-                height_handle: tw.height_handle,
-                profile_id: prof_id,
-                custom_width: Cell::new(None),
-                custom_height: Cell::new(None),
-                tabbed: Cell::new(false),
-                col_id: Cell::new(new_col_id()),
-                saved_uri: RefCell::new("rail://start/".to_string()),
-                suspended: Cell::new(false),
-                keep_alive: Cell::new(false),
-                last_active: Cell::new(std::time::Instant::now()),
-                dt_box: tw.dt_box,
-                dt_handle: tw.dt_handle,
-                tab_inner: tw.tab_inner,
-                overlay: tw.overlay,
-                dt_open: Cell::new(false),
-                dt_height: Cell::new(self.default_devtools_height.get()),
-                dt_width: Cell::new(self.default_devtools_width.get()),
-                dt_dock: Cell::new(self.devtools_dock_side.get()),
-            });
-            drop(rows);
-        } else if cur_row_empty && from_r > 0 {
-            let mut rows = self.rows.borrow_mut();
-            while rows.len() > 1 && rows.last().is_some_and(|r| r.tabs.is_empty()) {
-                rows.pop();
+            if from_r >= rows.len() || from_c >= rows[from_r].tabs.len() {
+                return;
             }
-            drop(rows);
+            let tab = rows[from_r].detach(from_c);
+            let source_empty = rows[from_r].tabs.is_empty();
+            while rows.len() <= to_r {
+                rows.push(Row { tabs: Vec::new() });
+            }
+            let insert_c = to_c.min(rows[to_r].tabs.len());
+            rows[to_r].tabs.insert(insert_c, tab);
+            let mut dest_r = to_r;
+            if source_empty && from_r > 0 {
+                rows.remove(from_r);
+                if dest_r > from_r {
+                    dest_r -= 1;
+                }
+            }
+            (dest_r, insert_c, source_empty)
+        };
+
+        if source_empty && from_r > 0 {
+            self.remap_previous_workspace_after_remove(from_r);
+            let old = self.row_last_col.borrow().clone();
+            let mut remapped = std::collections::HashMap::new();
+            for (row, col) in old {
+                if row == from_r {
+                    continue;
+                }
+                remapped.insert(if row > from_r { row - 1 } else { row }, col);
+            }
+            *self.row_last_col.borrow_mut() = remapped;
+            self.focus_row.set(dest_r);
         }
 
-        self.sync_strip();
-        self.focus_coords(to_r, insert_c);
+        if source_empty && from_r == 0 {
+            // Keep Rail's permanent home workspace alive when its last tab is dragged away.
+            self.new_tab();
+        } else {
+            self.sync_strip();
+        }
+        self.focus_coords(dest_r, insert_c);
+        self.refresh_sidebar();
         self.schedule_save_session();
     }
 }

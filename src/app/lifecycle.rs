@@ -319,6 +319,25 @@ impl App {
         self.reveal_focus();
     }
 
+    /// Toggle Niri-style fullscreen for the focused tab, hiding the other columns/workspaces.
+    pub(crate) fn toggle_window_fullscreen(self: &Rc<Self>) {
+        if self.layout.solo().is_some() {
+            self.leave_solo_fullscreen(true);
+            return;
+        }
+        let rows = self.rows.borrow();
+        let Some(tab) = rows
+            .get(self.focus_row.get())
+            .and_then(|row| row.tabs.get(self.focus_col.get()))
+        else {
+            return;
+        };
+        let widget: gtk::Widget = tab.container.clone().upcast();
+        self.layout.set_solo(Some(widget));
+        drop(rows);
+        self.strip.queue_allocate();
+    }
+
     /// Sahifa ichidagi element (video va h.k.) to'liq ekran bo'lganda: o'sha tab butun oynani
     /// egallaydi, split / yon tomondagi tablar ko'rinmaydi — haqiqiy brauzerlardagidek.
     pub(crate) fn enter_solo_fullscreen(self: &Rc<Self>, view: &WebView) {

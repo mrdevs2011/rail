@@ -385,6 +385,10 @@ impl App {
             *self.row_last_col.borrow_mut() = remapped;
         }
         drop(rows);
+        if source_is_empty && source_row > 0 {
+            self.remap_previous_workspace_after_remove(source_row);
+            self.focus_row.set(focus_destination);
+        }
         if home_row_empty {
             self.focus_row.set(0);
             self.focus_col.set(0);
@@ -424,6 +428,15 @@ impl App {
             remapped.insert(new_row, col);
         }
         *self.row_last_col.borrow_mut() = remapped;
+        if let Some(previous) = self.previous_workspace.get() {
+            self.previous_workspace.set(Some(if previous == source {
+                target
+            } else if previous == target {
+                source
+            } else {
+                previous
+            }));
+        }
         self.focus_row.set(target);
         self.sync_strip();
         self.focus_coords(target, self.focus_col.get());

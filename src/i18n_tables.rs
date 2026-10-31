@@ -421,9 +421,9 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Перезагрузить активную вкладку",
     ),
     (
-        "Toggle Full Tab View",
-        "To'liq tab ko'rinishini almashtirish",
-        "Переключить полноэкранный вид вкладки",
+        "Toggle focused tab fullscreen",
+        "Fokusdagi tabni to'liq ekranda ko'rsatish",
+        "Полноэкранный режим выбранной вкладки",
     ),
     (
         "Focus column Left",
@@ -436,14 +436,49 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Перейти в правый столбец",
     ),
     (
+        "Focus window Up in column (Alt+Arrow)",
+        "Ustundagi yuqori oynaga o'tish (Alt+strelka)",
+        "Окно выше в столбце (Alt+стрелка)",
+    ),
+    (
+        "Focus window Down in column (Alt+Arrow)",
+        "Ustundagi pastki oynaga o'tish (Alt+strelka)",
+        "Окно ниже в столбце (Alt+стрелка)",
+    ),
+    (
+        "Focus workspace above",
+        "Yuqoridagi ish maydoniga o'tish",
+        "Перейти на рабочее пространство выше",
+    ),
+    (
+        "Focus workspace below",
+        "Pastdagi ish maydoniga o'tish",
+        "Перейти на рабочее пространство ниже",
+    ),
+    (
+        "Focus previous workspace",
+        "Oldingi ish maydoniga qaytish",
+        "Вернуться к предыдущему рабочему пространству",
+    ),
+    (
+        "Consume window from the right into the focused column",
+        "O'ngdagi oynani fokusdagi ustunga qo'shish",
+        "Переместить окно справа в текущий столбец",
+    ),
+    (
+        "Expel bottom window to a new right column",
+        "Pastki oynani o'ngdagi yangi ustunga chiqarish",
+        "Вынести нижнее окно в новый столбец справа",
+    ),
+    (
         "Focus window Down",
-        "Pastdagi oynaga o'tish (ustun ichida, so'ng pastki qator)",
-        "Окно ниже (в столбце, затем строка ниже)",
+        "Ustun ichidagi pastki oynaga o'tish",
+        "Перейти к окну ниже в столбце",
     ),
     (
         "Focus window Up",
-        "Yuqoridagi oynaga o'tish (ustun ichida, so'ng yuqori qator)",
-        "Окно выше (в столбце, затем строка выше)",
+        "Ustun ichidagi yuqori oynaga o'tish",
+        "Перейти к окну выше в столбце",
     ),
     (
         "Move tab column Left",
@@ -457,12 +492,12 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ),
     (
         "Move window Down",
-        "Oynani pastga surish (ustun ichida, so'ng pastki qator)",
+        "Oynani ustun ichida pastga surish",
         "Сдвинуть окно вниз (в столбце, затем строка ниже)",
     ),
     (
         "Move window Up",
-        "Oynani yuqoriga surish (ustun ichida, so'ng yuqori qator)",
+        "Oynani ustun ichida yuqoriga surish",
         "Сдвинуть окно вверх (в столбце, затем строка выше)",
     ),
     ("Switch to tab 1", "1-tabga o'tish", "Перейти на вкладку 1"),
