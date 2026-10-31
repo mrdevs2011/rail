@@ -391,7 +391,13 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
     postMsg('full_page');
   };
 
-  function onMouseMove(e) {
+  function onPointerMove(e) {
+    // Start a drag only after a small movement threshold, so a click can still
+    // select the hovered element without accidentally creating a tiny region.
+    if (isMouseDown && !isDragging && Math.hypot(e.pageX - startX, e.pageY - startY) >= 4) {
+      isDragging = true;
+    }
+
     if (isDragging) {
       const currX = e.pageX;
       const currY = e.pageY;
@@ -485,7 +491,7 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
     if (e.stopImmediatePropagation) e.stopImmediatePropagation();
   }
 
-  function onMouseDown(e) {
+  function onPointerDown(e) {
     if (isOurUi(e.target)) {
       return;
     }
@@ -520,7 +526,7 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
     startY = e.pageY;
   }
 
-  function onMouseUp(e) {
+  function onPointerUp(e) {
     if (isOurUi(e.target)) return;
     e.preventDefault();
     e.stopPropagation();
@@ -542,8 +548,17 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
     }
 
     if (isMouseDown) {
-      isMouseDown = false;
       const dist = Math.hypot(e.pageX - mouseDownPos.x, e.pageY - mouseDownPos.y);
+      // Pointer-up can arrive at a distant coordinate without an intermediate
+      // move event (e.g. a fast touch/pen gesture); finalize that region too.
+      if (dist >= 6 && !isDragging) {
+        isDragging = true;
+        sel.left = Math.min(startX, e.pageX);
+        sel.top = Math.min(startY, e.pageY);
+        sel.width = Math.abs(e.pageX - startX);
+        sel.height = Math.abs(e.pageY - startY);
+      }
+      isMouseDown = false;
 
       if (dist < 6 && hoveredRect && !isDragging) {
         sel = { ...hoveredRect };
@@ -584,24 +599,20 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
     updateToolbarPos();
   }
 
-  window.addEventListener('mousemove', onMouseMove, true);
-  window.addEventListener('mousedown', onMouseDown, true);
-  window.addEventListener('mouseup', onMouseUp, true);
+  window.addEventListener('pointermove', onPointerMove, true);
+  window.addEventListener('pointerdown', onPointerDown, true);
+  window.addEventListener('pointerup', onPointerUp, true);
   window.addEventListener('click', interceptEvent, true);
-  window.addEventListener('pointerdown', interceptEvent, true);
-  window.addEventListener('pointerup', interceptEvent, true);
   window.addEventListener('contextmenu', interceptEvent, true);
   window.addEventListener('dblclick', interceptEvent, true);
   window.addEventListener('keydown', onKeyDown, true);
   window.addEventListener('scroll', onScroll, true);
 
   function cleanup() {
-    window.removeEventListener('mousemove', onMouseMove, true);
-    window.removeEventListener('mousedown', onMouseDown, true);
-    window.removeEventListener('mouseup', onMouseUp, true);
+    window.removeEventListener('pointermove', onPointerMove, true);
+    window.removeEventListener('pointerdown', onPointerDown, true);
+    window.removeEventListener('pointerup', onPointerUp, true);
     window.removeEventListener('click', interceptEvent, true);
-    window.removeEventListener('pointerdown', interceptEvent, true);
-    window.removeEventListener('pointerup', interceptEvent, true);
     window.removeEventListener('contextmenu', interceptEvent, true);
     window.removeEventListener('dblclick', interceptEvent, true);
     window.removeEventListener('keydown', onKeyDown, true);
@@ -671,7 +682,7 @@ impl App {
                 move |res| {
                     match res {
                         Ok(tex) => finish_capture(&app, &tex, false),
-                        Err(e) => eprintln!("[rail] full page screenshot error: {e}"),
+                        Err(e) => report_capture_error(&app, &e.to_string()),
                     }
                     cleanup_screenshot(&view_c);
                 },
@@ -730,7 +741,7 @@ impl App {
                             let final_tex = crop_texture(&tex, crop_r).unwrap_or(tex);
                             finish_capture(&app, &final_tex, to_clipboard);
                         }
-                        Err(e) => eprintln!("[rail] visible snapshot error: {e}"),
+                        Err(e) => report_capture_error(&app, &e.to_string()),
                     }
                     cleanup_screenshot(&view_c);
                 },
@@ -757,9 +768,7 @@ impl App {
                             let final_tex = crop_texture(&tex, crop_r).unwrap_or(tex);
                             finish_capture(&app, &final_tex, to_clipboard);
                         }
-                        Err(e) => {
-                            eprintln!("[rail] full document snapshot error: {e}; falling back");
-                        }
+                        Err(e) => report_capture_error(&app, &e.to_string()),
                     }
                     cleanup_screenshot(&view_c);
                 },
@@ -782,10 +791,20 @@ fn finish_capture(app: &Rc<App>, tex: &gdk::Texture, to_clipboard: bool) {
     if to_clipboard {
         app.win.clipboard().set_texture(tex);
         app.show_copied_toast(tr("Nusxalandi!"), tr("Screenshot buferga nusxalandi"));
-    } else if let Some(path) = save_texture_png(tex) {
-        let name = path.file_name().unwrap_or_default().to_string_lossy();
-        app.show_copied_toast(tr("Saqlandi!"), &format!("Downloads/Rail/{}", name));
+    } else {
+        match save_texture_png(tex) {
+            Ok(path) => {
+                let name = path.file_name().unwrap_or_default().to_string_lossy();
+                app.show_copied_toast(tr("Saqlandi!"), &format!("Downloads/Rail/{}", name));
+            }
+            Err(error) => report_capture_error(app, &error),
+        }
     }
+}
+
+fn report_capture_error(app: &Rc<App>, message: &str) {
+    eprintln!("[rail] screenshot failed: {message}");
+    app.show_copied_toast(tr("Failed"), message);
 }
 
 fn crop_texture(tex: &gdk::Texture, r: Rect) -> Option<gdk::Texture> {
@@ -833,18 +852,19 @@ pub(crate) fn screenshot_dir() -> std::path::PathBuf {
     dl_dir.join("Rail")
 }
 
-fn save_texture_png(tex: &gdk::Texture) -> Option<std::path::PathBuf> {
+fn save_texture_png(tex: &gdk::Texture) -> Result<std::path::PathBuf, String> {
     let dir = screenshot_dir();
-    let _ = std::fs::create_dir_all(&dir);
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let ts = chrono_like_timestamp();
-    let path = dir.join(format!("Screenshot {ts}.png"));
-    if let Err(e) = tex.save_to_png(&path) {
-        eprintln!("[rail] save png failed: {e}");
-        None
-    } else {
-        eprintln!("[rail] screenshot saved → {}", path.display());
-        Some(path)
+    let mut path = dir.join(format!("Screenshot {ts}.png"));
+    let mut suffix = 2u32;
+    while path.exists() {
+        path = dir.join(format!("Screenshot {ts} ({suffix}).png"));
+        suffix = suffix.saturating_add(1);
     }
+    tex.save_to_png(&path).map_err(|e| e.to_string())?;
+    eprintln!("[rail] screenshot saved → {}", path.display());
+    Ok(path)
 }
 
 fn chrono_like_timestamp() -> String {
@@ -884,4 +904,31 @@ fn get_json_str(s: &str, key: &str) -> Option<String> {
     let rest = &s[idx + pat.len()..];
     let end_idx = rest.find('"')?;
     Some(rest[..end_idx].to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IN_PAGE_SCREENSHOT_JS;
+
+    #[test]
+    fn screenshot_selector_uses_pointer_events_without_suppressing_them() {
+        for event in ["pointermove", "pointerdown", "pointerup"] {
+            assert!(
+                IN_PAGE_SCREENSHOT_JS
+                    .contains(&format!("window.addEventListener('{}', onPointer", event))
+            );
+        }
+        assert!(!IN_PAGE_SCREENSHOT_JS.contains("addEventListener('pointerdown', interceptEvent"));
+        assert!(!IN_PAGE_SCREENSHOT_JS.contains("addEventListener('pointerup', interceptEvent"));
+        assert!(
+            !IN_PAGE_SCREENSHOT_JS.contains("removeEventListener('pointerdown', interceptEvent")
+        );
+        assert!(!IN_PAGE_SCREENSHOT_JS.contains("removeEventListener('pointerup', interceptEvent"));
+        assert!(IN_PAGE_SCREENSHOT_JS.contains("function onPointerDown(e)"));
+        assert!(IN_PAGE_SCREENSHOT_JS.contains("function onPointerUp(e)"));
+        assert!(
+            IN_PAGE_SCREENSHOT_JS.contains("Math.hypot(e.pageX - startX, e.pageY - startY) >= 4")
+        );
+        assert!(IN_PAGE_SCREENSHOT_JS.contains("if (dist >= 6 && !isDragging)"));
+    }
 }
