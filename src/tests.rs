@@ -327,32 +327,47 @@ fn test_app_settings_roundtrip() {
 }
 
 #[test]
-fn test_shortcut_master_and_individual_priority() {
+fn test_individual_shortcut_enable_disable() {
     let mut cfg = ShortcutConfig::default();
-    // Initially all enabled
     assert!(SHORTCUT_DEFS.iter().all(|d| sc_enabled(&cfg, d.id)));
-
-    // User disables one shortcut (e.g. "data" Alt+I)
     cfg.disabled.insert("data".to_string());
     assert!(!sc_enabled(&cfg, "data"));
-    assert!(!SHORTCUT_DEFS.iter().all(|d| sc_enabled(&cfg, d.id)));
+    assert!(sc_enabled(&cfg, "settings"));
+    cfg.disabled.remove("data");
+    assert!(sc_enabled(&cfg, "data"));
+}
 
-    // Master checkbox turned ON -> forces all shortcuts enabled
-    cfg.disabled.clear();
-    cfg.site_wins = false;
-    assert!(SHORTCUT_DEFS.iter().all(|d| sc_enabled(&cfg, d.id)));
+#[test]
+fn test_website_shortcuts_always_have_precedence() {
+    assert_eq!(shortcut_propagation_phase(), gtk::PropagationPhase::Bubble);
+}
 
-    // Master checkbox turned OFF -> forces all shortcuts disabled except locked settings
-    for def in SHORTCUT_DEFS {
-        if !sc_is_locked(def.id) {
-            cfg.disabled.insert(def.id.to_string());
-        }
+#[test]
+fn test_cancelled_webkit_loads_are_not_page_failures() {
+    for message in [
+        "Operation was cancelled",
+        "Operation was canceled",
+        "Load request cancelled",
+        "Load request canceled",
+        "The operation was cancelled by the user",
+    ] {
+        assert!(is_cancelled_load_message(message), "{}", message);
     }
-    cfg.site_wins = true;
-    assert!(!sc_enabled(&cfg, "data"));
-    assert!(!sc_enabled(&cfg, "ws_1"));
-    // settings is not in SC_LOCKED, so it is disabled with the rest
-    assert!(!sc_enabled(&cfg, "settings"));
+    for message in [
+        "Connection refused",
+        "TLS handshake failed",
+        "Network is unreachable",
+    ] {
+        assert!(!is_cancelled_load_message(message), "{}", message);
+    }
+    let gio_cancel = glib::Error::new(gio::IOErrorEnum::Cancelled, "Operation was cancelled");
+    let webkit_cancel =
+        glib::Error::new(webkit6::NetworkError::Cancelled, "Load request cancelled");
+    let network_failure =
+        glib::Error::new(gio::IOErrorEnum::ConnectionRefused, "Connection refused");
+    assert!(is_cancelled_load_error(&gio_cancel));
+    assert!(is_cancelled_load_error(&webkit_cancel));
+    assert!(!is_cancelled_load_error(&network_failure));
 }
 
 #[test]
@@ -467,12 +482,25 @@ fn test_devtools_shortcuts() {
 /// Customize ro'yxatidagi har bir amalning handleri bor, handlerlar ro'yxatida esa ortiqcha ID yo'q.
 #[test]
 fn test_every_shortcut_has_a_handler() {
+    let source = include_str!("app/keys.rs");
+    let dispatch = source
+        .split("pub(crate) fn run_action")
+        .nth(1)
+        .and_then(|s| s.split("// ---- fixed keys").next())
+        .expect("run_action dispatch body exists");
     for def in SHORTCUT_DEFS {
         assert!(
             App::action_known(def.id),
-            "\"{}\" Customize ro'yxatida bor, lekin run_action da handleri yo'q",
+            "\"{}\" Customize ro'yxatida bor, lekin action registryda yo'q",
             def.id
         );
+        if !sc_series_member(def.id) {
+            assert!(
+                dispatch.contains(&format!("\"{}\"", def.id)),
+                "\"{}\" uchun run_action ichida haqiqiy dispatch arm yo'q",
+                def.id
+            );
+        }
     }
     for id in crate::app::STATIC_ACTIONS {
         assert!(

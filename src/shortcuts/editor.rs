@@ -7,7 +7,6 @@ pub(crate) struct ScUi {
     pub(crate) rows: gtk::Box,
     pub(crate) pending: Rc<RefCell<ShortcutConfig>>,
     pub(crate) status: gtk::Label,
-    pub(crate) prio: gtk::CheckButton,
     pub(crate) is_syncing: Rc<Cell<bool>>,
     /// One shared key picker for the whole page (not one per row).
     pub(crate) picker_host: gtk::Box,
@@ -345,16 +344,7 @@ pub(crate) fn sc_build(ui: &ScUi) {
                     } else {
                         c.disabled.insert(def.id.to_string());
                     }
-                    let all_on = SHORTCUT_DEFS.iter().all(|d| sc_enabled(&c, d.id));
-                    c.site_wins = !all_on;
                 }
-                let all_on = {
-                    let c = ui2.pending.borrow();
-                    SHORTCUT_DEFS.iter().all(|d| sc_enabled(&c, d.id))
-                };
-                ui2.is_syncing.set(true);
-                ui2.prio.set_active(all_on);
-                ui2.is_syncing.set(false);
                 sc_commit(&ui2);
                 // Update opacity without full rebuild
                 if let Some(parent) = s.parent()

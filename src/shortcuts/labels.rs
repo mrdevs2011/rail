@@ -128,13 +128,16 @@ pub(crate) fn sc_bind_tooltip<W: gtk::prelude::IsA<gtk::Widget>>(
     });
 }
 
-/// Resolve Rail shortcuts before WebKit can consume the key event.
-/// Unmatched keys still propagate to the page, so ordinary website typing and
-/// shortcuts remain available unless they conflict with a registered Rail binding.
+/// Website shortcuts always have precedence: Rail handles a registered shortcut only
+/// when the focused page did not consume the key event.
+pub(crate) fn shortcut_propagation_phase() -> gtk::PropagationPhase {
+    gtk::PropagationPhase::Bubble
+}
+
 pub(crate) fn apply_shortcut_priority() {
     KEY_CTL.with(|k| {
         if let Some(ctl) = k.borrow().as_ref() {
-            ctl.set_propagation_phase(gtk::PropagationPhase::Capture);
+            ctl.set_propagation_phase(shortcut_propagation_phase());
         }
     });
 }

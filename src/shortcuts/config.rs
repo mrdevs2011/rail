@@ -345,7 +345,6 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
 pub(crate) struct ShortcutConfig {
     pub(crate) overrides: std::collections::HashMap<String, Vec<String>>,
     pub(crate) disabled: std::collections::HashSet<String>,
-    pub(crate) site_wins: bool,
 }
 
 pub(crate) enum ScResolve {
@@ -382,7 +381,6 @@ pub(crate) fn load_shortcuts_config() -> ShortcutConfig {
     let Some(root) = minijson::parse(&text) else {
         return cfg;
     };
-    cfg.site_wins = root.get("priority").and_then(|v| v.as_str()) == Some("site");
     let version = match root.get("version") {
         Some(minijson::Json::Num(n)) => *n,
         _ => 1.0,
@@ -431,10 +429,7 @@ pub(crate) fn load_shortcuts_config() -> ShortcutConfig {
 
 pub(crate) fn save_shortcuts_config(cfg: &ShortcutConfig) -> bool {
     let mut out = String::from("{\n  \"version\": 2,\n");
-    out.push_str(&format!(
-        "  \"priority\": \"{}\",\n",
-        if cfg.site_wins { "site" } else { "rail" }
-    ));
+    out.push_str("  \"priority\": \"site\",\n");
     out.push_str("  \"shortcuts\": {\n");
     let total = SHORTCUT_DEFS.len();
     for (i, def) in SHORTCUT_DEFS.iter().enumerate() {

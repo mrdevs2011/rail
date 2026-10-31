@@ -139,10 +139,6 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
     let sc_page = gtk::Box::new(gtk::Orientation::Vertical, 6);
     sc_page.set_vexpand(true);
 
-    // Note: sc_prio removed per user request: website shortcuts always have precedence over browser shortcuts
-    let sc_prio = gtk::CheckButton::new();
-    sc_prio.set_active(false);
-
     let sc_rows = gtk::Box::new(gtk::Orientation::Vertical, 2);
     let sc_scroll = gtk::ScrolledWindow::new();
     sc_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
@@ -171,47 +167,14 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
         rows: sc_rows.clone(),
         pending: sc_pending.clone(),
         status: sc_status.clone(),
-        prio: sc_prio.clone(),
         is_syncing: is_syncing.clone(),
         picker_host: picker_host.clone(),
     };
     {
         let ui = sc_ui.clone();
-        sc_prio.connect_toggled(move |c| {
-            if ui.is_syncing.get() {
-                return;
-            }
-            // Master switch is boss: ON → every shortcut on; OFF → every (non-locked) off
-            let rail_wins = c.is_active();
-            {
-                let mut p = ui.pending.borrow_mut();
-                p.site_wins = !rail_wins;
-                p.disabled.clear();
-                if !rail_wins {
-                    for def in SHORTCUT_DEFS {
-                        if !sc_is_locked(def.id) {
-                            p.disabled.insert(def.id.to_string());
-                        }
-                    }
-                }
-            }
-            sc_commit(&ui);
-            // Idle rebuild — never block the click handler with a full widget tree rebuild.
-            sc_refresh(&ui);
-        });
-    }
-    {
-        let ui = sc_ui.clone();
-        let prio = sc_prio.clone();
         sc_page.connect_map(move |_| {
             *ui.pending.borrow_mut() = SHORTCUTS.with(|c| c.borrow().clone());
-            let all_on = {
-                let c = ui.pending.borrow();
-                !c.site_wins && SHORTCUT_DEFS.iter().all(|d| sc_enabled(&c, d.id))
-            };
-            ui.is_syncing.set(true);
-            prio.set_active(all_on);
-            // Leave is_syncing true briefly — cleared at end of sc_build via timeout.
+            // sc_build holds the sync guard while rows are rebuilt, then releases it.
             ui.status.set_text("");
             // Only build if the list is empty (first open). Avoid re-map rebuild storms.
             if ui.rows.first_child().is_none() {
@@ -230,11 +193,7 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
                 let mut c = ui.pending.borrow_mut();
                 c.overrides.clear();
                 c.disabled.clear();
-                c.site_wins = false;
             }
-            ui.is_syncing.set(true);
-            ui.prio.set_active(true);
-            ui.is_syncing.set(false);
             sc_commit(&ui);
             ui.status
                 .set_text(tr("All shortcuts are back to their defaults."));

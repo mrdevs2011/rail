@@ -2,6 +2,18 @@
 
 use crate::*;
 
+/// Text fallback for cancellation errors emitted by older / platform-specific WebKit builds.
+pub(crate) fn is_cancelled_load_message(message: &str) -> bool {
+    let normalized = message.trim().to_ascii_lowercase();
+    normalized.contains("cancelled") || normalized.contains("canceled")
+}
+
+pub(crate) fn is_cancelled_load_error(error: &glib::Error) -> bool {
+    error.matches(gio::IOErrorEnum::Cancelled)
+        || error.matches(webkit6::NetworkError::Cancelled)
+        || is_cancelled_load_message(error.message())
+}
+
 thread_local! {
     /// Tracks WebViews where the website called `preventDefault()` on `contextmenu` (or has a custom menu).
     static LAST_CONTEXT_PREVENTED: std::cell::RefCell<std::collections::HashMap<usize, std::time::Instant>> =
@@ -299,10 +311,13 @@ impl App {
         let app = self.clone();
         view.connect_estimated_load_progress_notify(move |_| app.update_load_bar());
         view.connect_load_failed(move |v, _event, uri, error| {
-            let err_msg = error.message().to_string();
-            if err_msg.contains("Load request cancelled") {
+            // WebKit reports an expected navigation supersession / Stop action as
+            // G_IO_ERROR_CANCELLED (often "Operation was cancelled"). It is not a
+            // failed page load and must never replace the current page with an error page.
+            if is_cancelled_load_error(error) {
                 return false;
             }
+            let err_msg = error.message().to_string();
             let html = crate::web::format_error_html(uri, &err_msg);
             v.load_alternate_html(&html, uri, None);
             true

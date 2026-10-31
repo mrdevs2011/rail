@@ -24,6 +24,8 @@ mod session;
 mod settings_modal;
 mod sidebar;
 mod signals;
+#[cfg(test)]
+pub(crate) use signals::{is_cancelled_load_error, is_cancelled_load_message};
 mod welcome;
 mod window_layout;
 #[cfg(test)]
