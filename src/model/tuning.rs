@@ -2,8 +2,6 @@
 
 /// How far the strip zooms out in overview (niri uses a similar factor).
 pub(crate) const OV_ZOOM: f64 = 0.4;
-pub(crate) const OV_ZOOM_MIN: f64 = 0.18;
-pub(crate) const OV_ZOOM_MAX: f64 = 0.85;
 /// Page zoom (Ctrl +/-/0): Chrome-style steps, 20%..500%.
 pub(crate) const PAGE_ZOOM_STEPS: [f64; 18] = [
     0.20, 0.25, 0.33, 0.50, 0.67, 0.75, 0.80, 0.90, 1.0, 1.10, 1.25, 1.50, 1.75, 2.0, 2.5, 3.0,

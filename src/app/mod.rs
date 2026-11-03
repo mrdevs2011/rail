@@ -69,8 +69,6 @@ pub(crate) struct App {
     pub(crate) ov: Cell<bool>,
     /// Zoom-in from overview is running; CSS/ov stay until the camera lands.
     pub(crate) ov_exiting: Cell<bool>,
-    /// Last overview scale (Ctrl+/- / pinch); reused next time overview opens.
-    pub(crate) ov_user_zoom: Cell<f64>,
     /// Tab coordinates (row, col) that were focused when overview opened; Esc returns here.
     pub(crate) ov_return: Cell<(usize, usize)>,
     /// Scroll position before overview, restored when zooming back in.
@@ -148,6 +146,8 @@ pub(crate) struct App {
     pub(crate) devtools_url_lbl: gtk::Label,
     pub(crate) devtools_window: RefCell<Option<gtk::Window>>,
     // Floating Settings Panel (Alt+Shift+S / Alt+P / Alt+I)
+    pub(crate) confirm_modal: RefCell<Option<gtk::Box>>,
+    pub(crate) download_toasts_box: gtk::Box,
     pub(crate) qr_modal: RefCell<Option<gtk::Box>>,
     pub(crate) settings_modal: gtk::Box,
     pub(crate) settings_body: gtk::Box,

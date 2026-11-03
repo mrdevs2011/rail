@@ -170,19 +170,19 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
     sc!(
         "overview_zoom_in",
         G_PANELS,
-        "Zoom in (page 20-500%, overview scale)",
+        "Zoom in (page 20-500%)",
         ["Ctrl+plus", "Ctrl+="]
     ),
     sc!(
         "overview_zoom_out",
         G_PANELS,
-        "Zoom out (page 20-500%, overview scale)",
+        "Zoom out (page 20-500%)",
         ["Ctrl+minus"]
     ),
     sc!(
         "zoom_reset",
         G_PANELS,
-        "Reset zoom (page 100%, overview default)",
+        "Reset zoom (page 100%)",
         ["Ctrl+0"]
     ),
     sc!("sidebar", G_PANELS, "Toggle Sidebar", ["Alt+B"]),

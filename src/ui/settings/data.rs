@@ -399,10 +399,12 @@ pub(crate) fn render_history_list(
         icon.set_valign(gtk::Align::Center);
         row.append(&icon);
 
-        // Info: Title & URL
+        // Info: Title & URL (clickable link to open directly in a new tab)
         let info_box = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         info_box.set_hexpand(true);
         info_box.set_valign(gtk::Align::Center);
+        info_box.add_css_class("hist-link-box");
+        info_box.set_cursor_from_name(Some("pointer"));
 
         let title_text = if entry.title.trim().is_empty() {
             crate::history::extract_clean_domain(&entry.url)
@@ -411,11 +413,13 @@ pub(crate) fn render_history_list(
         };
         let title_lbl = gtk::Label::new(Some(&title_text));
         title_lbl.add_css_class("settings-card-title");
+        title_lbl.add_css_class("hist-title-link");
         title_lbl.set_xalign(0.0);
         title_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
 
         let url_lbl = gtk::Label::new(Some(&entry.url));
         url_lbl.add_css_class("settings-card-desc");
+        url_lbl.add_css_class("hist-url-link");
         url_lbl.set_xalign(0.0);
         url_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
 
@@ -426,19 +430,16 @@ pub(crate) fn render_history_list(
         }
         info_box.append(&title_lbl);
         info_box.append(&url_lbl);
-        row.append(&info_box);
 
-        // Open in new tab button
-        let open_btn = gtk::Button::from_icon_name("tab-new-symbolic");
-        open_btn.add_css_class("flat-icon");
-        open_btn.set_tooltip_text(Some(tr("Open in new tab")));
         let a_open = app.clone();
         let u_open = entry.url.clone();
-        open_btn.connect_clicked(move |_| {
+        let click_link = gtk::GestureClick::new();
+        click_link.connect_pressed(move |_, _, _, _| {
             a_open.new_tab_with_url(&u_open);
             a_open.hide_settings_modal();
         });
-        row.append(&open_btn);
+        info_box.add_controller(click_link);
+        row.append(&info_box);
 
         // Delete button
         let del_btn = gtk::Button::from_icon_name("user-trash-symbolic");

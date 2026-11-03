@@ -536,4 +536,142 @@ impl App {
             }
         });
     }
+
+    pub(crate) fn show_download_toast(
+        self: &Rc<Self>,
+        id: u64,
+        filename: &str,
+        download: &webkit6::Download,
+    ) {
+        let rev = gtk::Revealer::new();
+        rev.set_transition_type(gtk::RevealerTransitionType::SlideUp);
+        rev.set_transition_duration(200);
+
+        let card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        card.add_css_class("download-toast");
+
+        // Top row: Filename & Cancel '✕' button
+        let top_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        top_row.set_hexpand(true);
+
+        let name_lbl = gtk::Label::new(Some(filename));
+        name_lbl.add_css_class("dl-toast-name");
+        name_lbl.set_xalign(0.0);
+        name_lbl.set_hexpand(true);
+        name_lbl.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
+        top_row.append(&name_lbl);
+
+        let cancel_btn = gtk::Button::new();
+        cancel_btn.add_css_class("dl-toast-cancel-btn");
+        cancel_btn.set_has_frame(false);
+        cancel_btn.set_focus_on_click(false);
+        cancel_btn.set_tooltip_text(Some(tr("Cancel")));
+        let x_lbl = gtk::Label::new(Some("✕"));
+        cancel_btn.set_child(Some(&x_lbl));
+        top_row.append(&cancel_btn);
+        card.append(&top_row);
+
+        // Progress bar
+        let prog_bar = gtk::ProgressBar::new();
+        prog_bar.add_css_class("dl-toast-prog");
+        prog_bar.set_fraction(0.0);
+        card.append(&prog_bar);
+
+        // Bottom status row
+        let status_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        status_row.set_hexpand(true);
+
+        let status_lbl = gtk::Label::new(Some(tr("Downloading...")));
+        status_lbl.add_css_class("dl-toast-status");
+        status_lbl.set_xalign(0.0);
+        status_lbl.set_hexpand(true);
+        status_row.append(&status_lbl);
+        card.append(&status_row);
+
+        rev.set_child(Some(&card));
+        self.download_toasts_box.append(&rev);
+        rev.set_reveal_child(true);
+
+        // Wire cancel
+        let dl_cancel = download.clone();
+        let rev_cancel = rev.clone();
+        let box_cancel = self.download_toasts_box.clone();
+        cancel_btn.connect_clicked(move |_| {
+            dl_cancel.cancel();
+            crate::mark_download_cancelled(id);
+            rev_cancel.set_reveal_child(false);
+            let r = rev_cancel.clone();
+            let b = box_cancel.clone();
+            glib::timeout_add_local_once(std::time::Duration::from_millis(250), move || {
+                b.remove(&r);
+            });
+        });
+
+        // Wire progress updates
+        let prog_ref = prog_bar.clone();
+        let status_ref = status_lbl.clone();
+        download.connect_received_data(move |dl, _| {
+            let prog = dl.estimated_progress();
+            prog_ref.set_fraction(prog);
+            let rec = dl.received_data_length() as i64;
+            let tot = if prog > 0.01 {
+                (rec as f64 / prog) as i64
+            } else {
+                0
+            };
+            let pct = (prog * 100.0).round() as i32;
+            if tot > 0 {
+                status_ref.set_text(&format!(
+                    "{} / {} · {}%",
+                    crate::format_bytes(rec),
+                    crate::format_bytes(tot),
+                    pct
+                ));
+            } else {
+                status_ref.set_text(&format!(
+                    "{} · {}%",
+                    crate::format_bytes(rec),
+                    pct
+                ));
+            }
+        });
+
+        // Wire finish
+        let rev_fin = rev.clone();
+        let box_fin = self.download_toasts_box.clone();
+        let prog_fin = prog_bar.clone();
+        let status_fin = status_lbl.clone();
+        download.connect_finished(move |_| {
+            prog_fin.set_fraction(1.0);
+            status_fin.set_text(tr("Downloaded!"));
+            let r = rev_fin.clone();
+            let b = box_fin.clone();
+            glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
+                r.set_reveal_child(false);
+                let r2 = r.clone();
+                let b2 = b.clone();
+                glib::timeout_add_local_once(std::time::Duration::from_millis(250), move || {
+                    b2.remove(&r2);
+                });
+            });
+        });
+
+        // Wire failure
+        let rev_fail = rev.clone();
+        let box_fail = self.download_toasts_box.clone();
+        let status_fail = status_lbl;
+        download.connect_failed(move |_, _| {
+            status_fail.set_text(tr("Download Failed"));
+            let r = rev_fail.clone();
+            let b = box_fail.clone();
+            glib::timeout_add_local_once(std::time::Duration::from_millis(3000), move || {
+                r.set_reveal_child(false);
+                let r2 = r.clone();
+                let b2 = b.clone();
+                glib::timeout_add_local_once(std::time::Duration::from_millis(250), move || {
+                    b2.remove(&r2);
+                });
+            });
+        });
+    }
 }

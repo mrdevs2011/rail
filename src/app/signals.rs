@@ -521,6 +521,13 @@ impl App {
                     });
                 }
             });
+
+            let app_dl = self.clone();
+            let wv_dl = view.downgrade();
+            ucm.connect_script_message_received(Some("railDownloads"), move |_, val| {
+                let Some(v) = wv_dl.upgrade() else { return };
+                app_dl.on_downloads_message(&v, val.to_str().as_str());
+            });
         }
 
         let app = self.clone();
@@ -764,5 +771,39 @@ impl App {
         });
 
         height_handle.add_controller(hdrag);
+    }
+
+    pub(crate) fn on_downloads_message(self: &Rc<Self>, view: &WebView, msg: &str) {
+        if msg == "clear_all" {
+            let v = view.clone();
+            self.show_confirm_dialog(
+                tr("Clear Download History"),
+                tr("Are you sure you want to clear all download history?"),
+                tr("Clear All"),
+                true,
+                move || {
+                    crate::clear_all_downloads();
+                    v.reload();
+                },
+            );
+        } else if let Some(id_str) = msg.strip_prefix("remove:") {
+            if let Ok(id) = id_str.parse::<u64>() {
+                crate::remove_download(id);
+                view.reload();
+            }
+        } else if let Some(id_str) = msg.strip_prefix("open_file:")
+            && let Ok(id) = id_str.parse::<u64>()
+            && let Some(path) = crate::get_download_path(id)
+        {
+            let uri = format!("file://{}", path);
+            let _ = gio::AppInfo::launch_default_for_uri(&uri, None::<&gio::AppLaunchContext>);
+        } else if let Some(id_str) = msg.strip_prefix("open_folder:")
+            && let Ok(id) = id_str.parse::<u64>()
+            && let Some(path) = crate::get_download_path(id)
+            && let Some(parent) = std::path::Path::new(&path).parent()
+        {
+            let uri = format!("file://{}", parent.to_string_lossy());
+            let _ = gio::AppInfo::launch_default_for_uri(&uri, None::<&gio::AppLaunchContext>);
+        }
     }
 }

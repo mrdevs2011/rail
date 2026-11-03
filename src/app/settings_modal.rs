@@ -205,38 +205,62 @@ impl App {
         self.open_settings_tab(SettingsTab::Data);
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn clear_history_action(self: &Rc<Self>) {
-        self.history.borrow_mut().clear();
-        self.data_modal_status_lbl.set_markup(&format!(
-            "<span foreground='#4ade80'><b>{}</b> {}</span>",
-            tr("History Cleared:"),
-            tr("All Omnibar history and suggestions have been purged.")
-        ));
+    pub(crate) fn clear_history_action_with_callback<F>(self: &Rc<Self>, on_done: F)
+    where
+        F: FnOnce() + 'static,
+    {
+        let app = self.clone();
+        self.show_confirm_dialog(
+            tr("Clear Browsing History"),
+            tr("Are you sure you want to clear all browsing and Omnibar history? This action cannot be undone."),
+            tr("Clear History"),
+            true,
+            move || {
+                app.history.borrow_mut().clear();
+                app.data_modal_status_lbl.set_markup(&format!(
+                    "<span foreground='#4ade80'><b>{}</b> {}</span>",
+                    tr("History Cleared:"),
+                    tr("All Omnibar history and suggestions have been purged.")
+                ));
+                on_done();
+            },
+        );
     }
 
-    #[allow(dead_code)]
+    pub(crate) fn clear_history_action(self: &Rc<Self>) {
+        self.clear_history_action_with_callback(|| {});
+    }
+
     pub(crate) fn clear_cache_action(self: &Rc<Self>) {
-        let dir = rail_data_dir();
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if p.is_dir()
-                    && p.file_name()
-                        .and_then(|n| n.to_str())
-                        .map(|n| n.starts_with("profile_"))
-                        .unwrap_or(false)
-                {
-                    let cache_dir = p.join("cache");
-                    let _ = std::fs::remove_dir_all(&cache_dir);
+        let app = self.clone();
+        self.show_confirm_dialog(
+            tr("Clear Disk Cache"),
+            tr("Are you sure you want to clear profile network disk caches?"),
+            tr("Clear Disk Cache"),
+            true,
+            move || {
+                let dir = rail_data_dir();
+                if let Ok(entries) = std::fs::read_dir(&dir) {
+                    for entry in entries.flatten() {
+                        let p = entry.path();
+                        if p.is_dir()
+                            && p.file_name()
+                                .and_then(|n| n.to_str())
+                                .map(|n| n.starts_with("profile_"))
+                                .unwrap_or(false)
+                        {
+                            let cache_dir = p.join("cache");
+                            let _ = std::fs::remove_dir_all(&cache_dir);
+                        }
+                    }
                 }
-            }
-        }
-        self.data_modal_status_lbl.set_markup(&format!(
-            "<span foreground='#4ade80'><b>{}</b> {}</span>",
-            tr("Cache Cleared:"),
-            tr("Profile network disk caches purged successfully.")
-        ));
+                app.data_modal_status_lbl.set_markup(&format!(
+                    "<span foreground='#4ade80'><b>{}</b> {}</span>",
+                    tr("Cache Cleared:"),
+                    tr("Profile network disk caches purged successfully.")
+                ));
+            },
+        );
     }
 
     pub(crate) fn refresh_data_modal_info(&self) {

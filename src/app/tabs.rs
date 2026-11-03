@@ -106,6 +106,7 @@ impl App {
         ucm.register_script_message_handler("railgo", None);
         ucm.register_script_message_handler("railScreenshot", None);
         ucm.register_script_message_handler("railContextMenu", None);
+        ucm.register_script_message_handler("railDownloads", None);
 
         let html_css = load_html_css();
         if css_has_active_content(&html_css) {

@@ -44,8 +44,7 @@ impl App {
         let vw = self.strip.width() as f64;
         let vh = self.strip.height() as f64;
         if vw <= 1.0 || vh <= 1.0 {
-            let z = self.ov_user_zoom.get().clamp(OV_ZOOM_MIN, OV_ZOOM_MAX);
-            self.target_zoom.set(z);
+            self.target_zoom.set(OV_ZOOM);
             self.ensure_overview_previews();
             self.animate();
             return;
@@ -60,11 +59,10 @@ impl App {
         // The zoom-out itself is anchored on the old camera center (see animate()); once the
         // zoom settles the camera glides to the framed position: whole grid centered when it
         // fits, otherwise the active tab centered (clamped at the grid edges).
-        let z = self.ov_user_zoom.get().clamp(OV_ZOOM_MIN, OV_ZOOM_MAX);
-        let (fx, fy) = self.overview_offsets_at_zoom(z);
+        let (fx, fy) = self.overview_offsets_at_zoom(OV_ZOOM);
         self.target_x.set(fx);
         self.target_y.set(fy);
-        self.target_zoom.set(z);
+        self.target_zoom.set(OV_ZOOM);
         self.ensure_overview_previews();
         self.animate();
     }
@@ -175,24 +173,6 @@ impl App {
                 tab.freeze.set_visible(false);
             }
         }
-    }
-
-    /// Ctrl+/- or pinch: change overview scale (clamped), keep framing on the focused tab.
-    pub(crate) fn overview_zoom_by(self: &Rc<Self>, factor: f64) {
-        if !self.ov.get() || self.ov_exiting.get() {
-            return;
-        }
-        let z0 = self.target_zoom.get();
-        let z1 = (z0 * factor).clamp(OV_ZOOM_MIN, OV_ZOOM_MAX);
-        if (z1 - z0).abs() < 0.001 {
-            return;
-        }
-        self.ov_user_zoom.set(z1);
-        self.target_zoom.set(z1);
-        let (fx, fy) = self.overview_offsets_at_zoom(z1);
-        self.target_x.set(fx);
-        self.target_y.set(fy);
-        self.animate();
     }
 
     pub(crate) fn cancel_overview(self: &Rc<Self>) {

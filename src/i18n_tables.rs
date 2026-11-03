@@ -1488,6 +1488,54 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "История загрузок в стиле Chrome для этой сессии профиля",
     ),
     (
+        "Clear Download History",
+        "Yuklab olishlar tarixini tozalash",
+        "Очистить историю загрузок",
+    ),
+    (
+        "Are you sure you want to clear all download history?",
+        "Haqiqatan ham barcha yuklab olishlar tarixini tozalamoqchimisiz?",
+        "Вы уверены, что хотите очистить всю историю загрузок?",
+    ),
+    (
+        "Clear Browsing History",
+        "Ko'rish tarixini tozalash",
+        "Очистить историю просмотров",
+    ),
+    (
+        "Are you sure you want to clear all browsing and Omnibar history? This action cannot be undone.",
+        "Haqiqatan ham barcha ko'rish va Omnibar tarixini tozalamoqchimisiz? Ushbu amalni qaytarib bo'lmaydi.",
+        "Вы уверены, что хотите очистить всю историю просмотров и Omnibar? Это действие нельзя отменить.",
+    ),
+    (
+        "Are you sure you want to clear profile network disk caches?",
+        "Haqiqatan ham profil tarmoq keshlarini tozalamoqchimisiz?",
+        "Вы уверены, что хотите очистить сетевой кэш профилей?",
+    ),
+    (
+        "Are you sure you want to delete profile",
+        "Profilni o'chirmoqchimisiz:",
+        "Вы уверены, что хотите удалить профиль",
+    ),
+    ("Clear All", "Hammasini tozalash", "Очистить всё"),
+    ("Downloaded!", "Yuklab olindi!", "Загружено!"),
+    (
+        "Download Failed",
+        "Yuklab olishda xatolik",
+        "Ошибка загрузки",
+    ),
+    (
+        "Remove from history",
+        "Tarixdan o'chirish",
+        "Удалить из истории",
+    ),
+    (
+        "Show in Folder",
+        "Jildda ko'rsatish",
+        "Показать в папке",
+    ),
+    ("Downloading...", "Yuklanmoqda...", "Загрузка..."),
+    (
         "This shortcut is locked and cannot be changed.",
         "Bu tezkor tugma qulflangan va o'zgartirib bo'lmaydi.",
         "Это сочетание клавиш заблокировано и не может быть изменено.",

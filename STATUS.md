@@ -1,7 +1,28 @@
 # AI Context — .
 
 ## Oxirgi holat
-- Sana: 2026-10-15 20:25
+- Sana: 2026-11-03 15:05
+- Nima qilindi:
+  - Overview zoom to'liq olib tashlandi: `OV_ZOOM` (0.4) qat'iy o'lchamga keltirildi; overview ichida pinch-zoom, Ctrl+scroll va Ctrl+/- zoom bloklandi.
+  - Yuklanayotgan fayllar uchun pastki o'ng burchakda Jonli Progress Toast qo'shildi: real-time bayt va foiz, hover qilinganda '✕' bekor qilish tugmasi, tugaganda auto-dismiss.
+  - Fayl kengaytmasi to'g'ri saqlanishi ta'minlandi (`decide_destination` signali orqali MIME type asosida `.html`, `.pdf`, `.zip` va b. avtomatik qo'shiladi).
+  - `rail://downloads` sahifasi mukammallashtirildi:
+    - Faol yuklanayotgan fayllar jonli progress bilan ko'rinadi (1s avtomatik yangilanish).
+    - Yuklangan vaqt (sana/soat) va yuklab olingan manzil (origin URL) ko'rsatiladi.
+    - Har bir qatorda hover qilinganda '✕' (tarixdan o'chirish) tugmasi paydo bo'ladi.
+    - Sarlavhada "Hammasini tozalash" (Clear All) tugmasi qo'shildi.
+    - Faylni ochish va jildda ko'rsatish havolalari ulandi.
+  - Yagona Markaziy Tasdiqlash Modali (`show_confirm_dialog`) yaratildi:
+    - Barcha katta qaytarib bo'lmaydigan amallar (Tarixni tozalash, Keshni tozalash, Yuklab olishlar tarixini tozalash, Profilni o'chirish) markaziy modal orqali tasdiqlanadi.
+    - Escape yoki fondan bosish orqali yopiladi.
+  - Sozlamalardagi Saytlar tarixi sahifasidan `+` tugmasi olib tashlandi; sayt sarlavhasi/URL to'g'ridan-to'g'ri yangi tabda ochiladigan havola qilib stil berildi.
+  - Barcha yangi matnlar `uz`, `en`, `ru` tillarida `i18n_tables.rs` ga kiritildi.
+  - 80 ta unit test va barcha Clippy lintlari 100% toza o'tdi (0 xato, 0 ogohlantirish).
+- Hozirgi muammo/blocker: Yo'q.
+- Keyingi qadam: O'zgarishlarni tekshirish va ishga tushirish.
+
+---
+### 2026-10-15 20:25
 - Nima qilindi: DevTools undocked oyna yopilgandagi (Win+Q) crash tuzatildi, HTML Color Chooser modal dialogi o'rnatildi, Ctrl+1..9 tab almashtirish qo'shildi, End-to-End Encrypted Cloud Sync (Supabase + Vercel) ulandi. v0.5.5 release yaratildi va o'rnatildi.
 - Hozirgi muammo/blocker: Yo'q.
 - Keyingi qadam: Foydalanuvchi Rail'ni qayta ochsin.

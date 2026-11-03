@@ -213,25 +213,19 @@ impl App {
             "sidebar" => self.toggle_sidebar(),
             "fullscreen" => self.win.set_fullscreened(!self.win.is_fullscreen()),
             "quit" => self.win.close(),
-            // ---- zoom: overview ichida grid, aks holda sahifa ----
+            // ---- zoom: sahifa 20-500% (overview ichida zoom olib tashlangan) ----
             "overview_zoom_in" => {
-                if self.overview_open() {
-                    self.overview_zoom_by(1.06);
-                } else {
+                if !self.overview_open() {
                     self.page_zoom(1);
                 }
             }
             "overview_zoom_out" => {
-                if self.overview_open() {
-                    self.overview_zoom_by(1.0 / 1.06);
-                } else {
+                if !self.overview_open() {
                     self.page_zoom(-1);
                 }
             }
             "zoom_reset" => {
-                if self.overview_open() {
-                    self.overview_zoom_by(OV_ZOOM / self.target_zoom.get());
-                } else {
+                if !self.overview_open() {
                     self.page_zoom(0);
                 }
             }
@@ -309,6 +303,10 @@ impl App {
         }
 
         if k == gdk::Key::Escape {
+            if self.confirm_modal_open() {
+                self.hide_confirm_modal();
+                return true;
+            }
             if self.qr_modal_open() {
                 self.hide_qr_modal();
                 return true;

@@ -1302,6 +1302,9 @@ button.color-choice.selected {
 .hist-row .shortcut-kbd { padding: 0 6px; font-size: 10.5px; }
 .hist-row .settings-card-title, .hist-row .settings-card-desc { margin: 0; }
 .hist-row button.flat-icon { min-width: 22px; min-height: 20px; }
+.hist-link-box { cursor: pointer; }
+.hist-link-box:hover .hist-title-link { color: #ffffff; text-decoration: underline; }
+.hist-link-box:hover .hist-url-link { color: #38bdf8; text-decoration: underline; }
 .settings-option-item {
     background: #000000;
     border: 1px solid #191919;
@@ -2374,4 +2377,140 @@ entry.find-entry, entry.find-entry:focus-within {
     padding: 4px 8px;
     font-size: 11px;
     font-weight: 500;
+}
+
+/* ---- Central Confirmation Modal ---- */
+.confirm-backdrop {
+    background: rgba(0, 0, 0, 0.72);
+}
+.confirm-card {
+    background: #0d0d0d;
+    border: 1px solid #27272a;
+    border-radius: 6px;
+    padding: 20px 24px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.98);
+    min-width: 360px;
+    max-width: 440px;
+}
+.confirm-header {
+    margin-bottom: 12px;
+}
+.confirm-title {
+    color: #ffffff;
+    font-size: 13.5px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    letter-spacing: -0.01em;
+}
+.confirm-close-btn {
+    background: transparent;
+    border: none;
+    color: #71717a;
+    padding: 2px 6px;
+    cursor: pointer;
+}
+.confirm-close-btn:hover {
+    color: #ffffff;
+}
+.confirm-message {
+    color: #a1a1aa;
+    font-size: 12.5px;
+    line-height: 1.5;
+    margin-bottom: 22px;
+}
+.confirm-actions {
+    margin-top: 6px;
+}
+.confirm-btn-cancel {
+    background: #18181b;
+    border: 1px solid #27272a;
+    color: #d4d4d8;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    font-weight: 600;
+}
+.confirm-btn-cancel:hover {
+    background: #27272a;
+    color: #ffffff;
+}
+.confirm-btn-danger {
+    background: #dc2626;
+    border: 1px solid #ef4444;
+    color: #ffffff;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    font-weight: 600;
+}
+.confirm-btn-danger:hover {
+    background: #ef4444;
+}
+.confirm-btn-primary {
+    background: #2563eb;
+    border: 1px solid #3b82f6;
+    color: #ffffff;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    font-weight: 600;
+}
+.confirm-btn-primary:hover {
+    background: #3b82f6;
+}
+
+/* ---- Download Toasts ---- */
+.download-toasts-container {
+    background: transparent;
+}
+.download-toast {
+    background: #0f0f10;
+    border: 1px solid #27272a;
+    border-radius: 6px;
+    padding: 10px 14px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.95);
+    min-width: 290px;
+    max-width: 340px;
+}
+.download-toast:hover {
+    border-color: #3f3f46;
+}
+.dl-toast-name {
+    color: #fafafa;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+.dl-toast-cancel-btn {
+    opacity: 0;
+    transition: opacity 120ms ease;
+    background: transparent;
+    border: none;
+    color: #71717a;
+    padding: 2px 6px;
+    cursor: pointer;
+}
+.download-toast:hover .dl-toast-cancel-btn {
+    opacity: 1;
+}
+.dl-toast-cancel-btn:hover {
+    color: #ef4444;
+}
+.dl-toast-prog trough {
+    background: #18181b;
+    border-radius: 2px;
+    min-height: 4px;
+}
+.dl-toast-prog progress {
+    background: #38bdf8;
+    border-radius: 2px;
+    min-height: 4px;
+}
+.dl-toast-status {
+    color: #888888;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    font-size: 10.5px;
 }

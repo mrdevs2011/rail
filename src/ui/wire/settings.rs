@@ -101,9 +101,13 @@ pub(crate) fn wire_settings(
     let b_box = hist_list_box.clone();
     let s_ent = hist_search_entry.clone();
     btn_clear_hist_tab.connect_clicked(move |_| {
-        a.clear_history_action();
-        let items = a.history.borrow().get_all_sorted();
-        render_history_list(&b_box, &items, &s_ent.text(), &a, &s_ent);
+        let a_cb = a.clone();
+        let b_cb = b_box.clone();
+        let s_cb = s_ent.clone();
+        a.clear_history_action_with_callback(move || {
+            let items = a_cb.history.borrow().get_all_sorted();
+            render_history_list(&b_cb, &items, &s_cb.text(), &a_cb, &s_cb);
+        });
     });
 
     let a = app.clone();

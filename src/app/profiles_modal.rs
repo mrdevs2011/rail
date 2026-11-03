@@ -204,24 +204,35 @@ impl App {
                 del_btn.set_tooltip_text(Some(tr("Delete Profile")));
                 let app = self.clone();
                 let pid = p.id.clone();
+                let pname = p.name.clone();
                 del_btn.connect_clicked(move |_| {
-                    app.profiles.borrow_mut().delete_profile(&pid);
-                    {
-                        let mut rows = app.rows.borrow_mut();
-                        for row in rows.iter_mut() {
-                            for tab in row.tabs.iter_mut() {
-                                if tab.profile_id == pid {
-                                    tab.profile_id = "default".to_string();
+                    let a_conf = app.clone();
+                    let pid_conf = pid.clone();
+                    app.show_confirm_dialog(
+                        tr("Delete Profile"),
+                        &format!("{} \"{}\"?", tr("Are you sure you want to delete profile"), pname),
+                        tr("Delete Profile"),
+                        true,
+                        move || {
+                            a_conf.profiles.borrow_mut().delete_profile(&pid_conf);
+                            {
+                                let mut rows = a_conf.rows.borrow_mut();
+                                for row in rows.iter_mut() {
+                                    for tab in row.tabs.iter_mut() {
+                                        if tab.profile_id == pid_conf {
+                                            tab.profile_id = "default".to_string();
+                                        }
+                                    }
                                 }
                             }
-                        }
-                    }
-                    let a = app.clone();
-                    glib::idle_add_local_once(move || {
-                        a.rebuild_profiles_modal_list();
-                        a.rebuild_profile_popover();
-                        a.refresh_sidebar();
-                    });
+                            let a = a_conf.clone();
+                            glib::idle_add_local_once(move || {
+                                a.rebuild_profiles_modal_list();
+                                a.rebuild_profile_popover();
+                                a.refresh_sidebar();
+                            });
+                        },
+                    );
                 });
                 actions_box.append(&del_btn);
             }

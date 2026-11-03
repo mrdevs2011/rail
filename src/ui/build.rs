@@ -270,6 +270,15 @@ pub(crate) fn build(gapp: &gtk::Application) {
     gtk::Window::set_default_icon_name("rail");
     overlay.add_overlay(&update::build_card(&win));
 
+    let download_toasts_box = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    download_toasts_box.add_css_class("download-toasts-container");
+    download_toasts_box.set_halign(gtk::Align::End);
+    download_toasts_box.set_valign(gtk::Align::End);
+    download_toasts_box.set_margin_end(16);
+    download_toasts_box.set_margin_bottom(16);
+    download_toasts_box.set_can_target(true);
+    overlay.add_overlay(&download_toasts_box);
+
     let app = Rc::new(App {
         win: win.clone(),
         shell: shell.clone(),
@@ -300,7 +309,6 @@ pub(crate) fn build(gapp: &gtk::Application) {
         find_ui: RefCell::new(None),
         ov: Cell::new(false),
         ov_exiting: Cell::new(false),
-        ov_user_zoom: Cell::new(OV_ZOOM),
         ov_return: Cell::new((0, 0)),
         ov_saved_x: Cell::new(0.0),
         ov_saved_y: Cell::new(0.0),
@@ -358,6 +366,8 @@ pub(crate) fn build(gapp: &gtk::Application) {
         devtools_resize_handle: devtools_resize_handle.clone(),
         devtools_url_lbl: devtools_url_lbl.clone(),
         devtools_window: RefCell::new(None),
+        confirm_modal: RefCell::new(None),
+        download_toasts_box: download_toasts_box.clone(),
         qr_modal: RefCell::new(None),
         settings_modal: settings_modal.clone(),
         settings_body: settings_body.clone(),

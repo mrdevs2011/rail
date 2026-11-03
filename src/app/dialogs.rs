@@ -3,6 +3,166 @@
 use crate::*;
 
 impl App {
+    pub(crate) fn confirm_modal_open(&self) -> bool {
+        self.confirm_modal.borrow().is_some()
+    }
+
+    pub(crate) fn hide_confirm_modal(self: &Rc<Self>) {
+        if let Some(backdrop) = self.confirm_modal.borrow_mut().take()
+            && let Some(parent) = backdrop.parent()
+            && let Ok(overlay) = parent.downcast::<gtk::Overlay>() {
+                overlay.remove_overlay(&backdrop);
+            }
+    }
+
+    /// Centralized confirmation modal for irreversible/destructive actions (Clear History, Clear Cache, Clear Downloads, etc.)
+    pub(crate) fn show_confirm_dialog<F>(
+        self: &Rc<Self>,
+        title: &str,
+        message: &str,
+        confirm_label: &str,
+        is_danger: bool,
+        on_confirm: F,
+    ) where
+        F: FnOnce() + 'static,
+    {
+        self.hide_confirm_modal();
+
+        let root_overlay = match self
+            .win
+            .child()
+            .and_then(|c| c.downcast::<gtk::Overlay>().ok())
+        {
+            Some(ov) => ov,
+            None => return,
+        };
+
+        // Full-window dim backdrop
+        let backdrop = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        backdrop.add_css_class("confirm-backdrop");
+        backdrop.set_hexpand(true);
+        backdrop.set_vexpand(true);
+        backdrop.set_halign(gtk::Align::Fill);
+        backdrop.set_valign(gtk::Align::Fill);
+        backdrop.set_can_target(true);
+
+        // Center card with sharp minimalist styling
+        let card = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        card.add_css_class("confirm-card");
+        card.set_halign(gtk::Align::Center);
+        card.set_valign(gtk::Align::Center);
+        card.set_can_target(true);
+
+        // Topbar: title + close '✕' button
+        let header = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        header.add_css_class("confirm-header");
+
+        let title_lbl = gtk::Label::new(Some(title));
+        title_lbl.add_css_class("confirm-title");
+        title_lbl.set_hexpand(true);
+        title_lbl.set_xalign(0.0);
+        header.append(&title_lbl);
+
+        let close_btn = gtk::Button::new();
+        close_btn.add_css_class("confirm-close-btn");
+        close_btn.set_has_frame(false);
+        close_btn.set_focus_on_click(false);
+        let x_lbl = gtk::Label::new(Some("✕"));
+        close_btn.set_child(Some(&x_lbl));
+        let a_close = Rc::downgrade(self);
+        close_btn.connect_clicked(move |_| {
+            if let Some(app) = a_close.upgrade() {
+                app.hide_confirm_modal();
+            }
+        });
+        header.append(&close_btn);
+        card.append(&header);
+
+        // Description / message
+        let msg_lbl = gtk::Label::new(Some(message));
+        msg_lbl.add_css_class("confirm-message");
+        msg_lbl.set_xalign(0.0);
+        msg_lbl.set_wrap(true);
+        msg_lbl.set_max_width_chars(44);
+        card.append(&msg_lbl);
+
+        // Action buttons (Cancel & Confirm)
+        let actions = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        actions.add_css_class("confirm-actions");
+        actions.set_halign(gtk::Align::End);
+
+        let cancel_btn = gtk::Button::with_label(tr("Cancel"));
+        cancel_btn.add_css_class("confirm-btn-cancel");
+        cancel_btn.set_cursor_from_name(Some("pointer"));
+        let a_cancel = Rc::downgrade(self);
+        cancel_btn.connect_clicked(move |_| {
+            if let Some(app) = a_cancel.upgrade() {
+                app.hide_confirm_modal();
+            }
+        });
+        actions.append(&cancel_btn);
+
+        let confirm_btn = gtk::Button::with_label(confirm_label);
+        if is_danger {
+            confirm_btn.add_css_class("confirm-btn-danger");
+        } else {
+            confirm_btn.add_css_class("confirm-btn-primary");
+        }
+        confirm_btn.set_cursor_from_name(Some("pointer"));
+
+        let a_confirm = Rc::downgrade(self);
+        let on_confirm_cell = Rc::new(RefCell::new(Some(on_confirm)));
+        confirm_btn.connect_clicked(move |_| {
+            if let Some(app) = a_confirm.upgrade() {
+                app.hide_confirm_modal();
+                if let Some(cb) = on_confirm_cell.borrow_mut().take() {
+                    cb();
+                }
+            }
+        });
+        actions.append(&confirm_btn);
+        card.append(&actions);
+
+        backdrop.append(&card);
+
+        // Click outside card closes modal
+        let click = gtk::GestureClick::new();
+        let c_ref = card.clone();
+        let bd_ref = backdrop.clone();
+        let a_click = Rc::downgrade(self);
+        click.connect_pressed(move |_, _, x, y| {
+            if let Some(c) = c_ref.parent()
+                && let Some(bounds) = c.compute_bounds(&bd_ref) {
+                    let bx = bounds.x() as f64;
+                    let by = bounds.y() as f64;
+                    let bw = bounds.width() as f64;
+                    let bh = bounds.height() as f64;
+                    if (x < bx || x > bx + bw || y < by || y > by + bh)
+                        && let Some(app) = a_click.upgrade() {
+                            app.hide_confirm_modal();
+                        }
+                }
+        });
+        backdrop.add_controller(click);
+
+        // Escape key to close
+        let key = gtk::EventControllerKey::new();
+        let a_key = Rc::downgrade(self);
+        key.connect_key_pressed(move |_, k, _, _| {
+            if k == gdk::Key::Escape {
+                if let Some(app) = a_key.upgrade() {
+                    app.hide_confirm_modal();
+                }
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+        backdrop.add_controller(key);
+
+        root_overlay.add_overlay(&backdrop);
+        *self.confirm_modal.borrow_mut() = Some(backdrop);
+    }
+
     /// Show content as a top-center card that slides down from the top and slides back up on close.
     /// Returns a closer closure.
     pub(crate) fn show_top_dialog(
