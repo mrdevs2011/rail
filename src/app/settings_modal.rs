@@ -150,8 +150,15 @@ impl App {
     }
 
     pub(crate) fn set_customize_subpath(self: &Rc<Self>, shortcuts: bool) {
-        self.customize_stack
-            .set_visible_child_name(if shortcuts { "shortcuts" } else { "html" });
+        let active = if shortcuts { "shortcuts" } else { "html" };
+        self.customize_stack.set_visible_child_name(active);
+        for (name, button) in &self.customize_sub_buttons {
+            if name == active {
+                button.add_css_class("active");
+            } else {
+                button.remove_css_class("active");
+            }
+        }
         let route = if shortcuts {
             "rail://settings/customize/shortcuts/"
         } else {

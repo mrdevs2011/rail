@@ -436,6 +436,10 @@ pub(crate) fn build(gapp: &gtk::Application) {
         current_settings_tab: Cell::new(SettingsTab::General),
         css_buffer: css_buffer.clone(),
         customize_stack: customize_stack.clone(),
+        customize_sub_buttons: vec![
+            ("html".into(), customize_html_button.clone()),
+            ("shortcuts".into(), customize_shortcuts_button.clone()),
+        ],
         search_engine: RefCell::new(initial_settings.search_engine.clone()),
         recently_closed: RefCell::new(Vec::new()),
     });

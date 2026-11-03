@@ -170,6 +170,7 @@ pub(crate) struct App {
     pub(crate) current_settings_tab: Cell<SettingsTab>,
     pub(crate) css_buffer: gtk::TextBuffer,
     pub(crate) customize_stack: gtk::Stack,
+    pub(crate) customize_sub_buttons: Vec<(String, gtk::Button)>,
     pub(crate) search_engine: RefCell<String>,
     pub(crate) recently_closed: RefCell<Vec<(String, String)>>,
 }

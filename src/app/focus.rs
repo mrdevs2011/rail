@@ -316,11 +316,15 @@ impl App {
             return;
         };
 
-        let active_settings_uri = v
-            .uri()
-            .map(|u| u.to_string())
-            .filter(|u| u.starts_with("rail://settings"))
-            .unwrap_or_else(|| self.saved_uri_of(&v));
+        let saved_settings_uri = self.saved_uri_of(&v);
+        let active_settings_uri = if saved_settings_uri.starts_with("rail://settings") {
+            saved_settings_uri
+        } else {
+            v.uri()
+                .map(|u| u.to_string())
+                .filter(|u| u.starts_with("rail://settings"))
+                .unwrap_or_default()
+        };
         if self.current_settings_tab.get() != section {
             self.current_settings_tab.set(section);
             let tab_name = match section {
@@ -333,12 +337,12 @@ impl App {
                 SettingsTab::About => "about",
             };
             self.settings_stack.set_visible_child_name(tab_name);
-            for (btn_tab, btn) in self.settings_tab_buttons.borrow().iter() {
-                if *btn_tab == section {
-                    btn.add_css_class("active");
-                } else {
-                    btn.remove_css_class("active");
-                }
+        }
+        for (btn_tab, btn) in self.settings_tab_buttons.borrow().iter() {
+            if *btn_tab == section {
+                btn.add_css_class("active");
+            } else {
+                btn.remove_css_class("active");
             }
         }
 
@@ -360,13 +364,19 @@ impl App {
         }
 
         if section == SettingsTab::Customize {
-            self.customize_stack.set_visible_child_name(
-                if active_settings_uri.contains("/shortcuts") {
-                    "shortcuts"
+            let sub = if active_settings_uri.contains("/shortcuts") {
+                "shortcuts"
+            } else {
+                "html"
+            };
+            self.customize_stack.set_visible_child_name(sub);
+            for (name, button) in &self.customize_sub_buttons {
+                if name == sub {
+                    button.add_css_class("active");
                 } else {
-                    "html"
-                },
-            );
+                    button.remove_css_class("active");
+                }
+            }
         }
 
         // Stay parented on the settings tab overlay even when another tab is focused,
