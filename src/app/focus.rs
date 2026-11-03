@@ -2,6 +2,56 @@
 
 use crate::*;
 
+/// Keep the focused coordinates stable when a different tab/workspace is removed.
+fn adjusted_focus_after_unfocused_close(
+    cur_r: usize,
+    cur_c: usize,
+    closed_r: usize,
+    closed_c: usize,
+    row_removed: bool,
+) -> (usize, usize) {
+    let row = if row_removed && closed_r < cur_r {
+        cur_r.saturating_sub(1)
+    } else {
+        cur_r
+    };
+    let col = if closed_r == cur_r && closed_c < cur_c {
+        cur_c.saturating_sub(1)
+    } else {
+        cur_c
+    };
+    (row, col)
+}
+
+#[cfg(test)]
+mod close_focus_tests {
+    use super::adjusted_focus_after_unfocused_close;
+
+    #[test]
+    fn closing_workspace_above_focus_shifts_focus_up() {
+        assert_eq!(
+            adjusted_focus_after_unfocused_close(2, 1, 0, 0, true),
+            (1, 1)
+        );
+    }
+
+    #[test]
+    fn closing_workspace_below_focus_keeps_focus_row() {
+        assert_eq!(
+            adjusted_focus_after_unfocused_close(0, 1, 2, 0, true),
+            (0, 1)
+        );
+    }
+
+    #[test]
+    fn closing_tab_before_focus_shifts_focus_column_left() {
+        assert_eq!(
+            adjusted_focus_after_unfocused_close(1, 3, 1, 1, false),
+            (1, 2)
+        );
+    }
+}
+
 impl App {
     pub(crate) fn close_view(self: &Rc<Self>, view: &WebView) {
         let Some((r_idx, c_idx)) = self.find_view_coords(view) else {
@@ -31,6 +81,16 @@ impl App {
             return;
         }
         let tab = rows[r_idx].detach(c_idx);
+        // A WebKit related_view shares its opener's web process. Terminating the
+        // process while closing this one view can blank/freeze the surviving tabs.
+        // Let WebKit reap the process naturally when its final view is dropped.
+        let tab_widget: gtk::Widget = tab.container.clone().upcast();
+        if self.layout.solo().as_ref() == Some(&tab_widget) {
+            self.layout.set_solo(None);
+        }
+        self.anim_frozen
+            .borrow_mut()
+            .retain(|(_, frozen_view)| frozen_view != &tab.view);
         let closed_uri = tab
             .view
             .uri()
@@ -56,15 +116,25 @@ impl App {
         let total_rows = rows.len();
         drop(rows);
 
-        // Free the web process right away instead of waiting for the WebView to be finalized.
-        tab.view.terminate_web_process();
-
+        // Do not call terminate_web_process() here: WebKit related views can share
+        // a process, so killing this tab's process can kill a still-open sibling tab.
+        // Dropping `tab` below releases this WebView; WebKit owns process reclamation.
         self.sync_strip();
 
         if total_tabs == 0 {
             self.save_session_immediate();
             self.win.close();
             return;
+        }
+
+        if row_removed {
+            let mut last_cols = self.row_last_col.borrow_mut();
+            let old = std::mem::take(&mut *last_cols);
+            for (row, col) in old {
+                if row != r_idx {
+                    last_cols.insert(if row > r_idx { row - 1 } else { row }, col);
+                }
+            }
         }
 
         if is_closing_focused {
@@ -87,22 +157,20 @@ impl App {
                 self.focus_coords(next_r, next_c);
             }
         } else {
-            let mut new_r = cur_r;
-            let mut new_c = cur_c;
-
-            if row_removed && r_idx < cur_r {
-                new_r = cur_r.saturating_sub(1);
-            }
-            if r_idx == cur_r && c_idx < cur_c {
-                new_c = cur_c.saturating_sub(1);
-            }
-
+            let (new_r, new_c) =
+                adjusted_focus_after_unfocused_close(cur_r, cur_c, r_idx, c_idx, row_removed);
             self.focus_row.set(new_r);
             self.focus_col.set(new_c);
-
             self.refresh_sidebar();
             self.update_window_title();
+            self.update_load_bar();
             self.schedule_save_session();
+            // Removing any tab/workspace changes the strip's world geometry. Recompute
+            // the camera target even when the closed tab was not focused; otherwise the
+            // viewport can remain pointed at a now-nonexistent row and appear black.
+            self.reveal_focus();
+            self.sync_settings_chrome();
+            self.sync_welcome_palette();
             if self.map_open() {
                 self.trigger_map_animation();
             }
