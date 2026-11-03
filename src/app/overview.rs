@@ -231,8 +231,16 @@ impl App {
         match k {
             gdk::Key::h | gdk::Key::Left | gdk::Key::KP_Left => self.focus_column_left(),
             gdk::Key::l | gdk::Key::Right | gdk::Key::KP_Right => self.focus_column_right(),
-            gdk::Key::j | gdk::Key::Down | gdk::Key::KP_Down => self.focus_row_down(),
-            gdk::Key::k | gdk::Key::Up | gdk::Key::KP_Up => self.focus_row_up(),
+            // Niri-style workspace navigation: overview Up/Down changes the workspace
+            // itself, never an individual tab inside a stacked column.
+            gdk::Key::j | gdk::Key::Down | gdk::Key::KP_Down => {
+                let next = self.focus_row.get().saturating_add(1);
+                self.focus_row(next);
+            }
+            gdk::Key::k | gdk::Key::Up | gdk::Key::KP_Up => {
+                let previous = self.focus_row.get().saturating_sub(1);
+                self.focus_row(previous);
+            }
             gdk::Key::Return | gdk::Key::KP_Enter => self.exit_overview(),
             gdk::Key::x => {
                 if let Some(v) = self.focused_view() {

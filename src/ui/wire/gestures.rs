@@ -77,13 +77,15 @@ pub(crate) fn wire_gestures(app: &Rc<App>, shell: gtk::Box, win: gtk::Applicatio
             ax.set(0.0);
             ay.set(0.0);
             l_swipe.set(now);
-            a.focus_row_down();
+            let next = a.focus_row.get().saturating_add(1);
+            a.focus_row(next);
             return glib::Propagation::Stop;
         } else if ny < -OV_THRESHOLD {
             ax.set(0.0);
             ay.set(0.0);
             l_swipe.set(now);
-            a.focus_row_up();
+            let previous = a.focus_row.get().saturating_sub(1);
+            a.focus_row(previous);
             return glib::Propagation::Stop;
         }
         glib::Propagation::Proceed
