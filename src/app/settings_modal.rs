@@ -136,6 +136,9 @@ impl App {
             "rail://settings/customize/html/"
         };
         if let Some(view) = self.focused_view() {
+            // load_html updates WebKit's live URI as well as the saved fallback, so
+            // Ctrl+L, the address pill, reload and session restore all agree.
+            view.load_html(&settings_shell_page(), Some(route));
             self.set_view_saved_uri(&view, route);
             self.pill_label.set_text(route);
         }
