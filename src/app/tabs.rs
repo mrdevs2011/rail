@@ -291,7 +291,6 @@ impl App {
     }
 
     pub(crate) fn new_tab(self: &Rc<Self>) {
-        self.exit_overview();
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
@@ -317,7 +316,7 @@ impl App {
                 }
                 if u.starts_with("rail://start") {
                     app.push_start_state(&v);
-                    if app.focused_view().as_ref() == Some(&v) {
+                    if !app.ov.get() && app.focused_view().as_ref() == Some(&v) {
                         app.focus_welcome_input(false);
                     }
                 }
@@ -326,7 +325,6 @@ impl App {
     }
 
     pub(crate) fn split_vertical(self: &Rc<Self>) {
-        self.exit_overview();
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
@@ -342,7 +340,8 @@ impl App {
         for ms in [30u64, 120, 350] {
             let app = self.clone();
             glib::timeout_add_local_once(std::time::Duration::from_millis(ms), move || {
-                if app.focused_is_welcome()
+                if !app.ov.get()
+                    && app.focused_is_welcome()
                     && let Some(v) = app.focused_view()
                 {
                     app.push_start_state(&v);
@@ -350,11 +349,12 @@ impl App {
                 }
             });
         }
-        self.entry.grab_focus();
+        if !self.ov.get() {
+            self.entry.grab_focus();
+        }
     }
 
     pub(crate) fn new_tab_with_url_and_profile(self: &Rc<Self>, url: &str, profile_id: &str) {
-        self.exit_overview();
         let session = self.profiles.borrow_mut().get_or_create_session(profile_id);
         let view = Self::create_web_view(&session, profile_id);
         if is_internal_uri(url) {
@@ -377,7 +377,6 @@ impl App {
     }
 
     pub(crate) fn split_with_url(self: &Rc<Self>, url: &str) {
-        self.exit_overview();
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);

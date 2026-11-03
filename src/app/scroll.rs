@@ -26,20 +26,27 @@ impl App {
         }
 
         let mut active_span: Option<(f64, f64)> = None;
+        let mut active_tab_center_y = cur_r as f64 * (vh + g) + vh / 2.0;
         if let Some(row) = rows.get(cur_r) {
             let cols = row_cols(row, vw, g);
-            active_span = cols
+            if let Some(&(start, len, x, w)) = cols
                 .iter()
                 .find(|&&(st, len, _, _)| cur_c >= st && cur_c < st + len)
-                .map(|&(_, _, x, w)| (x, x + w));
+            {
+                active_span = Some((x, x + w));
+                // Center the actual focused card, not the entire stacked column.
+                let card_h = stack_height(vh, len, g);
+                let index_in_stack = cur_c.saturating_sub(start);
+                let row_top = cur_r as f64 * (vh + g);
+                active_tab_center_y = row_top + index_in_stack as f64 * (card_h + g) + card_h / 2.0;
+            }
         }
         drop(rows);
 
-        // Niri-style: focused tab is always framed in the exact center of the screen
-        let row_center_y = cur_r as f64 * (vh + g) + vh / 2.0;
+        // Niri-style overview camera: keep the focused tab itself at screen center.
         let col_center_x = active_span.map_or(vw / 2.0, |(l, r)| (l + r) / 2.0);
         let tx = col_center_x - visible_w / 2.0;
-        let ty = row_center_y - visible_h / 2.0;
+        let ty = active_tab_center_y - visible_h / 2.0;
         (tx, ty)
     }
 
