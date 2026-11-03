@@ -167,22 +167,8 @@ impl App {
             "stack_left" => self.consume_or_expel(-1),
             "stack_right" => self.consume_or_expel(1),
             // ---- panels ----
-            "settings" => self.toggle_settings_modal(),
-            "profiles" => {
-                if self.settings_modal_open() {
-                    self.open_settings_tab(SettingsTab::Profiles);
-                } else if self.focused_is_welcome() {
-                    self.toggle_welcome_profiles();
-                } else if self.palette_open() {
-                    if self.profile_popover.is_visible() {
-                        self.profile_popover.popdown();
-                    } else {
-                        self.profile_popover.popup();
-                    }
-                } else {
-                    self.toggle_profiles_modal();
-                }
-            }
+            "settings" => self.toggle_side_settings_popover(),
+            "profiles" => self.toggle_side_profile_popover(),
             "data" => {
                 if self.settings_modal_open() {
                     self.open_settings_tab(SettingsTab::Data);
@@ -191,7 +177,7 @@ impl App {
                 }
             }
             "history" => self.open_history(),
-            "downloads" => self.open_downloads(),
+            "downloads" => self.toggle_side_downloads_popover(),
             "open_file" => self.open_file_dialog(),
             "view_source" => self.view_source_of_focused(),
             "devtools" => {
@@ -303,6 +289,18 @@ impl App {
         }
 
         if k == gdk::Key::Escape {
+            if self.side_profile_popover.is_visible() {
+                self.side_profile_popover.popdown();
+                return true;
+            }
+            if self.side_downloads_popover.is_visible() {
+                self.side_downloads_popover.popdown();
+                return true;
+            }
+            if self.side_settings_popover.is_visible() {
+                self.side_settings_popover.popdown();
+                return true;
+            }
             if self.confirm_modal_open() {
                 self.hide_confirm_modal();
                 return true;

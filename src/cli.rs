@@ -23,6 +23,10 @@ pub(crate) fn export_data(archive_path: &Path) -> Result<(), String> {
             .join(archive_path)
     };
 
+    if let Some(p) = abs_archive.parent() {
+        let _ = std::fs::create_dir_all(p);
+    }
+
     let status = std::process::Command::new("tar")
         .arg("--exclude=*/cache")
         .arg("--exclude=*/cache/*")
@@ -64,6 +68,10 @@ pub(crate) fn import_data(archive_path: &Path) -> Result<(), String> {
             .join(archive_path)
     };
 
+    if let Some(p) = abs_archive.parent() {
+        let _ = std::fs::create_dir_all(p);
+    }
+
     if !abs_archive.exists() {
         return Err(trf(
             "Archive file does not exist: {}",
@@ -72,14 +80,39 @@ pub(crate) fn import_data(archive_path: &Path) -> Result<(), String> {
     }
 
     let dest_dir = rail_data_dir();
+    let _ = std::fs::create_dir_all(&dest_dir);
     let parent = dest_dir.parent().unwrap_or(&dest_dir);
     let _ = std::fs::create_dir_all(parent);
+
+    // Check archive structure: if entries are already rooted at `rail/`, extract to parent.
+    // If entries are flat (files directly inside), extract directly to dest_dir.
+    let inspect = std::process::Command::new("tar")
+        .arg("-tf")
+        .arg(&abs_archive)
+        .output();
+    let target_dir = match inspect {
+        Ok(ref out) => {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            let first_line = stdout.lines().next().unwrap_or("");
+            let dir_name = dest_dir
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("rail");
+            if first_line.starts_with(dir_name) || first_line.starts_with(&format!("{dir_name}/"))
+            {
+                parent
+            } else {
+                &dest_dir
+            }
+        }
+        Err(_) => parent,
+    };
 
     let status = std::process::Command::new("tar")
         .arg("-xzf")
         .arg(&abs_archive)
         .arg("-C")
-        .arg(parent)
+        .arg(target_dir)
         .status()
         .map_err(|e| trf("Failed to run tar command: {}", &[&e.to_string()]))?;
 

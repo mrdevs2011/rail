@@ -22,6 +22,7 @@ mod palette;
 mod profiles_modal;
 mod session;
 mod settings_modal;
+mod side_popovers;
 mod sidebar;
 mod signals;
 mod welcome;
@@ -109,6 +110,11 @@ pub(crate) struct App {
     pub(crate) profile_btn: gtk::Button,
     pub(crate) profile_btn_lbl: gtk::Label,
     pub(crate) profile_popover: gtk::Popover,
+    pub(crate) head_profile_btn: gtk::Button,
+    pub(crate) head_profile_dot: gtk::Label,
+    pub(crate) side_profile_popover: gtk::Popover,
+    pub(crate) side_downloads_popover: gtk::Popover,
+    pub(crate) side_settings_popover: gtk::Popover,
     pub(crate) profiles_modal_scroll: gtk::ScrolledWindow,
     pub(crate) profiles_list_box: gtk::ListBox,
     pub(crate) new_profile_entry: gtk::Entry,

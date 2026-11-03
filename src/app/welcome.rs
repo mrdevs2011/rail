@@ -294,6 +294,7 @@ impl App {
     }
 
     /// Alt+P on the welcome page: toggle the in-page profile menu.
+    #[allow(dead_code)]
     pub(crate) fn toggle_welcome_profiles(&self) {
         if let Some(v) = self.focused_view() {
             Self::start_eval(&v, "window.railToggleProfiles&&window.railToggleProfiles()");

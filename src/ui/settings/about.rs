@@ -33,6 +33,8 @@ pub(crate) fn build_about_page(settings_stack: &gtk::Stack) {
     about_card.append(&brand_row);
 
     let specs = [
+        (tr("Author"), "Muhammadrasul Qosimov"),
+        (tr("Engineering"), tr("Engineered in Uzbekistan")),
         (tr("Core Engine"), "WebKitGTK 4.1 / WebKit 6.0"),
         (tr("GUI Framework"), "GTK 4.0 + GSK GPU Compositor"),
         (tr("Language"), tr("100% Pure Native Rust")),

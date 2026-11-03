@@ -218,7 +218,19 @@ impl App {
         });
 
         view.connect_decide_policy(|_view, decision, decision_type| {
-            if decision_type == webkit6::PolicyDecisionType::NavigationAction {
+            if decision_type == webkit6::PolicyDecisionType::Response {
+                if let Some(resp_decision) = decision.downcast_ref::<webkit6::ResponsePolicyDecision>() {
+                    let is_attachment = resp_decision
+                        .response()
+                        .and_then(|r| r.suggested_filename())
+                        .is_some()
+                        || !resp_decision.is_mime_type_supported();
+                    if is_attachment {
+                        resp_decision.download();
+                        return true;
+                    }
+                }
+            } else if decision_type == webkit6::PolicyDecisionType::NavigationAction {
                 if let Some(nav_decision) =
                     decision.downcast_ref::<webkit6::NavigationPolicyDecision>()
                     && let Some(req) = nav_decision.navigation_action().and_then(|a| a.request())

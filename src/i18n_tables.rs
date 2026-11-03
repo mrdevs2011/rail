@@ -802,8 +802,8 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ),
     (
         "Rail DevTools - {}",
-        "Rail DevTools - {}",
-        "Rail DevTools - {}",
+        "Rail dasturchi asboblari - {}",
+        "Инструменты разработчика Rail - {}",
     ),
     (
         "Touchpad Slide: ON",
@@ -1801,5 +1801,110 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Find previous match",
         "Oldingi natija",
         "Предыдущее совпадение",
+    ),
+    (
+        "Open full Downloads page",
+        "To'liq yuklab olishlar sahifasini ochish",
+        "Открыть полную страницу загрузок",
+    ),
+    (
+        "Expand to Full Settings",
+        "To'liq sozlamalarni ochish",
+        "Развернуть на все настройки",
+    ),
+    (
+        "Open in Settings (Alt+P)",
+        "Sozlamalarda ochish (Alt+P)",
+        "Открыть в настройках (Alt+P)",
+    ),
+    (
+        "Quick Settings",
+        "Tezkor sozlamalar",
+        "Быстрые настройки",
+    ),
+    (
+        "Add Profile",
+        "Profil qo'shish",
+        "Добавить профиль",
+    ),
+    (
+        "Are you sure you want to remove all items from download history?",
+        "Haqiqatan ham barcha yuklab olishlar tarixini tozalamoqchimisiz?",
+        "Вы уверены, что хотите удалить все элементы из истории загрузок?",
+    ),
+    (
+        "Always allow on this site",
+        "Ushbu saytda doim ruxsat berish",
+        "Всегда разрешать на этом сайте",
+    ),
+    (
+        "Author",
+        "Muallif",
+        "Автор",
+    ),
+    (
+        "Close",
+        "Yopish",
+        "Закрыть",
+    ),
+    (
+        "Drop skipped",
+        "Tashlash o'tkazib yuborildi",
+        "Перетаскивание пропущено",
+    ),
+    (
+        "Engineered in Uzbekistan",
+        "O'zbekistonda ishlab chiqilgan",
+        "Разработано в Узбекистане",
+    ),
+    (
+        "Engineering",
+        "Muhandislik",
+        "Инженерия",
+    ),
+    (
+        "Install",
+        "O'rnatish",
+        "Установить",
+    ),
+    (
+        "Install error",
+        "O'rnatish xatosi",
+        "Ошибка установки",
+    ),
+    (
+        "No modifier: pick an F-key",
+        "Modifikatorsiz: F-tugmalaridan birini tanlang",
+        "Без модификатора: выберите F-клавишу",
+    ),
+    (
+        "Numbered series — change individually via defaults or reset",
+        "Raqamlangan ketma-ketlik — alohida o'zgartiring yoki asl holatga qaytaring",
+        "Нумерованная серия — изменяйте отдельно или сбросьте",
+    ),
+    (
+        "Privacy",
+        "Maxfiylik",
+        "Конфиденциальность",
+    ),
+    (
+        "Reset",
+        "Asl holatga qaytarish",
+        "Сбросить",
+    ),
+    (
+        "Saved!",
+        "Saqlandi!",
+        "Сохранено!",
+    ),
+    (
+        "Screenshot copied to clipboard",
+        "Screenshot buferga nusxalandi",
+        "Скриншот скопирован в буфер обмена",
+    ),
+    (
+        "Sidebar mode",
+        "Yon panel rejimi",
+        "Режим боковой панели",
     ),
 ];

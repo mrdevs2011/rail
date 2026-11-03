@@ -4,6 +4,59 @@
 use crate::*;
 use webkit6::WebInspector;
 
+pub(crate) fn hide_inspector_left_right_buttons(w: &webkit6::WebViewBase) {
+    if let Ok(wv) = w.clone().downcast::<webkit6::WebView>() {
+        let script = r#"
+            (function() {
+                if (window.__rail_dock_cleaned) return;
+                window.__rail_dock_cleaned = true;
+                const style = document.createElement('style');
+                style.textContent = `
+                    .toolbar .item.dock-left,
+                    .toolbar .item.dock-right,
+                    .toolbar-item.dock-left,
+                    .toolbar-item.dock-right,
+                    .navigation-bar .item.dock-left,
+                    .navigation-bar .item.dock-right,
+                    button.dock-left,
+                    button.dock-right,
+                    [class*="dock-left"],
+                    [class*="dock-right"],
+                    [class*="dock-to-left"],
+                    [class*="dock-to-right"],
+                    [aria-label*="left" i][aria-label*="dock" i],
+                    [aria-label*="right" i][aria-label*="dock" i],
+                    [title*="left" i][title*="dock" i],
+                    [title*="right" i][title*="dock" i] {
+                        display: none !important;
+                        width: 0 !important;
+                        min-width: 0 !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        border: none !important;
+                        pointer-events: none !important;
+                    }
+                `;
+                (document.head || document.documentElement).appendChild(style);
+
+                const hide = () => {
+                    document.querySelectorAll('button, .item, .toolbar-item, div').forEach(el => {
+                        const t = (el.getAttribute('title') || el.getAttribute('aria-label') || el.className || '').toLowerCase();
+                        if ((t.includes('dock') || t.includes('attach')) && (t.includes('left') || t.includes('right'))) {
+                            el.style.setProperty('display', 'none', 'important');
+                        }
+                    });
+                };
+                hide();
+                try {
+                    new MutationObserver(hide).observe(document.documentElement, { childList: true, subtree: true });
+                } catch (e) {}
+            })();
+        "#;
+        wv.evaluate_javascript(script, None, None, None::<&gio::Cancellable>, |_| {});
+    }
+}
+
 thread_local! {
     static DT_CLOSING_WIN: Cell<bool> = const { Cell::new(false) };
     static IN_SHOW_DEVTOOLS: Cell<bool> = const { Cell::new(false) };
@@ -181,7 +234,7 @@ impl App {
             let insp = insp.clone();
             move || {
                 if let Some(w) = insp.web_view() {
-                    let widget: gtk::Widget = w.upcast();
+                    let widget: gtk::Widget = w.clone().upcast();
                     if widget.parent().as_ref() != Some(dt_box.upcast_ref()) {
                         if widget.parent().is_some() {
                             widget.unparent();
@@ -193,6 +246,7 @@ impl App {
                         widget.set_vexpand(true);
                         dt_box.append(&widget);
                     }
+                    hide_inspector_left_right_buttons(&w);
                 }
             }
         };
@@ -206,7 +260,7 @@ impl App {
         glib::timeout_add_local(std::time::Duration::from_millis(35), move || {
             let count = retries.get();
             if let Some(w) = insp_poll.web_view() {
-                let widget: gtk::Widget = w.upcast();
+                let widget: gtk::Widget = w.clone().upcast();
                 if widget.parent().as_ref() != Some(dt_box_poll.upcast_ref()) {
                     if widget.parent().is_some() {
                         widget.unparent();
@@ -218,6 +272,7 @@ impl App {
                     widget.set_vexpand(true);
                     dt_box_poll.append(&widget);
                 }
+                hide_inspector_left_right_buttons(&w);
                 return glib::ControlFlow::Break;
             }
             if count >= 35 {
@@ -270,7 +325,7 @@ impl App {
         };
 
         if let Some(w) = insp.web_view() {
-            let widget: gtk::Widget = w.upcast();
+            let widget: gtk::Widget = w.clone().upcast();
             if let Some(v_box) = win.child().and_then(|c| c.downcast::<gtk::Box>().ok())
                 && widget.parent().as_ref() != Some(v_box.upcast_ref()) {
                     if widget.parent().is_some() {
@@ -283,6 +338,7 @@ impl App {
                     widget.set_vexpand(true);
                     v_box.append(&widget);
                 }
+            hide_inspector_left_right_buttons(&w);
         }
 
         win.present();

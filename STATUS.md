@@ -1,25 +1,31 @@
 # AI Context — .
 
 ## Oxirgi holat
-- Sana: 2026-11-03 15:05
+- Sana: 2026-11-03 15:30
 - Nima qilindi:
-  - Overview zoom to'liq olib tashlandi: `OV_ZOOM` (0.4) qat'iy o'lchamga keltirildi; overview ichida pinch-zoom, Ctrl+scroll va Ctrl+/- zoom bloklandi.
-  - Yuklanayotgan fayllar uchun pastki o'ng burchakda Jonli Progress Toast qo'shildi: real-time bayt va foiz, hover qilinganda '✕' bekor qilish tugmasi, tugaganda auto-dismiss.
-  - Fayl kengaytmasi to'g'ri saqlanishi ta'minlandi (`decide_destination` signali orqali MIME type asosida `.html`, `.pdf`, `.zip` va b. avtomatik qo'shiladi).
-  - `rail://downloads` sahifasi mukammallashtirildi:
-    - Faol yuklanayotgan fayllar jonli progress bilan ko'rinadi (1s avtomatik yangilanish).
-    - Yuklangan vaqt (sana/soat) va yuklab olingan manzil (origin URL) ko'rsatiladi.
-    - Har bir qatorda hover qilinganda '✕' (tarixdan o'chirish) tugmasi paydo bo'ladi.
-    - Sarlavhada "Hammasini tozalash" (Clear All) tugmasi qo'shildi.
-    - Faylni ochish va jildda ko'rsatish havolalari ulandi.
-  - Yagona Markaziy Tasdiqlash Modali (`show_confirm_dialog`) yaratildi:
-    - Barcha katta qaytarib bo'lmaydigan amallar (Tarixni tozalash, Keshni tozalash, Yuklab olishlar tarixini tozalash, Profilni o'chirish) markaziy modal orqali tasdiqlanadi.
-    - Escape yoki fondan bosish orqali yopiladi.
-  - Sozlamalardagi Saytlar tarixi sahifasidan `+` tugmasi olib tashlandi; sayt sarlavhasi/URL to'g'ridan-to'g'ri yangi tabda ochiladigan havola qilib stil berildi.
-  - Barcha yangi matnlar `uz`, `en`, `ru` tillarida `i18n_tables.rs` ga kiritildi.
-  - 80 ta unit test va barcha Clippy lintlari 100% toza o'tdi (0 xato, 0 ogohlantirish).
-- Hozirgi muammo/blocker: Yo'q.
-- Keyingi qadam: O'zgarishlarni tekshirish va ishga tushirish.
+  - **Tezkor Float Popoverlar (Profiles, Downloads, Settings)**:
+    - Har biri o'z tugmasiga biriktirilgan ixcham va tezkor `gtk::Popover` sifatida ochiladi.
+    - Har uchala popoverning yuqori o'ng burchagida `[↗]` (Kengaytirish) tugmasi joylashtirildi: to'liq `rail://downloads`, to'liq `Settings > Profiles`, yoki to'liq Sozlamalar oynasiga o'tadi.
+    - Escape tugmasi yoki tashqi bosish barcha popoverlarni silliq yopadi.
+  - **Yon Panel Sarlavhasida Profil Tugmasi**:
+    - Chap panel bosh qismida (orqaga/oldinga strelkalarining chap tomonida) faol profil harfi va rangli doirachasiga ega avatar tugmasi o'rnatildi.
+    - Tugma bosilganda profillar popoveri tezkor chiqadi, tooltip faol profil nomini ko'rsatadi.
+  - **Yuklab Olish Tarmoq Xatoligi Tuzatildi**:
+    - Fayl yuklanishga o'tganda WebKit resurs yuklanishini to'xtatishi sababli chiqqan `net::ERR_NETWORK_ERROR - Page Failed to Load` xatoligi bartaraf etildi (`webkit6::PolicyError::FrameLoadInterruptedByPolicyChange` va `webkit6::NetworkError::Cancelled` to'g'ri filtrlandi).
+  - **DevTools Left/Right Tugmalari Butunlay Olib Tashlandi**:
+    - WebKit Web Inspector panelidagi keraksiz Left va Right dock tugmalari inyektsiya qilingan CSS va DOM kuzatuvchisi orqali yashirildi; qo'shni tugmalar bo'sh joy qoldirmasdan silliq surildi.
+  - **100% Mukammal Uch Tilli Tizim (Uzbek, English, Russian)**:
+    - Barcha 345 ta UI kalitlari `i18n_tables.rs` ga to'liq kiritildi.
+    - Rus tilida inglizcha yoki o'zbekcha so'z umuman chiqmaydi, o'zbek tilida begona tillar ko'rinmaydi.
+    - Muallif: Muhammadrasul Qosimov (O'zbekistonda ishlab chiqilgan) ma'lumoti Sozlamalar → Brauzer haqida bo'limiga kiritildi.
+  - **Ma'lumotlar Import/Eksporti Mukammallashtirildi**:
+    - Oflayn arxiv fayli ota jildi avtomatik yaratiladi, yassi yoki `rail/` prefiksli arxivlar xatosiz aniqlanib to'g'ri jildga tiklanadi.
+  - **Omborxona Tozalandi (Zero-Bloat)**:
+    - Ildizdagi keraksiz `index.html`, bir martalik `CLAUDE.md`, `ROADMAP.md` fayllari o'chirildi.
+    - `README.md` professional muhandislik darajasida noldan qayta yozildi.
+  - **Verifikatsiya**:
+    - 0 compiler warning, 0 clippy warning, 80/80 release unit testlar 100% muvaffaqiyatli.
+- Hozirgi muammo/blocker: Yo'q. Full production ready.
 
 ---
 ### 2026-10-15 20:25

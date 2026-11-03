@@ -2,11 +2,17 @@ use crate::*;
 
 pub(crate) fn wire_sidebar_header(
     app: &Rc<App>,
+    head_profile: gtk::Button,
     head_back: gtk::Button,
     head_forward: gtk::Button,
     head_reload: gtk::Button,
     head_mode: gtk::Button,
 ) {
+    let a = app.clone();
+    head_profile.connect_clicked(move |_| {
+        a.toggle_side_profile_popover();
+    });
+
     let a = app.clone();
     head_back.connect_clicked(move |_| {
         if let Some(v) = a.focused_view()

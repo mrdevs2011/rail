@@ -23,9 +23,7 @@ pub(crate) fn wire_devtools(
             let slot = (x / 24.0).floor() as i32;
             LAST_DT_SLOT.with(|c| c.set(slot));
             let target = match slot {
-                1 => Some(DevToolsDockSide::Left),
-                2 => Some(DevToolsDockSide::Right),
-                3 => Some(DevToolsDockSide::Undocked),
+                1 => Some(DevToolsDockSide::Undocked),
                 _ => None,
             };
             LAST_DT_TARGET.with(|c| c.set(target));
@@ -98,10 +96,10 @@ pub(crate) fn wire_devtools(
 
     {
         let a = app.clone();
-        footer_settings.connect_clicked(move |_| a.open_settings_tab(SettingsTab::General));
+        footer_settings.connect_clicked(move |_| a.toggle_side_settings_popover());
     }
     {
         let a = app.clone();
-        footer_downloads.connect_clicked(move |_| a.open_downloads());
+        footer_downloads.connect_clicked(move |_| a.toggle_side_downloads_popover());
     }
 }

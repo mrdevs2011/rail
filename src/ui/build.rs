@@ -22,6 +22,8 @@ pub(crate) fn build(gapp: &gtk::Application) {
     let SidebarWidgets {
         footer_downloads,
         footer_settings,
+        head_profile,
+        head_profile_dot,
         head_close_side,
         head_back,
         head_forward,
@@ -34,6 +36,21 @@ pub(crate) fn build(gapp: &gtk::Application) {
         pill_pwa_btn,
         side,
     } = build_sidebar();
+
+    let side_profile_popover = gtk::Popover::new();
+    side_profile_popover.add_css_class("side-float-popover");
+    side_profile_popover.set_parent(&head_profile);
+    side_profile_popover.set_has_arrow(true);
+
+    let side_downloads_popover = gtk::Popover::new();
+    side_downloads_popover.add_css_class("side-float-popover");
+    side_downloads_popover.set_parent(&footer_downloads);
+    side_downloads_popover.set_has_arrow(true);
+
+    let side_settings_popover = gtk::Popover::new();
+    side_settings_popover.add_css_class("side-float-popover");
+    side_settings_popover.set_parent(&footer_settings);
+    side_settings_popover.set_has_arrow(true);
 
     let StripWidgets {
         layout,
@@ -337,6 +354,11 @@ pub(crate) fn build(gapp: &gtk::Application) {
         profile_btn: profile_btn.clone(),
         profile_btn_lbl: profile_btn_lbl.clone(),
         profile_popover: profile_popover.clone(),
+        head_profile_btn: head_profile.clone(),
+        head_profile_dot: head_profile_dot.clone(),
+        side_profile_popover: side_profile_popover.clone(),
+        side_downloads_popover: side_downloads_popover.clone(),
+        side_settings_popover: side_settings_popover.clone(),
         profiles_modal_scroll: page_prof_scroll.clone(),
         profiles_list_box: profiles_list_box.clone(),
         new_profile_entry: new_profile_entry.clone(),
@@ -438,7 +460,8 @@ pub(crate) fn build(gapp: &gtk::Application) {
         footer_downloads,
         footer_settings,
     );
-    wire_sidebar_header(&app, head_back, head_forward, head_reload, head_close_side);
+    wire_sidebar_header(&app, head_profile, head_back, head_forward, head_reload, head_close_side);
+    app.sync_head_profile();
 
     let a_pwa = app.clone();
     app.pill_pwa_btn.connect_clicked(move |_| {

@@ -295,7 +295,13 @@ impl App {
         view.connect_estimated_load_progress_notify(move |_| app.update_load_bar());
         view.connect_load_failed(move |v, _event, uri, error| {
             let err_msg = error.message().to_string();
-            if err_msg.contains("Load request cancelled") {
+            let lower = err_msg.to_lowercase();
+            if lower.contains("cancel")
+                || lower.contains("interrupted")
+                || lower.contains("download")
+                || error.matches(webkit6::NetworkError::Cancelled)
+                || error.matches(webkit6::PolicyError::FrameLoadInterruptedByPolicyChange)
+            {
                 return false;
             }
             let html = crate::web::format_error_html(uri, &err_msg);

@@ -128,6 +128,7 @@ impl App {
         self.css_buffer.set_text(&load_html_css());
     }
 
+    #[allow(dead_code)]
     pub(crate) fn toggle_settings_modal(self: &Rc<Self>) {
         // Already on settings → close that tab (do NOT replace with start/new-tab page).
         let on_settings = self
@@ -171,6 +172,7 @@ impl App {
         self.settings_modal.is_visible() && self.current_settings_tab.get() == SettingsTab::Profiles
     }
 
+    #[allow(dead_code)]
     pub(crate) fn toggle_profiles_modal(self: &Rc<Self>) {
         let is_on_profiles = self
             .focused_view()

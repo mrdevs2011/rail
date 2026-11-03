@@ -1,124 +1,130 @@
 # Rail
 
-> **Rail** — a blazing-fast, keyboard-driven web browser built with GTK4 and WebKitGTK. Inspired by the **Niri** Wayland compositor, it features an infinite horizontal ribbon of columns, vertical window stacks, and storage-isolated multi-profiles.
+> **Rail** — zamonaviy Linux tizimlari uchun mo'ljallangan, yuqori tezlikka ega, xotirani tejaydigan va to'liq klaviaturaga yo'naltirilgan minimalist brauzer.
+
+O'zbekistonlik dasturchi **Muhammadrasul Qosimov** tomonidan sof Rust, GTK4 va WebKitGTK 6.0 negizida yaratilgan. Loyiha tashqi pullik servislardan 100% mustaqil bo'lib, Wayland (Niri) va X11 muhitlarida ortiqcha yuklamalarsiz (0% idle CPU) ishlaydi.
 
 ---
 
-## 🚀 Quick Install (Tezkor o‘rnatish)
+## ⚡ Asosiy Muhandislik Ustunlari
 
-### Usul 1: Bir qatorli avtomatik o‘rnatish (Tavsiya etiladi)
+- **Ko'p Profilli To'liq Izolyatsiya (Sandboxed Profiles)**  
+  Har bir profil uchun alohida `WebKitNetworkSession` ajratiladi. Ish, shaxsiy yoki o'qish profillari kuki, kesh va `localStorage` bo'yicha mutlaq ajratilgan bo'lib, ma'lumotlar oqishi (leak) ning oldi olinadi.
 
-Terminalni oching va quyidagi buyruqni bering. Skript kerakli kutubxonalarni tekshiradi, dasturni `~/.local/bin/rail` ga joylaydi va ilovalar menyusiga (`.desktop` fayl va ikonka) qo‘shadi:
+- **Niri Uslubidagi 2D Tiling va Klaviaturaga Yo'naltirilgan Boshqaruv**  
+  Gorizontal cheksiz lenta (horizontal ribbon) va vertikal oynalar steki. Sichqonchasiz tezkor boshqaruv, buyruqlar palitrasi (`Ctrl+T` / `Ctrl+L`) va sozlanuvchi tugmalar kombinatsiyalari.
+
+- **Atomik Tranzaksiyaviy Saqlash va Auto-Healing**  
+  Sessiyalar, sozlamalar va profillar xavfsiz atomik tranzaksiyalar (yozish, tasdiqlash va zaxira tiklash) orqali saqlanadi. Kutilmagan uzilish yoki nosozlik yuz berganda brauzer o'z holatini avtomatik ravishda tiklaydi.
+
+- **Resurslarni Minimal Sarflash va Sof Native Arxitektura**  
+  Electron yoki keraksiz qatlamlarsiz, binar fayl hajmi juda ixcham, xotira sarfi minimal va fonga o'tgan tablar avtomatik ravishda uyqu rejimiga o'tkaziladi.
+
+---
+
+## 🚀 Tizim Talablari va O'rnatish
+
+### 1. Kerakli Kutubxonalar (Dependencies)
+
+Rail'ni yig'ish va ishlatish uchun tizimda GTK4 va WebKitGTK 6.0 bo'lishi lozim:
+
+- **Arch Linux / Manjaro:**
+  ```bash
+  sudo pacman -S gtk4 webkitgtk-6.0 base-devel
+  ```
+
+- **Ubuntu 23.04+ / Debian 12+:**
+  ```bash
+  sudo apt update
+  sudo apt install libgtk-4-dev libwebkitgtk-6.0-dev build-essential
+  ```
+
+- **Fedora 38+:**
+  ```bash
+  sudo dnf install gtk4-devel webkitgtk6.0-devel gcc
+  ```
+
+### 2. Manba Kodidan Yig'ish (Build from Source)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mrdevs2011/rail/main/install.sh | bash
+# 1. Omborxona nusxasini oling
+git clone https://github.com/mrdevs2011/rail.git
+cd rail
+
+# 2. Release rejimida yig'ing
+cargo build --release
+
+# 3. Brauzerni ishga tushiring
+cargo run --release
 ```
 
-### Usul 2: Binar faylni to‘g‘ridan-to‘g‘ri yuklab olish (~500 KB)
-
-Agar tizimingizda `libwebkitgtk-6.0` mavjud bo‘lsa, to‘g‘ridan-to‘g‘ri reliz binar faylini yuklab olishingiz mumkin:
-
+Tizimga o'rnatish uchun yig'ilgan binar faylni yo'lga ko'chiring:
 ```bash
-mkdir -p ~/.local/bin
-curl -fL -o ~/.local/bin/rail https://github.com/mrdevs2011/rail/releases/latest/download/rail-linux-x86_64
-chmod +x ~/.local/bin/rail
+install -Dm755 target/release/rail ~/.local/bin/rail
 ```
 
 ---
 
-## 🔄 Yangilanish (Update)
+## ⌨️ Asosiy Tugmalar (Keybindings)
 
-Har safar Rail ochilganda yangi versiya tekshiriladi. Bor bo'lsa pastki o'ngda karta chiqadi: "v0.5.1 is out, you are on v0.5.0, 3 versions behind".
-
-- **Update**: yangi versiyani yuklaydi va Rail o'zi qayta ochiladi (tablar joyida).
-- **x**: kartani yopadi, keyingi ochilishda yana eslatadi.
-- Terminaldan: `rail --update`
-
----
-
-## 🏃 Ishga tushirish (Usage)
-
-Terminaldan:
-```bash
-# Yangi oynada bosh sahifa bilan ochish
-rail
-
-# Ma'lum bir manzilni ochish
-rail https://github.com
-```
-
-Yoki ilovalar ro‘yxatidan (Rofi / Wofi / GNOME / KDE) **Rail** deb qidirib ochishingiz mumkin.
-
----
-
-## ⚡ Asosiy imkoniyatlar (Features)
-
-- **Niri-Style 2D Tiling**:
-  - Gorizontal cheksiz lenta (horizontal strip): har bir tab alohida ustun ko‘rinishida.
-  - Har bir ustun ichida vertikal oynalar steki (`Ctrl+V` yoki `Ctrl+Shift+T`).
-  - To‘liq klaviatura orqali boshqaruv (`Ctrl+H/J/K/L`) va oynalarni siljitish (`Ctrl+Shift+H/J/K/L`).
-- **Saqlash izolyatsiyasiga ega Multi-Profile tizimi**:
-  - Har bir profil uchun to‘liq alohida kuki, kesh, localStorage va sessiyalar (`WebKitNetworkSession`).
-  - Profillar menejeri: `Ctrl+P` yoki `Ctrl+Shift+P`.
-  - URL kiritish maydonida dumaloq profil tugmasi orqali tezkor almashtirish.
-- **Responsiv va moslashuvchan dizayn**:
-  - Kichik ekranlar, tor oynalar va yarim ekran (half-screen snapping) holatlarida ham qulay ishlaydi.
-- **Yengil va tezkor**:
-  - Rust + GTK4 + WebKitGTK 6.0 negizida yaratilgan.
-  - Binar fayl hajmi atigi ~500 KB.
-
----
-
-## ⌨️ Klaviatura qisqa klavishlari (Keybindings)
-
-| Klavishlar | Vazifasi |
+| Kombinatsiya | Amal |
 | :--- | :--- |
-| `Ctrl + T` | Omnibar / yangi tab |
-| `Ctrl + L` | Manzil qatori (URL bar) |
+| `Ctrl + T` / `Ctrl + L` | Omnibar / Manzil satri (qidiruv va tezkor buyruqlar) |
 | `Ctrl + W` | Fokusdagi tabni yopish |
-| `Ctrl + R` | Sahifani yangilash (Reload) |
-| `Ctrl + +` / `Ctrl + -` / `Ctrl + 0` | Sahifa masshtabi 20%–500% (overview'da — overview masshtabi), 0 — asl holat |
-| `Alt + F` | To‘liq kenglik / standart kenglik |
-| `Alt + Shift + V` | Yangi ish maydoni (workspace) |
-| `Alt + H` / `Alt + L` | Chap / o‘ng ustunga fokus |
-| `Alt + J` / `Alt + K` | Ustun ichida pastdagi / yuqoridagi oynaga fokus (ustun chetida — pastki / yuqori workspace) |
-| `Alt + [` / `Alt + ]` | **Stack:** oynani chap / o‘ng ustunga yig‘ish, stackdagi oynani chapga / o‘ngga ajratish (niri'dagi `consume-or-expel-window`) |
-| `Alt + Shift + H` / `L` | Butun ustunni chapga / o‘ngga ko‘chirish |
-| `Alt + Shift + J` / `K` | Oynani stack ichida pastga / yuqoriga surish (stack bo‘lmasa — pastki / yuqori workspace'ga) |
-| `Ctrl + Tab` / `Ctrl + Shift + Tab` | Keyingi / oldingi tab (aylanma) |
-| `Ctrl + 1…9` | Joriy qatordagi N-tabga o‘tish (`Ctrl + 9` — oxirgi) |
-| `Alt + 1…9` / `Alt + Shift + 1…9` | N-ish maydoniga o‘tish / tabni shu yerga ko‘chirish |
-| `Alt + O` | Fazoviy Overview (zoom-out) |
-| `Alt + B` | Yon panelni (Sidebar) yashirish/ko‘rsatish |
-| `Alt + M` | Roadmap / Minimap |
-| `Alt + P` / `Alt + I` / `Alt + S` | Profillar / Data & Backup / Sozlamalar |
-| `Alt + Shift + T` | Touchpad kanvas navigatsiyasi |
-| `F12` / `Alt + Shift + D` | DevTools / DevTools joylashuvini almashtirish |
-| `F11` | To‘liq ekran |
-| `Alt + Left` / `Alt + Right` | Orqaga / Oldinga |
+| `Ctrl + R` / `Ctrl + Shift + R` | Sahifani yangilash / Keshsiz qat'iy yangilash |
+| `Alt + H` / `Alt + L` | Chap / o'ng ustunga o'tish |
+| `Alt + J` / `Alt + K` | Ustun ichidagi stekda pastki / yuqori oynaga o'tish |
+| `Alt + Shift + V` | Yangi ish maydoni (workspace) yaratish |
+| `Alt + O` | Fazoviy Overview rejimi (umumiy ko'rinish) |
+| `Alt + P` | Tezkor profillar popover menyusi |
+| `Alt + S` | Tezkor sozlamalar popover menyusi |
+| `Alt + B` | Chap panelni (Sidebar) yashirish yoki ko'rsatish |
+| `F12` | WebKit dasturchi asboblari (DevTools) |
 
-### Dasturchilar uchun tezkor qidiruv
-
-Manzil satrida alias + so'rov yozing: `gh rust async`, `mdn fetch`, `crates serde`, `npm vite`, `docker postgres`, `k8s ingress`. Qo'llab-quvvatlanadigan aliaslar: `gh`/`github`, `ghcode`, `gl`, `mdn`, `so`, `crates`, `docs`, `npm`, `py`/`pypi`, `docker`, `k8s`, `yt`, `r`, `w`, `maps`. Bu odatiy qidiruv tizimini o'zgartirmaydi; to'liq URL va lokal fayl yo'llari avvalgidek ustun turadi.
-| `Ctrl + Q` | Rail'dan chiqish |
-
-Overview ichida: `h` `j` `k` `l` — harakat, `Enter` — ochish, `x` — yopish, `Esc` — bekor qilish.
-Har bir amalga **bitta** shortcut biriktirilgan; xohlasangiz Sozlamalar → Customize → Shortcuts orqali o‘zgartirishingiz mumkin.
 ---
 
-## 🛠 Manba kodidan yig‘ish (Building from Source)
+## 🌐 Til va Mahalliylashtirish (i18n)
 
-Talablar:
-- Rust (Cargo 1.85+)
-- GTK4 development paketlari (`gtk4-devel` yoki `libgtk-4-dev`)
-- WebKitGTK 6.0 development paketlari (`webkitgtk-6.0-devel` yoki `libwebkitgtk-6.0-dev`)
+Rail to'liq 3 ta tilda ishlaydi:
+- **O'zbekcha** (standart)
+- **English**
+- **Русский**
 
+Har bir til interfeys bo'ylab 100% qamrab olingan bo'lib, boshqa til aralashuvi mavjud emas. Tilni brauzer ichidagi sozlamalardan (`Alt+S` → *General*) osongina o'zgartirish mumkin.
+
+---
+
+## 📦 Zaxira va Ko'chirish (Backup & Sync)
+
+Rail barcha ish maydonlari, tablar, hisoblar va kuki fayllarini bitta siqilgan arxivga eksport yoki import qilish imkoniyatini beradi:
+
+```bash
+# Barcha ma'lumotlarni eksport qilish
+rail --export ~/rail_backup.tar.gz
+
+# Ma'lumotlarni qayta tiklash
+rail --import ~/rail_backup.tar.gz
+
+# Saqlash joyi va holat haqida ma'lumot
+rail --data-info
+```
+
+---
+
+## 🌍 English Overview & Quickstart
+
+**Rail** is a modern, keyboard-centric, high-performance Linux web browser engineered in pure Rust with GTK4 and WebKitGTK 6.0 by Uzbek engineer Muhammadrasul Qosimov. It features containerized multi-profile storage isolation, Niri-inspired 2D infinite tiling, zero idle CPU consumption, and resilient self-healing session persistence.
+
+### Quick Build:
 ```bash
 git clone https://github.com/mrdevs2011/rail.git
 cd rail
 cargo build --release
+./target/release/rail
 ```
 
-Yig‘ilgan binar fayl: `target/release/rail`
+---
 
-Qo‘llanma: batafsil holat uchun `STATUS.md` va `ROADMAP.md` fayllariga qarang.
+## 📄 Litsenziya
+
+Loyiha [MIT Litsenziyasi](LICENSE) asosida ochiq manbali tarzda tarqatiladi.

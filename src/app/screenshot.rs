@@ -781,10 +781,10 @@ fn cleanup_screenshot(view: &WebView) {
 fn finish_capture(app: &Rc<App>, tex: &gdk::Texture, to_clipboard: bool) {
     if to_clipboard {
         app.win.clipboard().set_texture(tex);
-        app.show_copied_toast(tr("Nusxalandi!"), tr("Screenshot buferga nusxalandi"));
+        app.show_copied_toast(tr("Copied!"), tr("Screenshot copied to clipboard"));
     } else if let Some(path) = save_texture_png(tex) {
         let name = path.file_name().unwrap_or_default().to_string_lossy();
-        app.show_copied_toast(tr("Saqlandi!"), &format!("Downloads/Rail/{}", name));
+        app.show_copied_toast(tr("Saved!"), &format!("Downloads/Rail/{}", name));
     }
 }
 
