@@ -29,6 +29,7 @@ impl App {
             .unwrap_or(false)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn dt_view(&self) -> Option<WebView> {
         self.focused_view()
     }
@@ -270,8 +271,8 @@ impl App {
 
         if let Some(w) = insp.web_view() {
             let widget: gtk::Widget = w.upcast();
-            if let Some(v_box) = win.child().and_then(|c| c.downcast::<gtk::Box>().ok()) {
-                if widget.parent().as_ref() != Some(v_box.upcast_ref()) {
+            if let Some(v_box) = win.child().and_then(|c| c.downcast::<gtk::Box>().ok())
+                && widget.parent().as_ref() != Some(v_box.upcast_ref()) {
                     if widget.parent().is_some() {
                         widget.unparent();
                     }
@@ -282,7 +283,6 @@ impl App {
                     widget.set_vexpand(true);
                     v_box.append(&widget);
                 }
-            }
         }
 
         win.present();
@@ -369,13 +369,13 @@ impl App {
             save_app_settings(&st);
         }
 
-        if let Some(view) = self.focused_view() {
-            if prev != side || !self.devtools_open() {
+        if let Some(view) = self.focused_view()
+            && (prev != side || !self.devtools_open()) {
                 self.show_view_devtools(&view);
             }
-        }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn hide_devtools_impl(&self, close_inspector: bool) {
         if let Some(view) = self.focused_view() {
             if close_inspector {

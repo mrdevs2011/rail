@@ -15,8 +15,8 @@ pub(crate) struct DownloadEntry {
 }
 
 thread_local! {
-    pub(crate) static DOWNLOADS: RefCell<Vec<DownloadEntry>> = RefCell::new(Vec::new());
-    pub(crate) static DOWNLOAD_SEQ: Cell<u64> = Cell::new(1);
+    pub(crate) static DOWNLOADS: RefCell<Vec<DownloadEntry>> = const { RefCell::new(Vec::new()) };
+    pub(crate) static DOWNLOAD_SEQ: Cell<u64> = const { Cell::new(1) };
 }
 
 pub(crate) fn downloads_json_path() -> PathBuf {
@@ -24,7 +24,7 @@ pub(crate) fn downloads_json_path() -> PathBuf {
 }
 
 pub(crate) fn load_downloads_from_disk() {
-    let Ok(text) = std::fs::read_to_string(downloads_json_path()) else {
+    let Some(text) = crate::storage::read_with_auto_healing(downloads_json_path(), |t| !t.trim().is_empty()) else {
         return;
     };
     // Simple line format: id\tstatus\tfilename\tpath\turl
@@ -74,7 +74,7 @@ pub(crate) fn save_downloads_to_disk() {
                 e.id, e.status, e.filename, e.path, e.url
             ));
         }
-        let _ = std::fs::write(downloads_json_path(), out);
+        let _ = crate::storage::atomic_write_with_backup(downloads_json_path(), &out);
     });
 }
 

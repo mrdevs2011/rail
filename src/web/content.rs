@@ -158,7 +158,7 @@ pub(crate) const DEFAULT_HTML_CSS: &str = r###"/* ==============================
 
 thread_local! {
     pub(crate) static STYLE_MANAGERS: RefCell<Vec<glib::WeakRef<webkit6::UserContentManager>>> =
-        RefCell::new(Vec::new());
+        const { RefCell::new(Vec::new()) };
     /// Compiled ad & tracker rules; `None` until compiled or when blocking is off.
     pub(crate) static ADBLOCK_FILTER: RefCell<Option<webkit6::UserContentFilter>> = const { RefCell::new(None) };
 }

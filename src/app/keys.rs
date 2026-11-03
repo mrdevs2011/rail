@@ -135,11 +135,10 @@ impl App {
             "new_tab" => self.open_new_tab_palette(),
             "focus_url" => self.show_palette(),
             "close_tab" => {
-                if !self.palette_open() {
-                    if let Some(v) = self.focused_view() {
+                if !self.palette_open()
+                    && let Some(v) = self.focused_view() {
                         self.close_view(&v);
                     }
-                }
             }
             "reload" => {
                 if let Some(v) = self.focused_view() {

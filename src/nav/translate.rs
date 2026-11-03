@@ -241,16 +241,16 @@ fn rebuild_url(host: &str, u: &glib::Uri, extra: &[(&str, &str)]) -> String {
         out.push('?');
         out.push_str(&pairs.join("&"));
     }
-    if let Some(f) = u.fragment() {
-        if !f.is_empty() {
+    if let Some(f) = u.fragment()
+        && !f.is_empty() {
             out.push('#');
             out.push_str(&f);
         }
-    }
     out
 }
 
 /// Page already served through Google Translate.
+#[allow(dead_code)]
 pub(crate) fn is_translated_uri(uri: &str) -> bool {
     glib::Uri::parse(uri, glib::UriFlags::NONE)
         .ok()

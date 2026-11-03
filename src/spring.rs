@@ -15,8 +15,10 @@ pub const SLIDE_DAMPING_RATIO: f64 = 1.0;
 pub const SLIDE_STIFFNESS: f64 = 2200.0;
 
 /// Touchpad deceleration used to project where a flick would stop (niri: 0.997 per ms).
+#[allow(dead_code)]
 const DECELERATION_TOUCHPAD: f64 = 0.997;
 /// Only this much recent history is used to measure the release velocity.
+#[allow(dead_code)]
 const HISTORY_SECS: f64 = 0.150;
 
 #[derive(Debug, Clone, Copy)]
@@ -88,15 +90,18 @@ impl Spring {
 }
 
 /// Distance a swipe released at `velocity` (px/s) keeps travelling before it would stop.
+#[allow(dead_code)]
 pub fn coast_distance(velocity: f64) -> f64 {
     -velocity / (1000.0 * DECELERATION_TOUCHPAD.ln())
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct SwipeTracker {
     history: VecDeque<(f64, f64)>, // (delta, time in seconds)
 }
 
+#[allow(dead_code)]
 impl SwipeTracker {
     pub fn new() -> Self {
         Self::default()
@@ -108,11 +113,10 @@ impl SwipeTracker {
 
     /// Adds a reading. Timestamps that go backwards are ignored.
     pub fn push(&mut self, delta: f64, t: f64) {
-        if let Some(&(_, last)) = self.history.back() {
-            if t < last {
+        if let Some(&(_, last)) = self.history.back()
+            && t < last {
                 return;
             }
-        }
         self.history.push_back((delta, t));
         while let Some(&(_, first)) = self.history.front() {
             if t <= first + HISTORY_SECS {

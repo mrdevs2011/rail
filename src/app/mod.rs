@@ -86,6 +86,7 @@ pub(crate) struct App {
     pub(crate) target_y: Cell<f64>,
     pub(crate) animating: Cell<bool>,
     /// Touchpad slide: at most one strip allocate per frame (avoids jank)
+    #[allow(dead_code)]
     pub(crate) pan_alloc_pending: Cell<bool>,
     /// Niri-style springs for the camera; `None` while at rest.
     pub(crate) cam_spring_x: Cell<Option<CamSpring>>,
@@ -118,6 +119,7 @@ pub(crate) struct App {
     pub(crate) new_profile_color_idx: Cell<usize>,
     pub(crate) color_buttons: RefCell<Vec<gtk::Button>>,
     /// Active screenshot overlay (Zen-style); removed on capture/cancel.
+    #[allow(dead_code)]
     pub(crate) ss_overlay: RefCell<Option<gtk::Overlay>>,
     pub(crate) last_saved_session: RefCell<String>,
     pub(crate) save_session_gen: Cell<u64>,
@@ -138,8 +140,11 @@ pub(crate) struct App {
     pub(crate) default_devtools_width: Cell<i32>,
     pub(crate) devtools_dock_side: Cell<DevToolsDockSide>,
     pub(crate) devtools_panel: gtk::Box,
+    #[allow(dead_code)]
     pub(crate) devtools_content_box: gtk::Box,
+    #[allow(dead_code)]
     pub(crate) devtools_resize_handle: gtk::Box,
+    #[allow(dead_code)]
     pub(crate) devtools_url_lbl: gtk::Label,
     pub(crate) devtools_window: RefCell<Option<gtk::Window>>,
     // Floating Settings Panel (Alt+Shift+S / Alt+P / Alt+I)

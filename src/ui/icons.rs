@@ -50,20 +50,18 @@ fn png_path(name: &str) -> Option<std::path::PathBuf> {
 
 /// Load a named icon: prefers `icons/png/{name}.png` if present, else `icons/svg/{name}.svg`.
 pub(crate) fn load_icon(name: &str, size: i32) -> gtk::Image {
-    if let Some(path) = png_path(name) {
-        if let Ok(tex) = gdk::Texture::from_filename(&path) {
+    if let Some(path) = png_path(name)
+        && let Ok(tex) = gdk::Texture::from_filename(&path) {
             let img = gtk::Image::from_paintable(Some(&tex));
             img.set_pixel_size(size);
             return img;
         }
-    }
-    if let Some(bytes) = svg_data(name) {
-        if let Ok(tex) = gdk::Texture::from_bytes(&glib::Bytes::from_static(bytes)) {
+    if let Some(bytes) = svg_data(name)
+        && let Ok(tex) = gdk::Texture::from_bytes(&glib::Bytes::from_static(bytes)) {
             let img = gtk::Image::from_paintable(Some(&tex));
             img.set_pixel_size(size);
             return img;
         }
-    }
     let img = gtk::Image::from_icon_name("image-missing");
     img.set_pixel_size(size);
     img
@@ -124,6 +122,7 @@ pub(crate) fn load_search_engine_icon(engine: &str, size: i32) -> gtk::Image {
     load_icon(canonical_search_engine(engine), size)
 }
 
+#[allow(dead_code)]
 pub(crate) fn create_google_icon(size: i32) -> gtk::Image {
     load_icon("google", size)
 }

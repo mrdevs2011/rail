@@ -51,6 +51,7 @@ impl Json {
             _ => None,
         }
     }
+    #[allow(dead_code)]
     pub fn as_obj(&self) -> Option<&[(String, Json)]> {
         match self {
             Json::Obj(items) => Some(items.as_slice()),

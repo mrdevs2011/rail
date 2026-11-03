@@ -321,7 +321,7 @@ pub(crate) fn encode(data: &[u8]) -> Option<Qr> {
     }
     let term = (cap - bits.len()).min(4);
     push_bits(&mut bits, 0, term);
-    while bits.len() % 8 != 0 {
+    while !bits.len().is_multiple_of(8) {
         bits.push(false);
     }
     let mut pad = 0xECu32;

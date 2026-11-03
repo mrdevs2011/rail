@@ -20,7 +20,7 @@ pub(crate) fn wire_close(app: &Rc<App>, win: gtk::ApplicationWindow) {
 
     {
         // Ko'rinmagan tablarni uxlatish (split da yonma-yon ko'rinib turgan tab uxlamaydi)
-        let weak = Rc::downgrade(&app);
+        let weak = Rc::downgrade(app);
         glib::timeout_add_local(Duration::from_secs(15), move || match weak.upgrade() {
             Some(a) => {
                 a.suspend_hidden_tabs();
@@ -35,7 +35,7 @@ pub(crate) fn wire_close(app: &Rc<App>, win: gtk::ApplicationWindow) {
 
     {
         // Main-loop watchdog: a 100 ms timer that fires late means the UI thread was blocked.
-        let weak = Rc::downgrade(&app);
+        let weak = Rc::downgrade(app);
         let last = Rc::new(Cell::new(std::time::Instant::now()));
         // Jank counter: late-fire buckets (>16/33/100 ms) summarised once a minute in jank.log.
         let jank = Rc::new(RefCell::new(jank::Jank::new()));

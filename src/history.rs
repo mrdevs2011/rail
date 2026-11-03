@@ -86,17 +86,10 @@ fn write_rows(path: &PathBuf, mut rows: Vec<Row>) {
     });
     let mut out = String::new();
     for (url, title, count, last) in rows.into_iter().take(2000) {
-        let clean_title = title.replace('\t', " ").replace('\n', " ");
+        let clean_title = title.replace(['\t', '\n'], " ");
         out.push_str(&format!("{}\t{}\t{}\t{}\n", url, clean_title, count, last));
     }
-    let tmp = path.with_extension("txt.tmp");
-    if fs::write(&tmp, &out).is_ok() {
-        if fs::rename(&tmp, path).is_err() {
-            let _ = fs::write(path, &out);
-        }
-    } else {
-        let _ = fs::write(path, &out);
-    }
+    let _ = crate::storage::atomic_write_with_backup(path, &out);
 }
 
 impl DiskWriter {
@@ -195,7 +188,9 @@ impl HistoryManager {
     }
 
     fn load(&mut self) {
-        if let Ok(content) = fs::read_to_string(&self.file_path) {
+        if let Some(content) =
+            crate::storage::read_with_auto_healing(&self.file_path, |c| !c.is_empty())
+        {
             for line in content.lines() {
                 let parts: Vec<&str> = line.split('\t').collect();
                 if parts.len() >= 4 {
@@ -303,7 +298,7 @@ impl HistoryManager {
 
     pub fn get_all_sorted(&self) -> Vec<HistoryEntry> {
         let mut list: Vec<HistoryEntry> = self.entries.values().cloned().collect();
-        list.sort_by(|a, b| b.last_visit.cmp(&a.last_visit));
+        list.sort_by_key(|a| std::cmp::Reverse(a.last_visit));
         list
     }
 
@@ -421,7 +416,7 @@ impl HistoryManager {
         }
 
         // Sort by score descending
-        candidates.sort_by(|a, b| b.score.cmp(&a.score));
+        candidates.sort_by_key(|a| std::cmp::Reverse(a.score));
 
         let mut results: Vec<HistorySuggestion> = candidates
             .into_iter()
@@ -455,11 +450,10 @@ impl HistoryManager {
         {
             let mut cache = self.suggest_cache.borrow_mut();
             let mut order = self.suggest_cache_order.borrow_mut();
-            if cache.len() >= SUGGEST_CACHE_CAP {
-                if let Some(oldest) = order.pop_front() {
+            if cache.len() >= SUGGEST_CACHE_CAP
+                && let Some(oldest) = order.pop_front() {
                     cache.remove(&oldest);
                 }
-            }
             cache.insert(raw_q.to_string(), results.clone());
             order.push_back(raw_q.to_string());
         }

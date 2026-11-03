@@ -37,18 +37,17 @@ impl App {
         revealer.set_reveal_child(true);
 
         let revealer_c = revealer.clone();
-        let close = move || {
+        
+        move || {
             revealer_c.set_reveal_child(false);
             let r = revealer_c.clone();
             glib::timeout_add_local_once(std::time::Duration::from_millis(200), move || {
-                if let Some(parent) = r.parent() {
-                    if let Ok(overlay) = parent.downcast::<gtk::Overlay>() {
+                if let Some(parent) = r.parent()
+                    && let Ok(overlay) = parent.downcast::<gtk::Overlay>() {
                         overlay.remove_overlay(&r);
                     }
-                }
             });
-        };
-        close
+        }
     }
 
     pub(crate) fn show_script_dialog(self: &Rc<Self>, view: &WebView, dialog: &ScriptDialog) {
@@ -245,8 +244,8 @@ impl App {
         menu.remove_all();
 
         // 1. Link items
-        if is_link {
-            if let Some(uri) = &link_uri {
+        if is_link
+            && let Some(uri) = &link_uri {
                 let uri_t = uri.clone();
                 let app_t = self.clone();
                 let act_tab = gio::SimpleAction::new("ctx-open-tab", None);
@@ -294,11 +293,10 @@ impl App {
 
                 menu.append(&ContextMenuItem::new_separator());
             }
-        }
 
         // 2. Image items
-        if is_image {
-            if let Some(img_url) = &image_uri {
+        if is_image
+            && let Some(img_url) = &image_uri {
                 let img_t = img_url.clone();
                 let app_t = self.clone();
                 let act_img = gio::SimpleAction::new("ctx-open-img", None);
@@ -338,7 +336,6 @@ impl App {
 
                 menu.append(&ContextMenuItem::new_separator());
             }
-        }
 
         // 3. Media items
         if is_media {
@@ -624,6 +621,7 @@ impl App {
         true
     }
 
+    #[allow(clippy::type_complexity)]
     fn show_permission_popup(
         self: &Rc<Self>,
         host: String,
@@ -650,8 +648,6 @@ impl App {
         vbox.append(&msg_lbl);
 
         let done = Rc::new(Cell::new(false));
-        let req_close = req.clone();
-        let done_close = done.clone();
         let closer_slot: Rc<RefCell<Option<Box<dyn Fn()>>>> = Rc::new(RefCell::new(None));
         let finish = {
             let done = done.clone();

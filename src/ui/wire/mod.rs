@@ -18,4 +18,3 @@ pub(crate) use minimap::*;
 pub(crate) use palette::*;
 pub(crate) use settings::*;
 pub(crate) use sidebar_header::*;
-pub(crate) use toast::*;

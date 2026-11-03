@@ -97,6 +97,7 @@ mod imp {
         pub on_resize: RefCell<Option<Rc<dyn Fn()>>>,
         /// Called with (child, now_visible) right BEFORE a column is hidden (so the app can grab a last
         /// frame) and right after it is shown again.
+        #[allow(clippy::type_complexity)]
         pub on_visibility: RefCell<Option<Rc<dyn Fn(&gtk::Widget, bool)>>>,
         /// For each row: list of is_full flags for each column
         pub grid: RefCell<Vec<Vec<bool>>>,
@@ -147,28 +148,24 @@ mod imp {
             }
             let (mx, my) = (vw * 0.25, vh * 0.25);
             let mut vis = x + w > -mx && x < vw + mx && y + h > -my && y < vh + my;
-            if !vis {
-                if let Some(f) = focus {
-                    if f == c || f.is_ancestor(c) {
+            if !vis
+                && let Some(f) = focus
+                    && (f == c || f.is_ancestor(c)) {
                         vis = true;
                     }
-                }
-            }
             if vis == c.is_child_visible() {
                 return;
             }
             let cb = self.on_visibility.borrow().clone();
-            if !vis {
-                if let Some(cb) = &cb {
+            if !vis
+                && let Some(cb) = &cb {
                     cb(c, false);
                 }
-            }
             c.set_child_visible(vis);
-            if vis {
-                if let Some(cb) = &cb {
+            if vis
+                && let Some(cb) = &cb {
                     cb(c, true);
                 }
-            }
         }
     }
 
@@ -185,11 +182,10 @@ mod imp {
         fn allocate(&self, widget: &gtk::Widget, width: i32, height: i32, _baseline: i32) {
             let resized =
                 self.width.replace(width) != width || self.height.replace(height) != height;
-            if resized {
-                if let Some(cb) = self.on_resize.borrow().clone() {
+            if resized
+                && let Some(cb) = self.on_resize.borrow().clone() {
                     glib::idle_add_local_once(move || cb());
                 }
-            }
             let vw = width as f64;
             let vh = height as f64;
             let (off_x, off_y, z) = (self.offset_x.get(), self.offset_y.get(), self.zoom.get());
@@ -296,9 +292,9 @@ mod imp {
                         }
                     }
                     let mut y_off = 0.0f64;
-                    for j in 0..len {
+                    for &h_val in hs.iter().take(len) {
                         let Some(c) = child else { break };
-                        let ch_f = if len == 1 { vh } else { hs[j] };
+                        let ch_f = if len == 1 { vh } else { h_val };
                         let tx = ((col_x - off_x) * z) as f32;
                         let ty = ((row_y + y_off - off_y) * z) as f32;
                         let t = gsk::Transform::new()
@@ -427,11 +423,10 @@ impl StripLayout {
         for (r_idx, target_row) in target.iter().enumerate() {
             if let Some(cur_row) = current.get(r_idx) {
                 for (c_idx, &t_val) in target_row.iter().enumerate() {
-                    if let Some(&c_val) = cur_row.get(c_idx) {
-                        if (c_val - t_val).abs() > 0.002 {
+                    if let Some(&c_val) = cur_row.get(c_idx)
+                        && (c_val - t_val).abs() > 0.002 {
                             return true;
                         }
-                    }
                 }
             }
         }
@@ -446,8 +441,8 @@ impl StripLayout {
         for (r_idx, target_row) in target.iter().enumerate() {
             if let Some(cur_row) = current.get_mut(r_idx) {
                 for (c_idx, &t_val) in target_row.iter().enumerate() {
-                    if let Some(c_val) = cur_row.get_mut(c_idx) {
-                        if (*c_val - t_val).abs() > 0.002 {
+                    if let Some(c_val) = cur_row.get_mut(c_idx)
+                        && (*c_val - t_val).abs() > 0.002 {
                             *c_val += (t_val - *c_val) * k;
                             if (*c_val - t_val).abs() <= 0.002 {
                                 *c_val = t_val;
@@ -455,7 +450,6 @@ impl StripLayout {
                                 still_animating = true;
                             }
                         }
-                    }
                 }
             }
         }

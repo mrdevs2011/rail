@@ -72,16 +72,16 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
         }
         return format!("file://{s}");
     }
-    if s.starts_with("~/") {
+    if let Some(rest) = s.strip_prefix("~/") {
         let home = glib::home_dir();
-        let full = home.join(&s[2..]);
+        let full = home.join(rest);
         if let Ok(uri) = glib::filename_to_uri(&full, None) {
             return uri.to_string();
         }
-        return format!("file://{}/{}", home.display(), &s[2..]);
+        return format!("file://{}/{}", home.display(), rest);
     }
-    if s.starts_with("./") || s.starts_with("../") {
-        if let Ok(cur) = std::env::current_dir() {
+    if (s.starts_with("./") || s.starts_with("../"))
+        && let Ok(cur) = std::env::current_dir() {
             let full = cur.join(s);
             let target = std::fs::canonicalize(&full).unwrap_or(full);
             if let Ok(uri) = glib::filename_to_uri(&target, None) {
@@ -89,7 +89,6 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
             }
             return format!("file://{}", target.display());
         }
-    }
 
     // Check if `s` exists directly on the filesystem (e.g. "analyze.py", "index.html")
     let direct_path = std::path::Path::new(s);
@@ -184,12 +183,12 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
                 .split('.')
                 .nth(1)
                 .and_then(|n| n.parse::<u8>().ok())
-                .map_or(false, |b| (16..=31).contains(&b)))
+                .is_some_and(|b| (16..=31).contains(&b)))
         || (s.contains(':')
             && !s.contains(' ')
             && s.split(':')
                 .nth(1)
-                .map_or(false, |p| p.chars().all(|c| c.is_ascii_digit())))
+                .is_some_and(|p| p.chars().all(|c| c.is_ascii_digit())))
     {
         return format!("http://{s}");
     }

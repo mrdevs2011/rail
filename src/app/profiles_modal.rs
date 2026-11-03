@@ -122,8 +122,8 @@ impl App {
                         .clamp(0, (total_profiles - 1) as isize)
                         as usize;
 
-                    if target_idx != from_idx {
-                        if app_end
+                    if target_idx != from_idx
+                        && app_end
                             .profiles
                             .borrow_mut()
                             .reorder_profile(from_idx, target_idx)
@@ -135,7 +135,6 @@ impl App {
                                 a.refresh_sidebar();
                             });
                         }
-                    }
                 });
 
                 drag_handle.add_controller(drag);

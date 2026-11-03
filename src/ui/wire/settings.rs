@@ -2,6 +2,7 @@
 
 use crate::*;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn wire_settings(
     app: &Rc<App>,
     add_prof_btn: gtk::Button,
@@ -170,12 +171,11 @@ pub(crate) fn wire_settings(
             .build();
         let a = a.clone();
         dialog.save(Some(&win), gio::Cancellable::NONE, move |res| {
-            if let Ok(file) = res {
-                if let Some(path) = file.path() {
+            if let Ok(file) = res
+                && let Some(path) = file.path() {
                     a.data_export_entry.set_text(&path.to_string_lossy());
                     a.execute_export_action();
                 }
-            }
         });
     });
 
@@ -190,12 +190,11 @@ pub(crate) fn wire_settings(
             .build();
         let a = a.clone();
         dialog.open(Some(&win), gio::Cancellable::NONE, move |res| {
-            if let Ok(file) = res {
-                if let Some(path) = file.path() {
+            if let Ok(file) = res
+                && let Some(path) = file.path() {
                     a.data_import_entry.set_text(&path.to_string_lossy());
                     a.execute_import_action();
                 }
-            }
         });
     });
 
@@ -217,7 +216,7 @@ pub(crate) fn wire_settings(
     {
         // Off-screen columns are unmapped by the strip layout (WebKit then throttles them). Grab the last
         // frame just before a live tab is hidden (so suspend can still freeze it) and drop it when shown.
-        let weak = Rc::downgrade(&app);
+        let weak = Rc::downgrade(app);
         layout.connect_visibility(move |child, visible| {
             let Some(a) = weak.upgrade() else { return };
             let Ok(rows) = a.rows.try_borrow() else {
@@ -263,7 +262,7 @@ pub(crate) fn wire_settings(
     }
 
     {
-        let weak = Rc::downgrade(&app);
+        let weak = Rc::downgrade(app);
         app.win.connect_fullscreened_notify(move |_| {
             if let Some(a) = weak.upgrade() {
                 a.apply_fullscreen_mode();

@@ -29,6 +29,9 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
             if paste_app.try_paste_image() {
                 return glib::Propagation::Stop;
             }
+            if paste_app.try_paste_files() {
+                return glib::Propagation::Stop;
+            }
         }
         glib::Propagation::Proceed
     });
@@ -51,11 +54,10 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
                 gdk::Key::Down => Some("win_down"),
                 _ => None,
             };
-            if let Some(action) = action {
-                if nav_app.run_action(action) {
+            if let Some(action) = action
+                && nav_app.run_action(action) {
                     return glib::Propagation::Stop;
                 }
-            }
         }
         glib::Propagation::Proceed
     });

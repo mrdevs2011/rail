@@ -407,8 +407,8 @@ impl App {
         let vw = self.strip.width() as f64;
         let clamped = width.clamp(280.0, vw);
         let rows = self.rows.borrow();
-        if let Some(row) = rows.get(r) {
-            if let Some(tab) = row.tabs.get(c) {
+        if let Some(row) = rows.get(r)
+            && let Some(tab) = row.tabs.get(c) {
                 tab.custom_width.set(Some(clamped));
                 if (clamped - vw).abs() < 10.0 {
                     tab.container.add_css_class("full");
@@ -416,7 +416,6 @@ impl App {
                     tab.container.remove_css_class("full");
                 }
             }
-        }
         drop(rows);
         self.layout.set_column_width(r, c, Some(clamped));
         self.strip.queue_allocate();

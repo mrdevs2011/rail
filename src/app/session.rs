@@ -3,7 +3,7 @@
 use crate::*;
 
 impl App {
-    pub(crate) fn save_session_internal(&self, sync: bool) {
+    pub(crate) fn save_session_internal(&self, _sync: bool) {
         let rows = self.rows.borrow();
         let total_tabs: usize = rows.iter().map(|r| r.tabs.len()).sum();
         let dir = rail_data_dir();
@@ -15,6 +15,7 @@ impl App {
             *self.last_saved_session.borrow_mut() = String::new();
             let _ = std::fs::remove_file(&path);
             let _ = std::fs::remove_file(&temp_path);
+            let _ = std::fs::remove_file(backup_path(&path));
             return;
         }
 
@@ -65,24 +66,8 @@ impl App {
             return;
         }
 
-        // Atomic write via temp file + atomic rename
-        let write_ok = if let Ok(mut file) = std::fs::File::create(&temp_path) {
-            use std::io::Write;
-            if file.write_all(out.as_bytes()).is_ok() {
-                if sync {
-                    let _ = file.sync_all(); // Flush physical hardware to SSD before exit / reboot
-                }
-                std::fs::rename(&temp_path, &path).is_ok()
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        if !write_ok {
-            let _ = std::fs::write(&path, &out);
-        }
+        // Atomic write via temp file + atomic rename + backup
+        let _ = atomic_write_with_backup(&path, &out);
 
         *self.last_saved_session.borrow_mut() = out;
     }
@@ -106,7 +91,9 @@ impl App {
 
     pub(crate) fn restore_session(self: &Rc<Self>) -> bool {
         let path = rail_data_dir().join("session.txt");
-        let Ok(content) = std::fs::read_to_string(path) else {
+        let Some(content) =
+            read_with_auto_healing(&path, |c| !parse_session_content(c).tabs.is_empty())
+        else {
             return false;
         };
         let state = parse_session_content(&content);
@@ -232,12 +219,11 @@ impl App {
         let mut stacked = state.stacked.clone();
         stacked.sort();
         for (sr, sc) in stacked {
-            if let Some(row) = rows.get(sr) {
-                if sc > 0 && sc < row.tabs.len() {
+            if let Some(row) = rows.get(sr)
+                && sc > 0 && sc < row.tabs.len() {
                     let id = row.tabs[sc - 1].col_id.get();
                     row.tabs[sc].col_id.set(id);
                 }
-            }
         }
         drop(rows);
 

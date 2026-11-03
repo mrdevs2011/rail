@@ -70,11 +70,10 @@ pub(crate) fn wire_palette(app: &Rc<App>, entry: gtk::Entry, pill: gtk::Button) 
                     return glib::Propagation::Stop;
                 }
             }
-            gdk::Key::Tab => {
-                if a.accept_autofill_or_next_suggestion() {
+            gdk::Key::Tab
+                if a.accept_autofill_or_next_suggestion() => {
                     return glib::Propagation::Stop;
                 }
-            }
             _ => {}
         }
         glib::Propagation::Proceed

@@ -76,7 +76,7 @@ pub(crate) fn sc_open_picker(
     pop.set_parent(&ui.picker_host);
     pop.set_position(gtk::PositionType::Bottom);
     // Point at the button the user clicked
-    if let Some(p) = anchor.compute_bounds(&ui.picker_host) {
+    if let Some(_p) = anchor.compute_bounds(&ui.picker_host) {
         // popover relative to host is fine; MenuButton-style is simpler:
     }
     let _ = anchor; // anchor via set_parent of a transient
@@ -155,8 +155,8 @@ pub(crate) fn sc_commit(ui: &ScUi) {
         apply_shortcut_priority();
         sc_refresh_bound();
         MAIN_APP.with(|slot| {
-            if let Some(app) = slot.borrow().as_ref() {
-                if let Ok(rows) = app.rows.try_borrow() {
+            if let Some(app) = slot.borrow().as_ref()
+                && let Ok(rows) = app.rows.try_borrow() {
                     for row in rows.iter() {
                         for tab in &row.tabs {
                             let uri = tab.view.uri().map(|u| u.to_string()).unwrap_or_default();
@@ -168,7 +168,6 @@ pub(crate) fn sc_commit(ui: &ScUi) {
                         }
                     }
                 }
-            }
         });
     } else {
         ui.status
@@ -361,16 +360,14 @@ pub(crate) fn sc_build(ui: &ScUi) {
                 ui2.is_syncing.set(false);
                 sc_commit(&ui2);
                 // Update opacity without full rebuild
-                if let Some(parent) = s.parent() {
-                    if let Some(boxp) = parent.downcast_ref::<gtk::Box>() {
-                        if let Some(lab) = boxp
+                if let Some(parent) = s.parent()
+                    && let Some(boxp) = parent.downcast_ref::<gtk::Box>()
+                        && let Some(lab) = boxp
                             .first_child()
                             .and_then(|w| w.downcast::<gtk::Label>().ok())
                         {
                             lab.set_opacity(if is_on { 1.0 } else { 0.45 });
                         }
-                    }
-                }
             });
         }
         row.append(&sw);
@@ -397,7 +394,7 @@ pub(crate) fn sc_build(ui: &ScUi) {
                 if ui3.is_syncing.get() {
                     return;
                 }
-                let n = ((sel.get() + 1) % SC_MODS.len() as u32);
+                let n = (sel.get() + 1) % SC_MODS.len() as u32;
                 sel.set(n);
                 mod_btn2.set_label(SC_MODS[n as usize]);
                 let is_f = key.len() >= 2

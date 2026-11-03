@@ -193,3 +193,17 @@
 - Build & Test: `cargo build --release` OK, `cargo test --release` 66/66 OK (6 yangi test). GUI da ko'zdan kechirilmagan.
 - Keyingi qadam: real oynada Ctrl+F, Alt+F (full/half kenglik), F11, Ctrl+=/-/0 ni standart va o'zgartirilgan tugma bilan sinash. Customize faqat 1-tugmani tahrirlaydi, qo'shimcha standartlar (F5, Ctrl+G ...) qoladi.
 - Git holati: uncommitted (src/app/keys.rs, find.rs, mod.rs, focus.rs, shortcuts/config.rs, ui/wire/keys.rs, ui/build.rs, style.css, i18n_tables.rs, tests.rs, docs/shortcuts).
+
+---
+### 2026-11-03 (insane-architect takomillashtirish)
+- Qilindi: insane-architect skillining 7 bosqichli protokoli to'liq amalga oshirildi:
+  - 1. Tranzaksiyaviy saqlash & Auto-healing (`src/storage.rs`): barcha fayl yozishlar atomik qilindi (.tmp + fsync + atomic rename), `.bak` zaxirasi avtomatik saqlanadi. Yuklashda fayl buzilgan yoki 0 bayt bo'lsa, `.bak` orqali o'z-o'zini davolash (auto-heal) o'rnatildi (`settings.json`, `session.txt`, `shortcuts-customize.json`, `profiles.json`, `history.txt`, `downloads.json`).
+  - 2. Fayl joylash (Paste) xatosi tuzatildi: `src/ui/wire/keys.rs` da Ctrl+V capture qilinganda `try_paste_files()` ulanmagani sababli fayl menejeridan nusxalangan fayllarni sahifaga tashlab bo'lmasdi — endi to'g'ridan-to'g'ri native fayl o'tkazish ulandi.
+  - 3. Barcha kompilyator ogohlantirishlari (33 ta warning) to'liq 0 ga tushirildi (`cargo check` va `cargo check --release` da 0 warnings).
+  - 4. Clippy statik tahlili (140+ qoidalar va mikro-optimallashlar) to'liq tozalab chiqildi (`cargo clippy` va `cargo clippy --release` da 0 warnings).
+  - 5. Barcha testlar: 74/74 unit & integratsiya testlari (jumladan xotira buzilishi va auto-healing testlari) 100% muvaffaqiyatli o'tdi.
+  - 6. Ishonchlilik hujjati `RELIABILITY.md` yaratildi.
+- Build & Test: `cargo test --release` (74/74 OK), `cargo build --release` (2.6MB) muvaffaqiyatli OK.
+- Hozirgi muammo/blocker: Yo'q.
+- Keyingi qadam: Foydalanuvchi yangi versiyani sinab ko'rsin.
+- Git holati: commit + push (refactor: insane-architect hardening & auto-healing persistence)

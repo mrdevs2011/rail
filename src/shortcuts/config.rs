@@ -22,7 +22,7 @@ macro_rules! sc {
 pub(crate) const SC_LOCKED: &[&str] = &["win_left", "win_right", "win_up", "win_down"];
 
 pub(crate) fn sc_is_locked(id: &str) -> bool {
-    SC_LOCKED.iter().any(|x| *x == id)
+    SC_LOCKED.contains(&id)
 }
 
 pub(crate) const G_TABS: &str = "Tabs & Workspaces";
@@ -218,9 +218,9 @@ pub(crate) enum ScResolve {
 
 thread_local! {
     pub(crate) static SHORTCUTS: RefCell<ShortcutConfig> = RefCell::new(ShortcutConfig::default());
-    pub(crate) static KEY_CTL: RefCell<Option<gtk::EventControllerKey>> = RefCell::new(None);
+    pub(crate) static KEY_CTL: RefCell<Option<gtk::EventControllerKey>> = const { RefCell::new(None) };
     /// The one running Rail window state: a second `rail [URL]` launch is forwarded here.
-    pub(crate) static MAIN_APP: RefCell<Option<Rc<App>>> = RefCell::new(None);
+    pub(crate) static MAIN_APP: RefCell<Option<Rc<App>>> = const { RefCell::new(None) };
 }
 
 pub(crate) fn shortcuts_path() -> PathBuf {
@@ -237,7 +237,7 @@ pub(crate) fn reload_customize_from_disk() {
 
 pub(crate) fn load_shortcuts_config() -> ShortcutConfig {
     let mut cfg = ShortcutConfig::default();
-    let Ok(text) = std::fs::read_to_string(shortcuts_path()) else {
+    let Some(text) = read_with_auto_healing(shortcuts_path(), |t| minijson::parse(t).is_some()) else {
         return cfg;
     };
     let Some(root) = minijson::parse(&text) else {
@@ -314,10 +314,7 @@ pub(crate) fn save_shortcuts_config(cfg: &ShortcutConfig) -> bool {
     }
     out.push_str("  }\n}\n");
     let path = shortcuts_path();
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    std::fs::write(path, out).is_ok()
+    atomic_write_with_backup(path, &out).is_ok()
 }
 
 pub(crate) fn sc_effective(def: &ShortcutDef, cfg: &ShortcutConfig) -> Vec<String> {
@@ -395,7 +392,7 @@ pub(crate) fn sc_set_slot(
     // Reserved combos of locked shortcuts cannot be stolen.
     for locked in SHORTCUT_DEFS.iter().filter(|d| sc_is_locked(d.id)) {
         if sc_effective(locked, cfg).iter().any(|c| c == combo) {
-            return Err(trf("{} is reserved and cannot be reassigned.", &[&combo]));
+            return Err(trf("{} is reserved and cannot be reassigned.", &[combo]));
         }
     }
     for other in SHORTCUT_DEFS {
@@ -546,14 +543,14 @@ pub(crate) fn shortcut_combo(
         return None;
     }
     let mut label: Option<String> = None;
-    if let Some(display) = gdk::Display::default() {
-        if let Some(entries) = display.map_keycode(keycode) {
+    if let Some(display) = gdk::Display::default()
+        && let Some(entries) = display.map_keycode(keycode) {
             for (kk, k) in entries.iter() {
                 if kk.level() != 0 {
                     continue;
                 }
-                if let Some(c) = k.to_unicode() {
-                    if c.is_ascii_graphic() {
+                if let Some(c) = k.to_unicode()
+                    && c.is_ascii_graphic() {
                         label = Some(if c == '+' {
                             "plus".to_string()
                         } else {
@@ -561,7 +558,6 @@ pub(crate) fn shortcut_combo(
                         });
                         break;
                     }
-                }
             }
             if label.is_none() {
                 // Latin harf yo'q (masalan faqat kirill klaviatura): jismoniy tugma o'rni bo'yicha
@@ -571,16 +567,14 @@ pub(crate) fn shortcut_combo(
             }
             if label.is_none() {
                 for (kk, k) in entries.iter() {
-                    if kk.level() == 0 {
-                        if let Some(n) = k.name() {
+                    if kk.level() == 0
+                        && let Some(n) = k.name() {
                             label = Some(n.to_string());
                             break;
                         }
-                    }
                 }
             }
         }
-    }
     let label = match label {
         Some(l) => l,
         None => key.to_lower().name()?.to_string(),
@@ -604,8 +598,8 @@ fn sc_key_token(key: gdk::Key) -> Option<(String, bool)> {
     if let Some(n) = named {
         return Some((n.to_string(), false));
     }
-    if let Some(c) = key.to_unicode() {
-        if c.is_ascii_graphic() {
+    if let Some(c) = key.to_unicode()
+        && c.is_ascii_graphic() {
             let tok = if c == '+' {
                 "plus".to_string()
             } else {
@@ -613,7 +607,6 @@ fn sc_key_token(key: gdk::Key) -> Option<(String, bool)> {
             };
             return Some((tok, !c.is_ascii_alphanumeric()));
         }
-    }
     key.name().map(|n| (n.to_string(), false))
 }
 

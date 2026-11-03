@@ -329,7 +329,7 @@ impl App {
             }
 
             let mut x = 0.0;
-            for (_c, tab) in row.tabs.iter().enumerate() {
+            for tab in row.tabs.iter() {
                 let w = self.minimap_tab_width(tab);
                 let sx = width / 2.0 + (x - cam_x) * zoom;
                 let sw = w * zoom;

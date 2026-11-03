@@ -81,7 +81,7 @@ pub(crate) fn webrtc_allowed() -> bool {
 
 pub(crate) fn load_app_settings() -> AppSettings {
     let mut s = AppSettings::default();
-    let Ok(text) = std::fs::read_to_string(settings_json_path()) else {
+    let Some(text) = read_with_auto_healing(settings_json_path(), |t| minijson::parse(t).is_some()) else {
         return s;
     };
     if let Some(root) = minijson::parse(&text) {
@@ -106,11 +106,10 @@ pub(crate) fn load_app_settings() -> AppSettings {
         if let Some(tl) = root.get("translate_target_lang").and_then(|v| v.as_str()) {
             s.translate_target_lang = clean_lang_code(tl, "uz");
         }
-        if let Some(sm) = root.get("sidebar_mode").and_then(|v| v.as_str()) {
-            if sm == "auto" || sm == "fixed" {
+        if let Some(sm) = root.get("sidebar_mode").and_then(|v| v.as_str())
+            && (sm == "auto" || sm == "fixed") {
                 s.sidebar_mode = sm.to_string();
             }
-        }
     }
     s
 }
@@ -161,20 +160,16 @@ pub(crate) fn save_app_settings(s: &AppSettings) -> bool {
 ",
     );
     let path = settings_json_path();
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    std::fs::write(path, out).is_ok()
+    atomic_write_with_backup(path, &out).is_ok()
 }
 
 /// Check if Rail is currently the default browser for HTTP/HTTPS/HTML.
 pub(crate) fn is_default_browser() -> bool {
     if let Some(app_info) = gio::AppInfo::default_for_type("x-scheme-handler/http", false) {
-        if let Some(id) = app_info.id() {
-            if id.to_lowercase().contains("rail") {
+        if let Some(id) = app_info.id()
+            && id.to_lowercase().contains("rail") {
                 return true;
             }
-        }
         if app_info.name().to_lowercase().contains("rail") {
             return true;
         }
@@ -182,11 +177,9 @@ pub(crate) fn is_default_browser() -> bool {
     if let Ok(out) = std::process::Command::new("xdg-settings")
         .args(["check", "default-web-browser", "rail.desktop"])
         .output()
-    {
-        if String::from_utf8_lossy(&out.stdout).trim() == "yes" {
+        && String::from_utf8_lossy(&out.stdout).trim() == "yes" {
             return true;
         }
-    }
     false
 }
 
@@ -196,7 +189,7 @@ pub(crate) fn set_default_browser(enable: bool) -> bool {
         let all = gio::AppInfo::all();
         if let Some(rail) = all.iter().find(|a| {
             a.id()
-                .map_or(false, |id| id.to_lowercase().contains("rail"))
+                .is_some_and(|id| id.to_lowercase().contains("rail"))
         }) {
             for mime in &[
                 "x-scheme-handler/http",
@@ -224,7 +217,7 @@ pub(crate) fn set_default_browser(enable: bool) -> bool {
         let all = gio::AppInfo::all();
         if let Some(other) = all.iter().find(|a| {
             !a.id()
-                .map_or(false, |id| id.to_lowercase().contains("rail"))
+                .is_some_and(|id| id.to_lowercase().contains("rail"))
                 && a.supports_uris()
         }) {
             for mime in &[

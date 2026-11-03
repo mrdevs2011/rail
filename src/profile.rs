@@ -49,14 +49,13 @@ impl Profile {
         // 2. If multi-word name:
         let words: Vec<&str> = trimmed.split_whitespace().collect();
         if words.len() > 1 {
-            if let Some(last) = words.last() {
-                if last.chars().all(|c| c.is_ascii_digit()) && last.len() <= 3 {
+            if let Some(last) = words.last()
+                && last.chars().all(|c| c.is_ascii_digit()) && last.len() <= 3 {
                     // e.g. "Profile 10" -> "10"
                     if words.len() == 2 && words[0].eq_ignore_ascii_case("profile") {
                         return (*last).to_string();
                     }
                 }
-            }
             // Multi-word initials up to 3: "John Doe" -> "JD", "My Work Space" -> "MWS"
             let initials: String = words
                 .iter()
@@ -142,7 +141,7 @@ impl ProfileManager {
     }
 
     fn load(&mut self) {
-        if let Ok(content) = fs::read_to_string(&self.config_file) {
+        if let Some(content) = crate::storage::read_with_auto_healing(&self.config_file, |c| c.contains('|')) {
             for line in content.lines() {
                 let parts: Vec<&str> = line.trim().split('|').collect();
                 if parts.len() >= 3 {
@@ -186,8 +185,8 @@ impl ProfileManager {
         for p in &self.profiles {
             out.push_str(&format!("{}|{}|{}\n", p.id, p.name, p.color_idx));
         }
-        let _ = fs::write(&self.config_file, out);
-        let _ = fs::write(&self.active_file, &self.active_id);
+        let _ = crate::storage::atomic_write_with_backup(&self.config_file, &out);
+        let _ = crate::storage::atomic_write_with_backup(&self.active_file, &self.active_id);
     }
 
     pub fn profiles(&self) -> &[Profile] {

@@ -250,6 +250,7 @@ impl App {
 
     /// Live 1:1 horizontal pan (finger tracks content). Used by touchpad slide mode.
     /// Offsets update every event; strip allocate is coalesced to one per frame.
+    #[allow(dead_code)]
     pub(crate) fn pan_canvas_x(self: &Rc<Self>, dx: f64) {
         let vw = self.strip.width() as f64;
         if vw <= 0.0 || dx == 0.0 {
@@ -289,6 +290,7 @@ impl App {
     /// swipe would coast to, snap to the nearest column edge there, focus the furthest column
     /// that is fully visible in the swipe direction, and let the spring continue from the
     /// release velocity so the motion never stops and restarts.
+    #[allow(dead_code)]
     pub(crate) fn finish_slide(self: &Rc<Self>, vel: f64) {
         let vw = self.strip.width() as f64;
         if vw <= 0.0 {

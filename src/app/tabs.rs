@@ -159,6 +159,7 @@ impl App {
         Self::build_web_view(None, Some(parent))
     }
 
+    #[allow(deprecated)]
     pub(crate) fn configure_native_web_view(view: &WebView) {
         // Use a native GTK chooser for every web file input. This is more reliable
         // than WebKit's default chooser on Linux and supports multi-file uploads.
@@ -195,11 +196,10 @@ impl App {
                     let model = dialog.files();
                     let mut uris = Vec::new();
                     for i in 0..model.n_items() {
-                        if let Some(obj) = model.item(i) {
-                            if let Ok(file) = obj.downcast::<gio::File>() {
+                        if let Some(obj) = model.item(i)
+                            && let Ok(file) = obj.downcast::<gio::File>() {
                                 uris.push(file.uri().to_string());
                             }
-                        }
                     }
                     let refs: Vec<&str> = uris.iter().map(String::as_str).collect();
                     if !refs.is_empty() {
@@ -220,9 +220,8 @@ impl App {
             if decision_type == webkit6::PolicyDecisionType::NavigationAction {
                 if let Some(nav_decision) =
                     decision.downcast_ref::<webkit6::NavigationPolicyDecision>()
-                {
-                    if let Some(req) = nav_decision.navigation_action().and_then(|a| a.request()) {
-                        if let Some(uri) = req.uri() {
+                    && let Some(req) = nav_decision.navigation_action().and_then(|a| a.request())
+                        && let Some(uri) = req.uri() {
                             let uri_s = uri.to_string();
                             let scheme = uri_s.split(':').next().unwrap_or("").to_lowercase();
                             if is_external_uri_scheme(&scheme)
@@ -236,8 +235,6 @@ impl App {
                                 return true;
                             }
                         }
-                    }
-                }
                 let policies = webkit6::WebsitePolicies::builder()
                     .autoplay(webkit6::AutoplayPolicy::AllowWithoutSound)
                     .build();
@@ -300,12 +297,11 @@ impl App {
         for ms in [30u64, 120, 350] {
             let app = self.clone();
             glib::timeout_add_local_once(std::time::Duration::from_millis(ms), move || {
-                if app.focused_is_welcome() {
-                    if let Some(v) = app.focused_view() {
+                if app.focused_is_welcome()
+                    && let Some(v) = app.focused_view() {
                         app.push_start_state(&v);
                         app.focus_welcome_input(false);
                     }
-                }
             });
         }
         self.entry.grab_focus();

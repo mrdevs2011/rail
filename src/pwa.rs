@@ -17,6 +17,7 @@ use std::rc::Rc;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct PwaAppInfo {
+    #[allow(dead_code)]
     pub id: String,
     pub name: String,
     pub url: String,
@@ -96,8 +97,8 @@ pub(crate) fn install_pwa_app(
     let icon_path = app_dir.join("icon.png");
     let mut icon_downloaded = false;
 
-    if let Some(i_url) = icon_url {
-        if i_url.starts_with("http://") || i_url.starts_with("https://") {
+    if let Some(i_url) = icon_url
+        && (i_url.starts_with("http://") || i_url.starts_with("https://")) {
             let tmp_icon = std::env::temp_dir().join(format!("rail_pwa_icon_{}", id));
             let curl_res = std::process::Command::new("curl")
                 .args([
@@ -121,7 +122,6 @@ pub(crate) fn install_pwa_app(
                 let _ = std::fs::remove_file(&tmp_icon);
             }
         }
-    }
 
     if !icon_downloaded {
         // Fallback: write crisp SVG icon
@@ -204,6 +204,7 @@ Keywords=pwa;web;app;{id};\n",
 }
 
 /// List all installed PWAs
+#[allow(dead_code)]
 pub(crate) fn list_installed_pwas() -> Vec<PwaAppInfo> {
     let dir = pwa_apps_dir();
     let mut list = Vec::new();
@@ -212,8 +213,8 @@ pub(crate) fn list_installed_pwas() -> Vec<PwaAppInfo> {
     };
     for entry in entries.flatten() {
         let meta_file = entry.path().join("app.json");
-        if let Ok(content) = std::fs::read_to_string(meta_file) {
-            if let Some(json) = crate::minijson::parse(&content) {
+        if let Ok(content) = std::fs::read_to_string(meta_file)
+            && let Some(json) = crate::minijson::parse(&content) {
                 let id = json
                     .get("id")
                     .and_then(|v| v.as_str())
@@ -247,12 +248,12 @@ pub(crate) fn list_installed_pwas() -> Vec<PwaAppInfo> {
                     });
                 }
             }
-        }
     }
     list
 }
 
 /// Uninstall PWA
+#[allow(dead_code)]
 pub(crate) fn uninstall_pwa_app(id: &str) -> Result<(), String> {
     let desktop_file = desktop_applications_dir().join(format!("rail-pwa-{}.desktop", id));
     if desktop_file.exists() {

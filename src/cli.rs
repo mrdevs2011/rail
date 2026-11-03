@@ -141,8 +141,8 @@ pub(crate) fn print_data_info() {
     }
 
     let profiles_file = dir.join("profiles.txt");
-    if profiles_file.exists() {
-        if let Ok(c) = std::fs::read_to_string(&profiles_file) {
+    if profiles_file.exists()
+        && let Ok(c) = std::fs::read_to_string(&profiles_file) {
             let count = c.lines().filter(|l| !l.trim().is_empty()).count();
             println!(
                 "{}",
@@ -152,11 +152,10 @@ pub(crate) fn print_data_info() {
                 )
             );
         }
-    }
 
     let profiles_dir = dir.join("profiles");
-    if profiles_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&profiles_dir) {
+    if profiles_dir.exists()
+        && let Ok(entries) = std::fs::read_dir(&profiles_dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if p.is_dir() {
@@ -173,7 +172,6 @@ pub(crate) fn print_data_info() {
                 }
             }
         }
-    }
 
     println!();
     println!("{}", tr("To share your exact environment with a friend:"));

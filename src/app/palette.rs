@@ -37,7 +37,7 @@ impl App {
         if on_welcome {
             // Keep the omnibar glued to the welcome page every frame (tab strip scroll,
             // sidebar toggle, window resize) so it never floats away from the brand.
-            thread_local! { static WELCOME_TICK: Cell<bool> = Cell::new(false); }
+            thread_local! { static WELCOME_TICK: Cell<bool> = const { Cell::new(false) }; }
             if !WELCOME_TICK.with(|t| t.replace(true)) {
                 let app = self.clone();
                 self.palette.add_tick_callback(move |_, _| {
@@ -77,11 +77,10 @@ impl App {
         self.selected_suggestion_idx.set(None);
         self.profile_popover.popdown();
         self.palette.set_visible(false);
-        if !self.profiles_modal_open() {
-            if let Some(v) = self.focused_view() {
+        if !self.profiles_modal_open()
+            && let Some(v) = self.focused_view() {
                 v.grab_focus();
             }
-        }
     }
 
     /// Show/hide the suggestions list together with its ScrolledWindow (so an empty
@@ -203,9 +202,9 @@ impl App {
 
         // 1. Inline autofill if typing forward (not on backspace/deletion) and NOT typing space
         let has_space = text.contains(' ') || text.ends_with(' ');
-        if is_typing_forward && !has_space {
-            if let Some(first) = suggestions.first() {
-                if first.kind != SuggestionKind::Search {
+        if is_typing_forward && !has_space
+            && let Some(first) = suggestions.first()
+                && first.kind != SuggestionKind::Search {
                     let clean_q = text.trim().to_lowercase();
                     let autofill = &first.autofill_text;
                     let autofill_lower = autofill.to_lowercase();
@@ -219,12 +218,10 @@ impl App {
                         self.last_entry_len.set(cur_len);
                     }
                 }
-            }
-        }
 
         // Active DNS prefetching in the background while typing to eliminate lookup latency
-        if let Some(first) = suggestions.first() {
-            if first.kind != SuggestionKind::Search {
+        if let Some(first) = suggestions.first()
+            && first.kind != SuggestionKind::Search {
                 let target_host =
                     host_of(&first.target_url).or_else(|| host_of(&first.autofill_text));
                 if let Some(h) = target_host {
@@ -233,7 +230,6 @@ impl App {
                     session.prefetch_dns(&h);
                 }
             }
-        }
 
         // 2. Render suggestions UI
         self.render_suggestions_ui(&suggestions);
@@ -328,13 +324,12 @@ impl App {
     }
 
     pub(crate) fn accept_autofill_or_next_suggestion(self: &Rc<Self>) -> bool {
-        if let Some((start, end)) = self.entry.selection_bounds() {
-            if start != end {
+        if let Some((start, end)) = self.entry.selection_bounds()
+            && start != end {
                 self.entry.set_position(-1);
                 self.entry.select_region(-1, -1);
                 return true;
             }
-        }
         self.move_suggestion_selection(1)
     }
 
@@ -348,8 +343,8 @@ impl App {
         // If it is the only tab, keep the start page and just close the input.
         let view = self.focused_view();
         let fresh = self.fresh.borrow().clone();
-        if let (Some(v), Some(f)) = (view, fresh) {
-            if v == f {
+        if let (Some(v), Some(f)) = (view, fresh)
+            && v == f {
                 let total_tabs: usize = self.rows.borrow().iter().map(|r| r.tabs.len()).sum();
                 if total_tabs > 1 {
                     self.close_view(&v);
@@ -357,7 +352,6 @@ impl App {
                     *self.fresh.borrow_mut() = None;
                 }
             }
-        }
     }
 
     pub(crate) fn switch_focused_tab_profile(self: &Rc<Self>, target_profile_id: &str) {
@@ -386,8 +380,8 @@ impl App {
         self.setup_view_signals(&new_view);
 
         let mut rows = self.rows.borrow_mut();
-        if let Some(row) = rows.get_mut(cur_r) {
-            if let Some(tab) = row.tabs.get_mut(cur_c) {
+        if let Some(row) = rows.get_mut(cur_r)
+            && let Some(tab) = row.tabs.get_mut(cur_c) {
                 tab.container.remove(&tab.view);
                 tab.container.prepend(&new_view);
                 new_view.add_css_class("tab");
@@ -397,7 +391,6 @@ impl App {
                 tab.view = new_view.clone();
                 tab.profile_id = target_profile_id.to_string();
             }
-        }
         drop(rows);
 
         if let Some(uri) = current_uri {
