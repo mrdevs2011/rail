@@ -197,6 +197,23 @@ fn test_settings_tab_enum() {
         crate::nav::normalize_internal_uri("rail://settings/customize/shortcuts"),
         "rail://settings/customize/shortcuts/"
     );
+    for (input, expected) in [
+        (
+            "rail://settings/data/history",
+            "rail://settings/data/history/",
+        ),
+        (
+            "rail://settings/data/export",
+            "rail://settings/data/export/",
+        ),
+        (
+            "rail://settings/data/import",
+            "rail://settings/data/import/",
+        ),
+        ("rail://settings/data/cache", "rail://settings/data/cache/"),
+    ] {
+        assert_eq!(crate::nav::normalize_internal_uri(input), expected);
+    }
     assert_eq!(
         crate::nav::normalize_internal_uri("rail://settings/customize/html"),
         "rail://settings/customize/html/"

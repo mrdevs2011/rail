@@ -342,6 +342,23 @@ impl App {
             }
         }
 
+        if section == SettingsTab::Data {
+            let sub = active_settings_uri
+                .trim_end_matches('/')
+                .rsplit('/')
+                .next()
+                .filter(|v| matches!(*v, "history" | "export" | "import" | "cache"))
+                .unwrap_or("history");
+            self.data_stack.set_visible_child_name(sub);
+            for (name, button) in &self.data_sub_buttons {
+                if name == sub {
+                    button.add_css_class("active");
+                } else {
+                    button.remove_css_class("active");
+                }
+            }
+        }
+
         if section == SettingsTab::Customize {
             self.customize_stack.set_visible_child_name(
                 if active_settings_uri.contains("/shortcuts") {

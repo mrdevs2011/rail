@@ -19,6 +19,10 @@ pub(crate) struct DataPage {
     pub(crate) hist_list_box: gtk::Box,
     pub(crate) hist_search_entry: gtk::Entry,
     pub(crate) sub_history_btn: gtk::Button,
+    pub(crate) sub_export_btn: gtk::Button,
+    pub(crate) sub_import_btn: gtk::Button,
+    pub(crate) sub_cache_btn: gtk::Button,
+    pub(crate) stack: gtk::Stack,
     pub(crate) sync_restore_entry: gtk::Entry,
     pub(crate) sync_url_result_entry: gtk::Entry,
 }
@@ -325,6 +329,10 @@ pub(crate) fn build_data_page(settings_stack: &gtk::Stack) -> DataPage {
         hist_list_box,
         hist_search_entry,
         sub_history_btn,
+        sub_export_btn,
+        sub_import_btn,
+        sub_cache_btn,
+        stack: data_stack,
         sync_restore_entry,
         sync_url_result_entry,
     }

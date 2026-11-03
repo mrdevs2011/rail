@@ -294,7 +294,9 @@ pub(crate) fn settings_tab_from_uri(uri: &str) -> Option<SettingsTab> {
         "" | "general" => SettingsTab::General,
         "profiles" | "profile" => SettingsTab::Profiles,
         "extensions" | "extension" => SettingsTab::General, // legacy URL compatibility
-        "data" | "backup" => SettingsTab::Data,
+        "data" | "backup" | "data/history" | "data/export" | "data/import" | "data/cache" => {
+            SettingsTab::Data
+        }
         "privacy" | "shield" => SettingsTab::Privacy,
         "customize" | "css" | "customize/html" | "customize/shortcuts" | "shortcuts" => {
             SettingsTab::Customize
@@ -313,6 +315,18 @@ pub(crate) fn normalize_internal_uri(uri: &str) -> String {
     }
     if u.starts_with("rail://history") || u.starts_with("chrome://history") {
         return "rail://settings/data".into();
+    }
+    if u.starts_with("rail://settings/data/") {
+        let sub = u
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .unwrap_or("history");
+        let sub = match sub {
+            "export" | "import" | "cache" => sub,
+            _ => "history",
+        };
+        return format!("rail://settings/data/{sub}/");
     }
     if u.starts_with("rail://settings/customize/shortcuts") {
         return "rail://settings/customize/shortcuts/".into();

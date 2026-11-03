@@ -455,6 +455,22 @@ impl App {
                         SettingsTab::About => "about",
                     };
                     self.settings_stack.set_visible_child_name(tab_name);
+                    if tab == SettingsTab::Data {
+                        let sub = canon
+                            .trim_end_matches('/')
+                            .rsplit('/')
+                            .next()
+                            .filter(|v| matches!(*v, "history" | "export" | "import" | "cache"))
+                            .unwrap_or("history");
+                        self.data_stack.set_visible_child_name(sub);
+                        for (name, button) in &self.data_sub_buttons {
+                            if name == sub {
+                                button.add_css_class("active");
+                            } else {
+                                button.remove_css_class("active");
+                            }
+                        }
+                    }
                     if tab == SettingsTab::Customize {
                         self.customize_stack.set_visible_child_name(
                             if canon.contains("/shortcuts") {

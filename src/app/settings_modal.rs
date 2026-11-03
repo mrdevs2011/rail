@@ -127,6 +127,28 @@ impl App {
         self.sync_settings_chrome();
     }
 
+    pub(crate) fn set_data_subpath(self: &Rc<Self>, subpath: &str) {
+        let name = match subpath {
+            "export" | "import" | "cache" => subpath,
+            _ => "history",
+        };
+        self.data_stack.set_visible_child_name(name);
+        for (button_name, button) in &self.data_sub_buttons {
+            if button_name == name {
+                button.add_css_class("active");
+            } else {
+                button.remove_css_class("active");
+            }
+        }
+        let route = format!("rail://settings/data/{name}/");
+        if let Some(view) = self.focused_view() {
+            view.load_html(&settings_shell_page(), Some(&route));
+            self.set_view_saved_uri(&view, &route);
+            self.pill_label.set_text(&route);
+        }
+        self.schedule_save_session();
+    }
+
     pub(crate) fn set_customize_subpath(self: &Rc<Self>, shortcuts: bool) {
         self.customize_stack
             .set_visible_child_name(if shortcuts { "shortcuts" } else { "html" });

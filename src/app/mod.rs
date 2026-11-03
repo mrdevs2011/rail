@@ -133,6 +133,8 @@ pub(crate) struct App {
     pub(crate) save_session_gen: Cell<u64>,
     pub(crate) data_modal_info_lbl: gtk::Label,
     pub(crate) data_modal_status_lbl: gtk::Label,
+    pub(crate) data_stack: gtk::Stack,
+    pub(crate) data_sub_buttons: Vec<(String, gtk::Button)>,
     pub(crate) data_export_entry: gtk::Entry,
     pub(crate) data_import_entry: gtk::Entry,
     pub(crate) sync_url_result_entry: gtk::Entry,

@@ -22,6 +22,9 @@ pub(crate) fn wire_settings(
     settings_close_btn: gtk::Button,
     settings_update_chip: gtk::Button,
     sub_history_btn: gtk::Button,
+    sub_export_btn: gtk::Button,
+    sub_import_btn: gtk::Button,
+    sub_cache_btn: gtk::Button,
     sync_restore_entry: gtk::Entry,
     sync_url_result_entry: gtk::Entry,
     tab_buttons_vec: Vec<(SettingsTab, gtk::Button)>,
@@ -117,6 +120,16 @@ pub(crate) fn wire_settings(
         let items = a.history.borrow().get_all_sorted();
         render_history_list(&b_box, &items, &ent.text(), &a, &s_ent);
     });
+
+    for (name, button) in [
+        ("history", sub_history_btn.clone()),
+        ("export", sub_export_btn),
+        ("import", sub_import_btn),
+        ("cache", sub_cache_btn),
+    ] {
+        let a = app.clone();
+        button.connect_clicked(move |_| a.set_data_subpath(&name));
+    }
 
     let a = app.clone();
     let b_box = hist_list_box.clone();
