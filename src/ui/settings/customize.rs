@@ -4,6 +4,9 @@ use crate::*;
 
 pub(crate) struct CustomizePage {
     pub(crate) css_buffer: gtk::TextBuffer,
+    pub(crate) stack: gtk::Stack,
+    pub(crate) html_button: gtk::Button,
+    pub(crate) shortcuts_button: gtk::Button,
 }
 
 pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage {
@@ -287,7 +290,12 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
     page_customize.append(&customize_stack);
     settings_stack.add_named(&page_customize, Some("customize"));
 
-    CustomizePage { css_buffer }
+    CustomizePage {
+        css_buffer,
+        stack: customize_stack,
+        html_button: sub_html,
+        shortcuts_button: sub_sc,
+    }
 }
 
 fn setup_css_tags(buf: &gtk::TextBuffer) {

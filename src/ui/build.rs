@@ -199,7 +199,12 @@ pub(crate) fn build(gapp: &gtk::Application) {
         engine_buttons,
         initial_settings,
     } = build_general_page(&settings_stack);
-    let CustomizePage { css_buffer } = build_customize_page(&settings_stack);
+    let CustomizePage {
+        css_buffer,
+        stack: customize_stack,
+        html_button: customize_html_button,
+        shortcuts_button: customize_shortcuts_button,
+    } = build_customize_page(&settings_stack);
     let ProfilesPage {
         add_prof_btn,
         color_btns,
@@ -419,9 +424,25 @@ pub(crate) fn build(gapp: &gtk::Application) {
         settings_tab_buttons: RefCell::new(tab_buttons_vec.clone()),
         current_settings_tab: Cell::new(SettingsTab::General),
         css_buffer: css_buffer.clone(),
+        customize_stack: customize_stack.clone(),
         search_engine: RefCell::new(initial_settings.search_engine.clone()),
         recently_closed: RefCell::new(Vec::new()),
     });
+
+    {
+        let weak = Rc::downgrade(&app);
+        customize_html_button.connect_clicked(move |_| {
+            if let Some(app) = weak.upgrade() {
+                app.set_customize_subpath(false);
+            }
+        });
+        let weak = Rc::downgrade(&app);
+        customize_shortcuts_button.connect_clicked(move |_| {
+            if let Some(app) = weak.upgrade() {
+                app.set_customize_subpath(true);
+            }
+        });
+    }
 
     app.select_palette_profile(&initial_prof_id);
 

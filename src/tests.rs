@@ -194,6 +194,18 @@ fn test_settings_tab_enum() {
         "rail://settings/data"
     );
     assert_eq!(
+        crate::nav::normalize_internal_uri("rail://settings/customize/shortcuts"),
+        "rail://settings/customize/shortcuts/"
+    );
+    assert_eq!(
+        crate::nav::normalize_internal_uri("rail://settings/customize/html"),
+        "rail://settings/customize/html/"
+    );
+    assert_eq!(
+        settings_tab_from_uri("rail://settings/customize/shortcuts/"),
+        Some(SettingsTab::Customize)
+    );
+    assert_eq!(
         crate::nav::to_uri("history", "google"),
         "rail://settings/data"
     );

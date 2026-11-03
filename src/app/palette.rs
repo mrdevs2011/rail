@@ -455,6 +455,15 @@ impl App {
                         SettingsTab::About => "about",
                     };
                     self.settings_stack.set_visible_child_name(tab_name);
+                    if tab == SettingsTab::Customize {
+                        self.customize_stack.set_visible_child_name(
+                            if canon.contains("/shortcuts") {
+                                "shortcuts"
+                            } else {
+                                "html"
+                            },
+                        );
+                    }
                     for (btn_tab, btn) in self.settings_tab_buttons.borrow().iter() {
                         if *btn_tab == tab {
                             btn.add_css_class("active");

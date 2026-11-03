@@ -275,7 +275,7 @@ pub(crate) fn settings_uri_for_tab(tab: SettingsTab) -> &'static str {
         SettingsTab::Profiles => "rail://settings/profiles",
         SettingsTab::Data => "rail://settings/data",
         SettingsTab::Privacy => "rail://settings/privacy",
-        SettingsTab::Customize => "rail://settings/customize",
+        SettingsTab::Customize => "rail://settings/customize/html/",
         SettingsTab::Update => "rail://settings/updates",
         SettingsTab::About => "rail://settings/about",
     }
@@ -296,7 +296,9 @@ pub(crate) fn settings_tab_from_uri(uri: &str) -> Option<SettingsTab> {
         "extensions" | "extension" => SettingsTab::General, // legacy URL compatibility
         "data" | "backup" => SettingsTab::Data,
         "privacy" | "shield" => SettingsTab::Privacy,
-        "customize" | "css" | "shortcuts" => SettingsTab::Customize,
+        "customize" | "css" | "customize/html" | "customize/shortcuts" | "shortcuts" => {
+            SettingsTab::Customize
+        }
         "updates" | "update" => SettingsTab::Update,
         "about" => SettingsTab::About,
         _ => SettingsTab::General,
@@ -311,6 +313,12 @@ pub(crate) fn normalize_internal_uri(uri: &str) -> String {
     }
     if u.starts_with("rail://history") || u.starts_with("chrome://history") {
         return "rail://settings/data".into();
+    }
+    if u.starts_with("rail://settings/customize/shortcuts") {
+        return "rail://settings/customize/shortcuts/".into();
+    }
+    if u.starts_with("rail://settings/customize/html") || u.starts_with("rail://settings/css") {
+        return "rail://settings/customize/html/".into();
     }
     if u.starts_with("rail://settings") {
         return settings_uri_for_tab(settings_tab_from_uri(u).unwrap_or(SettingsTab::General))
@@ -466,10 +474,10 @@ pub(crate) fn format_view_source_html(target_url: &str, raw_code: &str) -> Strin
     background: #202124;
     color: #e8eaed;
     font-family: 'JetBrains Mono', 'Fira Code', 'DejaVu Sans Mono', monospace;
-    font-size: 12.5px;
-    line-height: 1.5;
+    font-size: 12px;
+    line-height: 1.35;
     margin: 0;
-    padding: 8px 12px;
+    padding: 0;
     user-select: text;
   }}
   .tag {{ color: #f28b82; }}
@@ -490,8 +498,9 @@ pub(crate) fn format_view_source_html(target_url: &str, raw_code: &str) -> Strin
     counter-increment: line;
     content: counter(line);
     display: inline-block;
-    width: 3.5em;
-    margin-right: 1em;
+    width: 3.2em;
+    margin-right: 0.65em;
+    padding: 0 0.5em 0 0;
     color: #80868b;
     text-align: right;
     user-select: none;
@@ -526,6 +535,12 @@ pub(crate) fn load_view_source_page(v: &WebView, target: &str) {
         return;
     }
 
+    // Paint an immediate lightweight state instead of leaving a black about:blank tab
+    // while the original response is fetched on a worker thread.
+    v.load_html(
+        &format!("<!doctype html><meta charset=utf-8><style>body{{margin:0;padding:8px 10px;background:#202124;color:#9aa0a6;font:12px monospace}}</style>Loading source… <span style='color:#5f6368'>{}</span>", source_escape(&target_clean)),
+        Some("about:blank"),
+    );
     let (tx, rx) = std::sync::mpsc::channel();
     let url_for_thread = target_clean.clone();
     std::thread::spawn(move || {
@@ -618,8 +633,8 @@ mod view_source_tests {
     #[test]
     fn source_page_uses_compact_chrome_like_gutter_and_colored_tokens() {
         let html = format_view_source_html("https://example.com", "<html>\n<!-- note -->\n</html>");
-        assert!(html.contains("padding: 8px 12px"));
-        assert!(html.contains("width: 3.5em"));
+        assert!(html.contains("padding: 0;"));
+        assert!(html.contains("width: 3.2em"));
         assert!(html.contains("class=\"comment\""));
         assert!(html.contains("view-source:https://example.com"));
     }

@@ -488,7 +488,7 @@ impl App {
         let a_sc = self.clone();
         row_sc.connect_clicked(move |_| {
             a_sc.side_settings_popover.popdown();
-            a_sc.open_settings_tab(SettingsTab::Customize);
+            a_sc.open_customize_shortcuts();
         });
         list_box.append(&row_sc);
 

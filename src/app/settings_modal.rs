@@ -14,6 +14,9 @@ impl App {
             self.hide_palette();
         }
         self.current_settings_tab.set(tab);
+        if tab == SettingsTab::Customize {
+            self.customize_stack.set_visible_child_name("html");
+        }
         let tab_name = match tab {
             SettingsTab::General => "general",
             SettingsTab::Profiles => "profiles",
@@ -122,6 +125,26 @@ impl App {
         }
         // Attach to the (new) focused tab overlay — not the whole strip
         self.sync_settings_chrome();
+    }
+
+    pub(crate) fn set_customize_subpath(self: &Rc<Self>, shortcuts: bool) {
+        self.customize_stack
+            .set_visible_child_name(if shortcuts { "shortcuts" } else { "html" });
+        let route = if shortcuts {
+            "rail://settings/customize/shortcuts/"
+        } else {
+            "rail://settings/customize/html/"
+        };
+        if let Some(view) = self.focused_view() {
+            self.set_view_saved_uri(&view, route);
+            self.pill_label.set_text(route);
+        }
+        self.schedule_save_session();
+    }
+
+    pub(crate) fn open_customize_shortcuts(self: &Rc<Self>) {
+        self.open_settings_tab(SettingsTab::Customize);
+        self.set_customize_subpath(true);
     }
 
     pub(crate) fn reload_css_editor(&self) {

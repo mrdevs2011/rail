@@ -316,6 +316,11 @@ impl App {
             return;
         };
 
+        let active_settings_uri = v
+            .uri()
+            .map(|u| u.to_string())
+            .filter(|u| u.starts_with("rail://settings"))
+            .unwrap_or_else(|| self.saved_uri_of(&v));
         if self.current_settings_tab.get() != section {
             self.current_settings_tab.set(section);
             let tab_name = match section {
@@ -335,6 +340,16 @@ impl App {
                     btn.remove_css_class("active");
                 }
             }
+        }
+
+        if section == SettingsTab::Customize {
+            self.customize_stack.set_visible_child_name(
+                if active_settings_uri.contains("/shortcuts") {
+                    "shortcuts"
+                } else {
+                    "html"
+                },
+            );
         }
 
         // Stay parented on the settings tab overlay even when another tab is focused,
