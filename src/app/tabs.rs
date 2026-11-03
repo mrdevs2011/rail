@@ -298,10 +298,12 @@ impl App {
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
-        view.load_html(&start_page(), Some("rail://start/"));
+        // Attach the WebView to GTK before starting its first navigation. Loading
+        // while the widget is still unparented can leave a visible blank/black frame.
         *self.fresh.borrow_mut() = Some(view.clone());
         self.add_view(view.clone(), prof_id.clone(), false);
         self.set_view_saved_uri(&view, "rail://start/");
+        view.load_html(&start_page(), Some("rail://start/"));
         self.select_palette_profile(&prof_id);
         // In-page omnibar only — never show GTK palette over rail://start
         if self.palette_open() {
@@ -332,9 +334,9 @@ impl App {
         let prof_id = self.profiles.borrow().active_id().to_string();
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
-        view.load_html(&start_page(), Some("rail://start/"));
         *self.fresh.borrow_mut() = Some(view.clone());
-        self.add_view(view, prof_id.clone(), true);
+        self.add_view(view.clone(), prof_id.clone(), true);
+        view.load_html(&start_page(), Some("rail://start/"));
         self.select_palette_profile(&prof_id);
         if self.palette_open() {
             self.hide_palette();
