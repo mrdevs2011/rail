@@ -33,37 +33,40 @@ jobs:
         id: ver
         run: |
           set -euo pipefail
-          OLD=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          IFS=. read -r MAJ MIN PAT <<< "$OLD"
+          CURRENT=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          # Never reuse an existing release tag, even if Cargo.toml lags behind it.
+          LATEST_TAG=$(git tag --list 'v[0-9]*' | sort -V | tail -n1)
+          LATEST_TAG_VERSION="${LATEST_TAG#v}"
+          BASE="$CURRENT"
+          if [ -n "$LATEST_TAG_VERSION" ] && [ "$(printf '%s\n%s\n' "$BASE" "$LATEST_TAG_VERSION" | sort -V | tail -n1)" != "$BASE" ]; then
+            BASE="$LATEST_TAG_VERSION"
+          fi
+          IFS=. read -r MAJ MIN PAT <<< "$BASE"
           NEW="${MAJ}.${MIN}.$((PAT + 1))"
-          echo "Bump $OLD → $NEW"
+          echo "Bump $CURRENT (latest tag $LATEST_TAG) → $NEW"
 
-          sed -i "s/^version = \"${OLD}\"/version = \"${NEW}\"/" Cargo.toml
+          sed -i "s/^version = \"$CURRENT\"/version = \"$NEW\"/" Cargo.toml
 
           if [ -f package.json ]; then
-            sed -i "s/\"version\": \"${OLD}\"/\"version\": \"${NEW}\"/" package.json || true
-            # ba'zi package.json da version boshqa formatda bo'lishi mumkin
             python3 - <<PY
           import json, pathlib
           p = pathlib.Path("package.json")
-          if p.exists():
-              data = json.loads(p.read_text())
-              data["version"] = "${NEW}"
-              p.write_text(json.dumps(data, indent=2) + "\n")
+          data = json.loads(p.read_text())
+          data["version"] = "$NEW"
+          p.write_text(json.dumps(data, indent=2) + "\n")
           PY
           fi
 
-          # sayt badge lari
-          for f in index.html $(find docs -name '*.html' 2>/dev/null); do
+          for f in $(find docs -name '*.html' 2>/dev/null); do
             [ -f "$f" ] || continue
-            sed -i "s/v${OLD}/v${NEW}/g" "$f" || true
+            sed -i "s/v$CURRENT/v$NEW/g" "$f"
           done
           if [ -f ROADMAP.md ]; then
-            sed -i "s/v${OLD}/v${NEW}/g" ROADMAP.md || true
+            sed -i "s/v$CURRENT/v$NEW/g" ROADMAP.md
           fi
 
-          echo "version=${NEW}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${NEW}" >> "$GITHUB_OUTPUT"
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW" >> "$GITHUB_OUTPUT"
 
       - name: Commit version bump
         id: bump
@@ -71,15 +74,16 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml package.json index.html ROADMAP.md docs || true
+          # Stage only tracked files changed by the version bump; missing optional files
+          # must never abort staging and silently skip the bump.
+          git add -u
           if git diff --cached --quiet; then
-            echo "No version files changed"
-            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          else
-            git commit -m "chore: bump version to ${{ steps.ver.outputs.version }} [skip release]"
-            git push origin HEAD:main
-            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            echo "ERROR: version bump produced no tracked changes" >&2
+            exit 1
           fi
+          git commit -m "chore: bump version to ${{ steps.ver.outputs.version }} [skip release]"
+          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Install system deps
         run: |
