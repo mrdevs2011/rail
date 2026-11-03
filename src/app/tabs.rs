@@ -366,8 +366,9 @@ impl App {
                 view.load_uri(url);
             }
         }
+        self.add_view(view.clone(), profile_id.to_string(), false);
         self.set_view_saved_uri(&view, url);
-        self.add_view(view, profile_id.to_string(), false);
+        self.pill_label.set_text(&self.focused_display_uri());
     }
 
     pub(crate) fn new_tab_with_url(self: &Rc<Self>, url: &str) {
@@ -417,8 +418,9 @@ impl App {
                     let session = a.profiles.borrow_mut().get_or_create_session(&prof_id);
                     let new_view = Self::create_web_view(&session, &prof_id);
                     new_view.load_html(&html, Some("about:blank"));
+                    a.add_view(new_view.clone(), prof_id, false);
                     a.set_view_saved_uri(&new_view, &view_source_uri);
-                    a.add_view(new_view, prof_id, false);
+                    a.pill_label.set_text(&a.focused_display_uri());
                 } else {
                     a.new_tab_with_url(&view_source_uri);
                 }

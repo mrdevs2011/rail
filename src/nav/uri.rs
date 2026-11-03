@@ -345,15 +345,114 @@ pub(crate) fn edit_uri_for_entry(uri: &str) -> String {
     uri.to_string()
 }
 
+fn source_escape(input: &str) -> String {
+    input
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn source_span(class: &str, value: &str) -> String {
+    format!("<span class=\"{class}\">{}</span>", source_escape(value))
+}
+
+fn highlight_source_line(line: &str) -> String {
+    let chars: Vec<char> = line.chars().collect();
+    let mut out = String::with_capacity(line.len() * 2);
+    let mut i = 0;
+    while i < chars.len() {
+        if i + 3 < chars.len() && chars[i..i + 4] == ['<', '!', '-', '-'] {
+            let begin = i;
+            i += 4;
+            while i + 2 < chars.len() && chars[i..i + 3] != ['-', '-', '>'] {
+                i += 1;
+            }
+            if i + 2 < chars.len() {
+                i += 3;
+            }
+            let token: String = chars[begin..i].iter().collect();
+            out.push_str(&source_span("comment", &token));
+            continue;
+        }
+        if chars[i] != '<' {
+            let begin = i;
+            while i < chars.len() && chars[i] != '<' {
+                i += 1;
+            }
+            let token: String = chars[begin..i].iter().collect();
+            out.push_str(&source_escape(&token));
+            continue;
+        }
+
+        out.push_str(&source_span("punct", "<"));
+        i += 1;
+        if i < chars.len() && chars[i] == '/' {
+            out.push_str(&source_span("punct", "/"));
+            i += 1;
+        }
+        let name_start = i;
+        while i < chars.len()
+            && (chars[i].is_ascii_alphanumeric() || matches!(chars[i], '-' | ':' | '_'))
+        {
+            i += 1;
+        }
+        if i > name_start {
+            let token: String = chars[name_start..i].iter().collect();
+            out.push_str(&source_span("tag", &token));
+        }
+        while i < chars.len() {
+            if chars[i] == '>' {
+                out.push_str(&source_span("punct", ">"));
+                i += 1;
+                break;
+            }
+            if chars[i].is_whitespace() {
+                out.push(chars[i]);
+                i += 1;
+                continue;
+            }
+            if chars[i] == '"' || chars[i] == '\'' {
+                let quote = chars[i];
+                let begin = i;
+                i += 1;
+                while i < chars.len() {
+                    let c = chars[i];
+                    i += 1;
+                    if c == quote {
+                        break;
+                    }
+                }
+                let token: String = chars[begin..i].iter().collect();
+                out.push_str(&source_span("string", &token));
+                continue;
+            }
+            if chars[i] == '=' {
+                out.push_str(&source_span("punct", "="));
+                i += 1;
+                continue;
+            }
+            let begin = i;
+            while i < chars.len()
+                && !chars[i].is_whitespace()
+                && !matches!(chars[i], '>' | '=' | '"' | '\'')
+            {
+                i += 1;
+            }
+            if i == begin {
+                i += 1;
+            }
+            let token: String = chars[begin..i].iter().collect();
+            out.push_str(&source_span("attr", &token));
+        }
+    }
+    out
+}
+
 pub(crate) fn format_view_source_html(target_url: &str, raw_code: &str) -> String {
-    let mut lines_html = String::with_capacity(raw_code.len() * 2);
+    let mut lines_html = String::with_capacity(raw_code.len() * 3);
     for line in raw_code.lines() {
-        let esc = line
-            .replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;");
         lines_html.push_str("<span class=\"line\">");
-        lines_html.push_str(&esc);
+        lines_html.push_str(&highlight_source_line(line));
         lines_html.push_str("</span>\n");
     }
     format!(
@@ -361,18 +460,23 @@ pub(crate) fn format_view_source_html(target_url: &str, raw_code: &str) -> Strin
 <html>
 <head>
 <meta charset="utf-8">
-<title>view-source:{target_url}</title>
+<title>view-source:{}</title>
 <style>
   html, body {{
-    background: #0d0e12;
-    color: #e4e4e7;
+    background: #202124;
+    color: #e8eaed;
     font-family: 'JetBrains Mono', 'Fira Code', 'DejaVu Sans Mono', monospace;
-    font-size: 13px;
-    line-height: 1.6;
+    font-size: 12.5px;
+    line-height: 1.5;
     margin: 0;
-    padding: 16px 20px;
+    padding: 8px 12px;
     user-select: text;
   }}
+  .tag {{ color: #f28b82; }}
+  .attr {{ color: #c58af9; }}
+  .string {{ color: #81c995; }}
+  .comment {{ color: #9aa0a6; font-style: italic; }}
+  .punct {{ color: #bdc1c6; }}
   pre {{
     margin: 0;
     counter-reset: line;
@@ -386,9 +490,9 @@ pub(crate) fn format_view_source_html(target_url: &str, raw_code: &str) -> Strin
     counter-increment: line;
     content: counter(line);
     display: inline-block;
-    width: 48px;
-    margin-right: 20px;
-    color: #52525b;
+    width: 3.5em;
+    margin-right: 1em;
+    color: #80868b;
     text-align: right;
     user-select: none;
   }}
@@ -397,7 +501,8 @@ pub(crate) fn format_view_source_html(target_url: &str, raw_code: &str) -> Strin
 <body>
 <pre>{lines_html}</pre>
 </body>
-</html>"#
+</html>"#,
+        source_escape(target_url)
     )
 }
 
@@ -487,5 +592,35 @@ pub(crate) fn hard_reload_or_start(v: &WebView) {
         load_internal_page(v, &uri);
     } else {
         v.reload_bypass_cache();
+    }
+}
+
+#[cfg(test)]
+mod view_source_tests {
+    use super::{edit_uri_for_entry, format_view_source_html, highlight_source_line};
+
+    #[test]
+    fn view_source_uri_stays_visible_and_editable() {
+        let uri = "view-source:https://example.com/page";
+        assert_eq!(edit_uri_for_entry(uri), uri);
+    }
+
+    #[test]
+    fn source_highlighting_escapes_markup_and_colors_html_tokens() {
+        let rendered = highlight_source_line(r#"<a href="https://example.com/?a=1&b=2">Link</a>"#);
+        assert!(rendered.contains("class=\"tag\""));
+        assert!(rendered.contains("class=\"attr\""));
+        assert!(rendered.contains("class=\"string\""));
+        assert!(rendered.contains("&amp;"));
+        assert!(!rendered.contains("<a "));
+    }
+
+    #[test]
+    fn source_page_uses_compact_chrome_like_gutter_and_colored_tokens() {
+        let html = format_view_source_html("https://example.com", "<html>\n<!-- note -->\n</html>");
+        assert!(html.contains("padding: 8px 12px"));
+        assert!(html.contains("width: 3.5em"));
+        assert!(html.contains("class=\"comment\""));
+        assert!(html.contains("view-source:https://example.com"));
     }
 }
