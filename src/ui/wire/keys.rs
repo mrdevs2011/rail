@@ -10,6 +10,30 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
     apply_shortcut_priority();
     sc_refresh_bound();
 
+    // Resolve zoom shortcuts before WebKit/page handlers; retain user remappings.
+    let zoom_keys = gtk::EventControllerKey::new();
+    zoom_keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let zoom_app = app.clone();
+    zoom_keys.connect_key_pressed(move |_, key, keycode, state| {
+        use gdk::ModifierType as M;
+        if !state.contains(M::CONTROL_MASK) || state.intersects(M::ALT_MASK | M::SUPER_MASK) {
+            return glib::Propagation::Proceed;
+        }
+        match sc_resolve_any(&shortcut_combos(key, keycode, state)) {
+            ScResolve::Action(id)
+                if matches!(id, "overview_zoom_in" | "overview_zoom_out" | "zoom_reset") =>
+            {
+                if zoom_app.run_action(id) {
+                    glib::Propagation::Stop
+                } else {
+                    glib::Propagation::Proceed
+                }
+            }
+            _ => glib::Propagation::Proceed,
+        }
+    });
+    win.add_controller(zoom_keys);
+
     // WebKit consumes Ctrl+V before bubble-phase browser shortcuts run. Handle
     // image paste in a dedicated capture-phase controller; plain text paste still
     // proceeds to WebKit untouched.

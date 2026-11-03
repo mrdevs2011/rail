@@ -268,6 +268,23 @@ pub(crate) fn build(gapp: &gtk::Application) {
     hovered_link_label.set_visible(false);
     hovered_link_label.set_can_target(false);
     overlay.add_overlay(&hovered_link_label);
+
+    // Browser-style zoom percentage HUD: top-right, non-interactive, slide in/out.
+    let zoom_indicator_label = gtk::Label::new(Some("100%"));
+    zoom_indicator_label.add_css_class("zoom-indicator-label");
+    let zoom_indicator = gtk::Revealer::new();
+    zoom_indicator.add_css_class("zoom-indicator");
+    zoom_indicator.set_transition_type(gtk::RevealerTransitionType::SlideDown);
+    zoom_indicator.set_transition_duration(180);
+    zoom_indicator.set_halign(gtk::Align::End);
+    zoom_indicator.set_valign(gtk::Align::Start);
+    zoom_indicator.set_margin_top(12);
+    zoom_indicator.set_margin_end(16);
+    zoom_indicator.set_reveal_child(false);
+    zoom_indicator.set_can_target(false);
+    zoom_indicator.set_child(Some(&zoom_indicator_label));
+    overlay.add_overlay(&zoom_indicator);
+
     // Settings overlays the strip only (tab square), not the whole window
     strip_host.add_overlay(&settings_modal);
 
@@ -310,6 +327,9 @@ pub(crate) fn build(gapp: &gtk::Application) {
         pill_pwa_btn: pill_pwa_btn.clone(),
         load_bar,
         hovered_link_label,
+        zoom_indicator: zoom_indicator.clone(),
+        zoom_indicator_label: zoom_indicator_label.clone(),
+        zoom_indicator_gen: Cell::new(0),
         palette,
         palette_engine_icon,
         entry: entry.clone(),

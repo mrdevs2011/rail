@@ -91,6 +91,22 @@ impl App {
             next_page_zoom(cur, dir)
         };
         v.set_zoom_level(z);
+
+        // Update the HUD immediately; each subsequent zoom key extends its lifetime.
+        self.zoom_indicator_label
+            .set_text(&format!("{}%", (z * 100.0).round() as u32));
+        self.zoom_indicator_gen
+            .set(self.zoom_indicator_gen.get().wrapping_add(1));
+        let generation = self.zoom_indicator_gen.get();
+        self.zoom_indicator.set_reveal_child(true);
+        let app = Rc::downgrade(self);
+        glib::timeout_add_local_once(std::time::Duration::from_millis(850), move || {
+            if let Some(app) = app.upgrade()
+                && app.zoom_indicator_gen.get() == generation
+            {
+                app.zoom_indicator.set_reveal_child(false);
+            }
+        });
     }
 
     // ---- actions ---------------------------------------------------------

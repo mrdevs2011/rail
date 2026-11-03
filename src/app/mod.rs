@@ -49,6 +49,10 @@ pub(crate) struct App {
     pub(crate) load_bar: gtk::ProgressBar,
     /// Browser-style bottom-left URL preview for the currently hovered link.
     pub(crate) hovered_link_label: gtk::Label,
+    /// Small top-right page zoom indicator, shown only while zoom is changing.
+    pub(crate) zoom_indicator: gtk::Revealer,
+    pub(crate) zoom_indicator_label: gtk::Label,
+    pub(crate) zoom_indicator_gen: Cell<u64>,
     pub(crate) palette: gtk::Box,
     pub(crate) palette_engine_icon: gtk::Image,
     pub(crate) entry: gtk::Entry,

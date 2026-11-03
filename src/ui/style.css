@@ -966,6 +966,19 @@ button.color-choice.selected {
     transform: scale(1.15);
 }
 
+/* ---- Page zoom HUD (top-right, slides down/up) ---- */
+.zoom-indicator-label {
+    color: #f5f7fa;
+    background: rgba(18, 22, 28, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    padding: 7px 11px;
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.28);
+}
+
 /* ---- Top-center sliding dialogs ---- */
 .top-dialog-revealer {
     margin-top: 12px;
