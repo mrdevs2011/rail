@@ -22,6 +22,8 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
     gutter_view.set_editable(false);
     gutter_view.set_can_focus(false);
     gutter_view.set_can_target(false);
+    gutter_view.set_cursor_visible(false);
+    gutter_view.set_size_request(54, -1);
     gutter_view.set_wrap_mode(gtk::WrapMode::None);
     gutter_view.set_left_margin(8);
     gutter_view.set_right_margin(8);
@@ -45,7 +47,7 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
     editor_hbox.append(&gutter_view);
     editor_hbox.append(&css_view);
 
-    // Editor actions stay above the code so Reset is always immediately discoverable.
+    // Keep the editor dominant; actions sit in a footer below it.
     let css_toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     css_toolbar.set_homogeneous(false);
     let css_reset_btn = gtk::Button::with_label(tr("Reset to default"));
@@ -55,8 +57,10 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
     css_save_btn.add_css_class("settings-option-item");
     css_save_btn.add_css_class("active");
     css_toolbar.append(&css_reset_btn);
+    let toolbar_spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    toolbar_spacer.set_hexpand(true);
+    css_toolbar.append(&toolbar_spacer);
     css_toolbar.append(&css_save_btn);
-    page_css.append(&css_toolbar);
 
     {
         let buf = css_buffer.clone();
@@ -79,6 +83,7 @@ pub(crate) fn build_customize_page(settings_stack: &gtk::Stack) -> CustomizePage
     css_scroll.set_min_content_height(480);
     css_scroll.set_child(Some(&editor_hbox));
     page_css.append(&css_scroll);
+    page_css.append(&css_toolbar);
 
     // Initial gutter and syntax highlight
     update_gutter(&css_buffer, &gutter_buffer);

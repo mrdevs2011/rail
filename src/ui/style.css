@@ -1140,7 +1140,7 @@ button.color-choice.selected {
 }
 .css-editor-gutter {
     background-color: #080808;
-    color: #52525b;
+    color: #a1a1aa;
     border-right: 1px solid #1c1c1c;
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
     font-size: 12px;
@@ -1148,7 +1148,7 @@ button.color-choice.selected {
 }
 .css-editor-gutter text {
     background-color: #080808;
-    color: #52525b;
+    color: #a1a1aa;
 }
 .css-editor {
     font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'DejaVu Sans Mono', monospace;
