@@ -78,9 +78,10 @@ impl App {
         self.profile_popover.popdown();
         self.palette.set_visible(false);
         if !self.profiles_modal_open()
-            && let Some(v) = self.focused_view() {
-                v.grab_focus();
-            }
+            && let Some(v) = self.focused_view()
+        {
+            v.grab_focus();
+        }
     }
 
     /// Show/hide the suggestions list together with its ScrolledWindow (so an empty
@@ -202,34 +203,36 @@ impl App {
 
         // 1. Inline autofill if typing forward (not on backspace/deletion) and NOT typing space
         let has_space = text.contains(' ') || text.ends_with(' ');
-        if is_typing_forward && !has_space
+        if is_typing_forward
+            && !has_space
             && let Some(first) = suggestions.first()
-                && first.kind != SuggestionKind::Search {
-                    let clean_q = text.trim().to_lowercase();
-                    let autofill = &first.autofill_text;
-                    let autofill_lower = autofill.to_lowercase();
-                    if autofill_lower.starts_with(&clean_q) && autofill.chars().count() > cur_len {
-                        self.is_autofilling.set(true);
-                        self.entry.set_text(autofill);
-                        self.entry.select_region(cur_len as i32, -1);
-                        self.is_autofilling.set(false);
-                        // Foydalanuvchi yozgan uzunlikni eslaymiz (to'ldirilgan uzunlikni emas),
-                        // aks holda keyingi harf "o'chirish" deb hisoblanib to'ldirish bir harf oralatib ishlardi.
-                        self.last_entry_len.set(cur_len);
-                    }
-                }
+            && first.kind != SuggestionKind::Search
+        {
+            let clean_q = text.trim().to_lowercase();
+            let autofill = &first.autofill_text;
+            let autofill_lower = autofill.to_lowercase();
+            if autofill_lower.starts_with(&clean_q) && autofill.chars().count() > cur_len {
+                self.is_autofilling.set(true);
+                self.entry.set_text(autofill);
+                self.entry.select_region(cur_len as i32, -1);
+                self.is_autofilling.set(false);
+                // Foydalanuvchi yozgan uzunlikni eslaymiz (to'ldirilgan uzunlikni emas),
+                // aks holda keyingi harf "o'chirish" deb hisoblanib to'ldirish bir harf oralatib ishlardi.
+                self.last_entry_len.set(cur_len);
+            }
+        }
 
         // Active DNS prefetching in the background while typing to eliminate lookup latency
         if let Some(first) = suggestions.first()
-            && first.kind != SuggestionKind::Search {
-                let target_host =
-                    host_of(&first.target_url).or_else(|| host_of(&first.autofill_text));
-                if let Some(h) = target_host {
-                    let prof_id = self.selected_palette_profile.borrow().clone();
-                    let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-                    session.prefetch_dns(&h);
-                }
+            && first.kind != SuggestionKind::Search
+        {
+            let target_host = host_of(&first.target_url).or_else(|| host_of(&first.autofill_text));
+            if let Some(h) = target_host {
+                let prof_id = self.selected_palette_profile.borrow().clone();
+                let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
+                session.prefetch_dns(&h);
             }
+        }
 
         // 2. Render suggestions UI
         self.render_suggestions_ui(&suggestions);
@@ -325,11 +328,12 @@ impl App {
 
     pub(crate) fn accept_autofill_or_next_suggestion(self: &Rc<Self>) -> bool {
         if let Some((start, end)) = self.entry.selection_bounds()
-            && start != end {
-                self.entry.set_position(-1);
-                self.entry.select_region(-1, -1);
-                return true;
-            }
+            && start != end
+        {
+            self.entry.set_position(-1);
+            self.entry.select_region(-1, -1);
+            return true;
+        }
         self.move_suggestion_selection(1)
     }
 
@@ -344,14 +348,15 @@ impl App {
         let view = self.focused_view();
         let fresh = self.fresh.borrow().clone();
         if let (Some(v), Some(f)) = (view, fresh)
-            && v == f {
-                let total_tabs: usize = self.rows.borrow().iter().map(|r| r.tabs.len()).sum();
-                if total_tabs > 1 {
-                    self.close_view(&v);
-                } else {
-                    *self.fresh.borrow_mut() = None;
-                }
+            && v == f
+        {
+            let total_tabs: usize = self.rows.borrow().iter().map(|r| r.tabs.len()).sum();
+            if total_tabs > 1 {
+                self.close_view(&v);
+            } else {
+                *self.fresh.borrow_mut() = None;
             }
+        }
     }
 
     pub(crate) fn switch_focused_tab_profile(self: &Rc<Self>, target_profile_id: &str) {
@@ -381,16 +386,17 @@ impl App {
 
         let mut rows = self.rows.borrow_mut();
         if let Some(row) = rows.get_mut(cur_r)
-            && let Some(tab) = row.tabs.get_mut(cur_c) {
-                tab.container.remove(&tab.view);
-                tab.container.prepend(&new_view);
-                new_view.add_css_class("tab");
-                new_view.set_overflow(gtk::Overflow::Hidden);
-                new_view.set_vexpand(true);
-                new_view.set_hexpand(true);
-                tab.view = new_view.clone();
-                tab.profile_id = target_profile_id.to_string();
-            }
+            && let Some(tab) = row.tabs.get_mut(cur_c)
+        {
+            tab.container.remove(&tab.view);
+            tab.container.prepend(&new_view);
+            new_view.add_css_class("tab");
+            new_view.set_overflow(gtk::Overflow::Hidden);
+            new_view.set_vexpand(true);
+            new_view.set_hexpand(true);
+            tab.view = new_view.clone();
+            tab.profile_id = target_profile_id.to_string();
+        }
         drop(rows);
 
         if let Some(uri) = current_uri {

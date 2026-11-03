@@ -111,9 +111,10 @@ impl App {
         self.focus_coords(fr, fc);
         self.sync_settings_chrome();
         if let Some(v) = self.focused_view()
-            && !self.settings_modal_open() {
-                v.grab_focus();
-            }
+            && !self.settings_modal_open()
+        {
+            v.grab_focus();
+        }
     }
 
     /// Camera targets for the focused tab at zoom 1.0 (normal strip mode), without side effects.

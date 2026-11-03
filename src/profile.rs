@@ -50,12 +50,14 @@ impl Profile {
         let words: Vec<&str> = trimmed.split_whitespace().collect();
         if words.len() > 1 {
             if let Some(last) = words.last()
-                && last.chars().all(|c| c.is_ascii_digit()) && last.len() <= 3 {
-                    // e.g. "Profile 10" -> "10"
-                    if words.len() == 2 && words[0].eq_ignore_ascii_case("profile") {
-                        return (*last).to_string();
-                    }
+                && last.chars().all(|c| c.is_ascii_digit())
+                && last.len() <= 3
+            {
+                // e.g. "Profile 10" -> "10"
+                if words.len() == 2 && words[0].eq_ignore_ascii_case("profile") {
+                    return (*last).to_string();
                 }
+            }
             // Multi-word initials up to 3: "John Doe" -> "JD", "My Work Space" -> "MWS"
             let initials: String = words
                 .iter()
@@ -141,7 +143,9 @@ impl ProfileManager {
     }
 
     fn load(&mut self) {
-        if let Some(content) = crate::storage::read_with_auto_healing(&self.config_file, |c| c.contains('|')) {
+        if let Some(content) =
+            crate::storage::read_with_auto_healing(&self.config_file, |c| c.contains('|'))
+        {
             for line in content.lines() {
                 let parts: Vec<&str> = line.trim().split('|').collect();
                 if parts.len() >= 3 {

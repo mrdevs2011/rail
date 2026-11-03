@@ -460,7 +460,14 @@ pub(crate) fn build(gapp: &gtk::Application) {
         footer_downloads,
         footer_settings,
     );
-    wire_sidebar_header(&app, head_profile, head_back, head_forward, head_reload, head_close_side);
+    wire_sidebar_header(
+        &app,
+        head_profile,
+        head_back,
+        head_forward,
+        head_reload,
+        head_close_side,
+    );
     app.sync_head_profile();
 
     let a_pwa = app.clone();
@@ -484,6 +491,25 @@ pub(crate) fn build(gapp: &gtk::Application) {
     wire_keys(&app, win.clone());
 
     wire_close(&app, win.clone());
+
+    {
+        let a = app.clone();
+        app.side_profile_popover.connect_closed(move |_| {
+            a.check_sidebar_auto_close_on_popover_closed();
+        });
+    }
+    {
+        let a = app.clone();
+        app.side_downloads_popover.connect_closed(move |_| {
+            a.check_sidebar_auto_close_on_popover_closed();
+        });
+    }
+    {
+        let a = app.clone();
+        app.side_settings_popover.connect_closed(move |_| {
+            a.check_sidebar_auto_close_on_popover_closed();
+        });
+    }
 
     let restored = app.restore_session();
     if let Some(url) = TARGET_URL.get() {

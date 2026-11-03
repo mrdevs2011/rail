@@ -242,10 +242,11 @@ fn rebuild_url(host: &str, u: &glib::Uri, extra: &[(&str, &str)]) -> String {
         out.push_str(&pairs.join("&"));
     }
     if let Some(f) = u.fragment()
-        && !f.is_empty() {
-            out.push('#');
-            out.push_str(&f);
-        }
+        && !f.is_empty()
+    {
+        out.push('#');
+        out.push_str(&f);
+    }
     out
 }
 

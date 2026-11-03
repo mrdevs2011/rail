@@ -12,10 +12,13 @@ impl App {
             glib::markup_escape_text(&p.initial_letter())
         ));
         for i in 0..12 {
-            self.head_profile_dot.remove_css_class(&format!("prof-bg-{}", i));
+            self.head_profile_dot
+                .remove_css_class(&format!("prof-bg-{}", i));
         }
-        self.head_profile_dot.add_css_class(&format!("prof-bg-{}", p.color_idx));
-        self.head_profile_btn.set_tooltip_text(Some(&format!("{}: {}", tr("Profiles"), p.name)));
+        self.head_profile_dot
+            .add_css_class(&format!("prof-bg-{}", p.color_idx));
+        self.head_profile_btn
+            .set_tooltip_text(Some(&format!("{}: {}", tr("Profiles"), p.name)));
     }
 
     // =========================================================================
@@ -26,6 +29,7 @@ impl App {
         if self.side_profile_popover.is_visible() {
             self.side_profile_popover.popdown();
         } else {
+            self.set_sidebar(true);
             self.side_downloads_popover.popdown();
             self.side_settings_popover.popdown();
             self.rebuild_side_profile_popover();
@@ -178,6 +182,7 @@ impl App {
         if self.side_downloads_popover.is_visible() {
             self.side_downloads_popover.popdown();
         } else {
+            self.set_sidebar(true);
             self.side_profile_popover.popdown();
             self.side_settings_popover.popdown();
             self.rebuild_side_downloads_popover();
@@ -189,11 +194,8 @@ impl App {
                 if !app.side_downloads_popover.is_visible() {
                     return glib::ControlFlow::Break;
                 }
-                let has_active = crate::DOWNLOADS.with(|d| {
-                    d.borrow()
-                        .iter()
-                        .any(|item| item.status == "downloading")
-                });
+                let has_active = crate::DOWNLOADS
+                    .with(|d| d.borrow().iter().any(|item| item.status == "downloading"));
                 if has_active {
                     app.rebuild_side_downloads_popover();
                 }
@@ -305,14 +307,14 @@ impl App {
                 let path_c = e.path.clone();
                 fname_btn.connect_clicked(move |_| {
                     let uri = format!("file://{}", path_c);
-                    let _ = gio::AppInfo::launch_default_for_uri(&uri, None::<&gio::AppLaunchContext>);
+                    let _ =
+                        gio::AppInfo::launch_default_for_uri(&uri, None::<&gio::AppLaunchContext>);
                 });
                 top_row.append(&fname_btn);
 
-                let rem_btn = gtk::Button::new();
+                let rem_btn = gtk::Button::from_icon_name("window-close-symbolic");
                 rem_btn.add_css_class("side-dl-rem-btn");
-                let x_lbl = gtk::Label::new(Some("✕"));
-                rem_btn.set_child(Some(&x_lbl));
+                rem_btn.add_css_class("flat-icon");
                 rem_btn.set_tooltip_text(Some(tr("Remove from history")));
 
                 let eid = e.id;
@@ -336,7 +338,12 @@ impl App {
                 let meta_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
                 let pct = (e.progress * 100.0).round() as i32;
                 let size_str = if e.total > 0 {
-                    format!("{} / {} · {}%", crate::format_bytes(e.received), crate::format_bytes(e.total), pct)
+                    format!(
+                        "{} / {} · {}%",
+                        crate::format_bytes(e.received),
+                        crate::format_bytes(e.total),
+                        pct
+                    )
                 } else if e.received > 0 {
                     crate::format_bytes(e.received)
                 } else {
@@ -366,6 +373,7 @@ impl App {
         if self.side_settings_popover.is_visible() {
             self.side_settings_popover.popdown();
         } else {
+            self.set_sidebar(true);
             self.side_profile_popover.popdown();
             self.side_downloads_popover.popdown();
             self.rebuild_side_settings_popover();
@@ -420,7 +428,11 @@ impl App {
         list_box.set_margin_end(4);
 
         // General
-        let row_gen = self.create_popover_action_row("emblem-system-symbolic", tr("General"), "Search Engine, Home");
+        let row_gen = self.create_popover_action_row(
+            "emblem-system-symbolic",
+            tr("General"),
+            "Search Engine, Home",
+        );
         let a_g = self.clone();
         row_gen.connect_clicked(move |_| {
             a_g.side_settings_popover.popdown();
@@ -429,7 +441,11 @@ impl App {
         list_box.append(&row_gen);
 
         // Appearance / Customize
-        let row_app = self.create_popover_action_row("applications-graphics-symbolic", tr("Customize"), "Themes, Layout, CSS");
+        let row_app = self.create_popover_action_row(
+            "applications-graphics-symbolic",
+            tr("Customize"),
+            "Themes, Layout, CSS",
+        );
         let a_ap = self.clone();
         row_app.connect_clicked(move |_| {
             a_ap.side_settings_popover.popdown();
@@ -438,7 +454,11 @@ impl App {
         list_box.append(&row_app);
 
         // Privacy
-        let row_priv = self.create_popover_action_row("security-high-symbolic", tr("Privacy"), "Shields, AdBlock, Cookies");
+        let row_priv = self.create_popover_action_row(
+            "security-high-symbolic",
+            tr("Privacy"),
+            "Shields, AdBlock, Cookies",
+        );
         let a_pr = self.clone();
         row_priv.connect_clicked(move |_| {
             a_pr.side_settings_popover.popdown();
@@ -447,7 +467,11 @@ impl App {
         list_box.append(&row_priv);
 
         // Profiles / Accounts
-        let row_prof = self.create_popover_action_row("avatar-default-symbolic", tr("Profiles"), "Multiple Identities");
+        let row_prof = self.create_popover_action_row(
+            "avatar-default-symbolic",
+            tr("Profiles"),
+            "Multiple Identities",
+        );
         let a_pf = self.clone();
         row_prof.connect_clicked(move |_| {
             a_pf.side_settings_popover.popdown();
@@ -456,7 +480,11 @@ impl App {
         list_box.append(&row_prof);
 
         // Shortcuts
-        let row_sc = self.create_popover_action_row("input-keyboard-symbolic", tr("Shortcuts"), "Key Bindings & Navigation");
+        let row_sc = self.create_popover_action_row(
+            "input-keyboard-symbolic",
+            tr("Shortcuts"),
+            "Key Bindings & Navigation",
+        );
         let a_sc = self.clone();
         row_sc.connect_clicked(move |_| {
             a_sc.side_settings_popover.popdown();
@@ -465,7 +493,11 @@ impl App {
         list_box.append(&row_sc);
 
         // Data & History
-        let row_data = self.create_popover_action_row("drive-harddisk-symbolic", tr("Data"), "History, Cache, Sync");
+        let row_data = self.create_popover_action_row(
+            "drive-harddisk-symbolic",
+            tr("Data"),
+            "History, Cache, Sync",
+        );
         let a_dt = self.clone();
         row_data.connect_clicked(move |_| {
             a_dt.side_settings_popover.popdown();
@@ -478,7 +510,12 @@ impl App {
         self.side_settings_popover.set_child(Some(&pop_box));
     }
 
-    fn create_popover_action_row(&self, icon_name: &str, title: &str, subtitle: &str) -> gtk::Button {
+    fn create_popover_action_row(
+        &self,
+        icon_name: &str,
+        title: &str,
+        subtitle: &str,
+    ) -> gtk::Button {
         let btn = gtk::Button::new();
         btn.add_css_class("side-settings-row-btn");
 

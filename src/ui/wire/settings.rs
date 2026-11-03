@@ -176,10 +176,11 @@ pub(crate) fn wire_settings(
         let a = a.clone();
         dialog.save(Some(&win), gio::Cancellable::NONE, move |res| {
             if let Ok(file) = res
-                && let Some(path) = file.path() {
-                    a.data_export_entry.set_text(&path.to_string_lossy());
-                    a.execute_export_action();
-                }
+                && let Some(path) = file.path()
+            {
+                a.data_export_entry.set_text(&path.to_string_lossy());
+                a.execute_export_action();
+            }
         });
     });
 
@@ -195,10 +196,11 @@ pub(crate) fn wire_settings(
         let a = a.clone();
         dialog.open(Some(&win), gio::Cancellable::NONE, move |res| {
             if let Ok(file) = res
-                && let Some(path) = file.path() {
-                    a.data_import_entry.set_text(&path.to_string_lossy());
-                    a.execute_import_action();
-                }
+                && let Some(path) = file.path()
+            {
+                a.data_import_entry.set_text(&path.to_string_lossy());
+                a.execute_import_action();
+            }
         });
     });
 

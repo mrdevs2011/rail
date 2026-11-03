@@ -51,9 +51,10 @@ pub(crate) fn wire_keys(app: &Rc<App>, win: gtk::ApplicationWindow) {
                 _ => None,
             };
             if let Some(action) = action
-                && nav_app.run_action(action) {
-                    return glib::Propagation::Stop;
-                }
+                && nav_app.run_action(action)
+            {
+                return glib::Propagation::Stop;
+            }
         }
         glib::Propagation::Proceed
     });

@@ -40,10 +40,16 @@ pub(crate) fn build_sidebar() -> SidebarWidgets {
     head_profile.add_css_class("flat-icon");
     head_profile.add_css_class("side-head-btn");
     head_profile.add_css_class("side-head-profile-btn");
+    head_profile.set_size_request(28, 28);
+    head_profile.set_valign(gtk::Align::Center);
+    head_profile.set_halign(gtk::Align::Center);
     head_profile.set_tooltip_text(Some(tr("Profiles")));
 
     let head_profile_dot = gtk::Label::new(None);
     head_profile_dot.add_css_class("head-prof-dot");
+    head_profile_dot.set_size_request(22, 22);
+    head_profile_dot.set_valign(gtk::Align::Center);
+    head_profile_dot.set_halign(gtk::Align::Center);
     head_profile.set_child(Some(&head_profile_dot));
 
     let head_back = gtk::Button::from_icon_name("go-previous-symbolic");

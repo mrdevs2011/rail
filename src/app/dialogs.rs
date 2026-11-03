@@ -10,9 +10,10 @@ impl App {
     pub(crate) fn hide_confirm_modal(self: &Rc<Self>) {
         if let Some(backdrop) = self.confirm_modal.borrow_mut().take()
             && let Some(parent) = backdrop.parent()
-            && let Ok(overlay) = parent.downcast::<gtk::Overlay>() {
-                overlay.remove_overlay(&backdrop);
-            }
+            && let Ok(overlay) = parent.downcast::<gtk::Overlay>()
+        {
+            overlay.remove_overlay(&backdrop);
+        }
     }
 
     /// Centralized confirmation modal for irreversible/destructive actions (Clear History, Clear Cache, Clear Downloads, etc.)
@@ -132,16 +133,18 @@ impl App {
         let a_click = Rc::downgrade(self);
         click.connect_pressed(move |_, _, x, y| {
             if let Some(c) = c_ref.parent()
-                && let Some(bounds) = c.compute_bounds(&bd_ref) {
-                    let bx = bounds.x() as f64;
-                    let by = bounds.y() as f64;
-                    let bw = bounds.width() as f64;
-                    let bh = bounds.height() as f64;
-                    if (x < bx || x > bx + bw || y < by || y > by + bh)
-                        && let Some(app) = a_click.upgrade() {
-                            app.hide_confirm_modal();
-                        }
+                && let Some(bounds) = c.compute_bounds(&bd_ref)
+            {
+                let bx = bounds.x() as f64;
+                let by = bounds.y() as f64;
+                let bw = bounds.width() as f64;
+                let bh = bounds.height() as f64;
+                if (x < bx || x > bx + bw || y < by || y > by + bh)
+                    && let Some(app) = a_click.upgrade()
+                {
+                    app.hide_confirm_modal();
                 }
+            }
         });
         backdrop.add_controller(click);
 
@@ -197,15 +200,16 @@ impl App {
         revealer.set_reveal_child(true);
 
         let revealer_c = revealer.clone();
-        
+
         move || {
             revealer_c.set_reveal_child(false);
             let r = revealer_c.clone();
             glib::timeout_add_local_once(std::time::Duration::from_millis(200), move || {
                 if let Some(parent) = r.parent()
-                    && let Ok(overlay) = parent.downcast::<gtk::Overlay>() {
-                        overlay.remove_overlay(&r);
-                    }
+                    && let Ok(overlay) = parent.downcast::<gtk::Overlay>()
+                {
+                    overlay.remove_overlay(&r);
+                }
             });
         }
     }
@@ -404,98 +408,96 @@ impl App {
         menu.remove_all();
 
         // 1. Link items
-        if is_link
-            && let Some(uri) = &link_uri {
-                let uri_t = uri.clone();
-                let app_t = self.clone();
-                let act_tab = gio::SimpleAction::new("ctx-open-tab", None);
-                act_tab.connect_activate(move |_, _| {
-                    app_t.new_tab_with_url(&uri_t);
-                });
-                self.win.add_action(&act_tab);
-                menu.append(&ContextMenuItem::from_gaction(
-                    &act_tab,
-                    tr("Open Link in New Tab"),
-                    None,
-                ));
+        if is_link && let Some(uri) = &link_uri {
+            let uri_t = uri.clone();
+            let app_t = self.clone();
+            let act_tab = gio::SimpleAction::new("ctx-open-tab", None);
+            act_tab.connect_activate(move |_, _| {
+                app_t.new_tab_with_url(&uri_t);
+            });
+            self.win.add_action(&act_tab);
+            menu.append(&ContextMenuItem::from_gaction(
+                &act_tab,
+                tr("Open Link in New Tab"),
+                None,
+            ));
 
-                let uri_s = uri.clone();
-                let app_s = self.clone();
-                let act_split = gio::SimpleAction::new("ctx-open-split", None);
-                act_split.connect_activate(move |_, _| {
-                    app_s.split_with_url(&uri_s);
-                });
-                self.win.add_action(&act_split);
-                menu.append(&ContextMenuItem::from_gaction(
-                    &act_split,
-                    tr("Open Link in Split View"),
-                    None,
-                ));
+            let uri_s = uri.clone();
+            let app_s = self.clone();
+            let act_split = gio::SimpleAction::new("ctx-open-split", None);
+            act_split.connect_activate(move |_, _| {
+                app_s.split_with_url(&uri_s);
+            });
+            self.win.add_action(&act_split);
+            menu.append(&ContextMenuItem::from_gaction(
+                &act_split,
+                tr("Open Link in Split View"),
+                None,
+            ));
 
-                let uri_c = uri.clone();
-                let act_copy = gio::SimpleAction::new("ctx-copy-link", None);
-                act_copy.connect_activate(move |_, _| {
-                    if let Some(display) = gdk::Display::default() {
-                        display.clipboard().set_text(&uri_c);
-                    }
-                });
-                self.win.add_action(&act_copy);
-                menu.append(&ContextMenuItem::from_gaction(
-                    &act_copy,
-                    tr("Copy Link Address"),
-                    None,
-                ));
+            let uri_c = uri.clone();
+            let act_copy = gio::SimpleAction::new("ctx-copy-link", None);
+            act_copy.connect_activate(move |_, _| {
+                if let Some(display) = gdk::Display::default() {
+                    display.clipboard().set_text(&uri_c);
+                }
+            });
+            self.win.add_action(&act_copy);
+            menu.append(&ContextMenuItem::from_gaction(
+                &act_copy,
+                tr("Copy Link Address"),
+                None,
+            ));
 
-                menu.append(&ContextMenuItem::from_stock_action_with_label(
-                    ContextMenuAction::DownloadLinkToDisk,
-                    tr("Save Link As..."),
-                ));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::DownloadLinkToDisk,
+                tr("Save Link As..."),
+            ));
 
-                menu.append(&ContextMenuItem::new_separator());
-            }
+            menu.append(&ContextMenuItem::new_separator());
+        }
 
         // 2. Image items
-        if is_image
-            && let Some(img_url) = &image_uri {
-                let img_t = img_url.clone();
-                let app_t = self.clone();
-                let act_img = gio::SimpleAction::new("ctx-open-img", None);
-                act_img.connect_activate(move |_, _| {
-                    app_t.new_tab_with_url(&img_t);
-                });
-                self.win.add_action(&act_img);
-                menu.append(&ContextMenuItem::from_gaction(
-                    &act_img,
-                    tr("Open Image in New Tab"),
-                    None,
-                ));
+        if is_image && let Some(img_url) = &image_uri {
+            let img_t = img_url.clone();
+            let app_t = self.clone();
+            let act_img = gio::SimpleAction::new("ctx-open-img", None);
+            act_img.connect_activate(move |_, _| {
+                app_t.new_tab_with_url(&img_t);
+            });
+            self.win.add_action(&act_img);
+            menu.append(&ContextMenuItem::from_gaction(
+                &act_img,
+                tr("Open Image in New Tab"),
+                None,
+            ));
 
-                let img_c = img_url.clone();
-                let act_copy_img = gio::SimpleAction::new("ctx-copy-img-url", None);
-                act_copy_img.connect_activate(move |_, _| {
-                    if let Some(display) = gdk::Display::default() {
-                        display.clipboard().set_text(&img_c);
-                    }
-                });
-                self.win.add_action(&act_copy_img);
-                menu.append(&ContextMenuItem::from_gaction(
-                    &act_copy_img,
-                    tr("Copy Image Address"),
-                    None,
-                ));
+            let img_c = img_url.clone();
+            let act_copy_img = gio::SimpleAction::new("ctx-copy-img-url", None);
+            act_copy_img.connect_activate(move |_, _| {
+                if let Some(display) = gdk::Display::default() {
+                    display.clipboard().set_text(&img_c);
+                }
+            });
+            self.win.add_action(&act_copy_img);
+            menu.append(&ContextMenuItem::from_gaction(
+                &act_copy_img,
+                tr("Copy Image Address"),
+                None,
+            ));
 
-                menu.append(&ContextMenuItem::from_stock_action_with_label(
-                    ContextMenuAction::CopyImageToClipboard,
-                    tr("Copy Image"),
-                ));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::CopyImageToClipboard,
+                tr("Copy Image"),
+            ));
 
-                menu.append(&ContextMenuItem::from_stock_action_with_label(
-                    ContextMenuAction::DownloadImageToDisk,
-                    tr("Save Image As..."),
-                ));
+            menu.append(&ContextMenuItem::from_stock_action_with_label(
+                ContextMenuAction::DownloadImageToDisk,
+                tr("Save Image As..."),
+            ));
 
-                menu.append(&ContextMenuItem::new_separator());
-            }
+            menu.append(&ContextMenuItem::new_separator());
+        }
 
         // 3. Media items
         if is_media {

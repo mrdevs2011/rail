@@ -216,9 +216,10 @@ impl App {
     pub(crate) fn hide_qr_modal(self: &Rc<Self>) {
         if let Some(backdrop) = self.qr_modal.borrow_mut().take()
             && let Some(parent) = backdrop.parent()
-                && let Ok(overlay) = parent.downcast::<gtk::Overlay>() {
-                    overlay.remove_overlay(&backdrop);
-                }
+            && let Ok(overlay) = parent.downcast::<gtk::Overlay>()
+        {
+            overlay.remove_overlay(&backdrop);
+        }
     }
 
     /// Brutalist sharp modal card with a scannable QR code of the page address.
@@ -397,16 +398,18 @@ impl App {
         let bd_weak = backdrop.downgrade();
         click.connect_released(move |_, _, x, y| {
             if let (Some(c), Some(bd)) = (card_weak.upgrade(), bd_weak.upgrade())
-                && let Some(bounds) = c.compute_bounds(&bd) {
-                    let bx = bounds.x() as f64;
-                    let by = bounds.y() as f64;
-                    let bw = bounds.width() as f64;
-                    let bh = bounds.height() as f64;
-                    if (x < bx || x > bx + bw || y < by || y > by + bh)
-                        && let Some(app) = app_click.upgrade() {
-                            app.hide_qr_modal();
-                        }
+                && let Some(bounds) = c.compute_bounds(&bd)
+            {
+                let bx = bounds.x() as f64;
+                let by = bounds.y() as f64;
+                let bw = bounds.width() as f64;
+                let bh = bounds.height() as f64;
+                if (x < bx || x > bx + bw || y < by || y > by + bh)
+                    && let Some(app) = app_click.upgrade()
+                {
+                    app.hide_qr_modal();
                 }
+            }
         });
         backdrop.add_controller(click);
 

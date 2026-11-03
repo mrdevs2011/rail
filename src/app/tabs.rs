@@ -12,14 +12,13 @@ fn should_download_response(
     mime_type_supported: bool,
 ) -> bool {
     let mime = mime_type.unwrap_or_default().trim().to_ascii_lowercase();
-    let is_html_document = mime.starts_with("text/html")
-        || mime.starts_with("application/xhtml+xml");
+    let is_html_document =
+        mime.starts_with("text/html") || mime.starts_with("application/xhtml+xml");
     let is_explicit_attachment = content_disposition
         .and_then(|value| value.split(';').next())
         .is_some_and(|value| value.trim().eq_ignore_ascii_case("attachment"));
 
-    is_explicit_attachment
-        || (!is_html_document && (suggested_filename || !mime_type_supported))
+    is_explicit_attachment || (!is_html_document && (suggested_filename || !mime_type_supported))
 }
 
 pub(crate) fn is_external_uri_scheme(scheme: &str) -> bool {
@@ -218,9 +217,10 @@ impl App {
                     let mut uris = Vec::new();
                     for i in 0..model.n_items() {
                         if let Some(obj) = model.item(i)
-                            && let Ok(file) = obj.downcast::<gio::File>() {
-                                uris.push(file.uri().to_string());
-                            }
+                            && let Ok(file) = obj.downcast::<gio::File>()
+                        {
+                            uris.push(file.uri().to_string());
+                        }
                     }
                     let refs: Vec<&str> = uris.iter().map(String::as_str).collect();
                     if !refs.is_empty() {
@@ -265,20 +265,21 @@ impl App {
                 if let Some(nav_decision) =
                     decision.downcast_ref::<webkit6::NavigationPolicyDecision>()
                     && let Some(req) = nav_decision.navigation_action().and_then(|a| a.request())
-                        && let Some(uri) = req.uri() {
-                            let uri_s = uri.to_string();
-                            let scheme = uri_s.split(':').next().unwrap_or("").to_lowercase();
-                            if is_external_uri_scheme(&scheme)
-                                && gio::AppInfo::launch_default_for_uri(
-                                    &uri_s,
-                                    None::<&gio::AppLaunchContext>,
-                                )
-                                .is_ok()
-                            {
-                                decision.ignore();
-                                return true;
-                            }
-                        }
+                    && let Some(uri) = req.uri()
+                {
+                    let uri_s = uri.to_string();
+                    let scheme = uri_s.split(':').next().unwrap_or("").to_lowercase();
+                    if is_external_uri_scheme(&scheme)
+                        && gio::AppInfo::launch_default_for_uri(
+                            &uri_s,
+                            None::<&gio::AppLaunchContext>,
+                        )
+                        .is_ok()
+                    {
+                        decision.ignore();
+                        return true;
+                    }
+                }
                 let policies = webkit6::WebsitePolicies::builder()
                     .autoplay(webkit6::AutoplayPolicy::AllowWithoutSound)
                     .build();
@@ -342,10 +343,11 @@ impl App {
             let app = self.clone();
             glib::timeout_add_local_once(std::time::Duration::from_millis(ms), move || {
                 if app.focused_is_welcome()
-                    && let Some(v) = app.focused_view() {
-                        app.push_start_state(&v);
-                        app.focus_welcome_input(false);
-                    }
+                    && let Some(v) = app.focused_view()
+                {
+                    app.push_start_state(&v);
+                    app.focus_welcome_input(false);
+                }
             });
         }
         self.entry.grab_focus();
@@ -431,12 +433,23 @@ mod response_policy_tests {
 
     #[test]
     fn html_navigation_is_never_downloaded_for_mime_or_filename_reasons() {
-        assert!(!should_download_response(Some("text/html"), None, true, false));
         assert!(!should_download_response(
-            Some("text/html; charset=utf-8"), None, false, false
+            Some("text/html"),
+            None,
+            true,
+            false
         ));
         assert!(!should_download_response(
-            Some("application/xhtml+xml"), None, true, false
+            Some("text/html; charset=utf-8"),
+            None,
+            false,
+            false
+        ));
+        assert!(!should_download_response(
+            Some("application/xhtml+xml"),
+            None,
+            true,
+            false
         ));
     }
 
@@ -449,16 +462,32 @@ mod response_policy_tests {
             true,
         ));
         assert!(should_download_response(
-            Some("application/pdf"), Some("ATTACHMENT; filename=report.pdf"), false, true
+            Some("application/pdf"),
+            Some("ATTACHMENT; filename=report.pdf"),
+            false,
+            true
         ));
     }
 
     #[test]
     fn named_or_unsupported_non_html_payloads_download() {
         assert!(should_download_response(
-            Some("application/pdf"), Some("inline"), true, true
+            Some("application/pdf"),
+            Some("inline"),
+            true,
+            true
         ));
-        assert!(should_download_response(Some("application/octet-stream"), None, false, false));
-        assert!(!should_download_response(Some("application/pdf"), None, false, true));
+        assert!(should_download_response(
+            Some("application/octet-stream"),
+            None,
+            false,
+            false
+        ));
+        assert!(!should_download_response(
+            Some("application/pdf"),
+            None,
+            false,
+            true
+        ));
     }
 }

@@ -18,6 +18,7 @@ pub(crate) struct DownloadEntry {
 thread_local! {
     pub(crate) static DOWNLOADS: RefCell<Vec<DownloadEntry>> = const { RefCell::new(Vec::new()) };
     pub(crate) static DOWNLOAD_SEQ: Cell<u64> = const { Cell::new(1) };
+    static DOWNLOADS_LOADED: Cell<bool> = const { Cell::new(false) };
 }
 
 pub(crate) fn downloads_json_path() -> PathBuf {
@@ -25,14 +26,27 @@ pub(crate) fn downloads_json_path() -> PathBuf {
 }
 
 pub(crate) fn load_downloads_from_disk() {
-    let Some(text) = crate::storage::read_with_auto_healing(downloads_json_path(), |t| !t.trim().is_empty()) else {
+    let already_loaded = DOWNLOADS_LOADED.with(|l| {
+        if l.get() {
+            true
+        } else {
+            l.set(true);
+            false
+        }
+    });
+    if already_loaded {
+        return;
+    }
+    let p = downloads_json_path();
+    if !p.exists() {
+        return;
+    }
+    let Ok(text) = std::fs::read_to_string(&p) else {
         return;
     };
     DOWNLOADS.with(|d| {
         let mut v = d.borrow_mut();
-        if !v.is_empty() {
-            return;
-        }
+        v.clear();
         for line in text.lines() {
             let parts: Vec<&str> = line.splitn(6, '\t').collect();
             if parts.len() < 5 {
@@ -80,7 +94,10 @@ pub(crate) fn save_downloads_to_disk() {
                 e.id, e.status, e.filename, e.path, e.url, e.timestamp
             ));
         }
-        let _ = crate::storage::atomic_write_with_backup(downloads_json_path(), &out);
+        let p = downloads_json_path();
+        let _ = std::fs::write(&p, &out);
+        let bak = p.with_extension("bak");
+        let _ = std::fs::write(&bak, &out);
     });
 }
 
@@ -104,12 +121,18 @@ pub(crate) fn clear_all_downloads() {
     DOWNLOADS.with(|d| {
         d.borrow_mut().clear();
     });
-    let _ = crate::storage::atomic_write_with_backup(downloads_json_path(), "");
+    let p = downloads_json_path();
+    let _ = std::fs::write(&p, "");
+    let bak = p.with_extension("bak");
+    let _ = std::fs::write(&bak, "");
 }
 
 pub(crate) fn get_download_path(id: u64) -> Option<String> {
     DOWNLOADS.with(|d| {
-        d.borrow().iter().find(|e| e.id == id).map(|e| e.path.clone())
+        d.borrow()
+            .iter()
+            .find(|e| e.id == id)
+            .map(|e| e.path.clone())
     })
 }
 
@@ -234,7 +257,9 @@ pub(crate) fn resolve_download_filename(suggested: &str, uri: &str, mime: Option
                 .split('#')
                 .next()
                 .unwrap_or("");
-            if let Some(ext) = std::path::Path::new(uri_path).extension().and_then(|e| e.to_str())
+            if let Some(ext) = std::path::Path::new(uri_path)
+                .extension()
+                .and_then(|e| e.to_str())
                 && !ext.is_empty()
                 && ext.len() <= 6
                 && ext.chars().all(|c| c.is_ascii_alphabetic())
@@ -262,10 +287,7 @@ pub(crate) fn resolve_download_destination(
 
     if dest_path.exists() {
         let p = std::path::Path::new(&base_filename);
-        let stem = p
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("download");
+        let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("download");
         let ext = p
             .extension()
             .and_then(|s| s.to_str())
@@ -339,11 +361,18 @@ pub(crate) fn downloads_page() -> String {
             html.push_str(&format!(
                 r##"<div class="dl-row">
   <div class="dl-header">
-    <div class="dl-name-row">
-      <a href="#" class="dl-name" onclick="openFile({id}); return false;" title="{open_file_hint}">{fname}</a>
-      <button class="dl-remove-btn" onclick="removeDl({id}); return false;" title="{remove_hint}">✕</button>
+    <div class="dl-info">
+      <div class="dl-name-row">
+        <a href="#" class="dl-name" onclick="openFile({id}); return false;" title="{open_file_hint}">{fname}</a>
+      </div>
+      <div class="dl-meta">{date_badge}<span class="dl-size">{size}</span> · <span class="{cls}">{status}</span></div>
     </div>
-    <div class="dl-meta">{date_badge}<span class="dl-size">{size}</span> · <span class="{cls}">{status}</span></div>
+    <button class="dl-remove-btn" onclick="removeDl({id}); return false;" title="{remove_hint}">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="2" y1="2" x2="10" y2="10"></line>
+        <line x1="10" y1="2" x2="2" y2="10"></line>
+      </svg>
+    </button>
   </div>
   <div class="dl-bar"><div class="dl-fill" style="width:{pct}%"></div></div>
   <div class="dl-footer">
@@ -465,16 +494,17 @@ pub(crate) fn downloads_page() -> String {
   }}
   .dl-header {{
     display: flex;
-    flex-wrap: wrap;
     justify-content: space-between;
-    align-items: baseline;
-    gap: 6px;
+    align-items: flex-start;
+    gap: 12px;
+  }}
+  .dl-info {{
+    flex: 1;
+    min-width: 0;
   }}
   .dl-name-row {{
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-grow: 1;
   }}
   .dl-name {{
     font-size: clamp(12.5px, 2.8vw, 13.5px);
@@ -494,11 +524,16 @@ pub(crate) fn downloads_page() -> String {
     background: transparent;
     border: 1px solid #27272a;
     color: #71717a;
-    border-radius: 3px;
+    border-radius: 4px;
     cursor: pointer;
-    padding: 1px 6px;
-    font-size: 11px;
-    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    flex-shrink: 0;
+    margin-left: auto;
   }}
   .dl-row:hover .dl-remove-btn {{
     opacity: 1;
@@ -507,6 +542,11 @@ pub(crate) fn downloads_page() -> String {
     background: #271515;
     border-color: #ef4444;
     color: #ef4444;
+  }}
+  .dl-remove-btn svg {{
+    display: block;
+    width: 12px;
+    height: 12px;
   }}
   .dl-meta {{
     font-size: clamp(10.5px, 2.4vw, 11.5px);
@@ -726,28 +766,48 @@ mod tests {
 
     #[test]
     fn test_resolve_download_filename_html() {
-        let name = resolve_download_filename("", "https://news.ycombinator.com/item?id=123", Some("text/html; charset=utf-8"));
+        let name = resolve_download_filename(
+            "",
+            "https://news.ycombinator.com/item?id=123",
+            Some("text/html; charset=utf-8"),
+        );
         assert_eq!(name, "item.html");
     }
 
     #[test]
     fn test_resolve_download_filename_with_query_and_no_ext() {
-        let name = resolve_download_filename("export", "https://example.com/export?format=html", Some("text/html"));
+        let name = resolve_download_filename(
+            "export",
+            "https://example.com/export?format=html",
+            Some("text/html"),
+        );
         assert_eq!(name, "export.html");
     }
 
     #[test]
     fn test_resolve_download_filename_preserves_existing_ext() {
-        let name = resolve_download_filename("archive.tar.gz", "https://example.com/archive.tar.gz", Some("application/gzip"));
+        let name = resolve_download_filename(
+            "archive.tar.gz",
+            "https://example.com/archive.tar.gz",
+            Some("application/gzip"),
+        );
         assert_eq!(name, "archive.tar.gz");
 
-        let pdf = resolve_download_filename("paper.pdf", "https://example.com/paper.pdf", Some("application/pdf"));
+        let pdf = resolve_download_filename(
+            "paper.pdf",
+            "https://example.com/paper.pdf",
+            Some("application/pdf"),
+        );
         assert_eq!(pdf, "paper.pdf");
     }
 
     #[test]
     fn test_resolve_download_filename_sanitizes_bad_characters() {
-        let name = resolve_download_filename("../../evil/test\0file.pdf", "https://example.com/evil", Some("application/pdf"));
+        let name = resolve_download_filename(
+            "../../evil/test\0file.pdf",
+            "https://example.com/evil",
+            Some("application/pdf"),
+        );
         assert!(!name.contains('/'));
         assert!(!name.contains('\\'));
         assert!(!name.contains('\0'));

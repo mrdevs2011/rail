@@ -47,14 +47,15 @@ impl App {
         {
             let mut rows = self.rows.borrow_mut();
             if let Some(row) = rows.get_mut(r)
-                && c < row.tabs.len() {
-                    let (s, e) = row.col_span(c);
-                    let t = c as isize + dir;
-                    if t >= s as isize && (t as usize) < e {
-                        row.swap_keep_props(c, t as usize);
-                        swapped = Some(t as usize);
-                    }
+                && c < row.tabs.len()
+            {
+                let (s, e) = row.col_span(c);
+                let t = c as isize + dir;
+                if t >= s as isize && (t as usize) < e {
+                    row.swap_keep_props(c, t as usize);
+                    swapped = Some(t as usize);
                 }
+            }
         }
         if let Some(t) = swapped {
             self.sync_strip();

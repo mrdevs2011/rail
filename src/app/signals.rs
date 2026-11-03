@@ -22,9 +22,10 @@ impl App {
             if !app.ov.get() {
                 let Some(v) = v.upgrade() else { return };
                 if let Some((r, c)) = app.find_view_coords(&v)
-                    && (app.focus_row.get() != r || app.focus_col.get() != c) {
-                        app.focus_coords(r, c);
-                    }
+                    && (app.focus_row.get() != r || app.focus_col.get() != c)
+                {
+                    app.focus_coords(r, c);
+                }
             }
         });
         view.add_controller(click);
@@ -42,14 +43,15 @@ impl App {
                 return;
             }
             if hit.context_is_link()
-                && let Some(uri) = hit.link_uri().filter(|u| !u.is_empty()) {
-                    app_hover.hovered_link_label.set_text(uri.as_str());
-                    app_hover
-                        .hovered_link_label
-                        .set_tooltip_text(Some(uri.as_str()));
-                    app_hover.hovered_link_label.set_visible(true);
-                    return;
-                }
+                && let Some(uri) = hit.link_uri().filter(|u| !u.is_empty())
+            {
+                app_hover.hovered_link_label.set_text(uri.as_str());
+                app_hover
+                    .hovered_link_label
+                    .set_tooltip_text(Some(uri.as_str()));
+                app_hover.hovered_link_label.set_visible(true);
+                return;
+            }
             app_hover.hovered_link_label.set_text("");
             app_hover.hovered_link_label.set_tooltip_text(None);
             app_hover.hovered_link_label.set_visible(false);
@@ -69,13 +71,14 @@ impl App {
                     let side = app_insp.devtools_dock_side.get();
                     if side == DevToolsDockSide::Undocked {
                         if let Some(i) = insp_weak.upgrade()
-                            && let Some((r, c)) = app_insp.find_view_coords(&v) {
-                                let rows = app_insp.rows.borrow();
-                                if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) {
-                                    app_insp.show_floating_devtools(&v, tab, &i);
-                                    return true;
-                                }
+                            && let Some((r, c)) = app_insp.find_view_coords(&v)
+                        {
+                            let rows = app_insp.rows.borrow();
+                            if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(c)) {
+                                app_insp.show_floating_devtools(&v, tab, &i);
+                                return true;
                             }
+                        }
                     } else {
                         app_insp.show_view_devtools(&v);
                         return true;
@@ -126,10 +129,11 @@ impl App {
             insp.connect_bring_to_front(move |_| {
                 if let Some(v) = v_front.upgrade() {
                     if app_front.devtools_dock_side.get() == DevToolsDockSide::Undocked
-                        && let Some(win) = app_front.devtools_window.borrow().as_ref() {
-                            win.present();
-                            return true;
-                        }
+                        && let Some(win) = app_front.devtools_window.borrow().as_ref()
+                    {
+                        win.present();
+                        return true;
+                    }
                     if let Some((r, c)) = app_front.find_view_coords(&v) {
                         app_front.focus_coords(r, c);
                     }
@@ -193,9 +197,9 @@ impl App {
 
             let ptr = v.as_ptr() as usize;
             let recently_prevented = LAST_CONTEXT_PREVENTED.with(|m| {
-                m.borrow_mut().remove(&ptr).is_some_and(|t| {
-                    t.elapsed() < std::time::Duration::from_millis(400)
-                })
+                m.borrow_mut()
+                    .remove(&ptr)
+                    .is_some_and(|t| t.elapsed() < std::time::Duration::from_millis(400))
             });
 
             if recently_prevented && !is_shift {
@@ -219,9 +223,10 @@ impl App {
             if !app.ov.get() {
                 let Some(v) = v.upgrade() else { return };
                 if let Some((r, c)) = app.find_view_coords(&v)
-                    && (app.focus_row.get() != r || app.focus_col.get() != c) {
-                        app.focus_coords(r, c);
-                    }
+                    && (app.focus_row.get() != r || app.focus_col.get() != c)
+                {
+                    app.focus_coords(r, c);
+                }
             }
         });
         view.add_controller(focus);
@@ -332,14 +337,15 @@ impl App {
         view.connect_load_failed_with_tls_errors(move |v, failing_uri, cert, _errors| {
             if let Some(session) = v.network_session()
                 && let Ok(uri_obj) = glib::Uri::parse(failing_uri, glib::UriFlags::NONE)
-                    && let Some(host) = uri_obj.host() {
-                        let h = host.as_str();
-                        if h == "localhost" || h == "127.0.0.1" || h.ends_with(".local") {
-                            session.allow_tls_certificate_for_host(cert, &host);
-                            v.load_uri(failing_uri);
-                            return true;
-                        }
-                    }
+                && let Some(host) = uri_obj.host()
+            {
+                let h = host.as_str();
+                if h == "localhost" || h == "127.0.0.1" || h.ends_with(".local") {
+                    session.allow_tls_certificate_for_host(cert, &host);
+                    v.load_uri(failing_uri);
+                    return true;
+                }
+            }
             let html = crate::web::format_error_html(
                 failing_uri,
                 "net::ERR_CERT_AUTHORITY_INVALID: SSL / TLS certificate validation failed.",
@@ -354,12 +360,13 @@ impl App {
                 .unwrap_or_else(|| app.profiles.borrow().active_profile().id);
             let nv = App::create_related_web_view(v);
             if let Some(req) = nav.request()
-                && let Some(uri) = req.uri() {
-                    let u = uri.to_string();
-                    if !u.is_empty() && u != "about:blank" {
-                        app.set_view_saved_uri(&nv, &u);
-                    }
+                && let Some(uri) = req.uri()
+            {
+                let u = uri.to_string();
+                if !u.is_empty() && u != "about:blank" {
+                    app.set_view_saved_uri(&nv, &u);
                 }
+            }
             app.add_view(nv.clone(), parent_prof, false);
             app.mark_keep_alive(v);
             app.mark_keep_alive(&nv);
@@ -545,9 +552,10 @@ impl App {
             if !app.ov.get() {
                 let Some(v) = v.upgrade() else { return };
                 if let Some((r, c)) = app.find_view_coords(&v)
-                    && (app.focus_row.get() != r || app.focus_col.get() != c) {
-                        app.focus_coords(r, c);
-                    }
+                    && (app.focus_row.get() != r || app.focus_col.get() != c)
+                {
+                    app.focus_coords(r, c);
+                }
             }
         });
         container.add_controller(click);
@@ -576,9 +584,10 @@ impl App {
                     h.add_css_class("active");
                 }
                 if let Some(ev) = gesture.current_event()
-                    && let Some((rx, _)) = ev.position() {
-                        start_root_x.set(rx);
-                    }
+                    && let Some((rx, _)) = ev.position()
+                {
+                    start_root_x.set(rx);
+                }
                 if let Some((r, c)) = app.find_view_coords(&v) {
                     let (c, next_c) = app.col_head_and_next(r, c);
                     let vw = app.strip.width() as f64;
@@ -670,15 +679,16 @@ impl App {
         let v_dbl = view.downgrade();
         dbl_click.connect_pressed(move |_, n_press, _, _| {
             if n_press == 2
-                && let Some((r, c)) = v_dbl.upgrade().and_then(|v| app_dbl.find_view_coords(&v)) {
-                    let rows = app_dbl.rows.borrow();
-                    if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(row.col_span(c).0)) {
-                        tab.custom_width.set(None);
-                    }
-                    drop(rows);
-                    app_dbl.sync_strip();
-                    app_dbl.schedule_save_session();
+                && let Some((r, c)) = v_dbl.upgrade().and_then(|v| app_dbl.find_view_coords(&v))
+            {
+                let rows = app_dbl.rows.borrow();
+                if let Some(tab) = rows.get(r).and_then(|row| row.tabs.get(row.col_span(c).0)) {
+                    tab.custom_width.set(None);
                 }
+                drop(rows);
+                app_dbl.sync_strip();
+                app_dbl.schedule_save_session();
+            }
         });
 
         resize_handle.add_controller(drag);
@@ -706,9 +716,10 @@ impl App {
                     hh.add_css_class("active");
                 }
                 if let Some(ev) = gesture.current_event()
-                    && let Some((_, ry)) = ev.position() {
-                        start_root_y.set(ry);
-                    }
+                    && let Some((_, ry)) = ev.position()
+                {
+                    start_root_y.set(ry);
+                }
                 if let Some((r, c)) = app.find_view_coords(&v) {
                     let vh = app.strip.height() as f64;
                     let rows = app.rows.borrow();

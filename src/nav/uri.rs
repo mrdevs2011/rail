@@ -81,14 +81,15 @@ pub(crate) fn to_uri(input: &str, search_engine: &str) -> String {
         return format!("file://{}/{}", home.display(), rest);
     }
     if (s.starts_with("./") || s.starts_with("../"))
-        && let Ok(cur) = std::env::current_dir() {
-            let full = cur.join(s);
-            let target = std::fs::canonicalize(&full).unwrap_or(full);
-            if let Ok(uri) = glib::filename_to_uri(&target, None) {
-                return uri.to_string();
-            }
-            return format!("file://{}", target.display());
+        && let Ok(cur) = std::env::current_dir()
+    {
+        let full = cur.join(s);
+        let target = std::fs::canonicalize(&full).unwrap_or(full);
+        if let Ok(uri) = glib::filename_to_uri(&target, None) {
+            return uri.to_string();
         }
+        return format!("file://{}", target.display());
+    }
 
     // Check if `s` exists directly on the filesystem (e.g. "analyze.py", "index.html")
     let direct_path = std::path::Path::new(s);

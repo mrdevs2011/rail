@@ -179,12 +179,7 @@ pub(crate) const SHORTCUT_DEFS: &[ShortcutDef] = &[
         "Zoom out (page 20-500%)",
         ["Ctrl+minus"]
     ),
-    sc!(
-        "zoom_reset",
-        G_PANELS,
-        "Reset zoom (page 100%)",
-        ["Ctrl+0"]
-    ),
+    sc!("zoom_reset", G_PANELS, "Reset zoom (page 100%)", ["Ctrl+0"]),
     sc!("sidebar", G_PANELS, "Toggle Sidebar", ["Alt+B"]),
     sc!("downloads", G_PANELS, "Open Downloads", ["Ctrl+J"]),
     sc!("history", G_PANELS, "Open History", ["Ctrl+H"]),
@@ -237,7 +232,8 @@ pub(crate) fn reload_customize_from_disk() {
 
 pub(crate) fn load_shortcuts_config() -> ShortcutConfig {
     let mut cfg = ShortcutConfig::default();
-    let Some(text) = read_with_auto_healing(shortcuts_path(), |t| minijson::parse(t).is_some()) else {
+    let Some(text) = read_with_auto_healing(shortcuts_path(), |t| minijson::parse(t).is_some())
+    else {
         return cfg;
     };
     let Some(root) = minijson::parse(&text) else {
@@ -544,37 +540,40 @@ pub(crate) fn shortcut_combo(
     }
     let mut label: Option<String> = None;
     if let Some(display) = gdk::Display::default()
-        && let Some(entries) = display.map_keycode(keycode) {
+        && let Some(entries) = display.map_keycode(keycode)
+    {
+        for (kk, k) in entries.iter() {
+            if kk.level() != 0 {
+                continue;
+            }
+            if let Some(c) = k.to_unicode()
+                && c.is_ascii_graphic()
+            {
+                label = Some(if c == '+' {
+                    "plus".to_string()
+                } else {
+                    c.to_ascii_uppercase().to_string()
+                });
+                break;
+            }
+        }
+        if label.is_none() {
+            // Latin harf yo'q (masalan faqat kirill klaviatura): jismoniy tugma o'rni bo'yicha
+            if let Some(l) = sc_us_label(keycode) {
+                label = Some(l.to_string());
+            }
+        }
+        if label.is_none() {
             for (kk, k) in entries.iter() {
-                if kk.level() != 0 {
-                    continue;
-                }
-                if let Some(c) = k.to_unicode()
-                    && c.is_ascii_graphic() {
-                        label = Some(if c == '+' {
-                            "plus".to_string()
-                        } else {
-                            c.to_ascii_uppercase().to_string()
-                        });
-                        break;
-                    }
-            }
-            if label.is_none() {
-                // Latin harf yo'q (masalan faqat kirill klaviatura): jismoniy tugma o'rni bo'yicha
-                if let Some(l) = sc_us_label(keycode) {
-                    label = Some(l.to_string());
-                }
-            }
-            if label.is_none() {
-                for (kk, k) in entries.iter() {
-                    if kk.level() == 0
-                        && let Some(n) = k.name() {
-                            label = Some(n.to_string());
-                            break;
-                        }
+                if kk.level() == 0
+                    && let Some(n) = k.name()
+                {
+                    label = Some(n.to_string());
+                    break;
                 }
             }
         }
+    }
     let label = match label {
         Some(l) => l,
         None => key.to_lower().name()?.to_string(),
@@ -599,14 +598,15 @@ fn sc_key_token(key: gdk::Key) -> Option<(String, bool)> {
         return Some((n.to_string(), false));
     }
     if let Some(c) = key.to_unicode()
-        && c.is_ascii_graphic() {
-            let tok = if c == '+' {
-                "plus".to_string()
-            } else {
-                c.to_ascii_uppercase().to_string()
-            };
-            return Some((tok, !c.is_ascii_alphanumeric()));
-        }
+        && c.is_ascii_graphic()
+    {
+        let tok = if c == '+' {
+            "plus".to_string()
+        } else {
+            c.to_ascii_uppercase().to_string()
+        };
+        return Some((tok, !c.is_ascii_alphanumeric()));
+    }
     key.name().map(|n| (n.to_string(), false))
 }
 

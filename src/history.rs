@@ -451,9 +451,10 @@ impl HistoryManager {
             let mut cache = self.suggest_cache.borrow_mut();
             let mut order = self.suggest_cache_order.borrow_mut();
             if cache.len() >= SUGGEST_CACHE_CAP
-                && let Some(oldest) = order.pop_front() {
-                    cache.remove(&oldest);
-                }
+                && let Some(oldest) = order.pop_front()
+            {
+                cache.remove(&oldest);
+            }
             cache.insert(raw_q.to_string(), results.clone());
             order.push_back(raw_q.to_string());
         }

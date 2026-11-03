@@ -529,9 +529,10 @@ impl App {
         // Prefer a fresh durable snapshot while still mapped; otherwise keep the frame
         // grabbed on visibility-hide. Never clear an existing good frame here.
         if tab.view.is_mapped()
-            && let Some(tex) = Self::capture_durable_frame(&tab.view) {
-                tab.freeze.set_paintable(Some(&tex));
-            }
+            && let Some(tex) = Self::capture_durable_frame(&tab.view)
+        {
+            tab.freeze.set_paintable(Some(&tex));
+        }
         // ONLY suspend and terminate web process if a durable snapshot actually exists.
         // Terminating without a snapshot turns the tab into a pitch black crashed rectangle!
         if tab.freeze.paintable().is_some() {

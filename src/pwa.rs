@@ -98,30 +98,34 @@ pub(crate) fn install_pwa_app(
     let mut icon_downloaded = false;
 
     if let Some(i_url) = icon_url
-        && (i_url.starts_with("http://") || i_url.starts_with("https://")) {
-            let tmp_icon = std::env::temp_dir().join(format!("rail_pwa_icon_{}", id));
-            let curl_res = std::process::Command::new("curl")
-                .args([
-                    "-fsSL",
-                    "-m", "10",
-                    "-A", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
-                    "-o", tmp_icon.to_str().unwrap_or(""),
-                    i_url,
-                ])
-                .status();
+        && (i_url.starts_with("http://") || i_url.starts_with("https://"))
+    {
+        let tmp_icon = std::env::temp_dir().join(format!("rail_pwa_icon_{}", id));
+        let curl_res = std::process::Command::new("curl")
+            .args([
+                "-fsSL",
+                "-m",
+                "10",
+                "-A",
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                "-o",
+                tmp_icon.to_str().unwrap_or(""),
+                i_url,
+            ])
+            .status();
 
-            if curl_res.map(|s| s.success()).unwrap_or(false) && tmp_icon.is_file() {
-                // If the downloaded icon is already an image (PNG/ICO/JPG/SVG), convert or copy
-                if let Ok(pixbuf) = gtk::gdk_pixbuf::Pixbuf::from_file(&tmp_icon) {
-                    let _ = pixbuf.savev(&icon_path, "png", &[]);
-                    icon_downloaded = icon_path.is_file();
-                } else {
-                    let _ = std::fs::copy(&tmp_icon, &icon_path);
-                    icon_downloaded = icon_path.is_file();
-                }
-                let _ = std::fs::remove_file(&tmp_icon);
+        if curl_res.map(|s| s.success()).unwrap_or(false) && tmp_icon.is_file() {
+            // If the downloaded icon is already an image (PNG/ICO/JPG/SVG), convert or copy
+            if let Ok(pixbuf) = gtk::gdk_pixbuf::Pixbuf::from_file(&tmp_icon) {
+                let _ = pixbuf.savev(&icon_path, "png", &[]);
+                icon_downloaded = icon_path.is_file();
+            } else {
+                let _ = std::fs::copy(&tmp_icon, &icon_path);
+                icon_downloaded = icon_path.is_file();
             }
+            let _ = std::fs::remove_file(&tmp_icon);
         }
+    }
 
     if !icon_downloaded {
         // Fallback: write crisp SVG icon
@@ -214,40 +218,41 @@ pub(crate) fn list_installed_pwas() -> Vec<PwaAppInfo> {
     for entry in entries.flatten() {
         let meta_file = entry.path().join("app.json");
         if let Ok(content) = std::fs::read_to_string(meta_file)
-            && let Some(json) = crate::minijson::parse(&content) {
-                let id = json
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let name = json
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let url = json
-                    .get("url")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let icon_url = json
-                    .get("icon")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let theme_color = json
-                    .get("theme_color")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                if !name.is_empty() && !url.is_empty() {
-                    list.push(PwaAppInfo {
-                        id,
-                        name,
-                        url,
-                        icon_url,
-                        theme_color,
-                    });
-                }
+            && let Some(json) = crate::minijson::parse(&content)
+        {
+            let id = json
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let name = json
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let url = json
+                .get("url")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let icon_url = json
+                .get("icon")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let theme_color = json
+                .get("theme_color")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            if !name.is_empty() && !url.is_empty() {
+                list.push(PwaAppInfo {
+                    id,
+                    name,
+                    url,
+                    icon_url,
+                    theme_color,
+                });
             }
+        }
     }
     list
 }

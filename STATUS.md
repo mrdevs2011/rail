@@ -234,3 +234,9 @@
 - Hozirgi muammo/blocker: Yo'q.
 - Keyingi qadam: Foydalanuvchi yangi versiyani sinab ko'rsin.
 - Git holati: commit + push (refactor: insane-architect hardening & auto-healing persistence)
+
+---
+### 2026-11-03 16:13
+- Qilindi: Supabase navigation HTML-download regression fix: ResponsePolicyDecision now checks Content-Disposition attachment and preserves text/html/XHTML navigation even if WebKit reports unsupported MIME; tab close uses explicitly sized 12px GTK symbolic vector icon. cargo check --locked OK, cargo test --locked 80/80 OK, cargo build --release --locked OK. Existing unrelated working-tree edits preserved; no GUI smoke test yet.
+- Keyingi qadam: Restart Rail Browser from target/release/rail and test Supabase Start your project; verify tab close X appearance. If it still downloads, inspect response MIME and Content-Disposition from live request.
+- Git holati: 1b13b19 perf: live progress auto-refresh in quick downloads popover

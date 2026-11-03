@@ -98,8 +98,7 @@ pub(crate) fn import_data(archive_path: &Path) -> Result<(), String> {
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("rail");
-            if first_line.starts_with(dir_name) || first_line.starts_with(&format!("{dir_name}/"))
-            {
+            if first_line.starts_with(dir_name) || first_line.starts_with(&format!("{dir_name}/")) {
                 parent
             } else {
                 &dest_dir
@@ -175,36 +174,38 @@ pub(crate) fn print_data_info() {
 
     let profiles_file = dir.join("profiles.txt");
     if profiles_file.exists()
-        && let Ok(c) = std::fs::read_to_string(&profiles_file) {
-            let count = c.lines().filter(|l| !l.trim().is_empty()).count();
-            println!(
-                "{}",
-                trf(
-                    "  Profiles:      {} profiles configured",
-                    &[&count.to_string()]
-                )
-            );
-        }
+        && let Ok(c) = std::fs::read_to_string(&profiles_file)
+    {
+        let count = c.lines().filter(|l| !l.trim().is_empty()).count();
+        println!(
+            "{}",
+            trf(
+                "  Profiles:      {} profiles configured",
+                &[&count.to_string()]
+            )
+        );
+    }
 
     let profiles_dir = dir.join("profiles");
     if profiles_dir.exists()
-        && let Ok(entries) = std::fs::read_dir(&profiles_dir) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if p.is_dir() {
-                    let name = p.file_name().unwrap_or_default().to_string_lossy();
-                    let has_cookies = p.join("data").join("cookies.sqlite").exists();
-                    let has_storage = p.join("data").join("storage").exists();
-                    println!(
-                        "{}",
-                        trf(
-                            "    - Profile '{}': accounts/cookies={}, localStorage/IndexedDB={}",
-                            &[&name, &has_cookies.to_string(), &has_storage.to_string()]
-                        )
-                    );
-                }
+        && let Ok(entries) = std::fs::read_dir(&profiles_dir)
+    {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                let name = p.file_name().unwrap_or_default().to_string_lossy();
+                let has_cookies = p.join("data").join("cookies.sqlite").exists();
+                let has_storage = p.join("data").join("storage").exists();
+                println!(
+                    "{}",
+                    trf(
+                        "    - Profile '{}': accounts/cookies={}, localStorage/IndexedDB={}",
+                        &[&name, &has_cookies.to_string(), &has_storage.to_string()]
+                    )
+                );
             }
         }
+    }
 
     println!();
     println!("{}", tr("To share your exact environment with a friend:"));

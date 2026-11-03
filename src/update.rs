@@ -253,9 +253,10 @@ fn fast_parallel_download(url: &str, dest_tmp: &std::path::Path) -> Result<(), (
     for line in h_text.lines() {
         let l = line.to_ascii_lowercase();
         if l.starts_with("content-length:")
-            && let Some(val) = l.split(':').nth(1) {
-                total_size = val.trim().parse::<u64>().unwrap_or(0);
-            }
+            && let Some(val) = l.split(':').nth(1)
+        {
+            total_size = val.trim().parse::<u64>().unwrap_or(0);
+        }
     }
     if total_size < 200_000 {
         return Err(());

@@ -127,14 +127,14 @@ impl App {
                             .profiles
                             .borrow_mut()
                             .reorder_profile(from_idx, target_idx)
-                        {
-                            let a = app_end.clone();
-                            glib::idle_add_local_once(move || {
-                                a.rebuild_profiles_modal_list();
-                                a.rebuild_profile_popover();
-                                a.refresh_sidebar();
-                            });
-                        }
+                    {
+                        let a = app_end.clone();
+                        glib::idle_add_local_once(move || {
+                            a.rebuild_profiles_modal_list();
+                            a.rebuild_profile_popover();
+                            a.refresh_sidebar();
+                        });
+                    }
                 });
 
                 drag_handle.add_controller(drag);
@@ -210,7 +210,11 @@ impl App {
                     let pid_conf = pid.clone();
                     app.show_confirm_dialog(
                         tr("Delete Profile"),
-                        &format!("{} \"{}\"?", tr("Are you sure you want to delete profile"), pname),
+                        &format!(
+                            "{} \"{}\"?",
+                            tr("Are you sure you want to delete profile"),
+                            pname
+                        ),
                         tr("Delete Profile"),
                         true,
                         move || {

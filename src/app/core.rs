@@ -408,14 +408,15 @@ impl App {
         let clamped = width.clamp(280.0, vw);
         let rows = self.rows.borrow();
         if let Some(row) = rows.get(r)
-            && let Some(tab) = row.tabs.get(c) {
-                tab.custom_width.set(Some(clamped));
-                if (clamped - vw).abs() < 10.0 {
-                    tab.container.add_css_class("full");
-                } else {
-                    tab.container.remove_css_class("full");
-                }
+            && let Some(tab) = row.tabs.get(c)
+        {
+            tab.custom_width.set(Some(clamped));
+            if (clamped - vw).abs() < 10.0 {
+                tab.container.add_css_class("full");
+            } else {
+                tab.container.remove_css_class("full");
             }
+        }
         drop(rows);
         self.layout.set_column_width(r, c, Some(clamped));
         self.strip.queue_allocate();
@@ -561,13 +562,12 @@ impl App {
         name_lbl.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
         top_row.append(&name_lbl);
 
-        let cancel_btn = gtk::Button::new();
+        let cancel_btn = gtk::Button::from_icon_name("window-close-symbolic");
         cancel_btn.add_css_class("dl-toast-cancel-btn");
+        cancel_btn.add_css_class("flat-icon");
         cancel_btn.set_has_frame(false);
         cancel_btn.set_focus_on_click(false);
         cancel_btn.set_tooltip_text(Some(tr("Cancel")));
-        let x_lbl = gtk::Label::new(Some("✕"));
-        cancel_btn.set_child(Some(&x_lbl));
         top_row.append(&cancel_btn);
         card.append(&top_row);
 
@@ -628,11 +628,7 @@ impl App {
                     pct
                 ));
             } else {
-                status_ref.set_text(&format!(
-                    "{} · {}%",
-                    crate::format_bytes(rec),
-                    pct
-                ));
+                status_ref.set_text(&format!("{} · {}%", crate::format_bytes(rec), pct));
             }
         });
 

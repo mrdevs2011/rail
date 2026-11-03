@@ -31,7 +31,10 @@ pub(crate) fn temp_path<P: AsRef<Path>>(path: P) -> PathBuf {
 /// - Flushes and syncs to physical storage (`sync_all`).
 /// - Backs up any existing valid file to `<path>.bak`.
 /// - Atomically renames temporary file to `path`.
-pub(crate) fn atomic_write_with_backup<P: AsRef<Path>>(path: P, content: &str) -> std::io::Result<()> {
+pub(crate) fn atomic_write_with_backup<P: AsRef<Path>>(
+    path: P,
+    content: &str,
+) -> std::io::Result<()> {
     let target = path.as_ref();
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
@@ -47,10 +50,11 @@ pub(crate) fn atomic_write_with_backup<P: AsRef<Path>>(path: P, content: &str) -
     // Maintain backup of existing data if it exists and has content
     if target.exists()
         && let Ok(meta) = fs::metadata(target)
-            && meta.len() > 0 {
-                let bak = backup_path(target);
-                let _ = fs::copy(target, &bak);
-            }
+        && meta.len() > 0
+    {
+        let bak = backup_path(target);
+        let _ = fs::copy(target, &bak);
+    }
 
     // Atomic replace on POSIX
     fs::rename(&tmp, target)?;
@@ -73,17 +77,24 @@ pub(crate) fn read_with_auto_healing<P: AsRef<Path>, F: Fn(&str) -> bool>(
         if validator(&content) {
             return Some(content);
         }
-        eprintln!("[rail] Warning: Primary file {:?} failed validation/corrupted.", target);
+        eprintln!(
+            "[rail] Warning: Primary file {:?} failed validation/corrupted.",
+            target
+        );
     }
 
     // 2. Try backup file for self-healing
     let bak = backup_path(target);
     if let Ok(bak_content) = fs::read_to_string(&bak)
-        && validator(&bak_content) {
-            eprintln!("[rail] Self-healing: Restoring {:?} from {:?}.", target, bak);
-            let _ = atomic_write_with_backup(target, &bak_content);
-            return Some(bak_content);
-        }
+        && validator(&bak_content)
+    {
+        eprintln!(
+            "[rail] Self-healing: Restoring {:?} from {:?}.",
+            target, bak
+        );
+        let _ = atomic_write_with_backup(target, &bak_content);
+        return Some(bak_content);
+    }
 
     None
 }

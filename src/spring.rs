@@ -114,9 +114,10 @@ impl SwipeTracker {
     /// Adds a reading. Timestamps that go backwards are ignored.
     pub fn push(&mut self, delta: f64, t: f64) {
         if let Some(&(_, last)) = self.history.back()
-            && t < last {
-                return;
-            }
+            && t < last
+        {
+            return;
+        }
         self.history.push_back((delta, t));
         while let Some(&(_, first)) = self.history.front() {
             if t <= first + HISTORY_SECS {

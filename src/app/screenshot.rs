@@ -851,12 +851,13 @@ fn chrono_like_timestamp() -> String {
     if let Ok(out) = std::process::Command::new("date")
         .args(["+%Y-%m-%d %H-%M-%S"])
         .output()
-        && out.status.success() {
-            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !s.is_empty() {
-                return s;
-            }
+        && out.status.success()
+    {
+        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !s.is_empty() {
+            return s;
         }
+    }
     use std::time::{SystemTime, UNIX_EPOCH};
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)

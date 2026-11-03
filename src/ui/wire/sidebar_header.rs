@@ -16,17 +16,19 @@ pub(crate) fn wire_sidebar_header(
     let a = app.clone();
     head_back.connect_clicked(move |_| {
         if let Some(v) = a.focused_view()
-            && v.can_go_back() {
-                v.go_back();
-            }
+            && v.can_go_back()
+        {
+            v.go_back();
+        }
     });
 
     let a = app.clone();
     head_forward.connect_clicked(move |_| {
         if let Some(v) = a.focused_view()
-            && v.can_go_forward() {
-                v.go_forward();
-            }
+            && v.can_go_forward()
+        {
+            v.go_forward();
+        }
     });
 
     let a = app.clone();
@@ -74,6 +76,7 @@ pub(crate) fn wire_sidebar_header(
             && a_active.sidebar_auto.get()
             && a_active.side_open.get()
             && !a_active.sidebar_locked.get()
+            && !a_active.any_side_popover_open()
         {
             a_active.set_sidebar(false);
         }

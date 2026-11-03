@@ -150,22 +150,21 @@ mod imp {
             let mut vis = x + w > -mx && x < vw + mx && y + h > -my && y < vh + my;
             if !vis
                 && let Some(f) = focus
-                    && (f == c || f.is_ancestor(c)) {
-                        vis = true;
-                    }
+                && (f == c || f.is_ancestor(c))
+            {
+                vis = true;
+            }
             if vis == c.is_child_visible() {
                 return;
             }
             let cb = self.on_visibility.borrow().clone();
-            if !vis
-                && let Some(cb) = &cb {
-                    cb(c, false);
-                }
+            if !vis && let Some(cb) = &cb {
+                cb(c, false);
+            }
             c.set_child_visible(vis);
-            if vis
-                && let Some(cb) = &cb {
-                    cb(c, true);
-                }
+            if vis && let Some(cb) = &cb {
+                cb(c, true);
+            }
         }
     }
 
@@ -182,10 +181,9 @@ mod imp {
         fn allocate(&self, widget: &gtk::Widget, width: i32, height: i32, _baseline: i32) {
             let resized =
                 self.width.replace(width) != width || self.height.replace(height) != height;
-            if resized
-                && let Some(cb) = self.on_resize.borrow().clone() {
-                    glib::idle_add_local_once(move || cb());
-                }
+            if resized && let Some(cb) = self.on_resize.borrow().clone() {
+                glib::idle_add_local_once(move || cb());
+            }
             let vw = width as f64;
             let vh = height as f64;
             let (off_x, off_y, z) = (self.offset_x.get(), self.offset_y.get(), self.zoom.get());
@@ -424,9 +422,10 @@ impl StripLayout {
             if let Some(cur_row) = current.get(r_idx) {
                 for (c_idx, &t_val) in target_row.iter().enumerate() {
                     if let Some(&c_val) = cur_row.get(c_idx)
-                        && (c_val - t_val).abs() > 0.002 {
-                            return true;
-                        }
+                        && (c_val - t_val).abs() > 0.002
+                    {
+                        return true;
+                    }
                 }
             }
         }
@@ -442,14 +441,15 @@ impl StripLayout {
             if let Some(cur_row) = current.get_mut(r_idx) {
                 for (c_idx, &t_val) in target_row.iter().enumerate() {
                     if let Some(c_val) = cur_row.get_mut(c_idx)
-                        && (*c_val - t_val).abs() > 0.002 {
-                            *c_val += (t_val - *c_val) * k;
-                            if (*c_val - t_val).abs() <= 0.002 {
-                                *c_val = t_val;
-                            } else {
-                                still_animating = true;
-                            }
+                        && (*c_val - t_val).abs() > 0.002
+                    {
+                        *c_val += (t_val - *c_val) * k;
+                        if (*c_val - t_val).abs() <= 0.002 {
+                            *c_val = t_val;
+                        } else {
+                            still_animating = true;
                         }
+                    }
                 }
             }
         }

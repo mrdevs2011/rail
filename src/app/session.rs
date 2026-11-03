@@ -220,10 +220,12 @@ impl App {
         stacked.sort();
         for (sr, sc) in stacked {
             if let Some(row) = rows.get(sr)
-                && sc > 0 && sc < row.tabs.len() {
-                    let id = row.tabs[sc - 1].col_id.get();
-                    row.tabs[sc].col_id.set(id);
-                }
+                && sc > 0
+                && sc < row.tabs.len()
+            {
+                let id = row.tabs[sc - 1].col_id.get();
+                row.tabs[sc].col_id.set(id);
+            }
         }
         drop(rows);
 

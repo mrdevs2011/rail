@@ -157,9 +157,10 @@ impl App {
         }
 
         if let Some(tab) = rows[r_clamped].tabs.get(c_clamped)
-            && !tab.view.is_loading() {
-                self.load_bar.set_visible(false);
-            }
+            && !tab.view.is_loading()
+        {
+            self.load_bar.set_visible(false);
+        }
         drop(rows);
 
         // Overview navigation (h/j/k/l, arrows) must stay snappy: only move the camera.
@@ -200,9 +201,10 @@ impl App {
             && !self.ov.get()
             && !self.settings_modal_open()
             && !self.find_is_open()
-            && let Some(v) = self.focused_view() {
-                v.grab_focus();
-            }
+            && let Some(v) = self.focused_view()
+        {
+            v.grab_focus();
+        }
     }
 
     /// Keep settings UI on the settings tab's Overlay (like downloads lives in its
@@ -270,24 +272,26 @@ impl App {
         // Stay parented on the settings tab overlay even when another tab is focused,
         // so overview shows settings content the same way it shows downloads HTML.
         if let Some(parent) = v.parent()
-            && let Ok(ov) = parent.downcast::<gtk::Overlay>() {
-                let already = self
-                    .settings_modal
-                    .parent()
-                    .map(|p| p == *ov.upcast_ref::<gtk::Widget>())
-                    .unwrap_or(false);
-                if !already {
-                    if let Some(old) = self.settings_modal.parent()
-                        && let Ok(old_ov) = old.downcast::<gtk::Overlay>() {
-                            old_ov.remove_overlay(&self.settings_modal);
-                        }
-                    self.settings_modal.set_halign(gtk::Align::Fill);
-                    self.settings_modal.set_valign(gtk::Align::Fill);
-                    self.settings_modal.set_hexpand(true);
-                    self.settings_modal.set_vexpand(true);
-                    ov.add_overlay(&self.settings_modal);
+            && let Ok(ov) = parent.downcast::<gtk::Overlay>()
+        {
+            let already = self
+                .settings_modal
+                .parent()
+                .map(|p| p == *ov.upcast_ref::<gtk::Widget>())
+                .unwrap_or(false);
+            if !already {
+                if let Some(old) = self.settings_modal.parent()
+                    && let Ok(old_ov) = old.downcast::<gtk::Overlay>()
+                {
+                    old_ov.remove_overlay(&self.settings_modal);
                 }
+                self.settings_modal.set_halign(gtk::Align::Fill);
+                self.settings_modal.set_valign(gtk::Align::Fill);
+                self.settings_modal.set_hexpand(true);
+                self.settings_modal.set_vexpand(true);
+                ov.add_overlay(&self.settings_modal);
             }
+        }
 
         self.settings_modal.set_visible(true);
         // If a previous suspend left a black freeze over settings, clear it and keep process alive.
@@ -377,9 +381,10 @@ impl App {
         let n = rows[target_r].tabs.len();
         // 1) Last focused tab in that workspace (if still valid)
         if let Some(&c) = self.row_last_col.borrow().get(&target_r)
-            && c < n {
-                return c;
-            }
+            && c < n
+        {
+            return c;
+        }
         // 2) Same column ordinal + stack depth as the source tab
         if from_r < rows.len() && from_c < rows[from_r].tabs.len() {
             let from_cols = rows[from_r].columns();

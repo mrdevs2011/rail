@@ -111,9 +111,10 @@ impl App {
             let mut child = v.first_child();
             while let Some(w) = child {
                 if let Some(pm) = w.downcast_ref::<gtk::PopoverMenu>()
-                    && let Some(m) = pm.menu_model() {
-                        any |= add_menu_icons(&m, &icon, &labels);
-                    }
+                    && let Some(m) = pm.menu_model()
+                {
+                    any |= add_menu_icons(&m, &icon, &labels);
+                }
                 child = w.next_sibling();
             }
             if any || tries.get() >= 20 {

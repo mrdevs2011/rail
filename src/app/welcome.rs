@@ -151,18 +151,20 @@ impl App {
         // (Start page = centered column, max 580px, 20px side padding; brand block ~72px tall.)
         if self.focused_is_welcome()
             && let (Some(v), Some(parent)) = (self.focused_view(), self.palette.parent())
-                && let Some(b) = v.compute_bounds(&parent)
-                    && b.width() > 120.0 && b.height() > 120.0 {
-                        let cw = ((b.width() as i32) - 40).clamp(200, 580);
-                        let cx = b.x() + b.width() / 2.0;
-                        self.palette.set_size_request(cw, -1);
-                        self.palette.set_halign(gtk::Align::Start);
-                        self.palette
-                            .set_margin_start(((cx - cw as f32 / 2.0).round() as i32).max(0));
-                        let top = b.y() + b.height() / 2.0 + 36.0 + 28.0;
-                        self.palette.set_margin_top(top.round() as i32);
-                        return;
-                    }
+            && let Some(b) = v.compute_bounds(&parent)
+            && b.width() > 120.0
+            && b.height() > 120.0
+        {
+            let cw = ((b.width() as i32) - 40).clamp(200, 580);
+            let cx = b.x() + b.width() / 2.0;
+            self.palette.set_size_request(cw, -1);
+            self.palette.set_halign(gtk::Align::Start);
+            self.palette
+                .set_margin_start(((cx - cw as f32 / 2.0).round() as i32).max(0));
+            let top = b.y() + b.height() / 2.0 + 36.0 + 28.0;
+            self.palette.set_margin_top(top.round() as i32);
+            return;
+        }
         // Ctrl+L on a normal page: classic centered palette near the top
         target_w = target_w.max(200);
         self.palette.set_size_request(target_w, -1);
