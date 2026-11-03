@@ -2,6 +2,26 @@
 
 use crate::*;
 
+/// Decide whether a WebKit response is a file download rather than a document
+/// navigation. HTML documents must never be diverted just because WebKit cannot
+/// render a particular MIME variant or the URL happens to look like a filename.
+fn should_download_response(
+    mime_type: Option<&str>,
+    content_disposition: Option<&str>,
+    suggested_filename: bool,
+    mime_type_supported: bool,
+) -> bool {
+    let mime = mime_type.unwrap_or_default().trim().to_ascii_lowercase();
+    let is_html_document = mime.starts_with("text/html")
+        || mime.starts_with("application/xhtml+xml");
+    let is_explicit_attachment = content_disposition
+        .and_then(|value| value.split(';').next())
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("attachment"));
+
+    is_explicit_attachment
+        || (!is_html_document && (suggested_filename || !mime_type_supported))
+}
+
 pub(crate) fn is_external_uri_scheme(scheme: &str) -> bool {
     matches!(
         scheme,
@@ -219,13 +239,24 @@ impl App {
 
         view.connect_decide_policy(|_view, decision, decision_type| {
             if decision_type == webkit6::PolicyDecisionType::Response {
-                if let Some(resp_decision) = decision.downcast_ref::<webkit6::ResponsePolicyDecision>() {
-                    let is_attachment = resp_decision
-                        .response()
-                        .and_then(|r| r.suggested_filename())
-                        .is_some()
-                        || !resp_decision.is_mime_type_supported();
-                    if is_attachment {
+                if let Some(resp_decision) =
+                    decision.downcast_ref::<webkit6::ResponsePolicyDecision>()
+                    && let Some(response) = resp_decision.response()
+                {
+                    let mime = response.mime_type();
+                    let disposition = response
+                        .http_headers()
+                        .and_then(|headers| headers.one("Content-Disposition"));
+                    let has_suggested_filename = response.suggested_filename().is_some();
+
+                    // Keep HTML/XHTML navigations in the WebView. Explicit attachment
+                    // headers still win; other named or unsupported payloads download.
+                    if should_download_response(
+                        mime.as_deref(),
+                        disposition.as_deref(),
+                        has_suggested_filename,
+                        resp_decision.is_mime_type_supported(),
+                    ) {
                         resp_decision.download();
                         return true;
                     }
@@ -391,5 +422,43 @@ impl App {
                 }
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod response_policy_tests {
+    use super::should_download_response;
+
+    #[test]
+    fn html_navigation_is_never_downloaded_for_mime_or_filename_reasons() {
+        assert!(!should_download_response(Some("text/html"), None, true, false));
+        assert!(!should_download_response(
+            Some("text/html; charset=utf-8"), None, false, false
+        ));
+        assert!(!should_download_response(
+            Some("application/xhtml+xml"), None, true, false
+        ));
+    }
+
+    #[test]
+    fn explicit_attachment_header_wins_even_for_html() {
+        assert!(should_download_response(
+            Some("text/html"),
+            Some(" attachment; filename=project.html"),
+            false,
+            true,
+        ));
+        assert!(should_download_response(
+            Some("application/pdf"), Some("ATTACHMENT; filename=report.pdf"), false, true
+        ));
+    }
+
+    #[test]
+    fn named_or_unsupported_non_html_payloads_download() {
+        assert!(should_download_response(
+            Some("application/pdf"), Some("inline"), true, true
+        ));
+        assert!(should_download_response(Some("application/octet-stream"), None, false, false));
+        assert!(!should_download_response(Some("application/pdf"), None, false, true));
     }
 }
