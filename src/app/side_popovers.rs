@@ -182,6 +182,23 @@ impl App {
             self.side_settings_popover.popdown();
             self.rebuild_side_downloads_popover();
             self.side_downloads_popover.popup();
+
+            // Auto-refresh active downloads progress while visible
+            let app = self.clone();
+            glib::timeout_add_local(std::time::Duration::from_millis(600), move || {
+                if !app.side_downloads_popover.is_visible() {
+                    return glib::ControlFlow::Break;
+                }
+                let has_active = crate::DOWNLOADS.with(|d| {
+                    d.borrow()
+                        .iter()
+                        .any(|item| item.status == "downloading")
+                });
+                if has_active {
+                    app.rebuild_side_downloads_popover();
+                }
+                glib::ControlFlow::Continue
+            });
         }
     }
 
