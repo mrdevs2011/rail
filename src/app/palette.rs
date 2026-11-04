@@ -20,7 +20,9 @@ impl App {
         };
         self.entry.set_text(&shown);
 
-        let prof_id = self.profiles.borrow().active_id().to_string();
+        let prof_id = self
+            .focused_tab_profile()
+            .unwrap_or_else(|| self.profiles.borrow().active_id().to_string());
         self.select_palette_profile(&prof_id);
         self.rebuild_profile_popover();
 
@@ -360,20 +362,57 @@ impl App {
     }
 
     pub(crate) fn switch_focused_tab_profile(self: &Rc<Self>, target_profile_id: &str) {
+        if self
+            .profiles
+            .borrow()
+            .get_profile(target_profile_id)
+            .is_none()
+        {
+            return;
+        }
+
         let cur_r = self.focus_row.get();
         let cur_c = self.focus_col.get();
-        let rows = self.rows.borrow();
-        let tab_info = rows
-            .get(cur_r)
-            .and_then(|r| r.tabs.get(cur_c))
-            .map(|t| (t.profile_id.clone(), t.view.uri()));
-        drop(rows);
+        let tab_info = {
+            let rows = self.rows.borrow();
+            rows.get(cur_r).and_then(|r| r.tabs.get(cur_c)).map(|tab| {
+                let live_uri = tab
+                    .view
+                    .uri()
+                    .map(|uri| uri.to_string())
+                    .unwrap_or_default();
+                let saved_uri = tab.saved_uri.borrow().clone();
+                let uri = if live_uri.is_empty()
+                    || live_uri == "about:blank"
+                    || live_uri == "about:srcdoc"
+                {
+                    saved_uri
+                } else {
+                    live_uri
+                };
+                (
+                    tab.profile_id.clone(),
+                    uri,
+                    tab.view.clone(),
+                    tab.dt_open.get(),
+                )
+            })
+        };
 
-        let Some((current_pid, current_uri)) = tab_info else {
+        let Some((current_pid, current_uri, old_view, has_devtools)) = tab_info else {
             return;
         };
         if current_pid == target_profile_id {
+            self.profiles.borrow_mut().set_active(target_profile_id);
+            self.select_palette_profile(target_profile_id);
+            self.sync_head_profile();
             return;
+        }
+
+        // DevTools Inspector belongs to its original WebView. Close it before replacing
+        // the view so no detached inspector or stale dock widget survives the migration.
+        if has_devtools {
+            self.hide_view_devtools(&old_view);
         }
 
         let session = self
@@ -382,39 +421,63 @@ impl App {
             .get_or_create_session(target_profile_id);
         let new_view = Self::create_web_view(&session, target_profile_id);
         new_view.set_can_target(!self.ov.get());
+        new_view.set_zoom_level(old_view.zoom_level());
         self.setup_view_signals(&new_view);
 
-        let mut rows = self.rows.borrow_mut();
-        if let Some(row) = rows.get_mut(cur_r)
-            && let Some(tab) = row.tabs.get_mut(cur_c)
-        {
-            tab.container.remove(&tab.view);
-            tab.container.prepend(&new_view);
-            new_view.add_css_class("tab");
-            new_view.set_overflow(gtk::Overflow::Hidden);
-            new_view.set_vexpand(true);
-            new_view.set_hexpand(true);
-            tab.view = new_view.clone();
-            tab.profile_id = target_profile_id.to_string();
-        }
-        drop(rows);
-
-        if let Some(uri) = current_uri {
-            if uri.starts_with("about:") || uri.is_empty() {
-                new_view.load_html(&start_page(), Some("rail://start/"));
-            } else {
-                if is_internal_uri(&uri) {
-                    load_internal_page(&new_view, &uri);
-                } else {
-                    new_view.load_uri(&uri);
-                }
-            }
+        let was_fresh = self.fresh.borrow().as_ref() == Some(&old_view);
+        let uri = if current_uri.is_empty() {
+            "rail://start/".to_string()
         } else {
-            new_view.load_html(&start_page(), Some("rail://start/"));
+            current_uri
+        };
+
+        let replaced = {
+            let mut rows = self.rows.borrow_mut();
+            if let Some(tab) = rows
+                .get_mut(cur_r)
+                .and_then(|row| row.tabs.get_mut(cur_c))
+                .filter(|tab| tab.view == old_view)
+            {
+                // The WebView is the Overlay's main child, not a direct child of
+                // tab.container. set_child() atomically detaches the old view and
+                // keeps the freeze/resize overlays and the column geometry intact.
+                tab.overlay.set_child(Some(&new_view));
+                tab.view = new_view.clone();
+                tab.profile_id = target_profile_id.to_string();
+                *tab.saved_uri.borrow_mut() = uri.clone();
+                tab.suspended.set(false);
+                // A normal profile-bound WebView no longer shares a popup WebProcess.
+                tab.keep_alive.set(false);
+                tab.last_active.set(std::time::Instant::now());
+                tab.freeze.set_visible(false);
+                tab.freeze.set_paintable(None::<&gdk::Paintable>);
+                true
+            } else {
+                false
+            }
+        };
+        if !replaced {
+            return;
         }
 
+        if was_fresh {
+            *self.fresh.borrow_mut() = Some(new_view.clone());
+        }
+
+        if uri.starts_with("rail://start") || uri.starts_with("about:") {
+            new_view.load_html(&start_page(), Some("rail://start/"));
+        } else if is_internal_uri(&uri) {
+            load_internal_page(&new_view, &uri);
+        } else {
+            new_view.load_uri(&uri);
+        }
+
+        self.profiles.borrow_mut().set_active(target_profile_id);
+        self.select_palette_profile(target_profile_id);
+        self.sync_head_profile();
         self.refresh_sidebar();
         self.schedule_save_session();
+        self.strip.queue_allocate();
         self.focus_coords(cur_r, cur_c);
     }
 

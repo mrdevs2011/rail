@@ -106,6 +106,9 @@ jobs:
       - name: Test
         run: cargo test --release
 
+      - name: Clippy (warnings are errors)
+        run: cargo clippy --release -- -D warnings
+
       - name: Prepare asset
         run: |
           cp target/release/rail target/release/rail-linux-x86_64

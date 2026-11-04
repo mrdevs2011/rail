@@ -205,7 +205,7 @@ impl App {
     /// freeze'ga qo'yadi: animatsiya davomida ekranda tayyor tekstura siljiydi, WebView esa qayta
     /// chizilmaydi. Video/audio o'ynayotgan va yuklanayotgan tablar tegilmaydi (jonli qoladi).
     /// `RAIL_NO_ANIM_FREEZE=1` bilan o'chiriladi (GPU'da solishtirish uchun).
-    pub(crate) fn freeze_for_anim(&self) {
+    pub(crate) fn freeze_for_anim(self: &Rc<Self>) {
         static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
         if !*ENABLED.get_or_init(|| std::env::var_os("RAIL_NO_ANIM_FREEZE").is_none()) {
             return;
@@ -227,6 +227,7 @@ impl App {
                 {
                     continue;
                 }
+                self.store_tab_frame(tab);
                 let wp = gtk::WidgetPaintable::new(Some(&tab.view));
                 let frame = gdk::prelude::PaintableExt::current_image(&wp);
                 tab.freeze.set_paintable(Some(&frame));
@@ -262,7 +263,15 @@ impl App {
                 continue;
             }
             pic.set_visible(false);
-            pic.set_paintable(Option::<&gdk::Paintable>::None);
+            // Keep the immutable last-good frame for tabs that just moved off-screen.
+            // suspend_tab() can now safely terminate their WebProcess without trying
+            // to snapshot an already-unmapped WebView.
+            let durable = pic
+                .paintable()
+                .is_some_and(|paintable| paintable.is::<gdk::Texture>());
+            if self.tab_is_visible(tab) || !durable {
+                pic.set_paintable(Option::<&gdk::Paintable>::None);
+            }
         }
     }
 
@@ -410,16 +419,14 @@ impl App {
         live.starts_with("rail://settings") || saved.starts_with("rail://settings")
     }
 
-    /// Snapshot the WebView into an *immutable* MemoryTexture so the frame cannot go black
-    /// when the web process is later terminated (live WidgetPaintable does).
+    /// Best-effort synchronous capture. GTK may return GdkEmptyPaintable for a
+    /// WebKit widget, so callers must never treat `None` as a valid snapshot.
     pub(crate) fn capture_durable_frame(view: &WebView) -> Option<gdk::Texture> {
-        if !view.is_mapped() || view.width() < 8 || view.height() < 8 {
+        if view.width() < 8 || view.height() < 8 {
             return None;
         }
         let wp = gtk::WidgetPaintable::new(Some(view));
         let frame = gdk::prelude::PaintableExt::current_image(&wp);
-        // Internal pages (rail://start) are legitimately near-black: accept their frame,
-        // otherwise such a tab would never get a picture.
         let allow_black = view.uri().is_some_and(|u| u.starts_with("rail://"));
         Self::durableize_paintable(&frame, allow_black)
     }
@@ -495,20 +502,70 @@ impl App {
         n > 0 && dark * 100 / n >= 98
     }
 
-    /// Store a durable last-good frame on the tab (visibility hide / pre-suspend).
-    pub(crate) fn store_tab_frame(tab: &Tab) {
-        if tab.suspended.get() {
+    /// Ask WebKit for a real snapshot while the page is still mapped. WidgetPaintable's
+    /// current_image() can be GdkEmptyPaintable for WebKitGTK, so this asynchronous API is
+    /// the reliable path for preserving the last visible frame before a tab is unmapped.
+    pub(crate) fn store_tab_frame(self: &Rc<Self>, tab: &Tab) {
+        if tab.suspended.get()
+            || tab.view.is_loading()
+            || tab.view.is_playing_audio()
+            || !tab.view.is_mapped()
+            || tab.view.width() < 8
+            || tab.view.height() < 8
+        {
             return;
         }
-        if let Some(tex) = Self::capture_durable_frame(&tab.view) {
-            tab.freeze.set_paintable(Some(&tex));
+
+        let view = tab.view.clone();
+        let expected_uri = view
+            .uri()
+            .map(|uri| uri.to_string())
+            .filter(|uri| !uri.is_empty())
+            .unwrap_or_else(|| tab.saved_uri.borrow().clone());
+        if expected_uri.is_empty() || expected_uri == "about:blank" {
+            return;
         }
+        let weak_app = Rc::downgrade(self);
+        let callback_view = view.clone();
+        view.snapshot(
+            webkit6::SnapshotRegion::Visible,
+            webkit6::SnapshotOptions::empty(),
+            None::<&gio::Cancellable>,
+            move |result| {
+                let Ok(texture) = result else { return };
+                let Some(app) = weak_app.upgrade() else {
+                    return;
+                };
+                let rows = app.rows.borrow();
+                let Some(current_tab) = rows
+                    .iter()
+                    .flat_map(|row| row.tabs.iter())
+                    .find(|candidate| candidate.view == callback_view)
+                else {
+                    return;
+                };
+                let current_uri = callback_view
+                    .uri()
+                    .map(|uri| uri.to_string())
+                    .unwrap_or_default();
+                if current_tab.suspended.get()
+                    || callback_view.is_loading()
+                    || (!current_uri.is_empty() && current_uri != expected_uri)
+                {
+                    return;
+                }
+                let allow_black = expected_uri.starts_with("rail://");
+                if let Some(frame) = App::durableize_paintable(texture.upcast_ref(), allow_black) {
+                    current_tab.freeze.set_paintable(Some(&frame));
+                }
+            },
+        );
     }
 
     /// Suspend a live tab: save URL + last frame, kill the web process completely.
-    /// No CSS placeholder — freeze overlay is shown only when a real picture exists.
-    /// Without a frame the process still dies (URL is enough to wake); the card stays
-    /// empty of the charcoal placeholder layer so grey blocks never appear.
+    /// No CSS placeholder — real websites stay live unless a durable frame exists.
+    /// The built-in start page is the exception: it has no user state and can be
+    /// reconstructed safely from its saved URI without showing a black card.
     pub(crate) fn suspend_tab(tab: &Tab) {
         if tab.suspended.get() || tab.keep_alive.get() || Self::is_settings_tab(tab) {
             return;
@@ -526,16 +583,28 @@ impl App {
             return;
         }
         *tab.saved_uri.borrow_mut() = uri;
+        // A built-in start page has no user document state or visual content to preserve.
+        // It can be safely reconstructed from saved_uri after its WebProcess is reclaimed.
+        let blank_start = Self::is_blank_start_tab(tab);
+        if blank_start {
+            tab.freeze.set_visible(false);
+            tab.freeze.set_paintable(Option::<&gdk::Paintable>::None);
+            tab.suspended.set(true);
+            tab.view.terminate_web_process();
+            return;
+        }
+
         // Prefer a fresh durable snapshot while still mapped; otherwise keep the frame
         // grabbed on visibility-hide. Never clear an existing good frame here.
-        if tab.view.is_mapped()
-            && let Some(tex) = Self::capture_durable_frame(&tab.view)
-        {
+        if let Some(tex) = Self::capture_durable_frame(&tab.view) {
             tab.freeze.set_paintable(Some(&tex));
         }
-        // ONLY suspend and terminate web process if a durable snapshot actually exists.
-        // Terminating without a snapshot turns the tab into a pitch black crashed rectangle!
-        if tab.freeze.paintable().is_some() {
+        // Never terminate a real website without a durable frame: it could become a black card.
+        let has_durable_frame = tab
+            .freeze
+            .paintable()
+            .is_some_and(|paintable| paintable.is::<gdk::Texture>());
+        if has_durable_frame {
             tab.freeze.set_visible(true);
             tab.suspended.set(true);
             tab.view.terminate_web_process();

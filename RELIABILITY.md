@@ -1,16 +1,16 @@
 # Rail Reliability & Fault-Tolerance Architecture
 
-This document describes the architectural reliability invariants, data safety mechanisms, and zero-regression protocols enforced in Rail according to the `insane-architect` engineering standard.
+This document records Rail reliability mechanisms and the checks currently used to validate them. It is not a claim that regressions, data loss, or platform-specific failures are impossible.
 
 ---
 
-## 1. Zero-Regression Invariant
+## 1. Regression Prevention
 
-All core business logic, user settings, profile boundaries, and keyboard navigation workflows are strictly shielded against regressions:
-- **100% Free Path**: No paid services or proprietary telemetry.
+Core workflows are protected by scoped changes, automated tests, and manual verification. A passing test suite reduces regression risk but does not prove that every site or desktop environment behaves identically:
+- **No paid runtime dependency**: Core browsing does not require a paid service or proprietary telemetry.
 - **Strict Profile Isolation**: Cookies, caches, IndexedDB, and local storage are partitioned by dedicated `WebKitNetworkSession` instances.
 - **Keyboard-First Paradigm**: All user interactions have deterministically assigned actions and hotkeys.
-- **B&W Minimalist Aesthetic**: Black and white canvas with a single blue dot accent.
+- **Monochrome Interface**: Black-and-white visual language with restrained accent use.
 
 ---
 
@@ -28,10 +28,12 @@ flowchart TD
     E -- No --> G[Proceed]
     F --> H[Atomic Rename: .tmp to Target Path]
     G --> H
-    H --> I[Operation Complete: 0% Data Loss Risk]
+    H --> I[Atomic replacement complete; directory sync attempted]
 ```
 
 ### Self-Healing on Load
+Recovery is best-effort and depends on the backup being present, readable, and valid. It cannot protect against disk failure, filesystem bugs, or simultaneous external modification.
+
 When loading persisted states (`settings.json`, `session.txt`, `shortcuts-customize.json`, `profiles.json`, `history.txt`, `downloads.json`):
 1. **Primary Read & Validate**: The primary file is inspected and validated (e.g. valid JSON parsing, non-empty session markers).
 2. **Defensive Auto-Recovery**: If the primary file is missing, zero-length, or corrupted, the storage engine inspects the `.bak` replica.
@@ -46,7 +48,7 @@ When loading persisted states (`settings.json`, `session.txt`, `shortcuts-custom
 - **Non-Blocking Background I/O**:
   - History snapshots are sorted and persisted on a dedicated background worker thread (`rail-history`) through epoch-stamped message queues.
   - Cloud backup encryption (AES-256-GCM) and decompression execute in background worker threads.
-- **Zero Idle CPU Drain**: Periodic polling loops have been systematically eliminated. Handlers fire only upon real system events, gestures, or debounced dirty flushes.
+- **Event-driven work**: Page and UI work is primarily event-driven. A lightweight main-loop watchdog samples responsiveness; it is not a guarantee of zero idle CPU usage.
 
 ---
 
@@ -58,8 +60,8 @@ When loading persisted states (`settings.json`, `session.txt`, `shortcuts-custom
 
 ## 5. Verification Matrix
 
-The test suite validates:
+The automated test suite currently covers:
 - **Storage Resilience**: Deliberately injected corruption triggers successful self-healing from backup.
 - **Format Integrity**: TSV and JSON parsers roundtrip properly without loss.
 - **Keyboard Maps & Actions**: Every shortcut maps to a registered action ID with collision resolution.
-- **Compiler & Linter Standards**: Maintained at **zero warnings** under both `cargo check --release` and `cargo clippy --release`.
+- **Compiler & Linter Standards**: Release checks are expected to pass `cargo check --release` and `cargo clippy --release -- -D warnings`.

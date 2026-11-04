@@ -17,15 +17,37 @@ rm -rf $RAIL_DATA_DIR; mkdir -p $RAIL_DATA_DIR
 $BIN > /tmp/rail-run2-$LABEL.log 2>&1 &
 RPID=$!
 sleep 8
-allcnt(){ ps -eo pid,ppid,args | awk -v p=$RPID '$2==p && /WebKitWebProcess/' | wc -l; }
+# WebKit is commonly nested below one or more bwrap processes; count the full
+# descendant tree instead of only direct children of Rail.
+web_pids(){
+  ps -eo pid=,ppid=,rss=,args= | awk -v root="$RPID" '
+    { pid[NR]=$1; parent[$1]=$2; command[$1]=$4 }
+    END {
+      for (i=1; i<=NR; i++) {
+        x=pid[i]
+        while (x>1 && (x in parent)) {
+          if (parent[x]==root) {
+            if (command[pid[i]] ~ /\/WebKitWebProcess$/) print pid[i]
+            break
+          }
+          x=parent[x]
+        }
+      }
+    }'
+}
+allcnt(){ web_pids | wc -l; }
 echo "rail_alive=$(kill -0 $RPID 2>/dev/null && echo yes || echo no) base_web=$(allcnt)" >> $LOG
 echo "windows: $(xdotool search --onlyvisible --name . 2>&1 | head -3 | tr '\n' ' ')" >> $LOG
 xdotool mousemove 500 350 click 1; sleep 1
 for i in $(seq 1 12); do xdotool key ctrl+t; sleep 1.5; done
 echo "after_open_12 web=$(allcnt)" >> $LOG
 sleep 45; echo "after_open_12_plus45s web=$(allcnt)" >> $LOG
+# Walk back to the first (sleeping) tab and verify that it can wake again.
+for i in $(seq 1 12); do xdotool key alt+h; sleep 0.2; done
 sleep 6
+echo "after_wake web=$(allcnt)" >> $LOG
 ps -o rss= -p $RPID | awk '{printf "rail_rss_MB=%.0f\n",$1/1024}' >> $LOG
+web_pids | xargs -r ps -o rss= -p | awk '{s+=$1} END {printf "web_tree_rss_MB=%.0f\n",s/1024}' >> $LOG
 echo "rail_alive_end=$(kill -0 $RPID 2>/dev/null && echo yes || echo no)" >> $LOG
 kill $RPID 2>/dev/null; sleep 1; kill $WPID 2>/dev/null
 echo FINISHED >> $LOG

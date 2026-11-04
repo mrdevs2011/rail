@@ -6,7 +6,7 @@ compositor and a throw-away `RAIL_DATA_DIR` under `/tmp`, so it never touches yo
 | Script | Measures | Needs |
 |---|---|---|
 | `perf.sh BIN LABEL` | time to first window, idle CPU and context switches over 10 s, RSS, process count | weston, xdotool |
-| `blank-tabs.sh BIN LABEL` | web-process count right after opening 12 blank tabs and again 45 s later (blank-tab suspend) | weston, xdotool |
+| `blank-tabs.sh BIN LABEL` | actual WebKit child-process count/RSS after opening 12 blank tabs, after 45 s of suspension, and after waking a sleeping tab | weston, xdotool |
 | `css-cost.sh BIN with\|without RUN` | median time to rebuild a 1500-block DOM with and without the default `html.css` | labwc, python3 |
 | `theme-warnings.sh BIN LABEL` | GTK "Theme parser" warning count + a screenshot (`/tmp/rail-theme-LABEL.png`) | labwc, grim |
 

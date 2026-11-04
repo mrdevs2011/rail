@@ -1873,6 +1873,16 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Tanlangan hududni rasmga olib bo'lmadi.",
         "Не удалось захватить выбранную область.",
     ),
+    (
+        "The full page could not be captured.",
+        "Butun sahifani rasmga olib bo'lmadi.",
+        "Не удалось захватить всю страницу.",
+    ),
+    (
+        "The screenshot could not be saved.",
+        "Skrinshotni saqlab bo'lmadi.",
+        "Не удалось сохранить скриншот.",
+    ),
     ("Sidebar mode", "Yon panel rejimi", "Режим боковой панели"),
     ("Browser Theme", "Brauzer mavzusi", "Тема браузера"),
     (

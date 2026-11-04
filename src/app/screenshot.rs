@@ -672,22 +672,12 @@ impl App {
                         cleanup_screenshot(&view_c);
                     }
                     Err(e) => {
-                        eprintln!(
-                            "[rail] full page screenshot error: {e}, falling back to visible"
+                        eprintln!("[rail] full page screenshot error: {e}");
+                        app.show_copied_toast(
+                            tr("Screenshot failed"),
+                            tr("The full page could not be captured."),
                         );
-                        let app2 = app.clone();
-                        let view_fb = view_c.clone();
-                        view_c.snapshot(
-                            webkit6::SnapshotRegion::Visible,
-                            webkit6::SnapshotOptions::empty(),
-                            None::<&gio::Cancellable>,
-                            move |res2| {
-                                if let Ok(tex2) = res2 {
-                                    finish_capture(&app2, &tex2, false);
-                                }
-                                cleanup_screenshot(&view_fb);
-                            },
-                        );
+                        cleanup_screenshot(&view_c);
                     }
                 },
             );
@@ -742,10 +732,22 @@ impl App {
                                 w: w * sx,
                                 h: h * sy,
                             };
-                            let final_tex = crop_texture(&tex, crop_r).unwrap_or(tex);
-                            finish_capture(&app, &final_tex, to_clipboard);
+                            if let Some(final_tex) = crop_texture(&tex, crop_r) {
+                                finish_capture(&app, &final_tex, to_clipboard);
+                            } else {
+                                app.show_copied_toast(
+                                    tr("Screenshot failed"),
+                                    tr("The selected area could not be captured."),
+                                );
+                            }
                         }
-                        Err(e) => eprintln!("[rail] visible snapshot error: {e}"),
+                        Err(e) => {
+                            eprintln!("[rail] visible snapshot error: {e}");
+                            app.show_copied_toast(
+                                tr("Screenshot failed"),
+                                tr("The selected area could not be captured."),
+                            );
+                        }
                     }
                     cleanup_screenshot(&view_c);
                 },
@@ -811,25 +813,37 @@ fn finish_capture(app: &Rc<App>, tex: &gdk::Texture, to_clipboard: bool) {
     } else if let Some(path) = save_texture_png(tex) {
         let name = path.file_name().unwrap_or_default().to_string_lossy();
         app.show_copied_toast(tr("Saved!"), &format!("Downloads/Rail/{}", name));
+    } else {
+        app.show_copied_toast(
+            tr("Screenshot failed"),
+            tr("The screenshot could not be saved."),
+        );
     }
+}
+
+fn crop_rect_is_valid(tw: f64, th: f64, r: Rect) -> bool {
+    tw.is_finite()
+        && th.is_finite()
+        && tw > 0.0
+        && th > 0.0
+        && r.x.is_finite()
+        && r.y.is_finite()
+        && r.w.is_finite()
+        && r.h.is_finite()
+        && r.x >= 0.0
+        && r.y >= 0.0
+        && r.w > 0.0
+        && r.h > 0.0
+        && r.x < tw
+        && r.y < th
+        && r.x + r.w <= tw + 1.0
+        && r.y + r.h <= th + 1.0
 }
 
 fn crop_texture(tex: &gdk::Texture, r: Rect) -> Option<gdk::Texture> {
     let tw = tex.width() as f64;
     let th = tex.height() as f64;
-    if !r.x.is_finite()
-        || !r.y.is_finite()
-        || !r.w.is_finite()
-        || !r.h.is_finite()
-        || r.x < 0.0
-        || r.y < 0.0
-        || r.w <= 0.0
-        || r.h <= 0.0
-        || r.x >= tw
-        || r.y >= th
-        || r.x + r.w > tw + 1.0
-        || r.y + r.h > th + 1.0
-    {
+    if !crop_rect_is_valid(tw, th, r) {
         return None;
     }
     let x = r.x.clamp(0.0, (tw - 1.0).max(0.0));
@@ -890,7 +904,7 @@ fn save_texture_png(tex: &gdk::Texture) -> Option<std::path::PathBuf> {
 
 fn chrono_like_timestamp() -> String {
     if let Ok(out) = std::process::Command::new("date")
-        .args(["+%Y-%m-%d %H-%M-%S"])
+        .args(["+%Y-%m-%d %H-%M-%S-%3N"])
         .output()
         && out.status.success()
     {
@@ -904,7 +918,11 @@ fn chrono_like_timestamp() -> String {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    format!("{secs}")
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
+    format!("{secs}-{nanos:09}")
 }
 
 fn get_json_num(s: &str, key: &str) -> Option<f64> {
@@ -925,4 +943,82 @@ fn get_json_str(s: &str, key: &str) -> Option<String> {
     let rest = &s[idx + pat.len()..];
     let end_idx = rest.find('"')?;
     Some(rest[..end_idx].to_string())
+}
+
+#[cfg(test)]
+mod crop_tests {
+    use super::{Rect, crop_rect_is_valid};
+
+    #[test]
+    fn accepts_a_crop_inside_the_snapshot() {
+        assert!(crop_rect_is_valid(
+            100.0,
+            80.0,
+            Rect {
+                x: 10.0,
+                y: 12.0,
+                w: 50.0,
+                h: 40.0
+            },
+        ));
+    }
+
+    #[test]
+    fn rejects_empty_non_finite_and_out_of_bounds_crops() {
+        for rect in [
+            Rect {
+                x: 0.0,
+                y: 0.0,
+                w: 0.0,
+                h: 10.0,
+            },
+            Rect {
+                x: 0.0,
+                y: 0.0,
+                w: 10.0,
+                h: -1.0,
+            },
+            Rect {
+                x: f64::NAN,
+                y: 0.0,
+                w: 10.0,
+                h: 10.0,
+            },
+            Rect {
+                x: 0.0,
+                y: f64::INFINITY,
+                w: 10.0,
+                h: 10.0,
+            },
+            Rect {
+                x: 99.0,
+                y: 0.0,
+                w: 2.1,
+                h: 10.0,
+            },
+            Rect {
+                x: 0.0,
+                y: 79.0,
+                w: 10.0,
+                h: 2.1,
+            },
+        ] {
+            assert!(
+                !crop_rect_is_valid(100.0, 80.0, rect),
+                "invalid crop accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_snapshot_dimensions() {
+        let rect = Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0,
+            h: 1.0,
+        };
+        assert!(!crop_rect_is_valid(0.0, 80.0, rect));
+        assert!(!crop_rect_is_valid(f64::INFINITY, 80.0, rect));
+    }
 }

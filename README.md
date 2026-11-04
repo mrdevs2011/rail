@@ -2,7 +2,7 @@
 
 > **Rail** — zamonaviy Linux tizimlari uchun mo'ljallangan, yuqori tezlikka ega, xotirani tejaydigan va to'liq klaviaturaga yo'naltirilgan minimalist brauzer.
 
-O'zbekistonlik dasturchi **Muhammadrasul Qosimov** tomonidan sof Rust, GTK4 va WebKitGTK 6.0 negizida yaratilgan. Loyiha tashqi pullik servislardan 100% mustaqil bo'lib, Wayland (Niri) va X11 muhitlarida ortiqcha yuklamalarsiz (0% idle CPU) ishlaydi.
+O'zbekistonlik dasturchi **Muhammadrasul Qosimov** tomonidan sof Rust, GTK4 va WebKitGTK 6.0 negizida yaratilgan. Brauzer asosiy ishlashi uchun tashqi pullik servisga tayanmaydi va Wayland (Niri) hamda X11 muhitlarini qo'llab-quvvatlaydi.
 
 ---
 
@@ -90,7 +90,7 @@ Rail to'liq 3 ta tilda ishlaydi:
 - **English**
 - **Русский**
 
-Har bir til interfeys bo'ylab 100% qamrab olingan bo'lib, boshqa til aralashuvi mavjud emas. Tilni brauzer ichidagi sozlamalardan (`Alt+S` → *General*) osongina o'zgartirish mumkin.
+Interfeys o'zbek, ingliz va rus tillarini qo'llab-quvvatlaydi. Tilni brauzer ichidagi sozlamalardan (`Alt+S` → *General*) o'zgartirish mumkin.
 
 ---
 
@@ -113,7 +113,7 @@ rail --data-info
 
 ## 🌍 English Overview & Quickstart
 
-**Rail** is a modern, keyboard-centric, high-performance Linux web browser engineered in pure Rust with GTK4 and WebKitGTK 6.0 by Uzbek engineer Muhammadrasul Qosimov. It features containerized multi-profile storage isolation, Niri-inspired 2D infinite tiling, zero idle CPU consumption, and resilient self-healing session persistence.
+**Rail** is a modern, keyboard-centric, high-performance Linux web browser engineered in pure Rust with GTK4 and WebKitGTK 6.0 by Uzbek engineer Muhammadrasul Qosimov. It features multi-profile storage isolation, Niri-inspired 2D tiling, event-driven UI work, and recoverable session persistence.
 
 ### Quick Build:
 ```bash

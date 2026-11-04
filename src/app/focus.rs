@@ -187,6 +187,22 @@ impl App {
             return;
         }
         let c_clamped = c_idx.min(rows[r_clamped].tabs.len() - 1);
+
+        // Capture the page while its WebView is still mapped. Once the camera moves,
+        // GTK may unmap it and WebKit can no longer provide a reliable last frame.
+        let previous = (self.focus_row.get(), self.focus_col.get());
+        if previous != (r_clamped, c_clamped)
+            && let Some(old_tab) = rows
+                .get(previous.0)
+                .and_then(|row| row.tabs.get(previous.1))
+            && old_tab.view.is_mapped()
+            && !old_tab.view.is_loading()
+            && !old_tab.view.is_playing_audio()
+        {
+            self.store_tab_frame(old_tab);
+        }
+
+        let focused_profile = rows[r_clamped].tabs[c_clamped].profile_id.clone();
         self.focus_row.set(r_clamped);
         self.focus_col.set(c_clamped);
         self.row_last_col.borrow_mut().insert(r_clamped, c_clamped);
@@ -203,7 +219,11 @@ impl App {
                         let uri = tab.saved_uri.borrow().clone();
                         if !uri.is_empty() {
                             // Cover dead WebView only when we have a real last-frame picture.
-                            tab.freeze.set_visible(tab.freeze.paintable().is_some());
+                            let has_frame = tab
+                                .freeze
+                                .paintable()
+                                .is_some_and(|paintable| paintable.is::<gdk::Texture>());
+                            tab.freeze.set_visible(has_frame);
                             if is_internal_uri(&uri) {
                                 load_internal_page(&tab.view, &uri);
                             } else {
@@ -230,6 +250,7 @@ impl App {
             self.load_bar.set_visible(false);
         }
         drop(rows);
+        self.select_palette_profile(&focused_profile);
 
         // Overview navigation (h/j/k/l, arrows) must stay snappy: only move the camera.
         // Sidebar rebuild, session save, tab wake-up etc. run once on exit_overview().

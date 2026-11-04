@@ -167,7 +167,11 @@ impl App {
             for tab in row.tabs.iter() {
                 if tab.suspended.get() {
                     // Show freeze only when a real picture exists.
-                    tab.freeze.set_visible(tab.freeze.paintable().is_some());
+                    let has_frame = tab
+                        .freeze
+                        .paintable()
+                        .is_some_and(|paintable| paintable.is::<gdk::Texture>());
+                    tab.freeze.set_visible(has_frame);
                     continue;
                 }
                 // Live tab: always leave the live view visible, hide any leftover freeze

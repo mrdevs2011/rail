@@ -249,17 +249,19 @@ pub(crate) fn wire_settings(
                     if visible {
                         if tab.suspended.get() {
                             // Overview / slide-in: show last frame if we have one (not a blank panel).
-                            if tab.freeze.paintable().is_some() {
-                                tab.freeze.set_visible(true);
-                            }
+                            let has_frame = tab
+                                .freeze
+                                .paintable()
+                                .is_some_and(|paintable| paintable.is::<gdk::Texture>());
+                            tab.freeze.set_visible(has_frame);
                         } else {
                             // Live tab remapped: keep last frame over WebKit until it paints again
                             // (clear_tab_freeze runs when is_loading goes false).
-                            if tab.freeze.paintable().is_some() {
-                                tab.freeze.set_visible(true);
-                            } else {
-                                tab.freeze.set_visible(false);
-                            }
+                            let has_frame = tab
+                                .freeze
+                                .paintable()
+                                .is_some_and(|paintable| paintable.is::<gdk::Texture>());
+                            tab.freeze.set_visible(has_frame);
                             tab.view.queue_draw();
                             // If not loading, drop the cover on the next idle so we do not stick.
                             if !tab.view.is_loading() {
@@ -272,7 +274,7 @@ pub(crate) fn wire_settings(
                         }
                     } else if !tab.suspended.get() {
                         // About to unmap: durable last frame for suspend / overview (never live WidgetPaintable).
-                        App::store_tab_frame(tab);
+                        a.store_tab_frame(tab);
                     }
                     return;
                 }

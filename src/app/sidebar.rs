@@ -470,7 +470,8 @@ impl App {
         self.pill_label.set_text(&disp_uri);
         let is_web = disp_uri.starts_with("http://") || disp_uri.starts_with("https://");
         let is_already_installed = is_web && pwa::is_pwa_installed_for_url(&disp_uri);
-        self.pill_pwa_btn.set_visible(is_web && !is_already_installed);
+        self.pill_pwa_btn
+            .set_visible(is_web && !is_already_installed);
     }
 
     pub(crate) fn prompt_install_current_pwa(self: &Rc<Self>) {
@@ -633,7 +634,9 @@ impl App {
     /// Always open an internal page in a new tab and show the real rail:// URL.
     pub(crate) fn open_internal_new_tab(self: &Rc<Self>, uri: &str) {
         let uri = normalize_internal_uri(uri);
-        let prof_id = self.profiles.borrow().active_id().to_string();
+        let prof_id = self
+            .focused_tab_profile()
+            .unwrap_or_else(|| self.profiles.borrow().active_id().to_string());
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
         load_internal_page(&view, &uri);

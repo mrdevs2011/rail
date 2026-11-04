@@ -329,7 +329,9 @@ impl App {
     }
 
     pub(crate) fn new_tab(self: &Rc<Self>) {
-        let prof_id = self.profiles.borrow().active_id().to_string();
+        let prof_id = self
+            .focused_tab_profile()
+            .unwrap_or_else(|| self.profiles.borrow().active_id().to_string());
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
         // Attach the WebView to GTK before starting its first navigation. Loading
@@ -365,7 +367,9 @@ impl App {
     }
 
     pub(crate) fn split_vertical(self: &Rc<Self>) {
-        let prof_id = self.profiles.borrow().active_id().to_string();
+        let prof_id = self
+            .focused_tab_profile()
+            .unwrap_or_else(|| self.profiles.borrow().active_id().to_string());
         let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
         let view = Self::create_web_view(&session, &prof_id);
         *self.fresh.borrow_mut() = Some(view.clone());
@@ -408,7 +412,9 @@ impl App {
     }
 
     pub(crate) fn new_tab_with_url(self: &Rc<Self>, url: &str) {
-        let prof_id = self.profiles.borrow().active_id().to_string();
+        let prof_id = self
+            .focused_tab_profile()
+            .unwrap_or_else(|| self.profiles.borrow().active_id().to_string());
         self.new_tab_with_url_and_profile(url, &prof_id);
     }
 
