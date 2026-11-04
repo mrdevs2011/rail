@@ -147,8 +147,8 @@ fn main() -> glib::ExitCode {
         // without hoarding gigabytes of dead render buffers or speculative JIT heaps.
         let mut mps = webkit6::MemoryPressureSettings::new();
         mps.set_memory_limit(768);
-        mps.set_conservative_threshold(0.70);
         mps.set_strict_threshold(0.85);
+        mps.set_conservative_threshold(0.70);
         mps.set_kill_threshold(0.0);
         mps.set_poll_interval(5.0);
         webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);

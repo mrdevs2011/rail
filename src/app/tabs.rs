@@ -98,11 +98,9 @@ impl App {
     /// One site-capability configuration shared by browser tabs, popups and PWA windows.
     pub(crate) fn configure_web_settings(settings: &webkit6::Settings) {
         settings.set_enable_webrtc(webrtc_allowed());
-        settings.set_enable_dns_prefetching(true);
         settings.set_enable_smooth_scrolling(load_app_settings().smooth_scrolling);
         settings.set_enable_webgl(true);
         settings.set_property("enable-2d-canvas-acceleration", true);
-        settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_mediasource(true);
         settings.set_enable_media(true);
         settings.set_enable_media_capabilities(true);

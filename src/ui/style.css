@@ -1315,7 +1315,6 @@ button.color-choice.selected {
 .hist-row .shortcut-kbd { padding: 0 6px; font-size: 10.5px; }
 .hist-row .settings-card-title, .hist-row .settings-card-desc { margin: 0; }
 .hist-row button.flat-icon { min-width: 22px; min-height: 20px; }
-.hist-link-box { cursor: pointer; }
 .hist-link-box:hover .hist-title-link { color: #ffffff; text-decoration: underline; }
 .hist-link-box:hover .hist-url-link { color: #38bdf8; text-decoration: underline; }
 .settings-option-item {
@@ -2348,7 +2347,7 @@ button.suggested-action,
 button.suggested-action label,
 .ext-load-btn,
 .ext-load-btn label {
-    color: #ffffff !important;
+    color: #ffffff;
     font-weight: 600;
 }
 
@@ -2403,7 +2402,6 @@ entry.find-entry, entry.find-entry:focus-within {
     padding: 20px 24px;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.98);
     min-width: 360px;
-    max-width: 440px;
 }
 .confirm-header {
     margin-bottom: 12px;
@@ -2420,7 +2418,6 @@ entry.find-entry, entry.find-entry:focus-within {
     border: none;
     color: #71717a;
     padding: 2px 6px;
-    cursor: pointer;
 }
 .confirm-close-btn:hover {
     color: #ffffff;
@@ -2486,7 +2483,6 @@ entry.find-entry, entry.find-entry:focus-within {
     padding: 10px 14px;
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.95);
     min-width: 290px;
-    max-width: 340px;
 }
 .download-toast:hover {
     border-color: #3f3f46;
@@ -2504,7 +2500,6 @@ entry.find-entry, entry.find-entry:focus-within {
     border: none;
     color: #71717a;
     padding: 2px 6px;
-    cursor: pointer;
 }
 .download-toast:hover .dl-toast-cancel-btn {
     opacity: 1;
@@ -2534,11 +2529,7 @@ entry.find-entry, entry.find-entry:focus-within {
 
 button.side-head-profile-btn {
     min-width: 28px;
-    max-width: 28px;
     min-height: 28px;
-    max-height: 28px;
-    width: 28px;
-    height: 28px;
     padding: 0;
     margin: 0;
     border-radius: 50%;
@@ -2552,11 +2543,7 @@ button.side-head-profile-btn:hover {
 }
 .head-prof-dot {
     min-width: 22px;
-    max-width: 22px;
     min-height: 22px;
-    max-height: 22px;
-    width: 22px;
-    height: 22px;
     border-radius: 50%;
     font-size: 11px;
     font-weight: 800;
@@ -2623,7 +2610,6 @@ button.side-popover-clear-btn:hover {
     font-size: 12px;
     color: #71717a;
     padding: 28px 16px;
-    text-align: center;
 }
 button.side-popover-add-btn {
     background: rgba(255, 255, 255, 0.06);
@@ -2658,11 +2644,7 @@ button.side-prof-item.side-prof-active {
 }
 .side-prof-dot {
     min-width: 24px;
-    max-width: 24px;
     min-height: 24px;
-    max-height: 24px;
-    width: 24px;
-    height: 24px;
     border-radius: 50%;
     font-size: 11px;
     font-weight: 800;
@@ -2699,7 +2681,6 @@ button.side-dl-name-btn {
     background: transparent;
     border: none;
     padding: 0;
-    text-align: left;
 }
 .side-dl-name {
     font-size: 12px;
