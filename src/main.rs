@@ -17,6 +17,7 @@ mod i18n;
 mod i18n_tables;
 mod jank;
 mod minijson;
+mod notifications;
 mod profile;
 mod qr;
 mod spring;
@@ -67,6 +68,9 @@ use ui::*;
 use web::*;
 
 fn main() -> glib::ExitCode {
+    // Seamlessly overlay DevTools resources to remove unwanted dock left/right buttons
+    crate::web::ensure_devtools_overlay();
+
     // libsoup3 HTTP/2 tunnel & proxy fix:
     // HTTP/2 multiplexing is required for YouTube video/audio streaming and instant seeking.
     // Setting SOUP_FORCE_HTTP1 globally starved video chunk downloads by forcing serial HTTP/1.1 connections.
@@ -147,6 +151,10 @@ fn main() -> glib::ExitCode {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a.starts_with("--appimage-")) {
         return glib::ExitCode::FAILURE;
+    }
+
+    if args.iter().any(|a| a == "--background" || a == "--daemon") {
+        return pwa::run_background_daemon();
     }
 
     // First pass: extract custom data directory if specified

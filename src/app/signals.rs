@@ -296,6 +296,7 @@ impl App {
         // Site permission prompts (microphone, camera, geolocation, notifications)
         let app = self.clone();
         view.connect_permission_request(move |v, req| app.handle_permission_request(v, req));
+        crate::notifications::attach_notification_handler(view, None, None);
         let app = self.clone();
         view.connect_estimated_load_progress_notify(move |_| app.update_load_bar());
         view.connect_load_failed(move |v, _event, uri, error| {
@@ -306,8 +307,13 @@ impl App {
                 || lower.contains("download")
                 || error.matches(webkit6::NetworkError::Cancelled)
                 || error.matches(webkit6::PolicyError::FrameLoadInterruptedByPolicyChange)
+                || error.matches(webkit6::PolicyError::CannotShowMimeType)
+                || error.matches(webkit6::PolicyError::CannotShowUri)
             {
-                return false;
+                if v.can_go_back() {
+                    v.go_back();
+                }
+                return true;
             }
             let html = crate::web::format_error_html(uri, &err_msg);
             v.load_alternate_html(&html, uri, None);

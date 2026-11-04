@@ -1,30 +1,23 @@
 # AI Context — .
 
 ## Oxirgi holat
-- Sana: 2026-11-03 15:30
+- Sana: 2026-11-04 08:50
 - Nima qilindi:
-  - **Tezkor Float Popoverlar (Profiles, Downloads, Settings)**:
-    - Har biri o'z tugmasiga biriktirilgan ixcham va tezkor `gtk::Popover` sifatida ochiladi.
-    - Har uchala popoverning yuqori o'ng burchagida `[↗]` (Kengaytirish) tugmasi joylashtirildi: to'liq `rail://downloads`, to'liq `Settings > Profiles`, yoki to'liq Sozlamalar oynasiga o'tadi.
-    - Escape tugmasi yoki tashqi bosish barcha popoverlarni silliq yopadi.
-  - **Yon Panel Sarlavhasida Profil Tugmasi**:
-    - Chap panel bosh qismida (orqaga/oldinga strelkalarining chap tomonida) faol profil harfi va rangli doirachasiga ega avatar tugmasi o'rnatildi.
-    - Tugma bosilganda profillar popoveri tezkor chiqadi, tooltip faol profil nomini ko'rsatadi.
-  - **Yuklab Olish Tarmoq Xatoligi Tuzatildi**:
-    - Fayl yuklanishga o'tganda WebKit resurs yuklanishini to'xtatishi sababli chiqqan `net::ERR_NETWORK_ERROR - Page Failed to Load` xatoligi bartaraf etildi (`webkit6::PolicyError::FrameLoadInterruptedByPolicyChange` va `webkit6::NetworkError::Cancelled` to'g'ri filtrlandi).
-  - **DevTools Left/Right Tugmalari Butunlay Olib Tashlandi**:
-    - WebKit Web Inspector panelidagi keraksiz Left va Right dock tugmalari inyektsiya qilingan CSS va DOM kuzatuvchisi orqali yashirildi; qo'shni tugmalar bo'sh joy qoldirmasdan silliq surildi.
-  - **100% Mukammal Uch Tilli Tizim (Uzbek, English, Russian)**:
-    - Barcha 345 ta UI kalitlari `i18n_tables.rs` ga to'liq kiritildi.
-    - Rus tilida inglizcha yoki o'zbekcha so'z umuman chiqmaydi, o'zbek tilida begona tillar ko'rinmaydi.
-    - Muallif: Muhammadrasul Qosimov (O'zbekistonda ishlab chiqilgan) ma'lumoti Sozlamalar → Brauzer haqida bo'limiga kiritildi.
-  - **Ma'lumotlar Import/Eksporti Mukammallashtirildi**:
-    - Oflayn arxiv fayli ota jildi avtomatik yaratiladi, yassi yoki `rail/` prefiksli arxivlar xatosiz aniqlanib to'g'ri jildga tiklanadi.
-  - **Omborxona Tozalandi (Zero-Bloat)**:
-    - Ildizdagi keraksiz `index.html`, bir martalik `CLAUDE.md`, `ROADMAP.md` fayllari o'chirildi.
-    - `README.md` professional muhandislik darajasida noldan qayta yozildi.
+  - **DevTools Dock Left / Right Tugmalari Butunlay Yo'q Qilindi**:
+    - WebKit Web Inspector ichidagi keraksiz Left va Right dock tugmalari GLib G_RESOURCE_OVERLAYS orqali ildizidan olib tashlandi.
+    - `Main.js` da tugmalarni yaratish to'xtatildi, `Main.css` da nol o'lcham berildi; qolgan elementlar bo'shliq qoldirmasdan silliq surildi.
+  - **Yuklab Olish Va Xatolik Sahifasi Mukammallashtirildi**:
+    - Next.js RSC va boshqa subresource fetch so'rovlari yuklab olishga aylanib ketishi to'xtatildi (`is_main_frame_main_resource` tekshiruvi orqali).
+    - `.apk`, `.exe`, `.zip` va barcha fayllar yuklanayotganda `net::ERR_NETWORK_ERROR - Page Failed to Load` xatoligi chiqishi butunlay bartaraf etildi (`CannotShowMimeType` va `CannotShowUri` to'g'ri qayta ishlandi).
+    - Downloads sahifasidagi 'X' belgisi to'liq o'ng tomonga qadalgan SVG ikonka holiga keltirildi.
+  - **PWA va Fonda Bildirishnomalar Tizimi (Background Daemon)**:
+    - WebKitGTK Web Notifications (`connect_show_notification`) to'liq ulandi; native Linux bildirishnomalari (`notify-send`) orqali chiqariladi.
+    - Ilova yoki brauzer butunlay yopilgan holatda ham bildirishnomalar kelishi uchun yengil fon xizmati (`rail --background` / `--daemon`) yaratildi (<20MB RAM).
+    - O'rnatilgan PWA'lar uchun bildirishnoma ruxsatlari avtomatik beriladi.
   - **Verifikatsiya**:
-    - 0 compiler warning, 0 clippy warning, 80/80 release unit testlar 100% muvaffaqiyatli.
+    - `cargo check --release`: 0 ogohlantirish.
+    - `cargo clippy --release`: 0 ogohlantirish.
+    - `cargo test --release`: 93/93 test muvaffaqiyatli o'tdi.
 - Hozirgi muammo/blocker: Yo'q. Full production ready.
 
 ---

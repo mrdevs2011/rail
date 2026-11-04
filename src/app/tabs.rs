@@ -8,17 +8,36 @@ use crate::*;
 fn should_download_response(
     mime_type: Option<&str>,
     content_disposition: Option<&str>,
-    suggested_filename: bool,
+    is_main_frame: bool,
     mime_type_supported: bool,
 ) -> bool {
-    let mime = mime_type.unwrap_or_default().trim().to_ascii_lowercase();
-    let is_html_document =
-        mime.starts_with("text/html") || mime.starts_with("application/xhtml+xml");
+    // Subresources (fetch, XHR, RSC components, images, scripts, fonts) must NEVER be diverted into browser file downloads.
+    if !is_main_frame {
+        return false;
+    }
+
     let is_explicit_attachment = content_disposition
         .and_then(|value| value.split(';').next())
         .is_some_and(|value| value.trim().eq_ignore_ascii_case("attachment"));
 
-    is_explicit_attachment || (!is_html_document && (suggested_filename || !mime_type_supported))
+    // Server explicitly commanded the browser to download as attachment
+    if is_explicit_attachment {
+        return true;
+    }
+
+    let mime = mime_type.unwrap_or_default().trim().to_ascii_lowercase();
+    let is_html_or_text = mime.starts_with("text/html")
+        || mime.starts_with("application/xhtml+xml")
+        || mime.starts_with("text/plain")
+        || mime.starts_with("application/json");
+
+    // Ordinary web pages and supported documents must always be rendered in the view
+    if is_html_or_text || mime_type_supported {
+        return false;
+    }
+
+    // Binary / unsupported files (apk, exe, zip, deb, iso, etc.)
+    true
 }
 
 pub(crate) fn is_external_uri_scheme(scheme: &str) -> bool {
@@ -245,24 +264,25 @@ impl App {
             if decision_type == webkit6::PolicyDecisionType::Response {
                 if let Some(resp_decision) =
                     decision.downcast_ref::<webkit6::ResponsePolicyDecision>()
-                    && let Some(response) = resp_decision.response()
                 {
-                    let mime = response.mime_type();
-                    let disposition = response
-                        .http_headers()
-                        .and_then(|headers| headers.one("Content-Disposition"));
-                    let has_suggested_filename = response.suggested_filename().is_some();
+                    if !resp_decision.is_main_frame_main_resource() {
+                        return false;
+                    }
+                    if let Some(response) = resp_decision.response() {
+                        let mime = response.mime_type();
+                        let disposition = response
+                            .http_headers()
+                            .and_then(|headers| headers.one("Content-Disposition"));
 
-                    // Keep HTML/XHTML navigations in the WebView. Explicit attachment
-                    // headers still win; other named or unsupported payloads download.
-                    if should_download_response(
-                        mime.as_deref(),
-                        disposition.as_deref(),
-                        has_suggested_filename,
-                        resp_decision.is_mime_type_supported(),
-                    ) {
-                        resp_decision.download();
-                        return true;
+                        if should_download_response(
+                            mime.as_deref(),
+                            disposition.as_deref(),
+                            true,
+                            resp_decision.is_mime_type_supported(),
+                        ) {
+                            resp_decision.download();
+                            return true;
+                        }
                     }
                 }
             } else if decision_type == webkit6::PolicyDecisionType::NavigationAction {
@@ -413,62 +433,78 @@ mod response_policy_tests {
     use super::should_download_response;
 
     #[test]
+    fn subresources_are_never_downloaded() {
+        assert!(!should_download_response(
+            Some("application/octet-stream"),
+            Some("attachment"),
+            false,
+            false,
+        ));
+        assert!(!should_download_response(
+            Some("text/x-component"),
+            None,
+            false,
+            false,
+        ));
+    }
+
+    #[test]
     fn html_navigation_is_never_downloaded_for_mime_or_filename_reasons() {
         assert!(!should_download_response(
             Some("text/html"),
             None,
             true,
-            false
+            false,
         ));
         assert!(!should_download_response(
             Some("text/html; charset=utf-8"),
             None,
+            true,
             false,
-            false
         ));
         assert!(!should_download_response(
             Some("application/xhtml+xml"),
             None,
             true,
-            false
+            false,
         ));
     }
 
     #[test]
-    fn explicit_attachment_header_wins_even_for_html() {
+    fn explicit_attachment_header_wins_for_main_frame() {
         assert!(should_download_response(
             Some("text/html"),
             Some(" attachment; filename=project.html"),
-            false,
+            true,
             true,
         ));
         assert!(should_download_response(
             Some("application/pdf"),
             Some("ATTACHMENT; filename=report.pdf"),
-            false,
-            true
+            true,
+            true,
         ));
     }
 
     #[test]
-    fn named_or_unsupported_non_html_payloads_download() {
+    fn unsupported_main_frame_payloads_download() {
         assert!(should_download_response(
-            Some("application/pdf"),
-            Some("inline"),
+            Some("application/vnd.android.package-archive"),
+            None,
             true,
-            true
+            false,
         ));
         assert!(should_download_response(
             Some("application/octet-stream"),
             None,
+            true,
             false,
-            false
         ));
         assert!(!should_download_response(
             Some("application/pdf"),
-            None,
-            false,
-            true
+            Some("inline"),
+            true,
+            true,
         ));
     }
 }

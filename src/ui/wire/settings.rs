@@ -128,7 +128,7 @@ pub(crate) fn wire_settings(
         ("cache", sub_cache_btn),
     ] {
         let a = app.clone();
-        button.connect_clicked(move |_| a.set_data_subpath(&name));
+        button.connect_clicked(move |_| a.set_data_subpath(name));
     }
 
     let a = app.clone();

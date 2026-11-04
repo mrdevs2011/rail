@@ -204,6 +204,8 @@ Keywords=pwa;web;app;{id};\n",
         .arg(&desktop_dir)
         .spawn();
 
+    ensure_background_daemon_running();
+
     Ok(final_icon)
 }
 
@@ -511,6 +513,18 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
         .build();
     App::configure_native_web_view(&view);
 
+    // Auto-grant notification permissions for standalone installed PWAs
+    view.connect_permission_request(|_v, req| {
+        if req.is::<webkit6::NotificationPermissionRequest>() {
+            req.allow();
+            return true;
+        }
+        false
+    });
+
+    let app_name_str = title_override.unwrap_or(url).to_string();
+    crate::notifications::attach_notification_handler(&view, Some(app_name_str), None);
+
     let v_back = view.clone();
     btn_back.connect_clicked(move |_| v_back.go_back());
 
@@ -534,6 +548,12 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
                 t_lbl.set_text(&t);
             }
         }
+    });
+
+    // When PWA window is closed, ensure background runner continues delivering notifications
+    win.connect_close_request(move |_| {
+        ensure_background_daemon_running();
+        glib::Propagation::Proceed
     });
 
     // Keyboard shortcuts in PWA window
@@ -592,4 +612,147 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
     root_box.append(&view);
     win.set_child(Some(&root_box));
     win.present();
+}
+
+/// Path to background daemon PID file
+pub(crate) fn daemon_pid_file() -> PathBuf {
+    pwa_apps_dir().join("daemon.pid")
+}
+
+/// Check if background daemon is actively running
+pub(crate) fn is_daemon_running() -> bool {
+    let pid_file = daemon_pid_file();
+    if let Ok(pid_str) = std::fs::read_to_string(&pid_file)
+        && let Ok(pid) = pid_str.trim().parse::<i32>()
+    {
+        return PathBuf::from(format!("/proc/{}", pid)).exists();
+    }
+    false
+}
+
+/// Ensure background daemon is running if any PWAs are installed
+pub(crate) fn ensure_background_daemon_running() {
+    let installed = list_installed_pwas();
+    if installed.is_empty() {
+        return;
+    }
+    if is_daemon_running() {
+        return;
+    }
+
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("rail"));
+    let _ = std::process::Command::new(exe)
+        .arg("--background")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+/// Run headless background PWA daemon listening for web notifications with minimal RAM usage
+pub(crate) fn run_background_daemon() -> glib::ExitCode {
+    let _ = gtk::init();
+
+    if is_daemon_running() {
+        return glib::ExitCode::SUCCESS;
+    }
+
+    let _ = std::fs::create_dir_all(pwa_apps_dir());
+    let pid_file = daemon_pid_file();
+    let my_pid = std::process::id();
+    let _ = std::fs::write(&pid_file, my_pid.to_string());
+
+    let installed = list_installed_pwas();
+    if installed.is_empty() {
+        let _ = std::fs::remove_file(&pid_file);
+        return glib::ExitCode::SUCCESS;
+    }
+
+    let mut mgr = ProfileManager::new(rail_data_dir());
+    let prof_id = mgr.active_id().to_string();
+    let session = mgr.get_or_create_session(&prof_id);
+
+    // Constrain WebKit background memory usage
+    let mut mps = webkit6::MemoryPressureSettings::new();
+    mps.set_memory_limit(128);
+    mps.set_conservative_threshold(0.20);
+    mps.set_strict_threshold(0.35);
+    mps.set_kill_threshold(0.0);
+    mps.set_poll_interval(5.0);
+    webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
+
+    let settings = webkit6::Settings::new();
+    settings.set_enable_page_cache(false);
+    settings.set_enable_javascript(true);
+    settings.set_enable_webaudio(false);
+    settings.set_enable_webgl(false);
+    settings.set_enable_smooth_scrolling(false);
+    settings.set_media_playback_requires_user_gesture(true);
+
+    let mut background_views = Vec::new();
+
+    for pwa in installed {
+        let view = WebView::builder()
+            .network_session(&session)
+            .settings(&settings)
+            .build();
+
+        view.connect_permission_request(|_v, req| {
+            if req.is::<webkit6::NotificationPermissionRequest>() {
+                req.allow();
+                return true;
+            }
+            false
+        });
+
+        let icon_file = pwa.icon_url.clone();
+        crate::notifications::attach_notification_handler(
+            &view,
+            Some(pwa.name.clone()),
+            icon_file,
+        );
+
+        view.load_uri(&pwa.url);
+        background_views.push(view);
+    }
+
+    let main_loop = glib::MainLoop::new(None, false);
+    let ml = main_loop.clone();
+    let pid_f = pid_file.clone();
+
+    glib::timeout_add_local(std::time::Duration::from_secs(60), move || {
+        if !pid_f.exists() {
+            ml.quit();
+            return glib::ControlFlow::Break;
+        }
+        glib::ControlFlow::Continue
+    });
+
+    main_loop.run();
+    let _ = std::fs::remove_file(&pid_file);
+    glib::ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_daemon_pid_path() {
+        let p = daemon_pid_file();
+        assert!(p.ends_with("apps/daemon.pid"));
+    }
+
+    #[test]
+    fn test_is_daemon_running_on_nonexistent() {
+        assert!(!PathBuf::from("/proc/999999999").exists());
+    }
+
+    #[test]
+    fn test_svg_icon_generation() {
+        let svg = generate_svg_icon("Telegram", Some("#0088cc"));
+        assert!(svg.contains("<svg"));
+        assert!(svg.contains("#0088cc"));
+        assert!(svg.contains(">T<"));
+    }
 }
