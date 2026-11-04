@@ -47,6 +47,21 @@ jobs:
 
           sed -i "s/^version = \"$CURRENT\"/version = \"$NEW\"/" Cargo.toml
 
+          # Keep the root package entry in Cargo.lock aligned with Cargo.toml.
+          if [ -f Cargo.lock ]; then
+            python3 - "$CURRENT" "$NEW" <<'PYLOCK'
+          import pathlib, re, sys
+          current, new = sys.argv[1:]
+          path = pathlib.Path("Cargo.lock")
+          content = path.read_text()
+          pattern = r'(\[\[package\]\]\nname = "rail"\nversion = ")' + re.escape(current) + r'(")'
+          updated, count = re.subn(pattern, lambda match: match.group(1) + new + match.group(2), content, count=1)
+          if count != 1:
+              raise SystemExit("Could not uniquely update the rail package version in Cargo.lock")
+          path.write_text(updated)
+          PYLOCK
+          fi
+
           if [ -f package.json ]; then
             python3 - <<PY
           import json, pathlib
