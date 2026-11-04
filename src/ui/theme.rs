@@ -1,6 +1,7 @@
 //! Theme management: Dark, Light, and System synchronization with Linux desktop and WebKit.
 
 use crate::*;
+use glib::translate::ToGlibPtrMut;
 use std::cell::RefCell;
 
 pub(crate) const LIGHT_THEME_CSS: &str = include_str!("style_light.css");
@@ -56,11 +57,13 @@ pub(crate) fn apply_theme_preference(pref: &str) {
 
     if let Some(s) = gtk::Settings::default() {
         s.set_gtk_application_prefer_dark_theme(effective_dark);
-        if s.find_property("gtk-interface-color-scheme").is_some() {
-            s.set_property(
-                "gtk-interface-color-scheme",
-                if effective_dark { 2i32 } else { 3i32 },
-            );
+        if let Some(pspec) = s.find_property("gtk-interface-color-scheme") {
+            let mut val = glib::Value::from_type(pspec.value_type());
+            let enum_num: i32 = if effective_dark { 2 } else { 3 };
+            unsafe {
+                glib::gobject_ffi::g_value_set_enum(val.to_glib_none_mut().0, enum_num);
+            }
+            s.set_property_from_value("gtk-interface-color-scheme", &val);
         }
     }
 
