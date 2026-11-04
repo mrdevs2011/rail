@@ -420,6 +420,7 @@ pub(crate) fn downloads_page() -> String {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
 <title>{title}</title>
 <style>
   * {{ box-sizing: border-box; }}
@@ -601,6 +602,29 @@ pub(crate) fn downloads_page() -> String {
   .dl-action-link:hover {{
     color: #ffffff;
     text-decoration: underline;
+  }}
+  @media (prefers-color-scheme: light) {{
+    body {{ background: #f6f8fa; color: #1f2328; }}
+    h1 {{ color: #1f2328; }}
+    .sub {{ color: #656d76; }}
+    .dl-clear-all-btn {{ background: #ffffff; border-color: #d0d7de; color: #1f2328; }}
+    .dl-clear-all-btn:hover {{ background: #fef2f2; border-color: #ef4444; color: #ef4444; }}
+    .empty {{ color: #656d76; border-color: #d0d7de; }}
+    .dl-row {{ background: #ffffff; border-color: #d0d7de; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }}
+    .dl-row:hover {{ border-color: #0284c7; }}
+    .dl-name {{ color: #1f2328; }}
+    .dl-name:hover {{ color: #0284c7; }}
+    .dl-remove-btn {{ border-color: #d0d7de; color: #656d76; }}
+    .dl-remove-btn:hover {{ background: #fef2f2; border-color: #ef4444; color: #ef4444; }}
+    .dl-meta {{ color: #656d76; }}
+    .dl-date {{ color: #8c959f; }}
+    .dl-meta .run {{ color: #0284c7; }}
+    .dl-bar {{ background: #e1e4e8; }}
+    .dl-fill {{ background: #0284c7; }}
+    .dl-url {{ color: #8c959f; }}
+    .dl-url:hover {{ color: #0284c7; }}
+    .dl-action-link {{ color: #656d76; }}
+    .dl-action-link:hover {{ color: #0284c7; }}
   }}
 </style>
 <script>

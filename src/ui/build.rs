@@ -4,16 +4,22 @@ use crate::*;
 
 pub(crate) fn build(gapp: &gtk::Application) {
     setup_adblock();
-    if let Some(s) = gtk::Settings::default() {
-        s.set_gtk_application_prefer_dark_theme(true);
-    }
+    let display = gdk::Display::default().expect("no display");
     let provider = gtk::CssProvider::new();
     provider.load_from_string(CSS);
     gtk::style_context_add_provider_for_display(
-        &gdk::Display::default().expect("no display"),
+        &display,
         &provider,
         gtk::STYLE_PROVIDER_PRIORITY_USER,
     );
+    THEME_PROVIDER.with(|p| {
+        gtk::style_context_add_provider_for_display(
+            &display,
+            p,
+            gtk::STYLE_PROVIDER_PRIORITY_USER + 10,
+        );
+    });
+    setup_system_theme_listener();
 
     let profile_mgr = ProfileManager::new(rail_data_dir());
     let history_mgr = HistoryManager::new(rail_data_dir());
@@ -589,4 +595,6 @@ pub(crate) fn build(gapp: &gtk::Application) {
     win.present();
     app.sync_welcome_palette();
     MAIN_APP.with(|m| *m.borrow_mut() = Some(app.clone()));
+    let initial_theme = load_app_settings().theme;
+    apply_theme_preference(&initial_theme);
 }

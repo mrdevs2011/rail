@@ -293,6 +293,7 @@ fn test_app_settings_roundtrip() {
         translate_source_lang: "auto".to_string(),
         translate_target_lang: "uz".to_string(),
         sidebar_mode: "fixed".to_string(),
+        theme: "dark".to_string(),
     };
     let mut out = String::from("{\n");
     out.push_str(&format!(

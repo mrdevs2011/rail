@@ -180,6 +180,57 @@ pub(crate) fn build_general_page(settings_stack: &gtk::Stack) -> GeneralPage {
     lang_card.append(&lang_restart);
     page_general.append(&lang_card);
 
+    // Appearance / Browser Theme Card
+    let theme_card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    theme_card.add_css_class("settings-card");
+    let theme_title = gtk::Label::new(Some(tr("Browser Theme")));
+    theme_title.add_css_class("settings-card-title");
+    theme_title.set_xalign(0.0);
+    let theme_desc = gtk::Label::new(Some(tr(
+        "Choose color theme for Rail and websites (Dark, Light, or follow Linux system).",
+    )));
+    theme_desc.add_css_class("settings-card-desc");
+    theme_desc.set_xalign(0.0);
+    theme_desc.set_wrap(true);
+    theme_card.append(&theme_title);
+    theme_card.append(&theme_desc);
+
+    let theme_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let mut theme_buttons: Vec<(&'static str, gtk::Button)> = Vec::new();
+    for (id, label) in [
+        ("dark", tr("Dark")),
+        ("light", tr("Light")),
+        ("system", tr("System")),
+    ] {
+        let btn = gtk::Button::with_label(label);
+        btn.add_css_class("settings-option-item");
+        if initial_settings.theme == id {
+            btn.add_css_class("active");
+        }
+        theme_row.append(&btn);
+        theme_buttons.push((id, btn));
+    }
+
+    for (id, btn) in theme_buttons.iter() {
+        let id_str = id.to_string();
+        let all = theme_buttons.clone();
+        btn.connect_clicked(move |_| {
+            let mut s = load_app_settings();
+            s.theme = id_str.clone();
+            save_app_settings(&s);
+            for (curr_id, b) in all.iter() {
+                if *curr_id == id_str.as_str() {
+                    b.add_css_class("active");
+                } else {
+                    b.remove_css_class("active");
+                }
+            }
+            apply_theme_preference(&id_str);
+        });
+    }
+    theme_card.append(&theme_row);
+    page_general.append(&theme_card);
+
     // Page Translation Card
     let trl_card = gtk::Box::new(gtk::Orientation::Vertical, 8);
     trl_card.add_css_class("settings-card");

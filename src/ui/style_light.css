@@ -1,0 +1,463 @@
+/* ============================================================================
+   RAIL · DEV-STYLE CLASSIC LIGHT THEME
+   Tailored for developers: calm, high-contrast, zero-glare, eye-friendly off-white.
+   Inspired by classic dev tools (GitHub, VS Code Light+, Xcode).
+   ============================================================================ */
+
+window {
+    background: #f6f8fa;
+    color: #1f2328;
+}
+label {
+    color: #656d76;
+}
+
+/* ---- dev-style ultra-thin minimalist scrollbars ---- */
+scrollbar slider,
+scrollbar.horizontal slider,
+scrollbar.vertical slider,
+scrollbar.overlay-indicator slider,
+scrollbar.overlay-indicator:not(.dragging):not(.hovering) slider,
+scrollbar range trough slider {
+    background: rgba(0, 0, 0, 0.22);
+    background-color: rgba(0, 0, 0, 0.22);
+}
+scrollbar:hover slider,
+scrollbar.dragging slider,
+scrollbar.horizontal:hover slider,
+scrollbar.horizontal.dragging slider,
+scrollbar.vertical:hover slider,
+scrollbar.vertical.dragging slider {
+    background: rgba(0, 0, 0, 0.45);
+    background-color: rgba(0, 0, 0, 0.45);
+}
+
+/* ---- columns & tabs (Spatial 2D Strip) ---- */
+.tab {
+    border: 1px solid #d0d7de;
+    background: #ffffff;
+}
+.tab.focused {
+    border-color: #0284c7;
+}
+.tab-height-handle:hover,
+.tab-height-handle.active {
+    background: rgba(2, 132, 199, 0.35);
+}
+.tab-resize-handle:hover,
+.tab-resize-handle.active {
+    background: #0284c7;
+}
+.zoomed {
+    background: #eef1f5;
+}
+.zoomed .tab {
+    border: 1px solid #d0d7de;
+}
+.zoomed .tab.focused {
+    border-color: #0284c7;
+    outline: 2px solid #0284c7;
+}
+
+/* ---- sidebar (Developer Light Clean) ---- */
+.side-bar {
+    background: #f0f2f5;
+    border-right: 1px solid #d0d7de;
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.05);
+}
+.side-footer {
+    border-top: 1px solid #d0d7de;
+}
+button.side-footer-btn {
+    color: #656d76;
+}
+button.side-footer-btn:hover {
+    background: #e4e7eb;
+    border-color: #d0d7de;
+    color: #1f2328;
+}
+.brand {
+    color: #1f2328;
+}
+.brand-dot {
+    color: #0284c7;
+}
+button.btn-add-tab {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    color: #656d76;
+}
+button.btn-add-tab:hover {
+    background: #f6f8fa;
+    border-color: #0284c7;
+    color: #0284c7;
+}
+button.flat-icon {
+    color: #656d76;
+}
+button.flat-icon:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: #1f2328;
+}
+button.pill {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    color: #1f2328;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+button.pill:hover {
+    background: #ffffff;
+    border-color: #0284c7;
+    color: #1f2328;
+}
+button.pill label {
+    color: #1f2328;
+}
+button.pill:hover label {
+    color: #1f2328;
+}
+.pill-icon {
+    color: #656d76;
+}
+button.pill:hover .pill-icon {
+    color: #0284c7;
+}
+.pill-chip {
+    color: #656d76;
+    background: #f0f2f5;
+    border: 1px solid #d0d7de;
+}
+button.pill:hover .pill-chip {
+    color: #0284c7;
+    border-color: #0284c7;
+}
+
+/* ---- tab list & workspaces ---- */
+.tablist row:hover {
+    background: #e4e7eb;
+    border-color: #d0d7de;
+}
+.tablist row:selected {
+    background: transparent;
+    border-color: transparent;
+}
+.workspace-header {
+    background: #f0f2f5;
+    border: 1px solid #d0d7de;
+}
+.workspace-header:hover {
+    background: #e4e7eb;
+    border-color: #bbc0c5;
+}
+.workspace-header.active-workspace {
+    background: #ffffff;
+    border-color: #d0d7de;
+    border-left: 3px solid #0284c7;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.workspace-title {
+    color: #656d76;
+}
+.workspace-header.active-workspace .workspace-title {
+    color: #1f2328;
+}
+.workspace-badge {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+.workspace-tab-count {
+    color: #8c959f;
+}
+.workspace-header:hover .workspace-tab-count {
+    color: #1f2328;
+}
+button.btn-ws-add {
+    color: #656d76;
+}
+button.btn-ws-add:hover {
+    color: #0284c7;
+}
+.btn-new-ws-label {
+    color: #656d76;
+}
+button.btn-new-ws:hover .btn-new-ws-label {
+    color: #0284c7;
+}
+
+/* ---- tab row in sidebar ---- */
+.tab-row {
+    background: #ffffff;
+    border: 1px solid #e1e4e8;
+    color: #1f2328;
+}
+.tab-row:hover {
+    background: #f6f8fa;
+    border-color: #d0d7de;
+}
+.tab-row.active-tab {
+    background: #ffffff;
+    border-color: #0284c7;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.tab-title {
+    color: #1f2328;
+}
+.tab-row.active-tab .tab-title {
+    color: #0284c7;
+}
+.tab-domain {
+    color: #656d76;
+}
+.tab-meta-badge {
+    background: #f0f2f5;
+    color: #656d76;
+    border: 1px solid #d0d7de;
+}
+.tab-row:hover .tab-meta-badge {
+    border-color: #bbc0c5;
+    color: #1f2328;
+}
+.tab-row.active-tab .tab-meta-badge {
+    background: #e0f2fe;
+    color: #0369a1;
+    border-color: #bae6fd;
+}
+button.tab-close-btn {
+    color: #656d76;
+}
+button.tab-close-btn:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.12);
+}
+
+/* ---- Strip (Header / Mini Tab Bar) ---- */
+.strip {
+    background: #f0f2f5;
+    border-bottom: 1px solid #d0d7de;
+}
+.strip-pill {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    color: #656d76;
+}
+.strip-pill:hover {
+    background: #f6f8fa;
+    color: #1f2328;
+}
+.strip-pill.focused {
+    background: #ffffff;
+    border-color: #0284c7;
+    color: #1f2328;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.strip-pill-dot {
+    color: #0284c7;
+}
+
+/* ---- Omnibar Palette Modal ---- */
+.palette {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+}
+entry.palette-entry,
+entry.palette-entry:focus-within {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    color: #1f2328;
+}
+entry.palette-entry:focus-within {
+    background: #ffffff;
+    border-color: #0284c7;
+}
+.palette-hint {
+    color: #656d76;
+}
+.palette-suggestions-box {
+    border-top: 1px solid #e1e4e8;
+}
+.palette-sug-item {
+    background: transparent;
+    color: #1f2328;
+}
+.palette-sug-item:hover,
+.palette-sug-item.selected {
+    background: #f0f2f5;
+}
+.palette-sug-item.selected {
+    box-shadow: inset 2px 0 0 #0284c7;
+}
+.palette-sug-title {
+    color: #1f2328;
+}
+.palette-sug-url {
+    color: #656d76;
+}
+.palette-sug-badge {
+    background: #f0f2f5;
+    color: #656d76;
+    border: 1px solid #d0d7de;
+}
+
+/* ---- Context Menu & Popovers ---- */
+popover.ctxm > contents,
+popover.side-float-popover contents {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    color: #1f2328;
+}
+popover.side-float-popover arrow {
+    background: #ffffff;
+    border-color: #d0d7de;
+}
+popover.ctxm button.ctxm-row {
+    color: #1f2328;
+}
+popover.ctxm button.ctxm-row label {
+    color: #1f2328;
+}
+popover.ctxm button.ctxm-row:hover {
+    background: #f0f2f5;
+}
+popover.ctxm button.ctxm-row:disabled label {
+    color: #8c959f;
+}
+popover.ctxm .ctxm-sc {
+    color: #656d76;
+}
+popover.ctxm separator {
+    background: #e1e4e8;
+}
+popover.ctxm .ctxm-hdr {
+    border-bottom: 1px solid #e1e4e8;
+}
+popover.ctxm button.ctxm-hdr-btn {
+    color: #1f2328;
+}
+popover.ctxm button.ctxm-hdr-btn:hover {
+    background: #f0f2f5;
+}
+
+/* ---- Quick Settings Popovers ---- */
+button.side-settings-row-btn:hover {
+    background: #f0f2f5;
+    border-color: #e1e4e8;
+}
+.side-settings-row-icon {
+    color: #656d76;
+}
+button.side-settings-row-btn:hover .side-settings-row-icon {
+    color: #0284c7;
+}
+.side-settings-row-title {
+    color: #1f2328;
+}
+.side-settings-row-sub {
+    color: #656d76;
+}
+.side-settings-row-arrow {
+    color: #8c959f;
+}
+button.side-settings-row-btn:hover .side-settings-row-arrow {
+    color: #1f2328;
+}
+
+/* ---- Quick Downloads Popover Rows ---- */
+.side-dl-name {
+    color: #1f2328;
+}
+button.side-dl-name-btn:hover .side-dl-name {
+    color: #0284c7;
+}
+.side-dl-meta {
+    color: #656d76;
+}
+.side-dl-bar trough {
+    background: #e1e4e8;
+}
+.side-dl-bar progress {
+    background: #0284c7;
+}
+
+/* ---- Settings Full Page Modal ---- */
+.settings-modal,
+.settings-shell {
+    background: #f6f8fa;
+    color: #1f2328;
+}
+.settings-header {
+    background: #ffffff;
+    border-bottom: 1px solid #d0d7de;
+}
+.settings-title {
+    color: #1f2328;
+}
+.settings-sidebar {
+    background: #f0f2f5;
+    border-right: 1px solid #d0d7de;
+}
+.settings-tab-btn {
+    color: #656d76;
+}
+.settings-tab-btn:hover {
+    background: #e4e7eb;
+    color: #1f2328;
+}
+.settings-tab-btn.active {
+    background: #ffffff;
+    color: #1f2328;
+    border: 1px solid #d0d7de;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.settings-card {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+.settings-card-title,
+.settings-page-title {
+    color: #1f2328;
+}
+.settings-card-desc,
+.settings-page-subtitle {
+    color: #656d76;
+}
+.settings-option-item,
+button.settings-engine-btn {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    color: #1f2328;
+}
+.settings-option-item:hover,
+button.settings-engine-btn:hover {
+    background: #ffffff;
+    border-color: #0284c7;
+}
+.settings-option-item.active,
+button.settings-engine-btn.active {
+    background: #e0f2fe;
+    border-color: #0284c7;
+    color: #0369a1;
+}
+.settings-profiles-list row {
+    border-bottom: 1px solid #e1e4e8;
+}
+.settings-profiles-list row:hover,
+.settings-profiles-list row:selected {
+    background: #f6f8fa;
+}
+
+/* ---- Download Toasts ---- */
+.download-toast {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    color: #1f2328;
+}
+.download-toast-title {
+    color: #1f2328;
+}
+.download-toast-sub {
+    color: #656d76;
+}

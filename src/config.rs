@@ -38,6 +38,8 @@ pub(crate) struct AppSettings {
     pub(crate) translate_target_lang: String,
     /// Sidebar behavior: "fixed" (always open when shown) or "auto" (edge-hover).
     pub(crate) sidebar_mode: String,
+    /// Color theme: "system" | "dark" | "light"
+    pub(crate) theme: String,
 }
 
 impl Default for AppSettings {
@@ -51,6 +53,7 @@ impl Default for AppSettings {
             translate_source_lang: "auto".to_string(),
             translate_target_lang: "uz".to_string(),
             sidebar_mode: "fixed".to_string(),
+            theme: "system".to_string(),
         }
     }
 }
@@ -112,6 +115,11 @@ pub(crate) fn load_app_settings() -> AppSettings {
         {
             s.sidebar_mode = sm.to_string();
         }
+        if let Some(th) = root.get("theme").and_then(|v| v.as_str())
+            && (th == "system" || th == "dark" || th == "light")
+        {
+            s.theme = th.to_string();
+        }
     }
     s
 }
@@ -154,8 +162,12 @@ pub(crate) fn save_app_settings(s: &AppSettings) -> bool {
         minijson::escape(&s.translate_target_lang)
     ));
     out.push_str(&format!(
-        "  \"sidebar_mode\": \"{}\"\n",
+        "  \"sidebar_mode\": \"{}\",\n",
         minijson::escape(&s.sidebar_mode)
+    ));
+    out.push_str(&format!(
+        "  \"theme\": \"{}\"\n",
+        minijson::escape(&s.theme)
     ));
     out.push_str(
         "}

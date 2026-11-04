@@ -1859,4 +1859,17 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Скриншот скопирован в буфер обмена",
     ),
     ("Sidebar mode", "Yon panel rejimi", "Режим боковой панели"),
+    (
+        "Browser Theme",
+        "Brauzer mavzusi",
+        "Тема браузера",
+    ),
+    (
+        "Choose color theme for Rail and websites (Dark, Light, or follow Linux system).",
+        "Rail va veb-saytlar uchun rang mavzusini tanlang (Qorong'i, Yorug' yoki Linux tizimiga moslashuvchi).",
+        "Выберите цветовую тему для Rail и веб-сайтов (Тёмная, Светлая или системная Linux).",
+    ),
+    ("Dark", "Qorong'i", "Тёмная"),
+    ("Light", "Yorug'", "Светлая"),
+    ("System", "Tizim", "Системная"),
 ];

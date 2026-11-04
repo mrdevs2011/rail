@@ -3,11 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="dark light">
 <title>Rail Browser</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root { --bg: #000000; --fg: #ededed; --dim: #525252; --line-hi: #3a3a3a; --acc: #38bdf8; --panel: #0c0c0c; --line: #1f1f1f; }
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f8fa;
+    --fg: #1f2328;
+    --dim: #656d76;
+    --line-hi: #d0d7de;
+    --acc: #0284c7;
+    --panel: #ffffff;
+    --line: #d0d7de;
+  }
+  .sug:hover, .sug.sel { background: #f0f2f5; }
+  .sugs { scrollbar-color: #d0d7de transparent; }
+  #q::selection { background: #bae6fd; color: #0284c7; }
+  .hint .k { color: #1f2328; }
+  .pmenu { background: #ffffff; border: 1px solid #d0d7de; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .pitem:hover, .pitem.sel { background: #f0f2f5; }
+}
 html, body { height: 100%; }
 body {
   min-height: 100vh; min-height: 100svh; display: flex; align-items: center; justify-content: center;

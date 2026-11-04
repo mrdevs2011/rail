@@ -1,8 +1,19 @@
 # AI Context — .
 
 ## Oxirgi holat
-- Sana: 2026-11-04 09:20
+- Sana: 2026-11-04 09:35
 - Nima qilindi:
+  - **Brauzer Mavzusi (Theme: Dark / Light / System) To'liq Ishlab Chiqildi**:
+    - Sozlamalarga ("General Preferences") yangi **"Browser Theme" (Brauzer mavzusi)** bo'limi qo'shildi (`Dark`, `Light`, `System`).
+    - **Veb-saytlarga Rang Mavzusini Yetkazish (`prefers-color-scheme`)**:
+      - `gtk-application-prefer-dark-theme` va `gtk-interface-color-scheme` GTK4 xususiyatlari orqali WebKitGTK bilan sinxronlashtirildi.
+      - Foydalanuvchi "Dark" tanlasa, barcha saytlar `prefers-color-scheme: dark` oladi.
+      - Foydalanuvchi "Light" tanlasa, barcha saytlar `prefers-color-scheme: light` oladi.
+      - Foydalanuvchi "System" tanlasa, Rail Linux ish stoli muhitining rang rejimini (`org.gnome.desktop.interface color-scheme` / FreeDesktop portals) tekshiradi va saytlarga aynan shuni yetkazadi. Linux'da rejim o'zgarganda Rail va veb-saytlar reaktiv tarzda avtomatik o'zgaradi.
+    - **Dev-Style Classic Light Theme (`style_light.css`)**:
+      - Ko'zni toliqtirmaydigan, o'ta nozik va qulay dasturchilar uslubidagi yorug' mavzu (GitHub/VS Code/Xcode kabi yumshoq off-white `#f6f8fa`, qora matn `#1f2328`, muted kulrang `#656d76` va barcha elementlarda Railning klassik ko'k aksenti `#0284c7`).
+      - Ichki sahifalar (`rail://start` va `rail://downloads`) ham `@media (prefers-color-scheme: light)` bilan to'liq yangilandi.
+    - Barcha 3 tilda (O'zbek, Rus, Ingliz) 100% mukammal tarjima qilindi.
   - **"Open Image in New Tab" (Rasmni yangi tabda ochish) To'liq Mukammallashtirildi**:
     - Ota tabning tegishli profili, sessiyasi va WebProcess xotirasi (`create_related_web_view`) saqlab qolindi; endi autentifikatsiya talab qiluvchi rasmlar (Supabase, Discord, Telegram, Twitter, Canva) yoki `blob:` / `data:` URI orqali render qilingan rasmlar 100% ochiladi.
     - Hotlink himoyasiga ega CDN'lar (`403 Forbidden` beruvchi serverlar) uchun `URIRequest` orqali ota sahifaning `Referer` sarlavhasi (header) biriktirildi.
