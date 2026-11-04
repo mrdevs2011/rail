@@ -733,6 +733,205 @@ pub(crate) fn run_background_daemon() -> glib::ExitCode {
     glib::ExitCode::SUCCESS
 }
 
+pub(crate) const PWA_BRIDGE_SCRIPT: &str = r#"
+(function() {
+  if (window.__railPwaBridgeInjected) return;
+  window.__railPwaBridgeInjected = true;
+
+  function getManifestHref() {
+    var el = document.querySelector('link[rel="manifest"]');
+    return el ? el.href : '';
+  }
+
+  function getAppIconHref() {
+    var el = document.querySelector('link[rel="icon"][sizes="512x512"], link[rel="apple-touch-icon"], link[rel="icon"][sizes="192x192"], link[rel="icon"]');
+    return el ? el.href : '';
+  }
+
+  function getThemeColorMeta() {
+    var el = document.querySelector('meta[name="theme-color"]');
+    return el ? el.content : '';
+  }
+
+  function sendPwaInstallTrigger() {
+    try {
+      var handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railPwaInstall;
+      if (handler) {
+        var payload = JSON.stringify({
+          title: document.title || '',
+          url: window.location.href,
+          manifest: getManifestHref(),
+          icon: getAppIconHref(),
+          theme: getThemeColorMeta()
+        });
+        handler.postMessage(payload);
+      }
+    } catch (_) {}
+  }
+
+  function fireBeforeInstallPrompt() {
+    try {
+      var evt = new Event('beforeinstallprompt', { bubbles: true, cancelable: true });
+      evt.prompt = function() {
+        sendPwaInstallTrigger();
+        return Promise.resolve({ outcome: 'accepted', platform: 'web' });
+      };
+      evt.userChoice = Promise.resolve({ outcome: 'accepted', platform: 'web' });
+      window.deferredPrompt = evt;
+      window.__beforeInstallPromptEvent = evt;
+      window.dispatchEvent(evt);
+    } catch (_) {}
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(fireBeforeInstallPrompt, 150);
+      setTimeout(fireBeforeInstallPrompt, 1000);
+    });
+  } else {
+    setTimeout(fireBeforeInstallPrompt, 150);
+    setTimeout(fireBeforeInstallPrompt, 1000);
+  }
+
+  // Intercept clicks on in-page install buttons (e.g. MyPlan's "Ilovani o'rnatish" button)
+  document.addEventListener('click', function(e) {
+    var btn = e.target && e.target.closest('button, a, [role="button"], div');
+    if (!btn) return;
+    var txt = (btn.innerText || btn.textContent || '').toLowerCase().trim();
+    if (txt.includes("ilovani o'rnatish") || txt.includes("ilovani ornatish") || txt.includes("ilovani yuklab olish") || txt.includes("install app") || txt.includes("install pwa") || txt === "o'rnatish" || txt === "ornatish" || txt === "install") {
+      sendPwaInstallTrigger();
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    }
+  }, true);
+})();
+"#;
+
+pub(crate) fn inject_pwa_bridge(ucm: &webkit6::UserContentManager) {
+    let script = webkit6::UserScript::new(
+        PWA_BRIDGE_SCRIPT,
+        webkit6::UserContentInjectedFrames::AllFrames,
+        webkit6::UserScriptInjectionTime::Start,
+        &[],
+        &[],
+    );
+    ucm.add_script(&script);
+}
+
+impl App {
+    pub(crate) fn handle_pwa_install_message(self: &Rc<Self>, payload: &str, view: &WebView) {
+        let mut title = String::new();
+        let mut url = view.uri().map(|s| s.to_string()).unwrap_or_default();
+        let mut manifest_url: Option<String> = None;
+        let mut icon_url: Option<String> = None;
+        let mut theme_color: Option<String> = None;
+
+        if let Some(json) = crate::minijson::parse(payload) {
+            if let Some(t) = json.get("title").and_then(|v| v.as_str()) {
+                title = t.trim().to_string();
+            }
+            if let Some(u) = json.get("url").and_then(|v| v.as_str())
+                && !u.trim().is_empty()
+            {
+                url = u.trim().to_string();
+            }
+            if let Some(m) = json.get("manifest").and_then(|v| v.as_str())
+                && !m.trim().is_empty()
+            {
+                manifest_url = Some(m.trim().to_string());
+            }
+            if let Some(i) = json.get("icon").and_then(|v| v.as_str())
+                && !i.trim().is_empty()
+            {
+                icon_url = Some(i.trim().to_string());
+            }
+            if let Some(th) = json.get("theme").and_then(|v| v.as_str())
+                && !th.trim().is_empty()
+            {
+                theme_color = Some(th.trim().to_string());
+            }
+        }
+
+        if title.is_empty() {
+            title = view.title().map(|s| s.to_string()).unwrap_or_else(|| url.clone());
+        }
+
+        if url.is_empty() || (!url.starts_with("http://") && !url.starts_with("https://")) {
+            return;
+        }
+
+        // If manifest_url is relative, resolve it
+        if let Some(ref m_url) = manifest_url {
+            let resolved_m_url = if !m_url.contains("://") {
+                glib::Uri::resolve_relative(Some(url.as_str()), m_url, glib::UriFlags::NONE)
+                    .map(|u| u.to_string())
+                    .unwrap_or_else(|_| m_url.clone())
+            } else {
+                m_url.clone()
+            };
+
+            // Fetch manifest to discover clean app name, high-res icon and theme color
+            let res = std::process::Command::new("curl")
+                .args(["-fsSL", "-m", "4", "-A", "Mozilla/5.0 (X11; Linux x86_64)", &resolved_m_url])
+                .output();
+            if let Ok(out) = res
+                && out.status.success()
+                && let Ok(text) = String::from_utf8(out.stdout)
+                && let Some(root) = crate::minijson::parse(&text)
+            {
+                if let Some(name) = root.get("short_name").and_then(|v| v.as_str())
+                    && !name.trim().is_empty()
+                {
+                    title = name.trim().to_string();
+                } else if let Some(name) = root.get("name").and_then(|v| v.as_str())
+                    && !name.trim().is_empty()
+                {
+                    title = name.trim().to_string();
+                }
+                if let Some(th) = root.get("theme_color").and_then(|v| v.as_str()) {
+                    theme_color = Some(th.trim().to_string());
+                }
+                if let Some(icons) = root.get("icons").and_then(|v| v.as_arr()) {
+                    for icon_obj in icons.iter().rev() {
+                        if let Some(src) = icon_obj.get("src").and_then(|v| v.as_str()) {
+                            if src.starts_with("http://") || src.starts_with("https://") {
+                                icon_url = Some(src.to_string());
+                                break;
+                            } else if let Ok(resolved) = glib::Uri::resolve_relative(Some(url.as_str()), src, glib::UriFlags::NONE) {
+                                icon_url = Some(resolved.to_string());
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Clean up title (remove website tagline like "MyPlan — Plan your day" -> "MyPlan")
+        let clean_title = if let Some(first_part) = title.split(['—', '–', '|', '-']).next() {
+            let t = first_part.trim();
+            if t.len() >= 2 {
+                t.to_string()
+            } else {
+                title
+            }
+        } else {
+            title
+        };
+
+        let pwa_info = PwaAppInfo {
+            id: slugify(&clean_title),
+            name: clean_title,
+            url,
+            icon_url,
+            theme_color,
+        };
+
+        prompt_install_pwa_dialog(self, &pwa_info);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

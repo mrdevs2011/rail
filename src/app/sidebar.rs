@@ -474,21 +474,7 @@ impl App {
 
     pub(crate) fn prompt_install_current_pwa(self: &Rc<Self>) {
         if let Some(view) = self.focused_view() {
-            let u = view.uri().map(|s| s.to_string()).unwrap_or_default();
-            let t = view
-                .title()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| u.clone());
-            if !u.is_empty() && (u.starts_with("http://") || u.starts_with("https://")) {
-                let info = crate::pwa::PwaAppInfo {
-                    id: crate::pwa::slugify(&t),
-                    name: t,
-                    url: u,
-                    icon_url: None,
-                    theme_color: None,
-                };
-                crate::pwa::prompt_install_pwa_dialog(self, &info);
-            }
+            self.handle_pwa_install_message("", &view);
         }
     }
 

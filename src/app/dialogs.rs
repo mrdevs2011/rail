@@ -627,19 +627,7 @@ impl App {
                 let v_pwa = view.clone();
                 let act_pwa = gio::SimpleAction::new("ctx-install-pwa", None);
                 act_pwa.connect_activate(move |_, _| {
-                    let u = v_pwa.uri().map(|s| s.to_string()).unwrap_or_default();
-                    let t = v_pwa
-                        .title()
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| u.clone());
-                    let pwa_info = crate::pwa::PwaAppInfo {
-                        id: crate::pwa::slugify(&t),
-                        name: t,
-                        url: u,
-                        icon_url: None,
-                        theme_color: None,
-                    };
-                    crate::pwa::prompt_install_pwa_dialog(&app_pwa, &pwa_info);
+                    app_pwa.handle_pwa_install_message("", &v_pwa);
                 });
                 self.win.add_action(&act_pwa);
                 menu.append(&ContextMenuItem::from_gaction(

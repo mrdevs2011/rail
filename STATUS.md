@@ -1,8 +1,16 @@
 # AI Context — .
 
 ## Oxirgi holat
-- Sana: 2026-11-04 09:35
+- Sana: 2026-11-04 09:45
 - Nima qilindi:
+  - **PWA O'rnatish Tizimi va Sahifa Ichidagi O'rnatish Tugmalari Mukammallashtirildi**:
+    - Nega saytlar (masalan `MyPlan`) "Ilovani brauzer menyusi orqali o'rnatishingiz mumkin" deb ogohlantirish berayotgan edi: WebKitGTK o'zida Chromium'dagi `beforeinstallprompt` hodisasini avtomatik chiqarmaydi, shu sababli sayt scripti fallback alert chiqarib qo'ygan.
+    - **`beforeinstallprompt` Polyfill & Event Dispatch**: WebKit WebProcess ga `PWA_BRIDGE_SCRIPT` ineksiya qilindi. U `window.dispatchEvent(new Event('beforeinstallprompt'))` hodisasini ishga tushiradi, `window.deferredPrompt` ga `prompt()` va `userChoice` obyektini joylaydi.
+    - **Sahifa Ichidagi O'rnatish Tugmalarini Ushtash (Capture & Intercept)**: Foydalanuvchi sayt ichidagi "Ilovani o'rnatish", "Install App", "Add to Home Screen" kabi tugmalarga bosganda, script saytning fallback alertini `e.stopImmediatePropagation()` va `e.preventDefault()` bilan bloklaydi va to'g'ridan-to'g'ri Rail brauzeriga `railPwaInstall` xabarini yuboradi.
+    - **Manifest Parsing & Yuqori Sifatli Ikonkalar (512x512)**:
+      - Sahifaning `<link rel="manifest">` fayli olinib, undagi aniq `short_name`, `name`, `theme_color` va eng katta o'lchamdagi ikonkalar (512x512, 192x192) yuklab olinadi.
+      - Saytning nisbiy yo'llari (`/manifest.json`, `/icon.png`) to'g'ri to'liq manzilga keltiriladi.
+      - Natijada Linux ish stoli uchun `.desktop` launcher va yuqori sifatli SVG/PNG ilova ikonkalari avtomatik yaratiladi.
   - **Brauzer Mavzusi (Theme: Dark / Light / System) To'liq Ishlab Chiqildi**:
     - Sozlamalarga ("General Preferences") yangi **"Browser Theme" (Brauzer mavzusi)** bo'limi qo'shildi (`Dark`, `Light`, `System`).
     - **Veb-saytlarga Rang Mavzusini Yetkazish (`prefers-color-scheme`)**:

@@ -547,6 +547,13 @@ impl App {
                 let Some(v) = wv_dl.upgrade() else { return };
                 app_dl.on_downloads_message(&v, val.to_str().as_str());
             });
+
+            let app_pwa = self.clone();
+            let wv_pwa = view.downgrade();
+            ucm.connect_script_message_received(Some("railPwaInstall"), move |_, val| {
+                let Some(v) = wv_pwa.upgrade() else { return };
+                app_pwa.handle_pwa_install_message(val.to_str().as_str(), &v);
+            });
         }
 
         let app = self.clone();

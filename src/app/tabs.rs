@@ -145,12 +145,14 @@ impl App {
         ucm.register_script_message_handler("railScreenshot", None);
         ucm.register_script_message_handler("railContextMenu", None);
         ucm.register_script_message_handler("railDownloads", None);
+        ucm.register_script_message_handler("railPwaInstall", None);
 
         let html_css = load_html_css();
         if css_has_active_content(&html_css) {
             ucm.add_style_sheet(&user_style_sheet(&html_css));
         }
         crate::web::inject_context_menu_bridge(&ucm);
+        crate::pwa::inject_pwa_bridge(&ucm);
         STYLE_MANAGERS.with(|l| l.borrow_mut().push(ucm.downgrade()));
         ADBLOCK_FILTER.with(|f| {
             if let Some(f) = f.borrow().as_ref() {
