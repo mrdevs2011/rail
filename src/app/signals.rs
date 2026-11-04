@@ -554,6 +554,14 @@ impl App {
                 let Some(v) = wv_pwa.upgrade() else { return };
                 app_pwa.handle_pwa_install_message(val.to_str().as_str(), &v);
             });
+
+            let wv_chk = view.downgrade();
+            ucm.connect_script_message_received(Some("railPwaCheck"), move |_, val| {
+                let Some(v) = wv_chk.upgrade() else { return };
+                let url = val.to_str().to_string();
+                let is_inst = pwa::is_pwa_installed_for_url(&url);
+                pwa::send_pwa_installed_status_to_view(&v, is_inst);
+            });
         }
 
         let app = self.clone();

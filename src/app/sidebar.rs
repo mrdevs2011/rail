@@ -469,7 +469,8 @@ impl App {
         let disp_uri = self.focused_display_uri();
         self.pill_label.set_text(&disp_uri);
         let is_web = disp_uri.starts_with("http://") || disp_uri.starts_with("https://");
-        self.pill_pwa_btn.set_visible(is_web);
+        let is_already_installed = is_web && pwa::is_pwa_installed_for_url(&disp_uri);
+        self.pill_pwa_btn.set_visible(is_web && !is_already_installed);
     }
 
     pub(crate) fn prompt_install_current_pwa(self: &Rc<Self>) {

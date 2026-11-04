@@ -259,6 +259,47 @@ pub(crate) fn list_installed_pwas() -> Vec<PwaAppInfo> {
     list
 }
 
+/// Extract clean normalized origin from a URL string (e.g. "https://myplan-mr.vercel.app")
+pub(crate) fn get_url_origin(url: &str) -> String {
+    if let Ok(uri) = glib::Uri::parse(url, glib::UriFlags::NONE) {
+        let scheme = uri.scheme();
+        let host = uri.host().unwrap_or_default();
+        let port = uri.port();
+        if port > 0 {
+            format!("{}://{}:{}", scheme, host, port).to_lowercase()
+        } else {
+            format!("{}://{}", scheme, host).to_lowercase()
+        }
+    } else {
+        String::new()
+    }
+}
+
+/// Check if a PWA is installed for the given page URL by comparing origins
+pub(crate) fn is_pwa_installed_for_url(page_url: &str) -> bool {
+    let target_origin = get_url_origin(page_url);
+    if target_origin.is_empty() {
+        return false;
+    }
+    let installed = list_installed_pwas();
+    for app in installed {
+        let app_origin = get_url_origin(&app.url);
+        if !app_origin.is_empty() && app_origin == target_origin {
+            return true;
+        }
+    }
+    false
+}
+
+/// Send PWA installed status to a WebView page
+pub(crate) fn send_pwa_installed_status_to_view(view: &WebView, installed: bool) {
+    let js = format!(
+        "if (window.__railSetPwaInstalled) window.__railSetPwaInstalled({});",
+        installed
+    );
+    view.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
+}
+
 /// Uninstall PWA
 #[allow(dead_code)]
 pub(crate) fn uninstall_pwa_app(id: &str) -> Result<(), String> {
@@ -294,11 +335,42 @@ pub(crate) fn prompt_install_pwa_dialog(app: &Rc<App>, info: &PwaAppInfo) {
     vbox.set_margin_top(20);
     vbox.set_margin_bottom(20);
 
-    // Title with icon
+    // Title with icon: show the app's real favicon/manifest icon if available
     let header_box = gtk::Box::new(gtk::Orientation::Horizontal, 14);
-    let img_icon = gtk::Image::from_icon_name("system-software-install-symbolic");
-    img_icon.set_pixel_size(36);
-    img_icon.add_css_class("pwa-dialog-icon");
+    let app_id = slugify(&info.name);
+    let installed_icon = pwa_apps_dir().join(&app_id).join("icon.png");
+
+    let img_icon = if installed_icon.is_file()
+        && let Ok(tex) = gdk::Texture::from_filename(&installed_icon)
+    {
+        let img = gtk::Image::from_paintable(Some(&tex));
+        img.set_pixel_size(44);
+        img
+    } else if let Some(ref icon_u) = info.icon_url
+        && (icon_u.starts_with("http://") || icon_u.starts_with("https://"))
+    {
+        let preview_path = std::env::temp_dir().join(format!("rail_pwa_prev_{}.png", app_id));
+        let _ = std::process::Command::new("curl")
+            .args(["-fsSL", "-m", "4", "-A", "Mozilla/5.0 (X11; Linux x86_64)", "-o", preview_path.to_str().unwrap_or(""), icon_u])
+            .output();
+        if preview_path.is_file()
+            && let Ok(tex) = gdk::Texture::from_filename(&preview_path)
+        {
+            let img = gtk::Image::from_paintable(Some(&tex));
+            img.set_pixel_size(44);
+            img
+        } else {
+            let img = gtk::Image::from_icon_name("system-software-install-symbolic");
+            img.set_pixel_size(40);
+            img.add_css_class("pwa-dialog-icon");
+            img
+        }
+    } else {
+        let img = gtk::Image::from_icon_name("system-software-install-symbolic");
+        img.set_pixel_size(40);
+        img.add_css_class("pwa-dialog-icon");
+        img
+    };
 
     let title_vbox = gtk::Box::new(gtk::Orientation::Vertical, 2);
     let title_lbl = gtk::Label::new(Some(tr("Install as Desktop App?")));
@@ -370,6 +442,10 @@ pub(crate) fn prompt_install_pwa_dialog(app: &Rc<App>, info: &PwaAppInfo) {
                     &name,
                     tr("App installed successfully! Opening standalone window..."),
                 );
+                // Broadcast installed status to all active tabs on this origin
+                app_cb.broadcast_pwa_installed_for_url(&url_cb, true);
+                app_cb.refresh_sidebar();
+
                 if let Some(gapp) = app_cb.win.application() {
                     open_pwa_window(&gapp, &url_cb, Some(&name));
                 }
@@ -389,7 +465,9 @@ pub(crate) fn prompt_install_pwa_dialog(app: &Rc<App>, info: &PwaAppInfo) {
     win.present();
 }
 
-/// Standalone PWA Window: opens when `rail --app="https://..."` is executed or app is launched
+/// Standalone PWA Window: opens when `rail --app="https://..."` is executed or app is launched.
+/// Runs as a pure, native desktop application window with NO browser headerbars, NO url bars,
+/// giving 100% full screen area to the web app content.
 pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override: Option<&str>) {
     let win = gtk::ApplicationWindow::builder()
         .application(app)
@@ -399,85 +477,13 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
         .build();
     win.add_css_class("pwa-window");
 
-    let root_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    // Set desktop window icon if installed
+    if let Some(name) = title_override {
+        let app_id = slugify(name);
+        win.set_icon_name(Some(&format!("rail-pwa-{}", app_id)));
+    }
 
-    // 1. Sleek HeaderBar
-    let header = gtk::HeaderBar::new();
-    header.add_css_class("pwa-headerbar");
-
-    let nav_box = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-
-    let btn_back = gtk::Button::from_icon_name("go-previous-symbolic");
-    btn_back.add_css_class("flat-icon");
-    btn_back.set_tooltip_text(Some(tr("Back")));
-    btn_back.set_sensitive(false);
-
-    let btn_forward = gtk::Button::from_icon_name("go-next-symbolic");
-    btn_forward.add_css_class("flat-icon");
-    btn_forward.set_tooltip_text(Some(tr("Forward")));
-    btn_forward.set_sensitive(false);
-
-    let btn_reload = gtk::Button::from_icon_name("view-refresh-symbolic");
-    btn_reload.add_css_class("flat-icon");
-    btn_reload.set_tooltip_text(Some(tr("Reload")));
-
-    nav_box.append(&btn_back);
-    nav_box.append(&btn_forward);
-    nav_box.append(&btn_reload);
-    header.pack_start(&nav_box);
-
-    // Center domain title pill
-    let center_pill = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    center_pill.add_css_class("pwa-title-pill");
-    let lock_icon = gtk::Image::from_icon_name("channel-secure-symbolic");
-    lock_icon.set_pixel_size(12);
-    let title_lbl = gtk::Label::new(Some(title_override.unwrap_or(url)));
-    title_lbl.add_css_class("pwa-title-text");
-    center_pill.append(&lock_icon);
-    center_pill.append(&title_lbl);
-    header.set_title_widget(Some(&center_pill));
-
-    // Right-side app menu
-    let menu_btn = gtk::MenuButton::new();
-    menu_btn.set_icon_name("open-menu-symbolic");
-    menu_btn.add_css_class("flat-icon");
-
-    let popover = gtk::Popover::new();
-    let pop_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
-    pop_box.set_margin_start(10);
-    pop_box.set_margin_end(10);
-    pop_box.set_margin_top(8);
-    pop_box.set_margin_bottom(8);
-
-    let pop_c1 = popover.clone();
-    let url_copy = url.to_string();
-    let btn_copy_url = gtk::Button::with_label(tr("Copy Page Address"));
-    btn_copy_url.add_css_class("ext-popover-footer-btn");
-    btn_copy_url.connect_clicked(move |_| {
-        pop_c1.popdown();
-        if let Some(display) = gdk::Display::default() {
-            display.clipboard().set_text(&url_copy);
-        }
-    });
-    pop_box.append(&btn_copy_url);
-
-    let pop_c2 = popover.clone();
-    let win_close = win.clone();
-    let btn_close = gtk::Button::with_label(tr("Close"));
-    btn_close.add_css_class("ext-popover-footer-btn");
-    btn_close.connect_clicked(move |_| {
-        pop_c2.popdown();
-        win_close.close();
-    });
-    pop_box.append(&btn_close);
-
-    popover.set_child(Some(&pop_box));
-    menu_btn.set_popover(Some(&popover));
-    header.pack_end(&menu_btn);
-
-    root_box.append(&header);
-
-    // 2. Web View for PWA
+    // 1. Web View for PWA
     let mut mgr = ProfileManager::new(rail_data_dir());
     let prof_id = mgr.active_id().to_string();
     let session = mgr.get_or_create_session(&prof_id);
@@ -525,28 +531,13 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
     let app_name_str = title_override.unwrap_or(url).to_string();
     crate::notifications::attach_notification_handler(&view, Some(app_name_str), None);
 
-    let v_back = view.clone();
-    btn_back.connect_clicked(move |_| v_back.go_back());
-
-    let v_fwd = view.clone();
-    btn_forward.connect_clicked(move |_| v_fwd.go_forward());
-
-    let v_reload = view.clone();
-    btn_reload.connect_clicked(move |_| v_reload.reload());
-
-    // Navigation updates
-    let b_back = btn_back.clone();
-    let b_fwd = btn_forward.clone();
-    let t_lbl = title_lbl.clone();
+    // Navigation and title updates
     let w_clone = win.clone();
     view.connect_load_changed(move |v, event| {
-        if event == webkit6::LoadEvent::Finished {
-            b_back.set_sensitive(v.can_go_back());
-            b_fwd.set_sensitive(v.can_go_forward());
-            if let Some(t) = v.title() {
-                w_clone.set_title(Some(&t));
-                t_lbl.set_text(&t);
-            }
+        if event == webkit6::LoadEvent::Finished
+            && let Some(t) = v.title()
+        {
+            w_clone.set_title(Some(&t));
         }
     });
 
@@ -556,7 +547,7 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
         glib::Propagation::Proceed
     });
 
-    // Keyboard shortcuts in PWA window
+    // Keyboard shortcuts in PWA window (Ctrl+R / F5 reload, Ctrl+W close, Alt+Left/Right history)
     let key_ctl = gtk::EventControllerKey::new();
     let v_key = view.clone();
     let w_key = win.clone();
@@ -608,9 +599,8 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
     });
     win.add_controller(key_ctl);
 
+    win.set_child(Some(&view));
     view.load_uri(url);
-    root_box.append(&view);
-    win.set_child(Some(&root_box));
     win.present();
 }
 
@@ -738,6 +728,47 @@ pub(crate) const PWA_BRIDGE_SCRIPT: &str = r#"
   if (window.__railPwaBridgeInjected) return;
   window.__railPwaBridgeInjected = true;
 
+  window.__railIsPwaInstalled = false;
+
+  function updatePageButtons(installed) {
+    if (!installed) return;
+    try {
+      var buttons = document.querySelectorAll('button, a, [role="button"], div');
+      for (var i = 0; i < buttons.length; i++) {
+        var el = buttons[i];
+        var txt = (el.innerText || el.textContent || '').toLowerCase().trim();
+        if (txt.includes("ilovani o'rnatish") || txt.includes("ilovani ornatish") || txt.includes("ilovani yuklab olish") || txt.includes("install app") || txt.includes("install pwa")) {
+          el.style.opacity = '0.45';
+          el.style.filter = 'grayscale(100%)';
+          el.style.pointerEvents = 'none';
+          el.setAttribute('aria-disabled', 'true');
+          el.setAttribute('disabled', 'true');
+        }
+      }
+    } catch (_) {}
+  }
+
+  window.__railSetPwaInstalled = function(installed) {
+    window.__railIsPwaInstalled = !!installed;
+    if (installed) {
+      try {
+        window.dispatchEvent(new CustomEvent('appinstalled'));
+      } catch (_) {}
+      updatePageButtons(true);
+      setTimeout(function() { updatePageButtons(true); }, 500);
+      setTimeout(function() { updatePageButtons(true); }, 2000);
+    }
+  };
+
+  function checkInstalledStatus() {
+    try {
+      var chkHandler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.railPwaCheck;
+      if (chkHandler) {
+        chkHandler.postMessage(window.location.href);
+      }
+    } catch (_) {}
+  }
+
   function getManifestHref() {
     var el = document.querySelector('link[rel="manifest"]');
     return el ? el.href : '';
@@ -770,6 +801,10 @@ pub(crate) const PWA_BRIDGE_SCRIPT: &str = r#"
   }
 
   function fireBeforeInstallPrompt() {
+    if (window.__railIsPwaInstalled) {
+      updatePageButtons(true);
+      return;
+    }
     try {
       var evt = new Event('beforeinstallprompt', { bubbles: true, cancelable: true });
       evt.prompt = function() {
@@ -785,16 +820,21 @@ pub(crate) const PWA_BRIDGE_SCRIPT: &str = r#"
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
+      checkInstalledStatus();
       setTimeout(fireBeforeInstallPrompt, 150);
       setTimeout(fireBeforeInstallPrompt, 1000);
     });
   } else {
+    checkInstalledStatus();
     setTimeout(fireBeforeInstallPrompt, 150);
     setTimeout(fireBeforeInstallPrompt, 1000);
   }
 
   // Intercept clicks on in-page install buttons (e.g. MyPlan's "Ilovani o'rnatish" button)
   document.addEventListener('click', function(e) {
+    if (window.__railIsPwaInstalled) {
+      return;
+    }
     var btn = e.target && e.target.closest('button, a, [role="button"], div');
     if (!btn) return;
     var txt = (btn.innerText || btn.textContent || '').toLowerCase().trim();
@@ -929,6 +969,26 @@ impl App {
         };
 
         prompt_install_pwa_dialog(self, &pwa_info);
+    }
+
+    /// Broadcast PWA installation state change to all open tabs matching this origin
+    pub(crate) fn broadcast_pwa_installed_for_url(self: &Rc<Self>, url: &str, installed: bool) {
+        let target_origin = get_url_origin(url);
+        if target_origin.is_empty() {
+            return;
+        }
+        if let Ok(rows) = self.rows.try_borrow() {
+            for row in rows.iter() {
+                for tab in &row.tabs {
+                    if let Some(uri) = tab.view.uri() {
+                        let origin = get_url_origin(uri.as_str());
+                        if origin == target_origin {
+                            send_pwa_installed_status_to_view(&tab.view, installed);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

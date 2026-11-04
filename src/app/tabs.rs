@@ -144,6 +144,7 @@ impl App {
         ucm.register_script_message_handler("railContextMenu", None);
         ucm.register_script_message_handler("railDownloads", None);
         ucm.register_script_message_handler("railPwaInstall", None);
+        ucm.register_script_message_handler("railPwaCheck", None);
 
         let html_css = load_html_css();
         if css_has_active_content(&html_css) {

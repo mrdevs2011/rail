@@ -7,6 +7,8 @@ pub(crate) fn wire_close(app: &Rc<App>, win: gtk::ApplicationWindow) {
     win.connect_close_request(move |_| {
         a.save_session_immediate();
         a.history.borrow_mut().flush();
+        // Ensure background notification daemon is active for any installed PWAs
+        pwa::ensure_background_daemon_running();
         // Kill every WebKit process now so closing the window never leaves RAM-eating orphans.
         a.shutdown_all_web_processes();
         if let Some(gapp) = a.win.application() {
