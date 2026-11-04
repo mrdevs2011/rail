@@ -50,6 +50,7 @@ impl App {
     pub(crate) fn is_page_level_hit(hit: &HitTestResult) -> bool {
         !(hit.context_is_link()
             || hit.context_is_image()
+            || hit.image_uri().is_some()
             || hit.context_is_media()
             || hit.context_is_editable()
             || hit.context_is_selection())

@@ -1,8 +1,15 @@
 # AI Context — .
 
 ## Oxirgi holat
-- Sana: 2026-11-04 09:00
+- Sana: 2026-11-04 09:20
 - Nima qilindi:
+  - **"Open Image in New Tab" (Rasmni yangi tabda ochish) To'liq Mukammallashtirildi**:
+    - Ota tabning tegishli profili, sessiyasi va WebProcess xotirasi (`create_related_web_view`) saqlab qolindi; endi autentifikatsiya talab qiluvchi rasmlar (Supabase, Discord, Telegram, Twitter, Canva) yoki `blob:` / `data:` URI orqali render qilingan rasmlar 100% ochiladi.
+    - Hotlink himoyasiga ega CDN'lar (`403 Forbidden` beruvchi serverlar) uchun `URIRequest` orqali ota sahifaning `Referer` sarlavhasi (header) biriktirildi.
+    - `allow_top_navigation_to_data_urls` ruxsati yoqildi, natijada inline SVG va base64 ma'lumotlariga ega rasmlar bevosita yangi tabda hech qanday cheklovlarsiz ochiladi.
+    - Nisbiy (relative) URL'lar ota tabning bazaviy manzili orqali to'g'ri to'liq manzilga (`glib::Uri::resolve_relative`) aylantiriladi.
+  - **"Open Link in New Tab" va "Open Link in Split View" Kontekst Izolyatsiyasi Yangilandi**:
+    - Havolalarni yangi tab yoki split ko'rinishida ochish ham ota tabning tegishli profili va `related_view` xususiyatlarini saqlab qoladi (`open_link_in_new_tab` va `open_link_in_split_view`).
   - **Modal Oynalarda Scroll Ishlamasligi Butunlay Tuzatildi**:
     - React / Next.js / Radix UI modal dialoglari (`react-remove-scroll` / `body-scroll-lock`) orqa fonni bloklash maqsadida WebKitGTK da g'ildirak (wheel) va sensor (touch) harakatlarini xato bloklab qo'yishi bartaraf etildi.
     - Avtomatik `findScrollable` DOM recovery hook'i qo'shildi: modal yoki scrollable container ichida `preventDefault()` chaqirilgan taqdirda ham, konteyner tabiiy va silliq aylanadi ([`src/web/content.rs`](file:///home/muhamad/MR/rail-browser/src/web/content.rs)).

@@ -399,8 +399,8 @@ impl App {
     ) {
         let is_link = hit.context_is_link();
         let link_uri = hit.link_uri().map(|s| s.to_string());
-        let is_image = hit.context_is_image();
         let image_uri = hit.image_uri().map(|s| s.to_string());
+        let is_image = hit.context_is_image() || image_uri.is_some();
         let is_media = hit.context_is_media();
         let is_editable = hit.context_is_editable();
         let is_selection = hit.context_is_selection();
@@ -411,9 +411,10 @@ impl App {
         if is_link && let Some(uri) = &link_uri {
             let uri_t = uri.clone();
             let app_t = self.clone();
+            let v_t = view.clone();
             let act_tab = gio::SimpleAction::new("ctx-open-tab", None);
             act_tab.connect_activate(move |_, _| {
-                app_t.new_tab_with_url(&uri_t);
+                app_t.open_link_in_new_tab(&v_t, &uri_t);
             });
             self.win.add_action(&act_tab);
             menu.append(&ContextMenuItem::from_gaction(
@@ -424,9 +425,10 @@ impl App {
 
             let uri_s = uri.clone();
             let app_s = self.clone();
+            let v_s = view.clone();
             let act_split = gio::SimpleAction::new("ctx-open-split", None);
             act_split.connect_activate(move |_, _| {
-                app_s.split_with_url(&uri_s);
+                app_s.open_link_in_split_view(&v_s, &uri_s);
             });
             self.win.add_action(&act_split);
             menu.append(&ContextMenuItem::from_gaction(
@@ -461,9 +463,10 @@ impl App {
         if is_image && let Some(img_url) = &image_uri {
             let img_t = img_url.clone();
             let app_t = self.clone();
+            let v_t = view.clone();
             let act_img = gio::SimpleAction::new("ctx-open-img", None);
             act_img.connect_activate(move |_, _| {
-                app_t.new_tab_with_url(&img_t);
+                app_t.open_image_in_new_tab(&v_t, &img_t);
             });
             self.win.add_action(&act_img);
             menu.append(&ContextMenuItem::from_gaction(

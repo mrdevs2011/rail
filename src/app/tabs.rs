@@ -118,6 +118,7 @@ impl App {
         settings.set_enable_site_specific_quirks(true);
         settings.set_javascript_can_access_clipboard(true);
         settings.set_allow_file_access_from_file_urls(true);
+        settings.set_allow_top_navigation_to_data_urls(true);
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
         settings.set_auto_load_images(true);
         let dev_no_cache = rail_data_dir().join("dev-disable-cache").exists();
@@ -129,7 +130,6 @@ impl App {
             settings.set_disable_web_security(true);
             settings.set_allow_universal_access_from_file_urls(true);
             settings.set_allow_file_access_from_file_urls(true);
-            settings.set_allow_top_navigation_to_data_urls(true);
         }
     }
 
@@ -386,11 +386,7 @@ impl App {
         if is_internal_uri(url) {
             load_internal_page(&view, url);
         } else {
-            if is_internal_uri(url) {
-                load_internal_page(&view, url);
-            } else {
-                view.load_uri(url);
-            }
+            view.load_uri(url);
         }
         self.add_view(view.clone(), profile_id.to_string(), false);
         self.set_view_saved_uri(&view, url);
@@ -402,16 +398,82 @@ impl App {
         self.new_tab_with_url_and_profile(url, &prof_id);
     }
 
-    pub(crate) fn split_with_url(self: &Rc<Self>, url: &str) {
-        let prof_id = self.profiles.borrow().active_id().to_string();
-        let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
-        let view = Self::create_web_view(&session, &prof_id);
-        if is_internal_uri(url) {
-            load_internal_page(&view, url);
+    pub(crate) fn open_image_in_new_tab(self: &Rc<Self>, opener_view: &WebView, image_url: &str) {
+        let parent_prof = self
+            .find_view_profile(opener_view)
+            .unwrap_or_else(|| self.profiles.borrow().active_profile().id);
+
+        let resolved_url = if !image_url.contains("://")
+            && !image_url.starts_with("data:")
+            && !image_url.starts_with("blob:")
+        {
+            if let Some(base_uri) = opener_view.uri()
+                && let Ok(resolved) = glib::Uri::resolve_relative(
+                    Some(base_uri.as_str()),
+                    image_url,
+                    glib::UriFlags::NONE,
+                )
+            {
+                resolved.to_string()
+            } else {
+                image_url.to_string()
+            }
         } else {
-            view.load_uri(url);
+            image_url.to_string()
+        };
+
+        let new_view = Self::create_related_web_view(opener_view);
+        if (resolved_url.starts_with("http://") || resolved_url.starts_with("https://"))
+            && let Some(opener_uri) = opener_view.uri()
+            && !opener_uri.is_empty()
+        {
+            let req = webkit6::URIRequest::new(&resolved_url);
+            if let Some(headers) = req.http_headers() {
+                headers.append("Referer", &opener_uri);
+            }
+            new_view.load_request(&req);
+        } else {
+            new_view.load_uri(&resolved_url);
         }
-        self.add_view(view, prof_id, true);
+
+        self.add_view(new_view.clone(), parent_prof, false);
+        self.mark_keep_alive(opener_view);
+        self.mark_keep_alive(&new_view);
+        self.set_view_saved_uri(&new_view, &resolved_url);
+        self.pill_label.set_text(&self.focused_display_uri());
+    }
+
+    pub(crate) fn open_link_in_new_tab(self: &Rc<Self>, opener_view: &WebView, url: &str) {
+        let parent_prof = self
+            .find_view_profile(opener_view)
+            .unwrap_or_else(|| self.profiles.borrow().active_profile().id);
+        let new_view = Self::create_related_web_view(opener_view);
+        if is_internal_uri(url) {
+            load_internal_page(&new_view, url);
+        } else {
+            new_view.load_uri(url);
+        }
+        self.add_view(new_view.clone(), parent_prof, false);
+        self.mark_keep_alive(opener_view);
+        self.mark_keep_alive(&new_view);
+        self.set_view_saved_uri(&new_view, url);
+        self.pill_label.set_text(&self.focused_display_uri());
+    }
+
+    pub(crate) fn open_link_in_split_view(self: &Rc<Self>, opener_view: &WebView, url: &str) {
+        let parent_prof = self
+            .find_view_profile(opener_view)
+            .unwrap_or_else(|| self.profiles.borrow().active_profile().id);
+        let new_view = Self::create_related_web_view(opener_view);
+        if is_internal_uri(url) {
+            load_internal_page(&new_view, url);
+        } else {
+            new_view.load_uri(url);
+        }
+        self.add_view(new_view.clone(), parent_prof, true);
+        self.mark_keep_alive(opener_view);
+        self.mark_keep_alive(&new_view);
+        self.set_view_saved_uri(&new_view, url);
     }
 
     /// View Page Source (Ctrl+U): open immediately, fetch the original response off-thread.
