@@ -141,11 +141,20 @@ fn main() -> glib::ExitCode {
         if let Some(ctx) = webkit6::WebContext::default() {
             ctx.set_cache_model(webkit6::CacheModel::DocumentViewer);
         }
-    } else if let Some(ctx) = webkit6::WebContext::default() {
-        // Default mode: full browser caching without artificial RAM throttling.
-        // This ensures YouTube / HTML5 video buffers remain in RAM for instant seeking
-        // without constant buffer eviction thrashing.
-        ctx.set_cache_model(webkit6::CacheModel::WebBrowser);
+    } else {
+        // Balanced hyper-performance & low-RAM mode:
+        // DocumentBrowser caches documents and network assets for instant navigation and media streaming
+        // without hoarding gigabytes of dead render buffers or speculative JIT heaps.
+        let mut mps = webkit6::MemoryPressureSettings::new();
+        mps.set_memory_limit(768);
+        mps.set_conservative_threshold(0.70);
+        mps.set_strict_threshold(0.85);
+        mps.set_kill_threshold(0.0);
+        mps.set_poll_interval(5.0);
+        webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
+        if let Some(ctx) = webkit6::WebContext::default() {
+            ctx.set_cache_model(webkit6::CacheModel::DocumentBrowser);
+        }
     }
 
     let args: Vec<String> = std::env::args().collect();

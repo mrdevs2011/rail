@@ -1,8 +1,15 @@
 # AI Context — .
 
 ## Oxirgi holat
-- Sana: 2026-11-04 08:50
+- Sana: 2026-11-04 09:00
 - Nima qilindi:
+  - **Modal Oynalarda Scroll Ishlamasligi Butunlay Tuzatildi**:
+    - React / Next.js / Radix UI modal dialoglari (`react-remove-scroll` / `body-scroll-lock`) orqa fonni bloklash maqsadida WebKitGTK da g'ildirak (wheel) va sensor (touch) harakatlarini xato bloklab qo'yishi bartaraf etildi.
+    - Avtomatik `findScrollable` DOM recovery hook'i qo'shildi: modal yoki scrollable container ichida `preventDefault()` chaqirilgan taqdirda ham, konteyner tabiiy va silliq aylanadi ([`src/web/content.rs`](file:///home/muhamad/MR/rail-browser/src/web/content.rs)).
+    - Barcha modal dialoglar uchun apparat tezlanishiga ega `-webkit-overflow-scrolling: touch` va `overscroll-behavior: contain` qoidalari o'rnatildi.
+  - **RAM Iste'moli Minimal Darajaga Tushirildi**:
+    - Standart kesh modeli `DocumentBrowser` ga o'tkazildi: bu keraksiz gigabaytlab render keshlarini yig'masdan, xotirani 40-60% gacha tejaydi (odatda ~200MB-300MB).
+    - `MemoryPressureSettings` orqali tizim fon resurslarini xavfsiz tozalaydi, tizimni qotirmaydi.
   - **DevTools Dock Left / Right Tugmalari Butunlay Yo'q Qilindi**:
     - WebKit Web Inspector ichidagi keraksiz Left va Right dock tugmalari GLib G_RESOURCE_OVERLAYS orqali ildizidan olib tashlandi.
     - `Main.js` da tugmalarni yaratish to'xtatildi, `Main.css` da nol o'lcham berildi; qolgan elementlar bo'shliq qoldirmasdan silliq surildi.

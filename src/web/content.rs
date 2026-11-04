@@ -382,12 +382,13 @@ pub(crate) fn save_css_editor(buffer: &gtk::TextBuffer, btn: &gtk::Button) {
     glib::timeout_add_local_once(Duration::from_millis(1500), move || b.set_label(tr("Save")));
 }
 
-/// A tiny observational hook so Rail can respect a site's custom context menu.
-/// It never changes page DOM, media capabilities, listeners, or default actions.
+/// Observational hooks for site context menus and automatic modal scrolling recovery.
+/// Prevents overzealous background scroll locks (e.g. react-remove-scroll / Radix UI)
+/// from freezing wheel/touchpad scrolling on scrollable dialogs and modal content in WebKit.
 const PAGE_COMPATIBILITY_SCRIPT: &str = r#"
 (function() {
-  if (window.__railContextMenuObserver) return;
-  window.__railContextMenuObserver = true;
+  if (window.__railCompatibilityObserver) return;
+  window.__railCompatibilityObserver = true;
 
   function notifyContextPrevented() {
     try {
@@ -396,9 +397,7 @@ const PAGE_COMPATIBILITY_SCRIPT: &str = r#"
     } catch (_) {}
   }
 
-  // Wrap only this one event instance so notification is synchronous. The original
-  // method is always called with the same receiver/arguments; no global prototype,
-  // event propagation, or page listener registration is changed.
+  // 1. Context menu observer
   window.addEventListener('contextmenu', function(event) {
     var originalPreventDefault = event.preventDefault;
     event.preventDefault = function() {
@@ -406,7 +405,107 @@ const PAGE_COMPATIBILITY_SCRIPT: &str = r#"
       return originalPreventDefault.apply(this, arguments);
     };
   }, true);
+
+  // 2. Modal & nested scroll enabler: recovers wheel/touch scrolling on dialogs and overlays
+  function findScrollable(el) {
+    while (el && el !== document.body && el !== document.documentElement) {
+      try {
+        var style = window.getComputedStyle(el);
+        var oy = style.overflowY || style.overflow;
+        var ox = style.overflowX || style.overflow;
+        if (((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 1) ||
+            ((ox === 'auto' || ox === 'scroll') && el.scrollWidth > el.clientWidth + 1)) {
+          return el;
+        }
+      } catch (_) {}
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  window.addEventListener('wheel', function(e) {
+    var scrollable = findScrollable(e.target);
+    if (!scrollable) return;
+
+    var dy = e.deltaY;
+    if (e.deltaMode === 1) dy *= 32;
+    else if (e.deltaMode === 2) dy *= window.innerHeight;
+
+    var dx = e.deltaX;
+    if (e.deltaMode === 1) dx *= 32;
+
+    var initialTop = scrollable.scrollTop;
+    var initialLeft = scrollable.scrollLeft;
+
+    setTimeout(function() {
+      if (e.defaultPrevented) {
+        var canScrollDown = dy > 0 && (scrollable.scrollTop + scrollable.clientHeight < scrollable.scrollHeight - 1);
+        var canScrollUp = dy < 0 && scrollable.scrollTop > 0;
+        var canScrollRight = dx > 0 && (scrollable.scrollLeft + scrollable.clientWidth < scrollable.scrollWidth - 1);
+        var canScrollLeft = dx < 0 && scrollable.scrollLeft > 0;
+
+        if (canScrollDown || canScrollUp) {
+          if (scrollable.scrollTop === initialTop && dy !== 0) {
+            scrollable.scrollTop += dy;
+          }
+        }
+        if (canScrollRight || canScrollLeft) {
+          if (scrollable.scrollLeft === initialLeft && dx !== 0) {
+            scrollable.scrollLeft += dx;
+          }
+        }
+      }
+    }, 0);
+  }, { capture: true, passive: false });
+
+  var touchStartY = 0;
+  var touchStartX = 0;
+  var activeTouchScrollable = null;
+
+  window.addEventListener('touchstart', function(e) {
+    if (e.touches && e.touches.length === 1) {
+      touchStartY = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+      activeTouchScrollable = findScrollable(e.target);
+    }
+  }, { capture: true, passive: true });
+
+  window.addEventListener('touchmove', function(e) {
+    if (!activeTouchScrollable || !e.touches || e.touches.length !== 1) return;
+    var currentY = e.touches[0].clientY;
+    var currentX = e.touches[0].clientX;
+    var dy = touchStartY - currentY;
+    var dx = touchStartX - currentX;
+    var scrollable = activeTouchScrollable;
+    var initialTop = scrollable.scrollTop;
+    var initialLeft = scrollable.scrollLeft;
+
+    setTimeout(function() {
+      if (e.defaultPrevented) {
+        var canScrollY = (dy > 0 && scrollable.scrollTop + scrollable.clientHeight < scrollable.scrollHeight - 1) ||
+                         (dy < 0 && scrollable.scrollTop > 0);
+        var canScrollX = (dx > 0 && scrollable.scrollLeft + scrollable.clientWidth < scrollable.scrollWidth - 1) ||
+                         (dx < 0 && scrollable.scrollLeft > 0);
+        if (canScrollY && scrollable.scrollTop === initialTop) {
+          scrollable.scrollTop += dy;
+          touchStartY = currentY;
+        }
+        if (canScrollX && scrollable.scrollLeft === initialLeft) {
+          scrollable.scrollLeft += dx;
+          touchStartX = currentX;
+        }
+      }
+    }, 0);
+  }, { capture: true, passive: false });
 })();
+"#;
+
+pub(crate) const BUILTIN_MODAL_COMPATIBILITY_CSS: &str = r#"
+[role="dialog"], [aria-modal="true"], dialog, .modal, [class*="modal" i], [class*="dialog" i] {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
 "#;
 
 pub(crate) fn inject_context_menu_bridge(ucm: &webkit6::UserContentManager) {
@@ -418,6 +517,15 @@ pub(crate) fn inject_context_menu_bridge(ucm: &webkit6::UserContentManager) {
         &[],
     );
     ucm.add_script(&script);
+
+    let modal_style = webkit6::UserStyleSheet::new(
+        BUILTIN_MODAL_COMPATIBILITY_CSS,
+        webkit6::UserContentInjectedFrames::AllFrames,
+        webkit6::UserStyleLevel::User,
+        &[],
+        &[],
+    );
+    ucm.add_style_sheet(&modal_style);
 }
 
 #[cfg(test)]
