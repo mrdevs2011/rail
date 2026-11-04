@@ -229,7 +229,7 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
   toolbar.appendChild(btnDl);
   root.appendChild(toolbar);
 
-  (document.body || docEl).appendChild(root);
+  docEl.appendChild(root);
 
   let hasSelection = false;
   let sel = { left: 0, top: 0, width: 0, height: 0 };
@@ -584,24 +584,22 @@ const IN_PAGE_SCREENSHOT_JS: &str = r##"
     updateToolbarPos();
   }
 
-  window.addEventListener('mousemove', onMouseMove, true);
-  window.addEventListener('mousedown', onMouseDown, true);
-  window.addEventListener('mouseup', onMouseUp, true);
+  // Use Pointer Events for selection. Cancelling pointerdown suppresses the browser's
+  // compatibility mouse events, so never install a separate preventDefault pointer hook.
+  window.addEventListener('pointermove', onMouseMove, true);
+  window.addEventListener('pointerdown', onMouseDown, true);
+  window.addEventListener('pointerup', onMouseUp, true);
   window.addEventListener('click', interceptEvent, true);
-  window.addEventListener('pointerdown', interceptEvent, true);
-  window.addEventListener('pointerup', interceptEvent, true);
   window.addEventListener('contextmenu', interceptEvent, true);
   window.addEventListener('dblclick', interceptEvent, true);
   window.addEventListener('keydown', onKeyDown, true);
   window.addEventListener('scroll', onScroll, true);
 
   function cleanup() {
-    window.removeEventListener('mousemove', onMouseMove, true);
-    window.removeEventListener('mousedown', onMouseDown, true);
-    window.removeEventListener('mouseup', onMouseUp, true);
+    window.removeEventListener('pointermove', onMouseMove, true);
+    window.removeEventListener('pointerdown', onMouseDown, true);
+    window.removeEventListener('pointerup', onMouseUp, true);
     window.removeEventListener('click', interceptEvent, true);
-    window.removeEventListener('pointerdown', interceptEvent, true);
-    window.removeEventListener('pointerup', interceptEvent, true);
     window.removeEventListener('contextmenu', interceptEvent, true);
     window.removeEventListener('dblclick', interceptEvent, true);
     window.removeEventListener('keydown', onKeyDown, true);
@@ -668,12 +666,29 @@ impl App {
                 webkit6::SnapshotRegion::FullDocument,
                 webkit6::SnapshotOptions::empty(),
                 None::<&gio::Cancellable>,
-                move |res| {
-                    match res {
-                        Ok(tex) => finish_capture(&app, &tex, false),
-                        Err(e) => eprintln!("[rail] full page screenshot error: {e}"),
+                move |res| match res {
+                    Ok(tex) => {
+                        finish_capture(&app, &tex, false);
+                        cleanup_screenshot(&view_c);
                     }
-                    cleanup_screenshot(&view_c);
+                    Err(e) => {
+                        eprintln!(
+                            "[rail] full page screenshot error: {e}, falling back to visible"
+                        );
+                        let app2 = app.clone();
+                        let view_fb = view_c.clone();
+                        view_c.snapshot(
+                            webkit6::SnapshotRegion::Visible,
+                            webkit6::SnapshotOptions::empty(),
+                            None::<&gio::Cancellable>,
+                            move |res2| {
+                                if let Ok(tex2) = res2 {
+                                    finish_capture(&app2, &tex2, false);
+                                }
+                                cleanup_screenshot(&view_fb);
+                            },
+                        );
+                    }
                 },
             );
             return;
@@ -736,7 +751,8 @@ impl App {
                 },
             );
         } else {
-            // Continuous scroll capture across the document
+            // The selected region is outside the viewport: capture the document, not a
+            // misleading crop of the currently visible viewport if full-page capture fails.
             view.snapshot(
                 webkit6::SnapshotRegion::FullDocument,
                 webkit6::SnapshotOptions::empty(),
@@ -754,11 +770,21 @@ impl App {
                                 w: w * sx,
                                 h: h * sy,
                             };
-                            let final_tex = crop_texture(&tex, crop_r).unwrap_or(tex);
-                            finish_capture(&app, &final_tex, to_clipboard);
+                            if let Some(final_tex) = crop_texture(&tex, crop_r) {
+                                finish_capture(&app, &final_tex, to_clipboard);
+                            } else {
+                                app.show_copied_toast(
+                                    tr("Screenshot failed"),
+                                    tr("The selected area could not be captured."),
+                                );
+                            }
                         }
                         Err(e) => {
-                            eprintln!("[rail] full document snapshot error: {e}; falling back");
+                            eprintln!("[rail] full document snapshot error: {e}");
+                            app.show_copied_toast(
+                                tr("Screenshot failed"),
+                                tr("The selected area could not be captured."),
+                            );
                         }
                     }
                     cleanup_screenshot(&view_c);
@@ -791,6 +817,21 @@ fn finish_capture(app: &Rc<App>, tex: &gdk::Texture, to_clipboard: bool) {
 fn crop_texture(tex: &gdk::Texture, r: Rect) -> Option<gdk::Texture> {
     let tw = tex.width() as f64;
     let th = tex.height() as f64;
+    if !r.x.is_finite()
+        || !r.y.is_finite()
+        || !r.w.is_finite()
+        || !r.h.is_finite()
+        || r.x < 0.0
+        || r.y < 0.0
+        || r.w <= 0.0
+        || r.h <= 0.0
+        || r.x >= tw
+        || r.y >= th
+        || r.x + r.w > tw + 1.0
+        || r.y + r.h > th + 1.0
+    {
+        return None;
+    }
     let x = r.x.clamp(0.0, (tw - 1.0).max(0.0));
     let y = r.y.clamp(0.0, (th - 1.0).max(0.0));
     let w = r.w.clamp(1.0, (tw - x).max(1.0));

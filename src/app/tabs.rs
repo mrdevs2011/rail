@@ -199,6 +199,19 @@ impl App {
         Self::build_web_view(None, Some(parent))
     }
 
+    /// Create a normal tab in the opener's profile session without sharing its WebProcess.
+    /// Context-menu tabs do not need `related_view`: the shared NetworkSession preserves
+    /// cookies, storage and authentication while allowing each page to be suspended safely.
+    /// `true` means the fallback had to use a related view and therefore needs keep-alive.
+    fn create_link_web_view(parent: &WebView) -> (WebView, bool) {
+        if let Some(session) = parent.network_session() {
+            attach_download_handlers_once(&session);
+            (Self::build_web_view(Some(&session), None), false)
+        } else {
+            (Self::create_related_web_view(parent), true)
+        }
+    }
+
     #[allow(deprecated)]
     pub(crate) fn configure_native_web_view(view: &WebView) {
         // Paint the WebView before its first document commits. Without this, GTK/WebKit
@@ -423,7 +436,7 @@ impl App {
             image_url.to_string()
         };
 
-        let new_view = Self::create_related_web_view(opener_view);
+        let (new_view, shares_process) = Self::create_link_web_view(opener_view);
         if (resolved_url.starts_with("http://") || resolved_url.starts_with("https://"))
             && let Some(opener_uri) = opener_view.uri()
             && !opener_uri.is_empty()
@@ -438,8 +451,10 @@ impl App {
         }
 
         self.add_view(new_view.clone(), parent_prof, false);
-        self.mark_keep_alive(opener_view);
-        self.mark_keep_alive(&new_view);
+        if shares_process {
+            self.mark_keep_alive(opener_view);
+            self.mark_keep_alive(&new_view);
+        }
         self.set_view_saved_uri(&new_view, &resolved_url);
         self.pill_label.set_text(&self.focused_display_uri());
     }
@@ -448,15 +463,17 @@ impl App {
         let parent_prof = self
             .find_view_profile(opener_view)
             .unwrap_or_else(|| self.profiles.borrow().active_profile().id);
-        let new_view = Self::create_related_web_view(opener_view);
+        let (new_view, shares_process) = Self::create_link_web_view(opener_view);
         if is_internal_uri(url) {
             load_internal_page(&new_view, url);
         } else {
             new_view.load_uri(url);
         }
         self.add_view(new_view.clone(), parent_prof, false);
-        self.mark_keep_alive(opener_view);
-        self.mark_keep_alive(&new_view);
+        if shares_process {
+            self.mark_keep_alive(opener_view);
+            self.mark_keep_alive(&new_view);
+        }
         self.set_view_saved_uri(&new_view, url);
         self.pill_label.set_text(&self.focused_display_uri());
     }
@@ -465,15 +482,17 @@ impl App {
         let parent_prof = self
             .find_view_profile(opener_view)
             .unwrap_or_else(|| self.profiles.borrow().active_profile().id);
-        let new_view = Self::create_related_web_view(opener_view);
+        let (new_view, shares_process) = Self::create_link_web_view(opener_view);
         if is_internal_uri(url) {
             load_internal_page(&new_view, url);
         } else {
             new_view.load_uri(url);
         }
         self.add_view(new_view.clone(), parent_prof, true);
-        self.mark_keep_alive(opener_view);
-        self.mark_keep_alive(&new_view);
+        if shares_process {
+            self.mark_keep_alive(opener_view);
+            self.mark_keep_alive(&new_view);
+        }
         self.set_view_saved_uri(&new_view, url);
     }
 

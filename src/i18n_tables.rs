@@ -1799,6 +1799,11 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Предыдущее совпадение",
     ),
     (
+        "Capture screenshot / Element picker",
+        "Sahifani rasmga olish / Element tanlash",
+        "Снимок страницы / Выбор элемента",
+    ),
+    (
         "Open full Downloads page",
         "To'liq yuklab olishlar sahifasini ochish",
         "Открыть полную страницу загрузок",
@@ -1858,12 +1863,18 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Screenshot buferga nusxalandi",
         "Скриншот скопирован в буфер обмена",
     ),
-    ("Sidebar mode", "Yon panel rejimi", "Режим боковой панели"),
     (
-        "Browser Theme",
-        "Brauzer mavzusi",
-        "Тема браузера",
+        "Screenshot failed",
+        "Skrinshot olinmadi",
+        "Не удалось сделать скриншот",
     ),
+    (
+        "The selected area could not be captured.",
+        "Tanlangan hududni rasmga olib bo'lmadi.",
+        "Не удалось захватить выбранную область.",
+    ),
+    ("Sidebar mode", "Yon panel rejimi", "Режим боковой панели"),
+    ("Browser Theme", "Brauzer mavzusi", "Тема браузера"),
     (
         "Choose color theme for Rail and websites (Dark, Light, or follow Linux system).",
         "Rail va veb-saytlar uchun rang mavzusini tanlang (Qorong'i, Yorug' yoki Linux tizimiga moslashuvchi).",

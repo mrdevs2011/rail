@@ -57,6 +57,7 @@ pub(crate) const STATIC_ACTIONS: &[&str] = &[
     "find",
     "find_next",
     "find_prev",
+    "screenshot",
 ];
 
 impl App {
@@ -236,6 +237,12 @@ impl App {
             "find" => return self.find_open(),
             "find_next" => return self.find_step(true),
             "find_prev" => return self.find_step(false),
+            // ---- screenshot ----
+            "screenshot" => {
+                if let Some(v) = self.focused_view() {
+                    self.start_screenshot_mode(&v);
+                }
+            }
             _ => return false,
         }
         true

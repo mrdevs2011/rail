@@ -408,22 +408,31 @@ const PAGE_COMPATIBILITY_SCRIPT: &str = r#"
 
   // 2. Modal & nested scroll enabler: recovers wheel/touch scrolling on dialogs and overlays
   function findScrollable(el) {
-    while (el && el !== document.body && el !== document.documentElement) {
-      try {
-        var style = window.getComputedStyle(el);
-        var oy = style.overflowY || style.overflow;
-        var ox = style.overflowX || style.overflow;
-        if (((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 1) ||
-            ((ox === 'auto' || ox === 'scroll') && el.scrollWidth > el.clientWidth + 1)) {
-          return el;
-        }
-      } catch (_) {}
-      el = el.parentElement;
+    if (!el || !el.closest) return null;
+    var modal = el.closest('[role="dialog"], [aria-modal="true"], dialog, .modal, [class*="modal" i], [class*="dialog" i]');
+    if (!modal) return null;
+    var curr = el;
+    while (curr && curr !== document.body && curr !== document.documentElement) {
+      if (curr.scrollHeight > curr.clientHeight + 1 || curr.scrollWidth > curr.clientWidth + 1) {
+        try {
+          var style = window.getComputedStyle(curr);
+          var oy = style.overflowY || style.overflow;
+          var ox = style.overflowX || style.overflow;
+          if (oy === 'auto' || oy === 'scroll' || ox === 'auto' || ox === 'scroll') {
+            return curr;
+          }
+        } catch (_) {}
+      }
+      if (curr === modal) break;
+      curr = curr.parentElement;
     }
     return null;
   }
 
   window.addEventListener('wheel', function(e) {
+    if (!e.target || !e.target.closest) return;
+    var modal = e.target.closest('[role="dialog"], [aria-modal="true"], dialog, .modal, [class*="modal" i], [class*="dialog" i]');
+    if (!modal) return;
     var scrollable = findScrollable(e.target);
     if (!scrollable) return;
 
@@ -456,17 +465,19 @@ const PAGE_COMPATIBILITY_SCRIPT: &str = r#"
         }
       }
     }, 0);
-  }, { capture: true, passive: false });
+  }, { capture: true, passive: true });
 
   var touchStartY = 0;
   var touchStartX = 0;
   var activeTouchScrollable = null;
 
   window.addEventListener('touchstart', function(e) {
-    if (e.touches && e.touches.length === 1) {
+    if (e.touches && e.touches.length === 1 && e.target && e.target.closest && e.target.closest('[role="dialog"], [aria-modal="true"], dialog, .modal, [class*="modal" i], [class*="dialog" i]')) {
       touchStartY = e.touches[0].clientY;
       touchStartX = e.touches[0].clientX;
       activeTouchScrollable = findScrollable(e.target);
+    } else {
+      activeTouchScrollable = null;
     }
   }, { capture: true, passive: true });
 
@@ -496,7 +507,7 @@ const PAGE_COMPATIBILITY_SCRIPT: &str = r#"
         }
       }
     }, 0);
-  }, { capture: true, passive: false });
+  }, { capture: true, passive: true });
 })();
 "#;
 

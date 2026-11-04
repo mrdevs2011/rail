@@ -158,7 +158,12 @@ impl App {
             col.append(&row);
         }
         // Screenshot (Zen-style region + full page)
-        let shot = menu_row("screenshot", tr("Take Screenshot"), "", is_web_uri(&uri));
+        let shot = menu_row(
+            "screenshot",
+            tr("Take Screenshot"),
+            "Ctrl+Shift+S",
+            is_web_uri(&uri),
+        );
         let (app, p, v) = (self.clone(), pop.downgrade(), view.clone());
         shot.connect_clicked(move |_| {
             if let Some(p) = p.upgrade() {
