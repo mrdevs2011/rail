@@ -811,7 +811,12 @@ impl App {
         kind: &'static str,
         req: webkit6::PermissionRequest,
     ) {
-        let title_text = trf("{} wants to", &[&host]);
+        let is_notif = kind == "notifications";
+        let title_text = if is_notif {
+            tr("Turn on notifications").to_string()
+        } else {
+            trf("{} wants to", &[&host])
+        };
         let vbox = gtk::Box::new(gtk::Orientation::Vertical, 10);
         vbox.add_css_class("js-dialog-window");
         vbox.set_margin_top(16);
@@ -824,7 +829,12 @@ impl App {
         header_lbl.set_xalign(0.0);
         vbox.append(&header_lbl);
 
-        let msg_lbl = gtk::Label::new(Some(permission_label(kind)));
+        let msg_text = if is_notif {
+            host.clone()
+        } else {
+            permission_label(kind).to_string()
+        };
+        let msg_lbl = gtk::Label::new(Some(&msg_text));
         msg_lbl.add_css_class("js-dialog-message");
         msg_lbl.set_xalign(0.0);
         msg_lbl.set_margin_bottom(6);
@@ -864,14 +874,38 @@ impl App {
             b.connect_clicked(move |_| f(allow, remember));
             vbox.append(&b);
         };
-        add_btn(
-            tr("Always allow on this site"),
-            "js-dialog-btn-ok",
-            true,
-            true,
-        );
-        add_btn(tr("Allow this time"), "js-dialog-btn-cancel", true, false);
-        add_btn(tr("Never allow"), "js-dialog-btn-cancel", false, true);
+        if is_notif {
+            // Site's own "enable notifications" button -> Edge-style prompt: Close / Turn on,
+            // with "Turn on" already focused so Enter confirms it. Close is not remembered, so
+            // the site can ask again later.
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            row.set_halign(gtk::Align::End);
+            let close_btn = gtk::Button::with_label(tr("Close"));
+            close_btn.add_css_class("js-dialog-btn-cancel");
+            let f = finish.clone();
+            close_btn.connect_clicked(move |_| f(false, false));
+            let on_btn = gtk::Button::with_label(tr("Turn on"));
+            on_btn.add_css_class("js-dialog-btn-ok");
+            let f = finish.clone();
+            on_btn.connect_clicked(move |_| f(true, true));
+            row.append(&close_btn);
+            row.append(&on_btn);
+            vbox.append(&row);
+            on_btn.grab_focus();
+            let focus_btn = on_btn.clone();
+            glib::idle_add_local_once(move || {
+                focus_btn.grab_focus();
+            });
+        } else {
+            add_btn(
+                tr("Always allow on this site"),
+                "js-dialog-btn-ok",
+                true,
+                true,
+            );
+            add_btn(tr("Allow this time"), "js-dialog-btn-cancel", true, false);
+            add_btn(tr("Never allow"), "js-dialog-btn-cancel", false, true);
+        }
 
         let vbox_for_dialog = vbox.clone();
         let closer = self.show_top_dialog(vbox_for_dialog);

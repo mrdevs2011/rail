@@ -1643,6 +1643,12 @@ pub const TABLE: &[(&str, &str, &str)] = &[
         "Узнавать ваше местоположение",
     ),
     (
+        "Turn on notifications",
+        "Bildirishnomalarni yoqish",
+        "Включить уведомления",
+    ),
+    ("Turn on", "Yoqish", "Включить"),
+    (
         "Show notifications",
         "Bildirishnomalar ko'rsatish",
         "Показывать уведомления",
