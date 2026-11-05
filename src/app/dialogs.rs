@@ -215,6 +215,14 @@ impl App {
     }
 
     pub(crate) fn show_script_dialog(self: &Rc<Self>, view: &WebView, dialog: &ScriptDialog) {
+        // JavaScript dialogs belong to the WebView that emitted the signal. Make that
+        // owner the visible tab before presenting the browser-level dialog; otherwise
+        // GTK focus restoration can leave the user on whichever tab was focused earlier.
+        if let Some((row, col)) = self.find_view_coords(view) {
+            self.focus_coords(row, col);
+        }
+        let owner_view = view.downgrade();
+        let app_weak = Rc::downgrade(self);
         let dialog_type = dialog.dialog_type();
         let message = dialog.message().map(|s| s.to_string()).unwrap_or_default();
         let default_prompt = dialog
@@ -348,9 +356,25 @@ impl App {
         let close_with_anim = {
             let closer = closer.clone();
             let close_dialog = close_dialog.clone();
+            let owner_view = owner_view.clone();
+            let app_weak = app_weak.clone();
             move |confirmed: bool| {
                 close_dialog(confirmed);
                 closer();
+
+                // The overlay temporarily owns GTK focus. Restore focus to the exact
+                // WebView that opened the JS dialog after its exit animation, not to
+                // a stale global/current-tab reference.
+                let owner_view = owner_view.clone();
+                let app_weak = app_weak.clone();
+                glib::timeout_add_local_once(std::time::Duration::from_millis(220), move || {
+                    if let (Some(app), Some(view)) = (app_weak.upgrade(), owner_view.upgrade())
+                        && let Some((row, col)) = app.find_view_coords(&view)
+                    {
+                        app.focus_coords(row, col);
+                        view.grab_focus();
+                    }
+                });
             }
         };
 
