@@ -792,7 +792,11 @@ impl App {
             .unwrap_or_else(|| tr("This page").to_string());
         let remembered =
             PERMISSION_DECISIONS.with(|m| m.borrow().get(&(host.clone(), kind)).copied());
-        if let Some(allowed) = remembered {
+        // Notifications always show the Close / Turn on prompt when a site asks (its own
+        // "enable notifications" button); other kinds keep honouring the saved decision.
+        if kind != "notifications"
+            && let Some(allowed) = remembered
+        {
             if allowed {
                 req.allow();
             } else {
