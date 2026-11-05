@@ -3,8 +3,8 @@
 //! that work both while the browser/PWA is active and in background daemon mode.
 
 use std::process::Command;
-use webkit6::prelude::*;
 use webkit6::WebView;
+use webkit6::prelude::*;
 
 /// Dispatch native Linux desktop notification using standard freedesktop notify daemon
 pub(crate) fn show_desktop_notification(
@@ -23,11 +23,13 @@ pub(crate) fn show_desktop_notification(
         cmd.arg("-i").arg(i);
     }
 
-    cmd.arg(title);
+    // Keep notification text as positional data even when it starts with '-'.
+    cmd.arg("--").arg(title);
     if !body.is_empty() {
         cmd.arg(body);
     }
 
+    // Never block the WebKit signal handler waiting for the desktop notification service.
     let _ = cmd.spawn();
 }
 

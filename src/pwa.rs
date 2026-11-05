@@ -314,7 +314,58 @@ pub(crate) fn uninstall_pwa_app(id: &str) -> Result<(), String> {
     let _ = std::process::Command::new("update-desktop-database")
         .arg(desktop_applications_dir())
         .spawn();
+    if list_installed_pwas().is_empty() {
+        let _ = std::fs::remove_file(
+            glib::user_config_dir().join("autostart/rail-pwa-background.desktop"),
+        );
+        let _ = std::fs::remove_file(daemon_pid_file());
+    }
     Ok(())
+}
+
+/// A standalone/background PWA may only emit notifications when its origin was
+/// explicitly allowed in Rail's normal site-permission prompt.
+fn notification_permission_granted(url: &str, decisions: &str) -> bool {
+    let host = glib::Uri::parse(url, glib::UriFlags::NONE)
+        .ok()
+        .and_then(|uri| uri.host().map(|value| value.to_ascii_lowercase()))
+        .unwrap_or_default();
+    if host.is_empty() {
+        return false;
+    }
+    decisions.lines().any(|line| {
+        let mut fields = line.split('\t');
+        matches!((fields.next(), fields.next(), fields.next()),
+            (Some(saved_host), Some("notifications"), Some("allow"))
+                if saved_host.eq_ignore_ascii_case(&host))
+    })
+}
+
+fn is_notification_permission_granted(url: &str) -> bool {
+    let path = rail_data_dir().join("site-permissions.tsv");
+    let decisions = std::fs::read_to_string(path).unwrap_or_default();
+    notification_permission_granted(url, &decisions)
+}
+
+/// Ensure the background listener is launched again after the next desktop login.
+fn ensure_background_autostart() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let dir = glib::user_config_dir().join("autostart");
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    // Exec values are quoted so paths containing spaces remain a single argument.
+    let escaped = exe
+        .to_string_lossy()
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
+    let content = format!(
+        "[Desktop Entry]\nType=Application\nName=Rail PWA Notifications\nComment=Keep installed Rail apps available for notifications\nExec=\"{}\" --background\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
+        escaped
+    );
+    let _ = std::fs::write(dir.join("rail-pwa-background.desktop"), content);
 }
 
 /// Open native PWA install confirmation dialog
@@ -519,10 +570,15 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
         .build();
     App::configure_native_web_view(&view);
 
-    // Auto-grant notification permissions for standalone installed PWAs
-    view.connect_permission_request(|_v, req| {
+    // Standalone PWA windows reuse the permission decision made in the browser.
+    let pwa_notification_allowed = is_notification_permission_granted(url);
+    view.connect_permission_request(move |_v, req| {
         if req.is::<webkit6::NotificationPermissionRequest>() {
-            req.allow();
+            if pwa_notification_allowed {
+                req.allow();
+            } else {
+                req.deny();
+            }
             return true;
         }
         false
@@ -615,13 +671,24 @@ pub(crate) fn is_daemon_running() -> bool {
     if let Ok(pid_str) = std::fs::read_to_string(&pid_file)
         && let Ok(pid) = pid_str.trim().parse::<i32>()
     {
-        return PathBuf::from(format!("/proc/{}", pid)).exists();
+        let proc_dir = PathBuf::from(format!("/proc/{}", pid));
+        if !proc_dir.exists() {
+            return false;
+        }
+        return std::fs::read(proc_dir.join("cmdline"))
+            .map(|cmdline| {
+                cmdline
+                    .split(|byte| *byte == 0)
+                    .any(|arg| arg == b"--background" || arg == b"--daemon")
+            })
+            .unwrap_or(false);
     }
     false
 }
 
 /// Ensure background daemon is running if any PWAs are installed
 pub(crate) fn ensure_background_daemon_running() {
+    ensure_background_autostart();
     let installed = list_installed_pwas();
     if installed.is_empty() {
         return;
@@ -687,9 +754,14 @@ pub(crate) fn run_background_daemon() -> glib::ExitCode {
             .settings(&settings)
             .build();
 
-        view.connect_permission_request(|_v, req| {
+        let notification_allowed = is_notification_permission_granted(&pwa.url);
+        view.connect_permission_request(move |_v, req| {
             if req.is::<webkit6::NotificationPermissionRequest>() {
-                req.allow();
+                if notification_allowed {
+                    req.allow();
+                } else {
+                    req.deny();
+                }
                 return true;
             }
             false
@@ -995,6 +1067,29 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn notification_permission_requires_explicit_origin_allow() {
+        let saved = "example.com\tnotifications\tallow\nother.com\tnotifications\tdeny\n";
+        assert!(notification_permission_granted(
+            "https://example.com/app",
+            saved
+        ));
+        assert!(!notification_permission_granted("https://other.com", saved));
+        assert!(!notification_permission_granted(
+            "https://unknown.com",
+            saved
+        ));
+        assert!(!notification_permission_granted("file:///tmp/app", saved));
+    }
+
+    #[test]
+    fn notification_permission_is_case_insensitive_for_host() {
+        assert!(notification_permission_granted(
+            "https://EXAMPLE.COM/path",
+            "example.com\tnotifications\tallow\n"
+        ));
+    }
 
     #[test]
     fn test_daemon_pid_path() {
