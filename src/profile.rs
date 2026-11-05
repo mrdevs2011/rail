@@ -357,7 +357,10 @@ impl ProfileManager {
             Some(p_cache.to_str().unwrap_or("")),
         );
 
-        session.set_itp_enabled(true);
+        // ITP blocks third-party cookies/storage, which breaks sandboxed cross-origin frames
+        // (e.g. Claude artifacts on *.claudeusercontent.com answer 403 and report
+        // "This browser isn't supported"). Tracking protection is handled by the ad blocker.
+        session.set_itp_enabled(false);
         // Favicons are off by default: without this WebView::favicon() is always None and the
         // sidebar falls back to letter badges instead of the site's icon.
         if let Some(dm) = session.website_data_manager() {
