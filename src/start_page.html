@@ -8,8 +8,10 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root { --bg: #000000; --fg: #ededed; --dim: #525252; --line-hi: #3a3a3a; --acc: #38bdf8; --panel: #0c0c0c; --line: #1f1f1f; }
-@media (prefers-color-scheme: light) {
-  :root {
+html[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="light"] {
     --bg: #f6f8fa;
     --fg: #1f2328;
     --dim: #656d76;
@@ -18,13 +20,13 @@
     --panel: #ffffff;
     --line: #d0d7de;
   }
-  .sug:hover, .sug.sel { background: #f0f2f5; }
-  .sugs { scrollbar-color: #d0d7de transparent; }
-  #q::selection { background: #bae6fd; color: #0284c7; }
-  .hint .k { color: #1f2328; }
-  .pmenu { background: #ffffff; border: 1px solid #d0d7de; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-  .pitem:hover, .pitem.sel { background: #f0f2f5; }
 }
+html[data-theme="light"] .sug:hover, html[data-theme="light"] .sug.sel { background: #f0f2f5; }
+html[data-theme="light"] .sugs { scrollbar-color: #d0d7de transparent; }
+html[data-theme="light"] #q::selection { background: #bae6fd; color: #0284c7; }
+html[data-theme="light"] .hint .k { color: #1f2328; }
+html[data-theme="light"] .pmenu { background: #ffffff; border: 1px solid #d0d7de; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+html[data-theme="light"] .pitem:hover, html[data-theme="light"] .pitem.sel { background: #f0f2f5; }
 html, body { height: 100%; }
 body {
   min-height: 100vh; min-height: 100svh; display: flex; align-items: center; justify-content: center;
@@ -146,6 +148,36 @@ body.shortcuts-expanded .container { margin-top: 0; margin-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   .container { animation: none; }
 }
+
+/* Explicit Light theme: the start page is a separate WebKit document, so it
+   needs its own complete palette rather than the GTK application stylesheet. */
+html[data-theme="light"] body { background: #f6f8fa; color: #1f2328; }
+html[data-theme="light"] .shortcuts { border-top-color: #d0d7de; }
+html[data-theme="light"] .shortcuts-title { color: #1f2328; }
+html[data-theme="light"] .shortcuts-caption { color: #656d76; }
+html[data-theme="light"] .shortcuts-toggle { border-color: #d0d7de; background: #ffffff; color: #424a53; }
+html[data-theme="light"] .shortcuts-toggle:hover { background: #eaeef2; border-color: #bbc0c5; color: #1f2328; }
+html[data-theme="light"] .shortcuts-toggle:focus-visible { outline-color: #0284c7; }
+html[data-theme="light"] .shortcut-group { background: #ffffff; border-color: #d0d7de; }
+html[data-theme="light"] .shortcut-group-title { color: #656d76; }
+html[data-theme="light"] .shortcut-row { border-top-color: #e1e4e8; }
+html[data-theme="light"] .shortcut-row:hover { background: #f6f8fa; }
+html[data-theme="light"] .shortcut-row.primary .shortcut-desc,
+html[data-theme="light"] .shortcut-desc { color: #424a53; }
+html[data-theme="light"] .shortcut-key { background: #f0f2f5; border-color: #d0d7de; color: #1f2328; }
+html[data-theme="light"] .shortcut-off { color: #8c959f; }
+html[data-theme="light"] .sug:hover, html[data-theme="light"] .sug.sel,
+html[data-theme="light"] .pitem:hover, html[data-theme="light"] .pitem.sel,
+html[data-theme="light"] .pmenu .manage:hover { background: #f0f2f5; }
+html[data-theme="light"] .sug .b { color: #656d76; border-color: #d0d7de; }
+html[data-theme="light"] .panel { background: #f6f8fa; border-top-color: #d0d7de; }
+html[data-theme="light"] .pmenu { background: #ffffff; border-color: #d0d7de; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+html[data-theme="light"] .pitem.sel { box-shadow: inset 2px 0 0 #0284c7; }
+html[data-theme="light"] .pitem .ck { color: #0284c7; }
+html[data-theme="light"] .pmenu .sep { background: #e1e4e8; }
+html[data-theme="light"] .pbtn { box-shadow: 0 0 0 1px rgba(31,35,40,.12); }
+html[data-theme="light"] .hint .k { color: #1f2328; }
+html[data-theme="light"] #q::selection { background: #bae6fd; color: #0369a1; }
 </style>
 </head>
 <body>
@@ -304,6 +336,9 @@ body.shortcuts-expanded .container { margin-top: 0; margin-bottom: 0; }
   });
 
   window.railState = function (st) {
+    // The built-in page follows Rail's explicit theme preference (including System),
+    // not WebKit's independent prefers-color-scheme value.
+    document.documentElement.setAttribute('data-theme', st.theme === 'light' ? 'light' : 'dark');
     var keep = S.selected;
     S = st;
     if (keep && S.profiles.some(function (p) { return p.id === keep; })) S.selected = keep;

@@ -84,6 +84,25 @@ pub(crate) fn apply_theme_preference(pref: &str) {
                 app.win.remove_css_class("dark-theme");
                 app.win.add_css_class("light-theme");
             }
+
+            // The built-in New Tab is a separate WebKit document and does not
+            // inherit GTK's CSS provider. Re-send the effective theme immediately
+            // so already-open start pages update without requiring a reload.
+            if let Ok(rows) = app.rows.try_borrow() {
+                for row in rows.iter() {
+                    for tab in &row.tabs {
+                        let uri = tab
+                            .view
+                            .uri()
+                            .map(|value| value.to_string())
+                            .unwrap_or_default();
+                        let saved = tab.saved_uri.borrow().clone();
+                        if uri.starts_with("rail://start") || saved.starts_with("rail://start") {
+                            app.push_start_state(&tab.view);
+                        }
+                    }
+                }
+            }
         }
     });
 }

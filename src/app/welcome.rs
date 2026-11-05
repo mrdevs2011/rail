@@ -219,6 +219,18 @@ impl App {
         let engine = self.search_engine.borrow().clone();
         let display_name = search_engine_display_name(&engine);
         let svg_str = std::str::from_utf8(search_engine_svg_bytes(&engine)).unwrap_or("");
+        let theme_pref = load_app_settings().theme;
+        let effective_theme = if theme_pref == "system" {
+            if detect_system_is_dark() {
+                "dark"
+            } else {
+                "light"
+            }
+        } else if theme_pref == "light" {
+            "light"
+        } else {
+            "dark"
+        };
         let shortcuts = SHORTCUTS.with(|cfg| {
             let cfg = cfg.borrow();
             let mut defs = SHORTCUT_DEFS.iter().collect::<Vec<_>>();
@@ -233,7 +245,8 @@ impl App {
             }).collect::<Vec<_>>().join(",")
         });
         format!(
-            "{{\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}],\"shortcuts\":[{}],\"shortcutTitle\":\"{}\",\"shortcutCaption\":\"{}\",\"showAll\":\"{}\",\"showLess\":\"{}\",\"shortcutDisabled\":\"{}\"}}",
+            "{{\"theme\":\"{}\",\"placeholder\":\"{}\",\"engineSvg\":\"{}\",\"hint\":\"{}\",\"selTitle\":\"{}\",\"manage\":\"{}\",\"badges\":[\"{}\",\"{}\",\"{}\"],\"selected\":\"{}\",\"profiles\":[{}],\"shortcuts\":[{}],\"shortcutTitle\":\"{}\",\"shortcutCaption\":\"{}\",\"showAll\":\"{}\",\"showLess\":\"{}\",\"shortcutDisabled\":\"{}\"}}",
+            effective_theme,
             e(&tr("Search with {} or enter URL").replace("{}", display_name)),
             e(svg_str),
             e(&sc_apply(
