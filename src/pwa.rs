@@ -790,8 +790,31 @@ pub(crate) fn run_background_daemon() -> glib::ExitCode {
     let ml = main_loop.clone();
     let pid_f = pid_file.clone();
 
+    // After an update the running daemon would keep serving the old code (and old push
+    // receiver) until the next login. Detect a replaced executable and hand over to the new one.
+    let exe = std::env::current_exe().ok();
+    let stamp = |p: &Option<PathBuf>| {
+        p.as_ref()
+            .and_then(|p| std::fs::metadata(p).ok())
+            .and_then(|m| m.modified().ok())
+    };
+    let started_stamp = stamp(&exe);
     glib::timeout_add_local(std::time::Duration::from_secs(60), move || {
         if !pid_f.exists() {
+            ml.quit();
+            return glib::ControlFlow::Break;
+        }
+        if let (Some(a), Some(b)) = (started_stamp, stamp(&exe))
+            && a != b
+            && let Some(path) = exe.clone()
+        {
+            let _ = std::fs::remove_file(&pid_f);
+            let _ = std::process::Command::new(path)
+                .arg("--background")
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn();
             ml.quit();
             return glib::ControlFlow::Break;
         }
@@ -799,7 +822,13 @@ pub(crate) fn run_background_daemon() -> glib::ExitCode {
     });
 
     main_loop.run();
-    let _ = std::fs::remove_file(&pid_file);
+    // Only remove the pid file if it is still ours (an updated successor writes its own).
+    if std::fs::read_to_string(&pid_file)
+        .map(|p| p.trim() == my_pid.to_string())
+        .unwrap_or(false)
+    {
+        let _ = std::fs::remove_file(&pid_file);
+    }
     glib::ExitCode::SUCCESS
 }
 
@@ -810,13 +839,18 @@ pub(crate) const PWA_BRIDGE_SCRIPT: &str = r#"
 
   window.__railIsPwaInstalled = false;
 
+  // Uzbek sites write o'rnatish with typographic apostrophes (o\u2018, o\u2019, o\u02bb); fold them to ASCII.
+  function normTxt(t) {
+    return String(t).toLowerCase().replace(/[\u2018\u2019\u02bb\u02bc\u0060\u00b4]/g, "'").trim();
+  }
+
   function updatePageButtons(installed) {
     if (!installed) return;
     try {
       var buttons = document.querySelectorAll('button, a, [role="button"], div');
       for (var i = 0; i < buttons.length; i++) {
         var el = buttons[i];
-        var txt = (el.innerText || el.textContent || '').toLowerCase().trim();
+        var txt = normTxt(el.innerText || el.textContent || '');
         if (txt.includes("ilovani o'rnatish") || txt.includes("ilovani ornatish") || txt.includes("ilovani yuklab olish") || txt.includes("install app") || txt.includes("install pwa")) {
           el.style.opacity = '0.45';
           el.style.filter = 'grayscale(100%)';
@@ -898,16 +932,34 @@ pub(crate) const PWA_BRIDGE_SCRIPT: &str = r#"
     } catch (_) {}
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      checkInstalledStatus();
-      setTimeout(fireBeforeInstallPrompt, 150);
-      setTimeout(fireBeforeInstallPrompt, 1000);
-    });
-  } else {
+  // SPAs often register their beforeinstallprompt listener after the event already fired.
+  // Replay the saved event to such late listeners so the site still captures a usable prompt().
+  var origAddListener = window.addEventListener;
+  window.addEventListener = function(type, fn, opts) {
+    var r = origAddListener.apply(this, arguments);
+    if (type === 'beforeinstallprompt' && this === window && fn &&
+        window.__beforeInstallPromptEvent && !window.__railIsPwaInstalled) {
+      var saved = window.__beforeInstallPromptEvent;
+      setTimeout(function() {
+        try {
+          if (typeof fn === 'function') fn.call(window, saved);
+          else if (fn.handleEvent) fn.handleEvent(saved);
+        } catch (_) {}
+      }, 0);
+    }
+    return r;
+  };
+
+  function scheduleInstallPrompt() {
     checkInstalledStatus();
     setTimeout(fireBeforeInstallPrompt, 150);
     setTimeout(fireBeforeInstallPrompt, 1000);
+    setTimeout(fireBeforeInstallPrompt, 3500);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', scheduleInstallPrompt);
+  } else {
+    scheduleInstallPrompt();
   }
 
   // Intercept clicks on in-page install buttons (e.g. MyPlan's "Ilovani o'rnatish" button)
@@ -917,7 +969,7 @@ pub(crate) const PWA_BRIDGE_SCRIPT: &str = r#"
     }
     var btn = e.target && e.target.closest('button, a, [role="button"], div');
     if (!btn) return;
-    var txt = (btn.innerText || btn.textContent || '').toLowerCase().trim();
+    var txt = normTxt(btn.innerText || btn.textContent || '');
     if (txt.includes("ilovani o'rnatish") || txt.includes("ilovani ornatish") || txt.includes("ilovani yuklab olish") || txt.includes("install app") || txt.includes("install pwa") || txt === "o'rnatish" || txt === "ornatish" || txt === "install") {
       sendPwaInstallTrigger();
       e.preventDefault();

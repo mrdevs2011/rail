@@ -278,19 +278,27 @@ pub(crate) fn start_receiver() -> webkit6::WebView {
         .user_content_manager(&ucm)
         .build();
     // localhost is a secure context, which WebCrypto needs.
-    view.load_html(
-        &format!("<!doctype html><title>rail-push</title><script>{RECEIVER_JS}</script>"),
-        Some("http://localhost/"),
-    );
+    let page = format!("<!doctype html><title>rail-push</title><script>{RECEIVER_JS}</script>");
+    view.load_html(&page, Some("http://localhost/"));
     // Keep the receiver's connection list in sync with the subscription files.
     let wv = view.downgrade();
-    let last = std::cell::RefCell::new(String::new());
+    let last = std::rc::Rc::new(std::cell::RefCell::new(String::new()));
     let ready = std::rc::Rc::new(std::cell::Cell::new(false));
     let ready_c = ready.clone();
     view.connect_load_changed(move |_, ev| {
         if ev == webkit6::LoadEvent::Finished {
             ready_c.set(true);
         }
+    });
+    // If the web process crashes or is killed under memory pressure, reload so the
+    // connections are rebuilt on the next sync tick.
+    let ready_t = ready.clone();
+    let last_t = last.clone();
+    view.connect_web_process_terminated(move |v, _| {
+        ready_t.set(false);
+        last_t.borrow_mut().clear();
+        // reload() would fetch http://localhost/, so load the inline page again.
+        v.load_html(&page, Some("http://localhost/"));
     });
     glib::timeout_add_local(std::time::Duration::from_secs(3), move || {
         let Some(v) = wv.upgrade() else {
