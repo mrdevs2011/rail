@@ -1,6 +1,6 @@
 [package]
 name = "rail"
-version = "0.5.242"
+version = "0.5.243"
 edition = "2024"
 
 [dependencies]
