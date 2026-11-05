@@ -45,6 +45,7 @@
     - Downloads sahifasidagi 'X' belgisi to'liq o'ng tomonga qadalgan SVG ikonka holiga keltirildi.
   - **PWA va Fonda Bildirishnomalar Tizimi (Background Daemon)**:
     - WebKitGTK Web Notifications (`connect_show_notification`) to'liq ulandi; native Linux bildirishnomalari (`notify-send`) orqali chiqariladi.
+    - Web Push (`src/push.rs`): WebKitGTK da Push API yo'q, shuning uchun `PushManager`/`PushSubscription` shim (Mozilla autopush ustida) qo'shilgan. Obunalar `<data>/push/subs/` da saqlanadi; `rail --background` (login autostart) brauzer yopiq bo'lsa ham push xabarlarni tinglab, native bildirishnoma chiqaradi (bosilsa sayt Rail da ochiladi). Debug: `RAIL_PUSH_DEBUG=1`.
     - Ilova yoki brauzer butunlay yopilgan holatda ham bildirishnomalar kelishi uchun yengil fon xizmati (`rail --background` / `--daemon`) yaratildi (<20MB RAM).
     - O'rnatilgan PWA'lar uchun bildirishnoma ruxsatlari avtomatik beriladi.
   - **Verifikatsiya**:

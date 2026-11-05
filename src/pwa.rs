@@ -314,7 +314,7 @@ pub(crate) fn uninstall_pwa_app(id: &str) -> Result<(), String> {
     let _ = std::process::Command::new("update-desktop-database")
         .arg(desktop_applications_dir())
         .spawn();
-    if list_installed_pwas().is_empty() {
+    if list_installed_pwas().is_empty() && !crate::push::has_subscriptions() {
         let _ = std::fs::remove_file(
             glib::user_config_dir().join("autostart/rail-pwa-background.desktop"),
         );
@@ -341,14 +341,14 @@ fn notification_permission_granted(url: &str, decisions: &str) -> bool {
     })
 }
 
-fn is_notification_permission_granted(url: &str) -> bool {
+pub(crate) fn is_notification_permission_granted(url: &str) -> bool {
     let path = rail_data_dir().join("site-permissions.tsv");
     let decisions = std::fs::read_to_string(path).unwrap_or_default();
     notification_permission_granted(url, &decisions)
 }
 
 /// Ensure the background listener is launched again after the next desktop login.
-fn ensure_background_autostart() {
+pub(crate) fn ensure_background_autostart() {
     let Ok(exe) = std::env::current_exe() else {
         return;
     };
@@ -544,6 +544,7 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
 
     let ucm = webkit6::UserContentManager::new();
     ucm.register_script_message_handler("railContextMenu", None);
+    crate::push::install_bridge(&ucm);
     let html_css = load_html_css();
     if css_has_active_content(&html_css) {
         ucm.add_style_sheet(&user_style_sheet(&html_css));
@@ -690,7 +691,7 @@ pub(crate) fn is_daemon_running() -> bool {
 pub(crate) fn ensure_background_daemon_running() {
     ensure_background_autostart();
     let installed = list_installed_pwas();
-    if installed.is_empty() {
+    if installed.is_empty() && !crate::push::has_subscriptions() {
         return;
     }
     if is_daemon_running() {
@@ -720,7 +721,7 @@ pub(crate) fn run_background_daemon() -> glib::ExitCode {
     let _ = std::fs::write(&pid_file, my_pid.to_string());
 
     let installed = list_installed_pwas();
-    if installed.is_empty() {
+    if installed.is_empty() && !crate::push::has_subscriptions() {
         let _ = std::fs::remove_file(&pid_file);
         return glib::ExitCode::SUCCESS;
     }
@@ -747,6 +748,8 @@ pub(crate) fn run_background_daemon() -> glib::ExitCode {
     settings.set_media_playback_requires_user_gesture(true);
 
     let mut background_views = Vec::new();
+    // Web Push receiver: keeps listening for pushes while the browser is closed.
+    background_views.push(crate::push::start_receiver());
 
     for pwa in installed {
         let view = WebView::builder()

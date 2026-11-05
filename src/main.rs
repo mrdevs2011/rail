@@ -19,6 +19,7 @@ mod jank;
 mod minijson;
 mod notifications;
 mod profile;
+mod push;
 mod qr;
 mod spring;
 mod storage;
@@ -326,6 +327,10 @@ fn main() -> glib::ExitCode {
         }
     }
 
+    // A browser start revives the push listener if it died (crash, killed, new binary).
+    if push::has_subscriptions() {
+        pwa::ensure_background_daemon_running();
+    }
     app.connect_activate(|gapp| {
         if let Some(app_url) = PWA_APP_URL.get() {
             crate::pwa::open_pwa_window(gapp, app_url, None);

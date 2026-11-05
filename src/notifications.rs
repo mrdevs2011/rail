@@ -61,3 +61,36 @@ pub(crate) fn attach_notification_handler(
         true
     });
 }
+
+/// Show a desktop notification whose click opens `url` in Rail. Runs notify-send on a worker
+/// thread because waiting for the action blocks until the notification is dismissed.
+pub(crate) fn show_clickable_notification(app_name: &str, title: &str, body: &str, url: &str) {
+    let (app, title, body, url) = (
+        app_name.to_string(),
+        title.to_string(),
+        body.to_string(),
+        url.to_string(),
+    );
+    std::thread::spawn(move || {
+        let mut cmd = Command::new("notify-send");
+        cmd.arg("-a")
+            .arg(&app)
+            .arg("-A")
+            .arg("default=Open")
+            .arg("--")
+            .arg(&title)
+            .arg(&body)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null());
+        let Ok(child) = cmd.spawn() else { return };
+        let Ok(out) = child.wait_with_output() else {
+            return;
+        };
+        if String::from_utf8_lossy(&out.stdout).trim() == "default"
+            && (url.starts_with("https://") || url.starts_with("http://"))
+            && let Ok(exe) = std::env::current_exe()
+        {
+            let _ = Command::new(exe).arg(&url).spawn();
+        }
+    });
+}

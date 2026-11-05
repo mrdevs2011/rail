@@ -152,6 +152,7 @@ impl App {
         }
         crate::web::inject_context_menu_bridge(&ucm);
         crate::pwa::inject_pwa_bridge(&ucm);
+        crate::push::install_bridge(&ucm);
         STYLE_MANAGERS.with(|l| l.borrow_mut().push(ucm.downgrade()));
         ADBLOCK_FILTER.with(|f| {
             if let Some(f) = f.borrow().as_ref() {
@@ -214,6 +215,7 @@ impl App {
 
     #[allow(deprecated)]
     pub(crate) fn configure_native_web_view(view: &WebView) {
+        crate::push::attach_handler(view);
         // Paint the WebView before its first document commits. Without this, GTK/WebKit
         // can expose an unpainted black frame while a new tab's initial HTML is parsed.
         view.set_background_color(&crate::ui::web_background_color());
