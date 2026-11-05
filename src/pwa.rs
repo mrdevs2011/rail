@@ -174,7 +174,9 @@ pub(crate) fn install_pwa_app(
     // Write Linux .desktop file in ~/.local/share/applications/
     let desktop_dir = desktop_applications_dir();
     let _ = std::fs::create_dir_all(&desktop_dir);
-    let desktop_file = desktop_dir.join(format!("rail-pwa-{}.desktop", id));
+    let desktop_file = desktop_dir.join(format!("webapp-{}.desktop", id));
+    // Older versions used rail-pwa-*.desktop, which made launchers list every PWA when searching "rail".
+    let _ = std::fs::remove_file(desktop_dir.join(format!("rail-pwa-{}.desktop", id)));
 
     let desktop_content = format!(
         "[Desktop Entry]\n\
@@ -182,7 +184,7 @@ Version=1.0\n\
 Type=Application\n\
 Name={name}\n\
 GenericName={name} (Web App)\n\
-Comment={name} - Progressive Web App via Rail Browser\n\
+Comment={name} - Progressive Web App\n\
 Exec={bin} --app=\"{url}\"\n\
 Icon={icon}\n\
 Terminal=false\n\
@@ -303,9 +305,8 @@ pub(crate) fn send_pwa_installed_status_to_view(view: &WebView, installed: bool)
 /// Uninstall PWA
 #[allow(dead_code)]
 pub(crate) fn uninstall_pwa_app(id: &str) -> Result<(), String> {
-    let desktop_file = desktop_applications_dir().join(format!("rail-pwa-{}.desktop", id));
-    if desktop_file.exists() {
-        let _ = std::fs::remove_file(&desktop_file);
+    for name in [format!("webapp-{}.desktop", id), format!("rail-pwa-{}.desktop", id)] {
+        let _ = std::fs::remove_file(desktop_applications_dir().join(name));
     }
     let app_dir = pwa_apps_dir().join(id);
     if app_dir.exists() {
