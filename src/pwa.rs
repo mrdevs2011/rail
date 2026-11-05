@@ -752,10 +752,15 @@ pub(crate) fn run_background_daemon() -> glib::ExitCode {
     background_views.push(crate::push::start_receiver());
 
     for pwa in installed {
+        // Same Web Push bridge as browser tabs, so installed apps never see "push unsupported".
+        let ucm = webkit6::UserContentManager::new();
+        crate::push::install_bridge(&ucm);
         let view = WebView::builder()
             .network_session(&session)
             .settings(&settings)
+            .user_content_manager(&ucm)
             .build();
+        crate::push::attach_handler(&view);
 
         let notification_allowed = is_notification_permission_granted(&pwa.url);
         view.connect_permission_request(move |_v, req| {
