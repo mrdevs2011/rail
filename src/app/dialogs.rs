@@ -225,10 +225,16 @@ impl App {
         let app_weak = Rc::downgrade(self);
         let dialog_type = dialog.dialog_type();
         let message = dialog.message().map(|s| s.to_string()).unwrap_or_default();
-        let default_prompt = dialog
-            .prompt_get_default_text()
-            .map(|s| s.to_string())
-            .unwrap_or_default();
+        // Only prompt dialogs carry default text; calling this on alert/confirm trips a
+        // WebKit g_return_if_fail CRITICAL.
+        let default_prompt = if dialog_type == ScriptDialogType::Prompt {
+            dialog
+                .prompt_get_default_text()
+                .map(|s| s.to_string())
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
 
         let host = view
             .uri()

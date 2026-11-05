@@ -216,7 +216,7 @@ impl App {
     pub(crate) fn configure_native_web_view(view: &WebView) {
         // Paint the WebView before its first document commits. Without this, GTK/WebKit
         // can expose an unpainted black frame while a new tab's initial HTML is parsed.
-        view.set_background_color(&gtk::gdk::RGBA::new(0.0, 0.0, 0.0, 1.0));
+        view.set_background_color(&crate::ui::web_background_color());
 
         // Use a native GTK chooser for every web file input. This is more reliable
         // than WebKit's default chooser on Linux and supports multi-file uploads.

@@ -6,6 +6,18 @@ use std::cell::RefCell;
 
 pub(crate) const LIGHT_THEME_CSS: &str = include_str!("style_light.css");
 
+static EFFECTIVE_DARK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+/// Background painted behind web content before a document commits: white in light mode
+/// so users never see a black/gray flash, black in dark mode.
+pub(crate) fn web_background_color() -> gtk::gdk::RGBA {
+    if EFFECTIVE_DARK.load(std::sync::atomic::Ordering::Relaxed) {
+        gtk::gdk::RGBA::new(0.0, 0.0, 0.0, 1.0)
+    } else {
+        gtk::gdk::RGBA::new(1.0, 1.0, 1.0, 1.0)
+    }
+}
+
 thread_local! {
     pub(crate) static THEME_PROVIDER: gtk::CssProvider = gtk::CssProvider::new();
     static SYSTEM_THEME_INITIALIZED: RefCell<bool> = const { RefCell::new(false) };
@@ -55,6 +67,8 @@ pub(crate) fn apply_theme_preference(pref: &str) {
         _ => detect_system_is_dark(),
     };
 
+    EFFECTIVE_DARK.store(effective_dark, std::sync::atomic::Ordering::Relaxed);
+
     if let Some(s) = gtk::Settings::default() {
         s.set_gtk_application_prefer_dark_theme(effective_dark);
         if let Some(pspec) = s.find_property("gtk-interface-color-scheme") {
@@ -91,6 +105,7 @@ pub(crate) fn apply_theme_preference(pref: &str) {
             if let Ok(rows) = app.rows.try_borrow() {
                 for row in rows.iter() {
                     for tab in &row.tabs {
+                        tab.view.set_background_color(&web_background_color());
                         let uri = tab
                             .view
                             .uri()
