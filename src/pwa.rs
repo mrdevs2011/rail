@@ -845,20 +845,38 @@ pub(crate) const PWA_BRIDGE_SCRIPT: &str = r#"
     return String(t).toLowerCase().replace(/[\u2018\u2019\u02bb\u02bc\u0060\u00b4]/g, "'").trim();
   }
 
+  // A site's "Install app" control is a short label on a button/link (or a childless label).
+  // It must NEVER match a layout container that merely *contains* such a button: matching on text
+  // `includes` over every <div> used to grey out and disable the whole app (root div -> opacity .45,
+  // grayscale, pointer-events:none).
+  var INSTALL_PHRASES = ["ilovani o'rnatish", "ilovani ornatish", "ilovani yuklab olish", "install app", "install pwa"];
+  var INSTALL_EXACT = ["o'rnatish", "ornatish", "install"];
+  function isInstallControl(el, allowExact) {
+    if (!el || el.nodeType !== 1) return false;
+    var tag = el.tagName;
+    var interactive = tag === 'BUTTON' || tag === 'A' || el.getAttribute('role') === 'button';
+    if (!interactive && el.children.length > 0) return false;
+    var txt = normTxt(el.innerText || el.textContent || '');
+    if (!txt || txt.length > 40) return false;
+    if (allowExact && INSTALL_EXACT.indexOf(txt) !== -1) return true;
+    for (var i = 0; i < INSTALL_PHRASES.length; i++) {
+      if (txt.indexOf(INSTALL_PHRASES[i]) !== -1) return true;
+    }
+    return false;
+  }
+
   function updatePageButtons(installed) {
     if (!installed) return;
     try {
-      var buttons = document.querySelectorAll('button, a, [role="button"], div');
+      var buttons = document.querySelectorAll('button, a, [role="button"], div, span');
       for (var i = 0; i < buttons.length; i++) {
         var el = buttons[i];
-        var txt = normTxt(el.innerText || el.textContent || '');
-        if (txt.includes("ilovani o'rnatish") || txt.includes("ilovani ornatish") || txt.includes("ilovani yuklab olish") || txt.includes("install app") || txt.includes("install pwa")) {
-          el.style.opacity = '0.45';
-          el.style.filter = 'grayscale(100%)';
-          el.style.pointerEvents = 'none';
-          el.setAttribute('aria-disabled', 'true');
-          el.setAttribute('disabled', 'true');
-        }
+        if (!isInstallControl(el, false)) continue;
+        el.style.opacity = '0.45';
+        el.style.filter = 'grayscale(100%)';
+        el.style.pointerEvents = 'none';
+        el.setAttribute('aria-disabled', 'true');
+        if (el.tagName === 'BUTTON') el.setAttribute('disabled', 'true');
       }
     } catch (_) {}
   }
@@ -968,10 +986,11 @@ pub(crate) const PWA_BRIDGE_SCRIPT: &str = r#"
     if (window.__railIsPwaInstalled) {
       return;
     }
-    var btn = e.target && e.target.closest('button, a, [role="button"], div');
-    if (!btn) return;
-    var txt = normTxt(btn.innerText || btn.textContent || '');
-    if (txt.includes("ilovani o'rnatish") || txt.includes("ilovani ornatish") || txt.includes("ilovani yuklab olish") || txt.includes("install app") || txt.includes("install pwa") || txt === "o'rnatish" || txt === "ornatish" || txt === "install") {
+    // Nearest real control first; a click on a bare label inside it counts through that control.
+    var t = e.target;
+    var btn = t && t.closest ? t.closest('button, a, [role="button"]') : null;
+    if (!btn || !isInstallControl(btn, true)) btn = (t && isInstallControl(t, true)) ? t : null;
+    if (btn) {
       sendPwaInstallTrigger();
       e.preventDefault();
       e.stopPropagation();
@@ -1128,6 +1147,15 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pwa_bridge_never_treats_layout_containers_as_install_buttons() {
+        // Regression: scanning every <div> for text that merely *contains* "install app" greyed out and
+        // disabled the whole page (the root div contains the site's install button).
+        assert!(!PWA_BRIDGE_SCRIPT.contains(r#"closest('button, a, [role="button"], div')"#));
+        assert!(PWA_BRIDGE_SCRIPT.contains("function isInstallControl"));
+        assert!(PWA_BRIDGE_SCRIPT.contains("el.children.length > 0"));
+    }
 
     #[test]
     fn notification_permission_requires_explicit_origin_allow() {

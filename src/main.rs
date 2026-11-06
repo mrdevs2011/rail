@@ -158,6 +158,9 @@ fn main() -> glib::ExitCode {
         }
     }
 
+    // Saved notification decisions are visible to every page from its first script (web standard).
+    app::install_notification_permission_sync();
+
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a.starts_with("--appimage-")) {
         return glib::ExitCode::FAILURE;

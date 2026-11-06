@@ -11,6 +11,7 @@ pub(crate) use devtools::*;
 pub(crate) use tabs::is_external_uri_scheme;
 mod data_actions;
 mod dialogs;
+pub(crate) use dialogs::install_notification_permission_sync;
 mod focus;
 mod keys;
 mod lifecycle;

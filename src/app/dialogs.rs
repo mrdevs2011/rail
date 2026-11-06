@@ -747,6 +747,44 @@ fn save_permission_decisions(decisions: &std::collections::HashMap<(String, &'st
     }
 }
 
+/// Origins with a saved notification decision, as WebKit security origins: (allowed, denied).
+fn saved_notification_origins() -> (Vec<webkit6::SecurityOrigin>, Vec<webkit6::SecurityOrigin>) {
+    let mut allowed = Vec::new();
+    let mut denied = Vec::new();
+    PERMISSION_DECISIONS.with(|m| {
+        for ((host, kind), allow) in m.borrow().iter() {
+            if *kind != "notifications" {
+                continue;
+            }
+            let origin = webkit6::SecurityOrigin::new("https", host, 0);
+            if *allow {
+                allowed.push(origin);
+            } else {
+                denied.push(origin);
+            }
+        }
+    });
+    (allowed, denied)
+}
+
+/// Web standard: once a site was allowed (or blocked), every later visit sees
+/// `Notification.permission === "granted"` (or `"denied"`) straight away, so the site never has to ask
+/// again. WebKitGTK keeps no permission state of its own; the embedder must hand it over.
+pub(crate) fn sync_notification_permissions(ctx: &webkit6::WebContext) {
+    let (allowed, denied) = saved_notification_origins();
+    let allowed_refs: Vec<&webkit6::SecurityOrigin> = allowed.iter().collect();
+    let denied_refs: Vec<&webkit6::SecurityOrigin> = denied.iter().collect();
+    ctx.initialize_notification_permissions(&allowed_refs, &denied_refs);
+}
+
+/// Hook the sync to WebKit: it asks for the initial permissions whenever a web process starts.
+pub(crate) fn install_notification_permission_sync() {
+    if let Some(ctx) = webkit6::WebContext::default() {
+        ctx.connect_initialize_notification_permissions(sync_notification_permissions);
+        sync_notification_permissions(&ctx);
+    }
+}
+
 /// Permission kinds Rail asks about. Anything else keeps WebKit's default handling.
 fn permission_kind(req: &webkit6::PermissionRequest) -> Option<&'static str> {
     if let Some(um) = req.downcast_ref::<webkit6::UserMediaPermissionRequest>() {
@@ -861,6 +899,11 @@ impl App {
                         decisions.insert((host.clone(), kind), allow);
                         save_permission_decisions(&decisions);
                     });
+                    if kind == "notifications"
+                        && let Some(ctx) = webkit6::WebContext::default()
+                    {
+                        sync_notification_permissions(&ctx);
+                    }
                 }
                 if let Some(c) = closer_slot.borrow().as_ref() {
                     c();
