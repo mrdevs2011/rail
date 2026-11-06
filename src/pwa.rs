@@ -178,6 +178,21 @@ pub(crate) fn install_pwa_app(
     // Older versions used rail-pwa-*.desktop, which made launchers list every PWA when searching "rail".
     let _ = std::fs::remove_file(desktop_dir.join(format!("rail-pwa-{}.desktop", id)));
 
+    // Launch PWAs through a symlink without "rail" in its path, so launchers that
+    // match on Exec (rofi) don't list every PWA when searching "rail".
+    let launch_bin = {
+        let link = glib::home_dir().join(".local/share/webapp/launch");
+        if let Some(parent) = link.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::remove_file(&link);
+        if std::os::unix::fs::symlink(&bin_path, &link).is_ok() {
+            link.to_string_lossy().into_owned()
+        } else {
+            bin_path.clone()
+        }
+    };
+
     let desktop_content = format!(
         "[Desktop Entry]\n\
 Version=1.0\n\
@@ -188,11 +203,11 @@ Comment={name} - Progressive Web App\n\
 Exec={bin} --app=\"{url}\"\n\
 Icon={icon}\n\
 Terminal=false\n\
-StartupWMClass=rail-pwa-{id}\n\
+StartupWMClass=webapp-{id}\n\
 Categories=Network;Application;WebBrowser;\n\
 Keywords=pwa;web;app;{id};\n",
         name = clean_name,
-        bin = bin_path,
+        bin = launch_bin,
         url = clean_url,
         icon = final_icon.display(),
         id = id,

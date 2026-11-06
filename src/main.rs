@@ -307,7 +307,17 @@ fn main() -> glib::ExitCode {
     // Single instance: running `rail [URL]` again hands the request to the already-open Rail
     // (profiles live inside Rail, no need for several processes). A custom data dir
     // (-d / RAIL_DATA_DIR) gets its own instance id, so portable setups stay independent.
-    let app_id = if CUSTOM_DATA_DIR.get().is_some() || std::env::var_os("RAIL_DATA_DIR").is_some() {
+    // A standalone PWA gets its own instance id per app URL; otherwise it would own
+    // "dev.rail.browser" and a later `rail` launch would be handed to the PWA window.
+    let pwa_app_id = PWA_APP_URL.get().map(|u| {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        u.hash(&mut h);
+        format!("dev.rail.pwa.a{:x}", h.finish())
+    });
+    let app_id = if let Some(id) = pwa_app_id {
+        id
+    } else if CUSTOM_DATA_DIR.get().is_some() || std::env::var_os("RAIL_DATA_DIR").is_some() {
         use std::hash::{Hash, Hasher};
         let mut h = std::collections::hash_map::DefaultHasher::new();
         rail_data_dir().to_string_lossy().hash(&mut h);
