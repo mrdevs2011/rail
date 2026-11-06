@@ -124,6 +124,9 @@
       if (!opts.userVisibleOnly && !appKey) {
         throw new DOMException('Subscribe requires userVisibleOnly or an applicationServerKey', 'NotSupportedError');
       }
+      if (Notification.permission === 'default') {
+        try { await Notification.requestPermission(); } catch (_) {}
+      }
       if (Notification.permission !== 'granted') {
         throw new DOMException('Registration failed - permission denied', 'NotAllowedError');
       }
