@@ -164,5 +164,17 @@
   for (const [n, c] of [['PushManager', PushManager], ['PushSubscription', PushSubscription], ['PushSubscriptionOptions', PushSubscriptionOptions]]) {
     Object.defineProperty(window, n, { value: c, configurable: true, writable: true });
   }
+  // Debug aid (printed only when RAIL_PUSH_DEBUG is set): outcome of the site's own push API calls.
+  try {
+    const rf = window.fetch;
+    const dbg = (m) => { try { window.webkit.messageHandlers.railPush.postMessage(JSON.stringify({ op: 'log', msg: String(m).slice(0, 600) })); } catch (_) {} };
+    window.fetch = function (input, init) {
+      const url = String((input && input.url) || input);
+      const hit = /notification-|push/i.test(url);
+      const p = rf.apply(this, arguments);
+      if (hit) p.then((r) => r.clone().text().then((t) => dbg(url + ' -> ' + r.status + ' ' + t + ' | req ' + String((init && init.body) || '').slice(0, 400))), (e) => dbg(url + ' failed: ' + e));
+      return p;
+    };
+  } catch (_) {}
   Object.defineProperty(window, '__railPush', { value: true });
 })();

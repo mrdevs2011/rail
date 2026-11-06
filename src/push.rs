@@ -82,6 +82,12 @@ fn handle_request(page_uri: &str, text: &str) -> String {
         return err("bad request");
     };
     let op = req.get("op").and_then(|v| v.as_str()).unwrap_or("");
+    if op == "log" {
+        if std::env::var_os("RAIL_PUSH_DEBUG").is_some() {
+            eprintln!("[push-page] {}", req.get("msg").and_then(|v| v.as_str()).unwrap_or(""));
+        }
+        return "{\"ok\":true}".to_string();
+    }
     let origin = req.get("origin").and_then(|v| v.as_str()).unwrap_or("");
     let id = req.get("id").and_then(|v| v.as_str()).unwrap_or("");
     let origin_host = host_of(origin);
