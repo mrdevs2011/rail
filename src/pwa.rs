@@ -620,55 +620,72 @@ pub(crate) fn open_pwa_window(app: &gtk::Application, url: &str, title_override:
         glib::Propagation::Proceed
     });
 
-    // Keyboard shortcuts in PWA window (Ctrl+R / F5 reload, Ctrl+W close, Alt+Left/Right history)
+    // Keyboard shortcuts in PWA window: same customizable bindings as the browser
+    // (Settings > Customize > Shortcuts). Only page-level actions are honoured; the sidebar
+    // and other browser chrome do not exist here.
+    SHORTCUTS.with(|c| *c.borrow_mut() = load_shortcuts_config());
     let key_ctl = gtk::EventControllerKey::new();
+    key_ctl.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let insp_open = Rc::new(std::cell::Cell::new(false));
+    if let Some(insp) = view.inspector() {
+        let o = insp_open.clone();
+        insp.connect_closed(move |_| o.set(false));
+    }
     let v_key = view.clone();
     let w_key = win.clone();
-    key_ctl.connect_key_pressed(move |_, key, _, state| {
-        let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
+    key_ctl.connect_key_pressed(move |_, key, keycode, state| {
         let alt = state.contains(gdk::ModifierType::ALT_MASK);
-
-        match key {
-            gdk::Key::F5 => {
-                v_key.reload();
-                glib::Propagation::Stop
-            }
-            gdk::Key::r if ctrl => {
-                v_key.reload();
-                glib::Propagation::Stop
-            }
-            gdk::Key::w if ctrl => {
-                w_key.close();
-                glib::Propagation::Stop
-            }
-            gdk::Key::Left if alt => {
-                if v_key.can_go_back() {
-                    v_key.go_back();
+        let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
+        if alt && !ctrl {
+            match key {
+                gdk::Key::Left => {
+                    if v_key.can_go_back() {
+                        v_key.go_back();
+                    }
+                    return glib::Propagation::Stop;
                 }
-                glib::Propagation::Stop
-            }
-            gdk::Key::Right if alt => {
-                if v_key.can_go_forward() {
-                    v_key.go_forward();
+                gdk::Key::Right => {
+                    if v_key.can_go_forward() {
+                        v_key.go_forward();
+                    }
+                    return glib::Propagation::Stop;
                 }
-                glib::Propagation::Stop
+                _ => {}
             }
-            gdk::Key::equal | gdk::Key::plus if ctrl => {
-                let cur = v_key.zoom_level();
-                v_key.set_zoom_level((cur + 0.1).min(3.0));
-                glib::Propagation::Stop
-            }
-            gdk::Key::minus if ctrl => {
-                let cur = v_key.zoom_level();
-                v_key.set_zoom_level((cur - 0.1).max(0.3));
-                glib::Propagation::Stop
-            }
-            gdk::Key::_0 if ctrl => {
-                v_key.set_zoom_level(1.0);
-                glib::Propagation::Stop
-            }
-            _ => glib::Propagation::Proceed,
         }
+        let id = match sc_resolve_any(&shortcut_combos(key, keycode, state)) {
+            ScResolve::Action(id) => id,
+            _ => return glib::Propagation::Proceed,
+        };
+        match id {
+            "reload" => reload_or_start(&v_key),
+            "hard_reload" => hard_reload_or_start(&v_key),
+            "devtools" => {
+                if let Some(insp) = v_key.inspector() {
+                    if insp_open.get() {
+                        insp.close();
+                        insp_open.set(false);
+                    } else {
+                        insp.show();
+                        insp_open.set(true);
+                    }
+                }
+            }
+            "close_tab" => w_key.close(),
+            "quit" => w_key.close(),
+            "fullscreen" => w_key.set_fullscreened(!w_key.is_fullscreen()),
+            "overview_zoom_in" => {
+                let cur = v_key.zoom_level();
+                v_key.set_zoom_level((cur + 0.1).min(5.0));
+            }
+            "overview_zoom_out" => {
+                let cur = v_key.zoom_level();
+                v_key.set_zoom_level((cur - 0.1).max(0.2));
+            }
+            "zoom_reset" => v_key.set_zoom_level(1.0),
+            _ => return glib::Propagation::Proceed,
+        }
+        glib::Propagation::Stop
     });
     win.add_controller(key_ctl);
 
