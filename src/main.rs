@@ -141,12 +141,12 @@ fn main() -> glib::ExitCode {
         webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
         if let Some(ctx) = webkit6::WebContext::default() {
             ctx.set_property("memory-pressure-settings", &mps);
-            ctx.set_cache_model(webkit6::CacheModel::DocumentViewer);
+            ctx.set_cache_model(webkit6::CacheModel::DocumentBrowser);
         }
     } else {
         // Balanced hyper-performance & low-RAM mode:
-        // Set memory pressure thresholds on both NetworkSession and WebContext (WebProcess)
-        // so WebKit aggressively reclaims render layers, JIT heaps and network buffers.
+        // WebBrowser cache model keeps active resources in memory for instant page loading,
+        // while MemoryPressureSettings automatically cleans up unused assets under pressure.
         let mut mps = webkit6::MemoryPressureSettings::new();
         mps.set_memory_limit(512);
         mps.set_strict_threshold(0.75);
@@ -156,7 +156,7 @@ fn main() -> glib::ExitCode {
         webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
         if let Some(ctx) = webkit6::WebContext::default() {
             ctx.set_property("memory-pressure-settings", &mps);
-            ctx.set_cache_model(webkit6::CacheModel::DocumentViewer);
+            ctx.set_cache_model(webkit6::CacheModel::WebBrowser);
         }
     }
 

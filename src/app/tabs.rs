@@ -2,6 +2,9 @@
 
 use crate::*;
 
+pub(crate) const DEFAULT_USER_AGENT: &str =
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
 /// Decide whether a WebKit response is a file download rather than a document
 /// navigation. HTML documents must never be diverted just because WebKit cannot
 /// render a particular MIME variant or the URL happens to look like a filename.
@@ -97,6 +100,9 @@ impl App {
 
     /// One site-capability configuration shared by browser tabs, popups and PWA windows.
     pub(crate) fn configure_web_settings(settings: &webkit6::Settings) {
+        settings.set_user_agent(Some(DEFAULT_USER_AGENT));
+        settings.set_enable_dns_prefetching(true);
+        settings.set_enable_hyperlink_auditing(false);
         settings.set_enable_webrtc(webrtc_allowed());
         settings.set_enable_smooth_scrolling(load_app_settings().smooth_scrolling);
         settings.set_enable_webgl(true);
@@ -402,14 +408,17 @@ impl App {
 
     pub(crate) fn new_tab_with_url_and_profile(self: &Rc<Self>, url: &str, profile_id: &str) {
         let session = self.profiles.borrow_mut().get_or_create_session(profile_id);
+        if let Some(host) = exact_host_of(url) {
+            session.prefetch_dns(&host);
+        }
         let view = Self::create_web_view(&session, profile_id);
+        self.add_view(view.clone(), profile_id.to_string(), false);
+        self.set_view_saved_uri(&view, url);
         if is_internal_uri(url) {
             load_internal_page(&view, url);
         } else {
             view.load_uri(url);
         }
-        self.add_view(view.clone(), profile_id.to_string(), false);
-        self.set_view_saved_uri(&view, url);
         self.pill_label.set_text(&self.focused_display_uri());
     }
 
@@ -444,7 +453,20 @@ impl App {
             image_url.to_string()
         };
 
+        if let Some(host) = exact_host_of(&resolved_url)
+            && let Some(session) = opener_view.network_session()
+        {
+            session.prefetch_dns(&host);
+        }
+
         let (new_view, shares_process) = Self::create_link_web_view(opener_view);
+        self.add_view(new_view.clone(), parent_prof, false);
+        if shares_process {
+            self.mark_keep_alive(opener_view);
+            self.mark_keep_alive(&new_view);
+        }
+        self.set_view_saved_uri(&new_view, &resolved_url);
+
         if (resolved_url.starts_with("http://") || resolved_url.starts_with("https://"))
             && let Some(opener_uri) = opener_view.uri()
             && !opener_uri.is_empty()
@@ -457,13 +479,6 @@ impl App {
         } else {
             new_view.load_uri(&resolved_url);
         }
-
-        self.add_view(new_view.clone(), parent_prof, false);
-        if shares_process {
-            self.mark_keep_alive(opener_view);
-            self.mark_keep_alive(&new_view);
-        }
-        self.set_view_saved_uri(&new_view, &resolved_url);
         self.pill_label.set_text(&self.focused_display_uri());
     }
 
@@ -471,18 +486,23 @@ impl App {
         let parent_prof = self
             .find_view_profile(opener_view)
             .unwrap_or_else(|| self.profiles.borrow().active_profile().id);
-        let (new_view, shares_process) = Self::create_link_web_view(opener_view);
-        if is_internal_uri(url) {
-            load_internal_page(&new_view, url);
-        } else {
-            new_view.load_uri(url);
+        if let Some(host) = exact_host_of(url)
+            && let Some(session) = opener_view.network_session()
+        {
+            session.prefetch_dns(&host);
         }
+        let (new_view, shares_process) = Self::create_link_web_view(opener_view);
         self.add_view(new_view.clone(), parent_prof, false);
         if shares_process {
             self.mark_keep_alive(opener_view);
             self.mark_keep_alive(&new_view);
         }
         self.set_view_saved_uri(&new_view, url);
+        if is_internal_uri(url) {
+            load_internal_page(&new_view, url);
+        } else {
+            new_view.load_uri(url);
+        }
         self.pill_label.set_text(&self.focused_display_uri());
     }
 
@@ -490,18 +510,23 @@ impl App {
         let parent_prof = self
             .find_view_profile(opener_view)
             .unwrap_or_else(|| self.profiles.borrow().active_profile().id);
-        let (new_view, shares_process) = Self::create_link_web_view(opener_view);
-        if is_internal_uri(url) {
-            load_internal_page(&new_view, url);
-        } else {
-            new_view.load_uri(url);
+        if let Some(host) = exact_host_of(url)
+            && let Some(session) = opener_view.network_session()
+        {
+            session.prefetch_dns(&host);
         }
+        let (new_view, shares_process) = Self::create_link_web_view(opener_view);
         self.add_view(new_view.clone(), parent_prof, true);
         if shares_process {
             self.mark_keep_alive(opener_view);
             self.mark_keep_alive(&new_view);
         }
         self.set_view_saved_uri(&new_view, url);
+        if is_internal_uri(url) {
+            load_internal_page(&new_view, url);
+        } else {
+            new_view.load_uri(url);
+        }
     }
 
     /// View Page Source (Ctrl+U): open immediately, fetch the original response off-thread.

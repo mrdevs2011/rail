@@ -247,6 +247,11 @@ fn is_likely_domain(host: &str) -> bool {
     lower_tld.len() >= 2 && lower_tld.chars().all(|c| c.is_ascii_alphabetic())
 }
 
+pub(crate) fn exact_host_of(uri: &str) -> Option<String> {
+    let u = glib::Uri::parse(uri, glib::UriFlags::NONE).ok()?;
+    u.host().map(|h| h.to_string())
+}
+
 pub(crate) fn host_of(uri: &str) -> Option<String> {
     let u = glib::Uri::parse(uri, glib::UriFlags::NONE).ok()?;
     let h = u.host()?;

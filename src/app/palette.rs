@@ -228,7 +228,8 @@ impl App {
         if let Some(first) = suggestions.first()
             && first.kind != SuggestionKind::Search
         {
-            let target_host = host_of(&first.target_url).or_else(|| host_of(&first.autofill_text));
+            let target_host = exact_host_of(&first.target_url)
+                .or_else(|| exact_host_of(&first.autofill_text));
             if let Some(h) = target_host {
                 let prof_id = self.selected_palette_profile.borrow().clone();
                 let session = self.profiles.borrow_mut().get_or_create_session(&prof_id);
@@ -583,6 +584,11 @@ impl App {
                 if let Some(v) = self.focused_view() {
                     self.pill_label
                         .set_text(&host_of(&uri).unwrap_or(uri.clone()));
+                    if let Some(host) = exact_host_of(&uri)
+                        && let Some(session) = v.network_session()
+                    {
+                        session.prefetch_dns(&host);
+                    }
                     if is_internal_uri(&uri) {
                         load_internal_page(&v, &uri);
                     } else {

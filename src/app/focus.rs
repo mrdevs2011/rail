@@ -227,6 +227,11 @@ impl App {
                             if is_internal_uri(&uri) {
                                 load_internal_page(&tab.view, &uri);
                             } else {
+                                if let Some(host) = exact_host_of(&uri)
+                                    && let Some(session) = tab.view.network_session()
+                                {
+                                    session.prefetch_dns(&host);
+                                }
                                 tab.view.load_uri(&uri);
                             }
                         } else {
