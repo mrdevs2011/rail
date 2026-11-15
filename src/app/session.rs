@@ -233,17 +233,18 @@ impl App {
         }
 
         // If no tab was awake (e.g. invalid focus indices), wake the first tab
-        if !loaded_tabs.is_empty() && loaded_tabs.iter().all(|(_, t)| t.suspended.get()) {
-            if let Some((_, first_tab)) = loaded_tabs.first_mut() {
-                first_tab.suspended.set(false);
-                first_tab.freeze.set_visible(false);
-                let uri = first_tab.saved_uri.borrow().clone();
-                if !uri.is_empty() {
-                    if is_internal_uri(&uri) {
-                        load_internal_page(&first_tab.view, &uri);
-                    } else {
-                        first_tab.view.load_uri(&uri);
-                    }
+        if !loaded_tabs.is_empty()
+            && loaded_tabs.iter().all(|(_, t)| t.suspended.get())
+            && let Some((_, first_tab)) = loaded_tabs.first_mut()
+        {
+            first_tab.suspended.set(false);
+            first_tab.freeze.set_visible(false);
+            let uri = first_tab.saved_uri.borrow().clone();
+            if !uri.is_empty() {
+                if is_internal_uri(&uri) {
+                    load_internal_page(&first_tab.view, &uri);
+                } else {
+                    first_tab.view.load_uri(&uri);
                 }
             }
         }

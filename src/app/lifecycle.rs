@@ -569,7 +569,7 @@ impl App {
         let g = (rgba.green() * 255.0).round().clamp(0.0, 255.0) as u8;
         let b = (rgba.blue() * 255.0).round().clamp(0.0, 255.0) as u8;
         let a = (rgba.alpha() * 255.0).round().clamp(0.0, 255.0) as u8;
-        let buf = vec![r, g, b, a].repeat(32 * 32);
+        let buf = [r, g, b, a].repeat(32 * 32);
         let bytes = glib::Bytes::from_owned(buf);
         gdk::MemoryTexture::new(32, 32, gdk::MemoryFormat::R8g8b8a8, &bytes, 32 * 4).upcast()
     }
