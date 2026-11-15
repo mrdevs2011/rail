@@ -494,6 +494,14 @@ fn url_encode(s: &str) -> String {
     out
 }
 
+impl Drop for HistoryManager {
+    fn drop(&mut self) {
+        self.flush();
+        // Wait for the queued snapshot to reach the disk before the process exits.
+        self.writer.finish();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -577,13 +585,5 @@ mod tests {
         let mgr2 = HistoryManager::new(temp_dir.clone());
         assert_eq!(mgr2.entries.len(), 0);
         let _ = fs::remove_dir_all(&temp_dir);
-    }
-}
-
-impl Drop for HistoryManager {
-    fn drop(&mut self) {
-        self.flush();
-        // Wait for the queued snapshot to reach the disk before the process exits.
-        self.writer.finish();
     }
 }

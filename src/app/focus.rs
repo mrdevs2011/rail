@@ -23,35 +23,6 @@ fn adjusted_focus_after_unfocused_close(
     (row, col)
 }
 
-#[cfg(test)]
-mod close_focus_tests {
-    use super::adjusted_focus_after_unfocused_close;
-
-    #[test]
-    fn closing_workspace_above_focus_shifts_focus_up() {
-        assert_eq!(
-            adjusted_focus_after_unfocused_close(2, 1, 0, 0, true),
-            (1, 1)
-        );
-    }
-
-    #[test]
-    fn closing_workspace_below_focus_keeps_focus_row() {
-        assert_eq!(
-            adjusted_focus_after_unfocused_close(0, 1, 2, 0, true),
-            (0, 1)
-        );
-    }
-
-    #[test]
-    fn closing_tab_before_focus_shifts_focus_column_left() {
-        assert_eq!(
-            adjusted_focus_after_unfocused_close(1, 3, 1, 1, false),
-            (1, 2)
-        );
-    }
-}
-
 impl App {
     pub(crate) fn close_view(self: &Rc<Self>, view: &WebView) {
         let Some((r_idx, c_idx)) = self.find_view_coords(view) else {
@@ -648,5 +619,34 @@ impl App {
         if let Some((url, prof_id)) = self.recently_closed.borrow_mut().pop() {
             self.new_tab_with_url_and_profile(&url, &prof_id);
         }
+    }
+}
+
+#[cfg(test)]
+mod close_focus_tests {
+    use super::adjusted_focus_after_unfocused_close;
+
+    #[test]
+    fn closing_workspace_above_focus_shifts_focus_up() {
+        assert_eq!(
+            adjusted_focus_after_unfocused_close(2, 1, 0, 0, true),
+            (1, 1)
+        );
+    }
+
+    #[test]
+    fn closing_workspace_below_focus_keeps_focus_row() {
+        assert_eq!(
+            adjusted_focus_after_unfocused_close(0, 1, 2, 0, true),
+            (0, 1)
+        );
+    }
+
+    #[test]
+    fn closing_tab_before_focus_shifts_focus_column_left() {
+        assert_eq!(
+            adjusted_focus_after_unfocused_close(1, 3, 1, 1, false),
+            (1, 2)
+        );
     }
 }
