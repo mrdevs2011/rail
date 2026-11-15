@@ -140,7 +140,6 @@ fn main() -> glib::ExitCode {
         mps.set_poll_interval(2.0);
         webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
         if let Some(ctx) = webkit6::WebContext::default() {
-            ctx.set_property("memory-pressure-settings", &mps);
             ctx.set_cache_model(webkit6::CacheModel::DocumentBrowser);
         }
     } else {
@@ -155,7 +154,6 @@ fn main() -> glib::ExitCode {
         mps.set_poll_interval(3.0);
         webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
         if let Some(ctx) = webkit6::WebContext::default() {
-            ctx.set_property("memory-pressure-settings", &mps);
             ctx.set_cache_model(webkit6::CacheModel::WebBrowser);
         }
     }
