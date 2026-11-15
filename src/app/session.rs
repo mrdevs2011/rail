@@ -144,24 +144,29 @@ impl App {
         }
 
         let mut loaded_tabs: Vec<(usize, Tab)> = Vec::new();
+        let target_r = state.focus.0;
+        let target_c = state.focus.1;
+        let mut row_tab_counts: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+
         for item in tab_items {
             let session = self
                 .profiles
                 .borrow_mut()
                 .get_or_create_session(&item.profile_id);
             let view = Self::create_web_view(&session, &item.profile_id);
-            if item.url.is_empty()
+
+            let col_idx = *row_tab_counts.entry(item.row).or_insert(0);
+            row_tab_counts.insert(item.row, col_idx + 1);
+
+            let is_focused = item.row == target_r && col_idx == target_c;
+            let is_blank = item.url.is_empty()
                 || item.url.starts_with("about:")
-                || item.url.starts_with("rail://start")
-            {
-                view.load_html(&start_page(), Some("rail://start/"));
-            } else if item.url.starts_with("rail://settings") {
-                view.load_html(&settings_shell_page(), Some(&item.url));
-            } else if is_internal_uri(&item.url) {
-                load_internal_page(&view, &item.url);
-            } else {
-                view.load_uri(&item.url);
-            }
+                || item.url.starts_with("rail://start");
+            let is_settings = item.url.starts_with("rail://settings");
+            let is_internal = is_internal_uri(&item.url);
+
+            let should_load = is_focused || is_blank || is_settings || is_internal;
+
             let tw = Self::create_tab_widget(&view);
             if !item.full {
                 tw.container.remove_css_class("full");
@@ -174,6 +179,24 @@ impl App {
                 &tw.dt_handle,
                 &tw.dt_box,
             );
+
+            if should_load {
+                if is_blank {
+                    view.load_html(&start_page(), Some("rail://start/"));
+                } else if is_settings {
+                    view.load_html(&settings_shell_page(), Some(&item.url));
+                } else if is_internal {
+                    load_internal_page(&view, &item.url);
+                } else {
+                    view.load_uri(&item.url);
+                }
+            } else {
+                // Background real tab: restore lazily to eliminate startup RAM spike.
+                // The WebProcess is not spawned until the tab is focused.
+                tw.freeze.set_paintable(Some(&Self::fallback_freeze_frame()));
+                tw.freeze.set_visible(true);
+            }
+
             loaded_tabs.push((
                 item.row,
                 Tab {
@@ -194,7 +217,7 @@ impl App {
                             String::new()
                         },
                     ),
-                    suspended: Cell::new(false),
+                    suspended: Cell::new(!should_load),
                     keep_alive: Cell::new(false),
                     last_active: Cell::new(std::time::Instant::now()),
                     dt_box: tw.dt_box,
@@ -207,6 +230,22 @@ impl App {
                     dt_dock: Cell::new(self.devtools_dock_side.get()),
                 },
             ));
+        }
+
+        // If no tab was awake (e.g. invalid focus indices), wake the first tab
+        if !loaded_tabs.is_empty() && loaded_tabs.iter().all(|(_, t)| t.suspended.get()) {
+            if let Some((_, first_tab)) = loaded_tabs.first_mut() {
+                first_tab.suspended.set(false);
+                first_tab.freeze.set_visible(false);
+                let uri = first_tab.saved_uri.borrow().clone();
+                if !uri.is_empty() {
+                    if is_internal_uri(&uri) {
+                        load_internal_page(&first_tab.view, &uri);
+                    } else {
+                        first_tab.view.load_uri(&uri);
+                    }
+                }
+            }
         }
 
         let mut rows = self.rows.borrow_mut();

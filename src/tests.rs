@@ -694,11 +694,11 @@ fn test_external_uri_protocols_are_routed_outside_webkit() {
 
 #[test]
 fn test_roomy_tab_cap_scales_with_physical_memory() {
-    assert_eq!(roomy_max_live_tabs(Some(4 * 1024)), 6);
-    assert_eq!(roomy_max_live_tabs(Some(8 * 1024)), 8);
-    assert_eq!(roomy_max_live_tabs(Some(16 * 1024)), 16);
-    assert_eq!(roomy_max_live_tabs(Some(32 * 1024)), 20);
-    assert_eq!(roomy_max_live_tabs(None), 8);
+    assert_eq!(roomy_max_live_tabs(Some(4 * 1024)), 4);
+    assert_eq!(roomy_max_live_tabs(Some(8 * 1024)), 5);
+    assert_eq!(roomy_max_live_tabs(Some(16 * 1024)), 8);
+    assert_eq!(roomy_max_live_tabs(Some(32 * 1024)), 8);
+    assert_eq!(roomy_max_live_tabs(None), 5);
 }
 
 #[test]

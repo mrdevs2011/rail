@@ -119,8 +119,8 @@ impl App {
         settings.set_allow_top_navigation_to_data_urls(true);
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
         settings.set_auto_load_images(true);
-        let dev_no_cache = rail_data_dir().join("dev-disable-cache").exists();
-        settings.set_enable_page_cache(!dev_no_cache);
+        // Avoid bfcache retaining multiple full-page DOMs & JS VM states in memory
+        settings.set_enable_page_cache(false);
 
         if rail_data_dir().join("dev-cors-bypass").exists()
             || rail_data_dir().join("dev-mixed-content").exists()

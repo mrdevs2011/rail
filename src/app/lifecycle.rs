@@ -562,10 +562,36 @@ impl App {
         );
     }
 
+    /// Create a durable theme-colored solid fallback frame so suspended tabs never show black.
+    pub(crate) fn fallback_freeze_frame() -> gdk::Texture {
+        let rgba = crate::ui::web_background_color();
+        let r = (rgba.red() * 255.0).round().clamp(0.0, 255.0) as u8;
+        let g = (rgba.green() * 255.0).round().clamp(0.0, 255.0) as u8;
+        let b = (rgba.blue() * 255.0).round().clamp(0.0, 255.0) as u8;
+        let a = (rgba.alpha() * 255.0).round().clamp(0.0, 255.0) as u8;
+        let buf = vec![r, g, b, a].repeat(32 * 32);
+        let bytes = glib::Bytes::from_owned(buf);
+        gdk::MemoryTexture::new(32, 32, gdk::MemoryFormat::R8g8b8a8, &bytes, 32 * 4).upcast()
+    }
+
+    pub(crate) fn store_tab_frame_for_view(self: &Rc<Self>, view: &WebView) {
+        let Ok(rows) = self.rows.try_borrow() else {
+            return;
+        };
+        for row in rows.iter() {
+            for tab in &row.tabs {
+                if &tab.view == view {
+                    self.store_tab_frame(tab);
+                    return;
+                }
+            }
+        }
+    }
+
     /// Suspend a live tab: save URL + last frame, kill the web process completely.
-    /// No CSS placeholder — real websites stay live unless a durable frame exists.
-    /// The built-in start page is the exception: it has no user state and can be
-    /// reconstructed safely from its saved URI without showing a black card.
+    /// Real websites freeze with their captured frame (or clean theme fallback).
+    /// The built-in start page is the exception: it has no user document state and can be
+    /// reconstructed safely from its saved URI.
     pub(crate) fn suspend_tab(tab: &Tab) {
         if tab.suspended.get() || tab.keep_alive.get() || Self::is_settings_tab(tab) {
             return;
@@ -595,22 +621,16 @@ impl App {
         }
 
         // Prefer a fresh durable snapshot while still mapped; otherwise keep the frame
-        // grabbed on visibility-hide. Never clear an existing good frame here.
+        // grabbed on visibility-hide. If no frame exists, supply a clean theme-matched frame.
         if let Some(tex) = Self::capture_durable_frame(&tab.view) {
             tab.freeze.set_paintable(Some(&tex));
+        } else if tab.freeze.paintable().is_none() {
+            tab.freeze.set_paintable(Some(&Self::fallback_freeze_frame()));
         }
-        // Never terminate a real website without a durable frame: it could become a black card.
-        let has_durable_frame = tab
-            .freeze
-            .paintable()
-            .is_some_and(|paintable| paintable.is::<gdk::Texture>());
-        if has_durable_frame {
-            tab.freeze.set_visible(true);
-            tab.suspended.set(true);
-            tab.view.terminate_web_process();
-        } else {
-            tab.freeze.set_visible(false);
-        }
+
+        tab.freeze.set_visible(true);
+        tab.suspended.set(true);
+        tab.view.terminate_web_process();
     }
 
     /// Davriy tekshiruv:

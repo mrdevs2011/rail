@@ -280,6 +280,16 @@ impl App {
                         }
                     }
                 }
+                // Pre-capture snapshot while the tab is loaded and focused
+                if app.focused_view().as_ref() == Some(v) {
+                    let weak_app = Rc::downgrade(&app);
+                    let v_clone = v.clone();
+                    glib::timeout_add_local_once(Duration::from_millis(300), move || {
+                        if let Some(a) = weak_app.upgrade() {
+                            a.store_tab_frame_for_view(&v_clone);
+                        }
+                    });
+                }
                 // Welcome page: always re-inject omnibar state after load (avoids empty bar race)
                 let mut u = v.uri().map(|s| s.to_string()).unwrap_or_default();
                 if u.is_empty() || u.starts_with("about:") {

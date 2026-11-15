@@ -33,18 +33,18 @@ pub(crate) fn next_page_zoom(cur: f64, dir: i32) -> f64 {
 pub(crate) const OV_ANIM_SECS: f64 = 0.18;
 
 /// Severe memory pressure only: reclaim a small number of inactive pages quickly.
-pub(crate) const SUSPEND_AFTER_SECS: u64 = 60;
-pub(crate) const MAX_LIVE_TABS: usize = 4;
+pub(crate) const SUSPEND_AFTER_SECS: u64 = 20;
+pub(crate) const MAX_LIVE_TABS: usize = 2;
 
-/// Healthy-memory mode: keep a background page alive for an hour before reclaiming it.
-pub(crate) const ROOMY_SUSPEND_AFTER_SECS: u64 = 3600;
+/// Healthy-memory mode: keep a background page alive for up to 3 minutes before reclaiming it.
+pub(crate) const ROOMY_SUSPEND_AFTER_SECS: u64 = 180;
 
-/// Moderate memory pressure: preserve a useful working set for at least ten minutes.
-pub(crate) const TIGHT_SUSPEND_AFTER_SECS: u64 = 600;
-pub(crate) const TIGHT_MAX_LIVE_TABS: usize = 8;
+/// Moderate memory pressure: preserve a useful working set for at least one minute.
+pub(crate) const TIGHT_SUSPEND_AFTER_SECS: u64 = 60;
+pub(crate) const TIGHT_MAX_LIVE_TABS: usize = 4;
 
 /// Bo'sh start-page tab — tez uxlatiladi.
-pub(crate) const BLANK_TAB_SUSPEND_SECS: u64 = 20;
+pub(crate) const BLANK_TAB_SUSPEND_SECS: u64 = 15;
 
 /// Memory pressure from PSI (`/proc/pressure/memory`, "some avg10").
 pub(crate) fn memory_pressure_avg10() -> Option<f64> {
@@ -72,11 +72,12 @@ pub(crate) fn mem_total_mb() -> Option<u64> {
     Some(kb / 1024)
 }
 
-/// Scale the healthy-memory cap to installed RAM (roughly one live tab per GiB,
-/// bounded to avoid unbounded WebKit process growth on very large workstations).
+/// Scale the healthy-memory cap to installed RAM (bounded between 4 and 8 live tabs
+/// to avoid unbounded WebKit WebProcess memory growth).
 pub(crate) fn roomy_max_live_tabs(total_mb: Option<u64>) -> usize {
     let total_mb = total_mb.unwrap_or(8 * 1024);
-    total_mb.saturating_add(1023).div_euclid(1024).clamp(6, 20) as usize
+    let tabs = total_mb.saturating_add(1023).div_euclid(1536);
+    tabs.clamp(4, 8) as usize
 }
 
 /// Swap nearly full? System is paging — suspend aggressively even if MemAvailable looks OK.

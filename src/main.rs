@@ -137,24 +137,26 @@ fn main() -> glib::ExitCode {
         mps.set_conservative_threshold(0.25);
         mps.set_strict_threshold(0.40);
         mps.set_kill_threshold(0.0);
-        mps.set_poll_interval(3.0);
+        mps.set_poll_interval(2.0);
         webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
         if let Some(ctx) = webkit6::WebContext::default() {
+            ctx.set_property("memory-pressure-settings", &mps);
             ctx.set_cache_model(webkit6::CacheModel::DocumentViewer);
         }
     } else {
         // Balanced hyper-performance & low-RAM mode:
-        // DocumentBrowser caches documents and network assets for instant navigation and media streaming
-        // without hoarding gigabytes of dead render buffers or speculative JIT heaps.
+        // Set memory pressure thresholds on both NetworkSession and WebContext (WebProcess)
+        // so WebKit aggressively reclaims render layers, JIT heaps and network buffers.
         let mut mps = webkit6::MemoryPressureSettings::new();
-        mps.set_memory_limit(768);
-        mps.set_strict_threshold(0.85);
-        mps.set_conservative_threshold(0.70);
+        mps.set_memory_limit(512);
+        mps.set_strict_threshold(0.75);
+        mps.set_conservative_threshold(0.50);
         mps.set_kill_threshold(0.0);
-        mps.set_poll_interval(5.0);
+        mps.set_poll_interval(3.0);
         webkit6::NetworkSession::set_memory_pressure_settings(&mut mps);
         if let Some(ctx) = webkit6::WebContext::default() {
-            ctx.set_cache_model(webkit6::CacheModel::DocumentBrowser);
+            ctx.set_property("memory-pressure-settings", &mps);
+            ctx.set_cache_model(webkit6::CacheModel::DocumentViewer);
         }
     }
 
