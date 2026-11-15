@@ -36,10 +36,7 @@ pub(crate) fn detect_system_is_dark() -> bool {
         }
         if scheme.contains("light") || scheme.contains("default") {
             let theme = s.string("gtk-theme").to_string();
-            if theme.to_lowercase().contains("dark") {
-                return true;
-            }
-            return false;
+            return theme.to_lowercase().contains("dark");
         }
     }
 

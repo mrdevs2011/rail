@@ -343,9 +343,6 @@ impl App {
             }
             return false;
         }
-        if self.overview_open() && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask()) {
-            return true;
-        }
-        false
+        self.overview_open() && self.ov_key(k, state & gtk::accelerator_get_default_mod_mask())
     }
 }

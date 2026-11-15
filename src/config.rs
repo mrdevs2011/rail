@@ -189,14 +189,10 @@ pub(crate) fn is_default_browser() -> bool {
             return true;
         }
     }
-    if let Ok(out) = std::process::Command::new("xdg-settings")
+    std::process::Command::new("xdg-settings")
         .args(["check", "default-web-browser", "rail.desktop"])
         .output()
-        && String::from_utf8_lossy(&out.stdout).trim() == "yes"
-    {
-        return true;
-    }
-    false
+        .is_ok_and(|out| String::from_utf8_lossy(&out.stdout).trim() == "yes")
 }
 
 /// Set or unset Rail as the default browser on Linux (freedesktop / GIO / XDG).
