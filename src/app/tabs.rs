@@ -29,6 +29,13 @@ fn should_download_response(
     }
 
     let mime = mime_type.unwrap_or_default().trim().to_ascii_lowercase();
+    // No Content-Type at all (WebKit also reports status 0 / empty URI for restored or
+    // cache-synthesised responses): nothing proves this is a file, so let WebKit sniff and
+    // render it. Treating "unknown" as "binary" turned whole pages (e.g. YouTube) into
+    // a stray download.html.
+    if mime.is_empty() {
+        return false;
+    }
     let is_html_or_text = mime.starts_with("text/html")
         || mime.starts_with("application/xhtml+xml")
         || mime.starts_with("text/plain")
@@ -600,6 +607,17 @@ mod response_policy_tests {
             true,
             true,
         ));
+    }
+
+    #[test]
+    fn responses_without_content_type_are_rendered_not_downloaded() {
+        // WebKit reports status 0, empty MIME and empty URI for restored/cache-synthesised
+        // responses; this used to become a stray download.html of the whole page.
+        assert!(!should_download_response(None, None, true, false));
+        assert!(!should_download_response(Some(""), None, true, false));
+        assert!(!should_download_response(Some("  "), None, true, false));
+        // An explicit attachment still downloads even without a type.
+        assert!(should_download_response(None, Some("attachment"), true, false));
     }
 
     #[test]
