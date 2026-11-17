@@ -125,8 +125,9 @@ impl App {
         settings.set_allow_top_navigation_to_data_urls(true);
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
         settings.set_auto_load_images(true);
-        // Avoid bfcache retaining multiple full-page DOMs & JS VM states in memory
-        settings.set_enable_page_cache(false);
+        // Back/forward cache: Back and Forward restore the page instantly instead of reloading
+        // it. WebKit drops cached pages by itself under memory pressure; low-RAM mode opts out.
+        settings.set_enable_page_cache(!std::env::var_os("RAIL_LOW_MEM").is_some_and(|v| v != "0"));
 
         if rail_data_dir().join("dev-cors-bypass").exists()
             || rail_data_dir().join("dev-mixed-content").exists()

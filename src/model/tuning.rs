@@ -32,15 +32,17 @@ pub(crate) fn next_page_zoom(cur: f64, dir: i32) -> f64 {
 /// Overview zoom in/out duration (fixed, ease-out): zoom, pan and grid land together.
 pub(crate) const OV_ANIM_SECS: f64 = 0.18;
 
-/// Severe memory pressure only: reclaim a small number of inactive pages quickly.
-pub(crate) const SUSPEND_AFTER_SECS: u64 = 20;
+/// Severe memory pressure only: reclaim inactive pages, but not so fast that a quick
+/// glance at another tab costs a full reload (and the page's scroll/form/video state).
+pub(crate) const SUSPEND_AFTER_SECS: u64 = 120;
 pub(crate) const MAX_LIVE_TABS: usize = 2;
 
-/// Healthy-memory mode: keep a background page alive for up to 3 minutes before reclaiming it.
-pub(crate) const ROOMY_SUSPEND_AFTER_SECS: u64 = 180;
+/// Healthy-memory mode: a background page stays alive for 30 minutes. Waking a suspended tab
+/// reloads it from scratch, so with free RAM available the live-tab cap is the real limit.
+pub(crate) const ROOMY_SUSPEND_AFTER_SECS: u64 = 30 * 60;
 
-/// Moderate memory pressure: preserve a useful working set for at least one minute.
-pub(crate) const TIGHT_SUSPEND_AFTER_SECS: u64 = 60;
+/// Moderate memory pressure: preserve the working set for ten minutes.
+pub(crate) const TIGHT_SUSPEND_AFTER_SECS: u64 = 10 * 60;
 pub(crate) const TIGHT_MAX_LIVE_TABS: usize = 4;
 
 /// Bo'sh start-page tab — tez uxlatiladi.
